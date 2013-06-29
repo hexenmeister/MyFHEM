@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning
 #
-# $Id$
+# $Id: 21_OWCOUNT.pm 3062 2013-04-11 06:17:17Z pahenning $
 #
 ########################################################################################
 #
@@ -80,7 +80,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.26";
+my $owx_version="4.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -135,6 +135,7 @@ sub OWCOUNT_Initialize ($) {
   $hash->{UndefFn} = "OWCOUNT_Undef";
   $hash->{GetFn}   = "OWCOUNT_Get";
   $hash->{SetFn}   = "OWCOUNT_Set";
+  $hash->{AfterExecuteFn} = "OWXCOUNT_AfterExecute";
   
   #-- see header for attributes
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 LogM LogY ".
@@ -214,7 +215,7 @@ sub OWCOUNT_Define ($$) {
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- Define device internals
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = $fam.".".$id.".".$crc;
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
@@ -619,6 +620,7 @@ sub OWCOUNT_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page);
+      $ret = "timeout" unless ($ret or OWXCOUNT_AwaitPage($hash,$page));
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page);
@@ -650,6 +652,7 @@ sub OWCOUNT_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page);
+      $ret = "timeout" unless ($ret or OWXCOUNT_AwaitPage($hash,$page));
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page);
@@ -665,6 +668,8 @@ sub OWCOUNT_Get($@) {
     if( $interface eq "OWX" ){
       $ret1 = OWXCOUNT_GetPage($hash,14);
       $ret2 = OWXCOUNT_GetPage($hash,15);
+      $ret2 = "timeout" unless ($ret2 or OWXCOUNT_AwaitPage($hash,15));
+      #no need to wait for page 14 as this is allready done in OWXCOUNT_AfterGetPage
     }elsif( $interface eq "OWServer" ){
       $ret1 = OWFSCOUNT_GetPage($hash,14);
       $ret2 = OWFSCOUNT_GetPage($hash,15);
@@ -804,6 +809,9 @@ sub OWCOUNT_GetValues($) {
   if( $interface eq "OWX" ){
     $ret1 = OWXCOUNT_GetPage($hash,14);
     $ret2 = OWXCOUNT_GetPage($hash,15);
+    #here asynchronous request of pages is initiated. 
+    #OWCOUNT_FormatValues is called in OWXCOUNT_AfterGetPage.
+    return undef unless ($ret1 or $ret2);
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSCOUNT_GetPage($hash,14);
     $ret2 = OWFSCOUNT_GetPage($hash,15);
@@ -963,8 +971,7 @@ sub OWCOUNT_Set($@) {
     
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
-  OWCOUNT_GetValues($hash);  
-  OWCOUNT_FormatValues($hash);  
+  OWCOUNT_GetValues($hash); #implies call to OWCOUNT_FormatValues
   Log 4, "OWCOUNT: Set $hash->{NAME} $key $value";
 }
 
@@ -1027,7 +1034,7 @@ sub OWFSCOUNT_GetPage($$) {
     
     $owg_val[0]      = $vval;
     #-- parse float from midnight
-    $owg_str =~ s/[^\d\.]+//g;
+    $owg_str =~ /([\d\.]+)/;
     $owg_str = int($owg_str*100)/100;
     $owg_str = 0.0 if(!(defined($owg_str)));
     $owg_midnight[0] = $owg_str;
@@ -1044,7 +1051,7 @@ sub OWFSCOUNT_GetPage($$) {
     
     $owg_val[1]      = $vval;
       #-- parse float from midnight
-    $owg_str =~ s/[^\d\.]+//g;
+    $owg_str =~ /([\d\.]+)/;
     $owg_str = int($owg_str*100)/100;
     $owg_str = 0.0 if(!(defined($owg_str)));
     $owg_midnight[1] = $owg_str;
@@ -1105,14 +1112,10 @@ sub OWFSCOUNT_SetPage($$$) {
 sub OWXCOUNT_GetPage($$) {
   my ($hash,$page) = @_;
   
-  my ($select, $res, $res2, $res3, @data);
-  
   #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
   my $master  = $hash->{IODev};
   
-  my ($i,$j,$k);
-
   #=============== wrong value requested ===============================
   if( ($page<0) || ($page>15) ){
     return "wrong memory page requested";
@@ -1122,45 +1125,33 @@ sub OWXCOUNT_GetPage($$) {
   #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
   my $ta2 = ($page*32) >> 8;
   my $ta1 = ($page*32) & 255;
-  $select=sprintf("\xA5%c%c",$ta1,$ta2);   
-  #-- reset the bus
-  OWX_Reset($master);
-    #-- reading 9 + 3 + 40 data bytes and 2 CRC bytes = 54 bytes
-  $res=OWX_Complex($master,$owx_dev,$select,42);
-  if( $res eq 0 ){
+  my $select=sprintf("\xA5%c%c",$ta1,$ta2);
+  
+  if (OWX_Execute($master,"page$page",1,$owx_dev,$select,42,0)) {
+  	return undef;
+  } else {   
     return "device $owx_dev not accessible in reading page $page"; 
   }
-  
-  #-- process results
-  if( length($res) < 54 ) {
-    #Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in first step";
-    #-- read the data in a second step
-    $res.=OWX_Complex($master,"","",0);
-    #-- process results
-    if( length($res) < 54 ) {
-      #Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in second step";  
-      #-- read the data in a third step
-      $res.=OWX_Complex($master,"","",0);
-    }
-  }  
-  #-- reset the bus
-  OWX_Reset($master);
+}
 
+sub OWXCOUNT_AfterGetPage($$$$$) {
+  my ( $hash, $page, $owx_dev, $command, $res ) = @_;
+	
   #-- process results
-  @data=split(//,substr($res,9));
+  my @data=split(//,$res);
   return "invalid data length, ".int(@data)." instead of 45 bytes in three steps"
-     if( int(@data) < 45);
+     if( int(@data) < 42);
   #return "invalid data"
   #  if (ord($data[17])<=0); 
   return "invalid CRC"
-    if (OWX_CRC16(substr($res,9,43),$data[43],$data[44]) == 0);
+    if (OWX_CRC16($command.substr($res,0,40),$data[40],$data[41]) == 0);
   
-  #-- first 3 command, next 32 are memory
+  #-- first 32 are memory
   #-- memory part, treated as string
-  $owg_str=substr($res,12,32);
+  $owg_str=substr($res,0,32);
   #-- counter part
   if( ($page == 14) || ($page == 15) ){
-    @data=split(//,substr($res,44));
+    @data=split(//,substr($res,32)); #remaining (after 32) are data
     if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
       #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
       return "device $owx_dev returns invalid data";
@@ -1172,21 +1163,37 @@ sub OWXCOUNT_GetPage($$) {
       $owg_val[0] = $value;
       #-- parse float from midnight
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = int($owg_str*100)/100;
-      $owg_str = 0.0 if(!(defined($owg_str)));
+      $owg_str = $owg_str ? int($owg_str*100)/100 : 0.0;
       $owg_midnight[0] = $owg_str;
     }elsif( $page == 15) {
       $owg_val[1] = $value;
       #-- parse float from midnight
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = int($owg_str*100)/100;
-      $owg_str = 0.0 if(!(defined($owg_str)));
+      $owg_str = $owg_str ? int($owg_str*100)/100 : 0.0;
       $owg_midnight[1] = $owg_str;
     }
-      
+    if ($page == 15) {
+      #TODO: skip OWCount_FormatValues if this is not being called from OW_GetValues
+      if (OWXCOUNT_AwaitPage($hash,14)) {
+      	OWCOUNT_FormatValues($hash);
+      }
+    }
   }
- 
   return undef;
+}
+
+sub OWXCOUNT_AwaitPage($$) {
+	my ($hash,$page) = @_;
+	
+	#-- ID of the device, hash of the busmaster
+	my $owx_dev = $hash->{ROM_ID};
+	my $master  = $hash->{IODev};
+	
+	if ($master and $owx_dev) {
+		return OWX_AwaitExecuteResponse($master,"page$page",$owx_dev);
+	} else {
+		return undef;
+	}
 }
 
 ########################################################################################
@@ -1220,39 +1227,49 @@ sub OWXCOUNT_SetPage($$$) {
   #Log 1, "OWXCOUNT: setting page Nr. $ta2 $ta1";
   $select=sprintf("\x0F%c%c",$ta1,$ta2).$data;   
   #-- reset the bus
-  OWX_Reset($master);
   #-- reading 9 + 3 + 16 bytes = 29 bytes
-  $res=OWX_Complex($master,$owx_dev,$select,0);
-  if( $res eq 0 ){
+  unless (OWX_Execute($master,"write.$page", 1, $owx_dev, $select, 0, undef )) {
     return "device $owx_dev not accessible in writing scratchpad"; 
   }
   
   #-- issue the match ROM command \x55 and the read scratchpad command
   #   \xAA 
   #-- reset the bus
-  OWX_Reset($master);
   #-- reading 9 + 4 + 16 bytes = 28 bytes
   # TODO: sometimes much less than 28
-  $res=OWX_Complex($master,$owx_dev,"\xAA",28);
-  if( length($res) < 13 ){
+  unless (OWX_Execute($master,"read.$page", 1, $owx_dev,"\xAA", 28, undef)
+    and ($res = OWX_AwaitExecuteResponse($master,"read.$page",$owx_dev))
+    and length($res) > 2 ) {
     return "device $owx_dev not accessible in reading scratchpad"; 
   }
 
   #-- issue the match ROM command \x55 and the copy scratchpad command
   #   \x5A followed by 3 byte authentication code
-  $select="\x5A".substr($res,10,3);
+  $select="\x5A".substr($res,0,3);
   #-- reset the bus
-  OWX_Reset($master);
-  $res=OWX_Complex($master,$owx_dev,$select,6);
-  
-  #-- process results
-  if( $res eq 0 ){
+  unless (OWX_Execute($master,"copy.$page", 1, $owx_dev, $select, 6, undef)
+    and OWX_AwaitExecuteResponse($master,"copy.$page",$owx_dev)) {
     return "device $owx_dev not accessible for writing"; 
   }
   
   return undef;
 }
 
+sub OWXCOUNT_AfterExecute() {
+  my ( $hash, $context, $success, $reset, $owx_dev, $data, $numread, $readdata ) = @_;
+  
+  my $loglevel = main::GetLogLevel($hash->{NAME},6);
+  return unless ($success and $context);
+  
+  CONTEXT: {
+    ($context =~ /^page.*/) and do {
+      return OWXCOUNT_AfterGetPage($hash,substr($context,4), $owx_dev, $data, $readdata );
+    };
+  };
+  $hash->{PRESENT} = 1; 
+  return undef;
+}
+   
 1;
 
 =pod

@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning 
 #
-# $Id$
+# $Id: 21_OWTHERM.pm 3062 2013-04-11 06:17:17Z pahenning $
 #
 # Disclaimer: No code of the former OWTEMP module is contained here
 #
@@ -72,7 +72,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="4.00";
 #-- temperature globals - always the raw values from/for the device
 my $owg_temp     = "";
 my $owg_th       = "";
@@ -130,6 +130,7 @@ sub OWTHERM_Initialize ($) {
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
                      $readingFnAttributes;                
+  $hash->{AfterExecuteFn} = "OWTHERM_AfterExecute";
   }
   
 ########################################################################################
@@ -213,7 +214,7 @@ sub OWTHERM_Define ($$) {
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = $fam.".".$id.".".$crc;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
   
@@ -470,7 +471,7 @@ sub OWTHERM_GetValues($@) {
     #-- max 3 tries
     for(my $try=0; $try<3; $try++){
       $ret = OWXTHERM_GetValues($hash);
-      last
+      return
         if( !defined($ret) );
     } 
   }elsif( $interface eq "OWServer" ){
@@ -808,9 +809,6 @@ sub OWXTHERM_GetValues($) {
 
   my ($hash) = @_;
   
-  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
-  my $change = 0;
-  
   #-- For default, perform the conversion now
   my $con=1;
   
@@ -827,46 +825,51 @@ sub OWXTHERM_GetValues($) {
 
   #-- if the conversion has not been called before 
   if( $con==1 ){
-    OWX_Reset($master);
     #-- issue the match ROM command \x55 and the start conversion command
-    if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "$owx_dev not accessible";
-    } 
     #-- conversion needs some 950 ms - but we may also do it in shorter time !
-    select(undef,undef,undef,1.0);
+    OWX_Execute($master,"convert",1,$owx_dev,"\x44",0,1000);
   }
 
   #-- NOW ask the specific device 
-  OWX_Reset($master);
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
-  #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
+  OWX_Execute($master,"read",1,$owx_dev,"\xBE",9,undef);
+
+  return undef;
+}
+
+sub OWTHERM_AfterExecute($$$$$$$$) {
+  my ($hash, $context, $success, $reset, $owx_dev, $data, $numread, $res) = @_;
+  
+  return undef unless (defined $context and $context eq "read");
+  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  my $change = 0;
+
+      #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
     return "$owx_dev not accessible in 2nd step"; 
   }
   
   #-- process results
-  @data=split(//,substr($res,9));
+  @data=split(//,$res);
   return "invalid data length, ".int(@data)." instead of 10 bytes"
-    if (@data != 10); 
+    if (@data != 9); 
   return "invalid data"
-    if (ord($data[8])<=0); 
+    if (ord($data[8])<=0);
   return "invalid CRC"
-    if (OWX_CRC8(substr($res,10,8),$data[9])==0);
-  
+    if (OWX_CRC8(substr($res,0,8),$data[8])==0);
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
   if( $hash->{OW_FAMILY} eq "10" ) {    
   
-    my $count_remain = ord($data[7]);
-    my $count_perc   = ord($data[8]);
+    my $count_remain = ord($data[6]);
+    my $count_perc   = ord($data[7]);
     my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
    
-    my $lsb  = ord($data[1]);
+    my $lsb  = ord($data[0]);
     my $msb  = 0;
-    my $sign = ord($data[2]) & 255;
+    my $sign = ord($data[1]) & 255;
       
     #-- test with -25 degrees
     #$lsb   =  12*16+14;
@@ -879,14 +882,14 @@ sub OWXTHERM_GetValues($) {
       $owg_temp = -128+$owg_temp;
     }
 
-    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
+    $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
+    $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
 
   } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
      
-    my $lsb  = ord($data[1]);
-    my $msb  = ord($data[2]) & 7;
-    my $sign = ord($data[2]) & 248;
+    my $lsb  = ord($data[0]);
+    my $msb  = ord($data[1]) & 7;
+    my $sign = ord($data[1]) & 248;
       
     #-- test with -55 degrees
     #$lsb   = 9*16;
@@ -898,8 +901,8 @@ sub OWXTHERM_GetValues($) {
     if( $sign !=0 ){
       $owg_temp = -128+$owg_temp;
     }
-    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
+    $ow_thn = ord($data[2]) > 127 ? 128-ord($data[2]) : ord($data[2]);
+    $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     
   } else {
     return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
@@ -908,7 +911,8 @@ sub OWXTHERM_GetValues($) {
   #-- process alarm settings
   $owg_tl = $ow_tln;
   $owg_th = $ow_thn;
-  
+
+  OWTHERM_FormatValues($hash);
   return undef;
 }
 
@@ -949,8 +953,6 @@ sub OWXTHERM_SetValues($@) {
   my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
   my $thp = $owg_th < 0 ? 128 - $owg_th : $owg_th; 
 
-  OWX_Reset($master);
-  
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
   #   followed by the write EEPROM command \x48
   #
@@ -960,11 +962,7 @@ sub OWXTHERM_SetValues($@) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c\x48",$thp,$tlp); 
-  my $res=OWX_Complex($master,$owx_dev,$select,3);
-
-  if( $res eq 0 ){
-    return "OWXTHERM: Device $owx_dev not accessible"; 
-  } 
+  OWX_Execute($master,"setvalues",1,$owx_dev,$select,3,undef);
   
   return undef;
 }
