@@ -28,6 +28,7 @@ sub TCM_Ready($);
 sub TCM_Write($$$);
 
 sub TCM_Parse120($$$);
+sub TCM_Parse310($$$);
 sub TCM_CRC8($);
 sub TCM_CSUM($);
 
@@ -114,17 +115,17 @@ TCM_Write($$$)
       $bstring = $msg;
     } else {
       # command with ESP3 format
-      my $packetType = hex (substr ($fn, 6, 2));
+      my $packetType = hex(substr($fn, 6, 2));
       if ($packetType != 1) {
         Log $ll2, "TCM120 $name: Packet Type not supported.";
         return;
       }
-      my $odataLen = hex (substr ($fn, 4, 2));
+      my $odataLen = hex(substr($fn, 4, 2));
       if ($odataLen != 0) {
         Log $ll2, "TCM120 $name: Radio Telegram with optional Data not supported.";
         return;
       }    
-      #my $mdataLen = hex (substr ($fn, 0, 4));
+      #my $mdataLen = hex(substr($fn, 0, 4));
       my $rorg = substr ($msg, 0, 2);
       # translate the RORG to ORG
       my %rorgmap = ("F6"=>"05",
@@ -147,7 +148,7 @@ TCM_Write($$$)
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
   }
-  Log $ll5, "TCM $name sending $bstring";
+  Log $ll5, "TCM: $name sending $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
@@ -244,7 +245,7 @@ TCM_Read($)
       if($net =~ m/^0B(..)(........)(........)(..)/) {
         # Receive Radio Telegram (RRT)
         my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
-
+        my $packetType = 1;
         # Re-translate the ORG to RadioORG / TCM310 equivalent
         my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
         if($orgmap{$org}) {
@@ -252,11 +253,14 @@ TCM_Read($)
         } else {
           Log 1, "TCM120: unknown ORG mapping for $org";
         }
-
+        if ($org ne "A5") {
+          # extract db_0
+          $d1 = substr($d1, 0, 2);
+        }
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log $ll5, "TCM: $name Telegram from $id blocked.";        
         } else {
-          Dispatch($hash, "EnOcean:$org:$d1:$id:$status", undef);
+          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
         }
 
       } else {
@@ -276,7 +280,7 @@ TCM_Read($)
   } else {                              # TCM310 / ESP3
 
     while($data =~ m/^55(....)(..)(..)(..)/) {
-      my ($l1, $l2, $t, $crc) = (hex($1), hex($2), $3, $4);
+      my ($l1, $l2, $packetType, $crc) = (hex($1), hex($2), hex($3), $4);
 
       my $tlen = 2*(7+$l1+$l2);
       last if(length($data) < $tlen);
@@ -302,12 +306,14 @@ TCM_Read($)
         next;
       }
 
-      if($t eq "01") { # Radio
+      if($packetType == 1) {
+        # packet type RADIO
         $mdata =~ m/^(..)(.*)(........)(..)$/;
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
 
         $odata =~ m/^(..)(........)(..)(..)$/;
         my %addvals = (
+          PacketType    => $packetType,
           SubTelNum     => hex($1),
           DestinationID => $2,
           RSSI          => hex($3),
@@ -318,10 +324,11 @@ TCM_Read($)
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log $ll5, "TCM: $name Telegram from $id blocked.";        
         } else {
-          Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
+          Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
 
-      } elsif($t eq "02") {
+      } elsif($packetType == 2) {
+        # packet type RESPONSE
         my $rc = substr($mdata, 0, 2);
         my %codes = (
           "00" => "RET_OK",
@@ -331,10 +338,30 @@ TCM_Read($)
           "04" => "RET_OPERATION_DENIED",
         );
         $rc = $codes{$rc} if($codes{$rc});
-        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "$name: RESPONSE: $rc");
+        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "TCM: $name RESPONSE: $rc");
+
+      } elsif($packetType == 3) {
+        # packet type RADIO_SUB_TEL
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+
+      } elsif($packetType == 4) {
+        # packet type EVENT
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+
+      } elsif($packetType == 5) {
+        # packet type COMMON_COMMAND
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+
+      } elsif($packetType == 6) {
+        # packet type SMART_ACK_COMMAND
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
+
+      } elsif($packetType == 7) {
+        # packet type REMOTE_MAN_COMMAND
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
 
       } else {
-        Log $ll2, "$name: unknown packet type $t: $data";
+        Log $ll2, "TCM: $name unknown packet type $packetType: $data";
 
       }
 
@@ -380,7 +407,7 @@ TCM_Parse120($$$)
   my $ll5 = GetLogLevel($name,5);
   my $ll2 = GetLogLevel($name,2);
 
-  Log $ll5, "TCMParse: $rawmsg";
+  Log $ll5, "TCM: Parse $rawmsg";
 
   my $msg = "";
   my $cmd = $parsetbl120{substr($rawmsg, 0, 4)};
@@ -404,7 +431,7 @@ TCM_Parse120($$$)
 
   }
 
-  Log $ll2, "$name $msg" if(!$ret);
+  Log $ll2, "TCM: $name $msg" if(!$ret);
   return $msg;
 }
 
@@ -422,16 +449,13 @@ TCM_Parse310($$$)
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   my $ll2 = GetLogLevel($name,2);
-
-  Log $ll5, "TCM Parse: $rawmsg";
-
+  Log $ll5, "TCM: Parse $rawmsg";
   my $rc = substr($rawmsg, 0, 2);
-  my $msg;
+  my $msg = "";
 
   if($rc ne "00") {
-    my $msg = $rc310{$rc};
+    $msg = $rc310{$rc};
     $msg = "Unknown return code $rc" if(!$msg);
-
   } else {
     my @ans;
     foreach my $k (sort keys %{$ptr}) {
@@ -444,7 +468,7 @@ TCM_Parse310($$$)
     $msg = join(",", @ans);
   }
 
-  Log $ll2, "$name $msg";
+  Log $ll2, "TCM: $name $msg";
   return $msg;
 }
 
@@ -510,8 +534,7 @@ TCM_Get($@)
     TCM_Write($hash, "", $rawcmd);
 
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
-    $msg = TCM_Parse120($hash, $msg, 1)
-      if(!$err);
+    $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
 
   #################################### TCM310
   } else {
@@ -522,8 +545,7 @@ TCM_Get($@)
     my $cmdHex = $cmdhash->{cmd};
     TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
-    $msg = TCM_Parse310($hash, $msg, $cmdhash)
-        if(!$err);
+    $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
 
   }
 
@@ -543,6 +565,7 @@ TCM_RemovePair($)
 {
   my $hash = shift;
   delete($hash->{pair});
+  CommandDeleteReading(undef, "$hash->{NAME} pair");
 }
 
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
@@ -594,6 +617,7 @@ TCM_Set($@)
 
   if($cmd eq "pairForSec") {
     $hash->{pair} = 1;
+    readingsSingleUpdate($hash, "pair", 1, 1);
     InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
     return;
   }
@@ -746,7 +770,7 @@ TCM_Undef($$)
   Please note that EnOcean repeaters also send Fhem data telegrams again. Use
   <code>attr &lt;name&gt; <a href="#blockSenderID">blockSenderID</a> own</code>
   to block receiving telegrams with TCM SenderIDs.<br>
-  The address range used by your transceiver module, you can find in the
+  The address range used by your transceiver module, can be found in the
   parameters BaseID and LastID.
   <br><br>
 

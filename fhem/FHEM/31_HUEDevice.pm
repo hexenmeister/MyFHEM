@@ -54,12 +54,56 @@ sub HUEDevice_Initialize($)
   $hash->{SetFn}    = "HUEDevice_Set";
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
-                      "$readingFnAttributes ".
+                      "color-icons:1,2 ".
                       "model:".join(",", sort keys %hueModels)." ".
-                      "subType:colordimmer,dimmer,switch";
+                      "subType:colordimmer,dimmer,switch ".
+                      $readingFnAttributes;
+
+  #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
 
   $data{webCmdFn}{colorpicker} = "HUEDevice_colorpickerFn";
   $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+}
+
+sub
+HUEDevice_devStateIcon($)
+{
+  my($hash) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+
+  return undef if( !$hash );
+
+  my $name = $hash->{NAME};
+
+  return undef
+         if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
+
+  return undef
+         if( AttrVal($name, "model", "") eq "LWL001" );
+
+  #return '<div style="height:19px;'.
+  #       'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
+  #       '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
+  #       '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
+
+  my $percent = ReadingsVal($name,"pct","100");
+  my $s = $dim_values{int($percent/7)};
+
+  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
+
+  return '<div style="width:32px;height:19px;'.
+         'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
+}
+sub
+HUEDevice_summaryFn($$$$)
+{
+Log 3, "HUEDevice_summaryFn";
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash   = $defs{$d};
+  my $name = $hash->{NAME};
+
+  return HUEDevice_devStateIcon($hash);
 }
 
 sub
@@ -77,17 +121,17 @@ HUEDevice_colorpickerFn($$$)
   $cmd = "" if($cmd eq "state");
   if( $args[1] ) {
     my $c = "\"$FW_ME?cmd=set $d $cmd$srf\"";
-    return "<td colspan='2'>".
+    return '<td align="center">'.
              '<a href='. $c .'>'.
                '<div style="width:32px;height:19px;'.
                'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
-             '</a>';
-           "</td>";
+             '</a>'.
+           '</td>';
   } else {
     my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
-    return "<td colspan='2'>".
+    return '<td align="center">'.
              "<input class='color {pickerMode:'$mode'}' value='#$cv' onchange='setColor(this,\"$mode\",$c)'\"/>".
-           "</td>";
+           '</td>';
   }
 }
 
@@ -120,7 +164,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{xy} = '';
 
 
-  $attr{$name}{devStateIcon} = '{(CommandGet("","'.$name.' devStateIcon"),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
@@ -146,6 +190,15 @@ sub HUEDevice_Undefine($$)
   return undef;
 }
 
+sub
+HUEDevice_max($@)
+{  
+  my ($max, @vars) = @_; 
+  for (@vars) {
+    $max = $_ if $_ > $max;
+  }
+  return $max;
+}  
 sub
 HUEDevice_SetParam($$@)
 {
@@ -222,7 +275,7 @@ HUEDevice_SetParam($$@)
       #$y = 1 if( $y > 1 );
       $Y = 1 if( $Y > 1 );
 
-      my $bri  = max($r,max($g,$b));
+      my $bri  = HUEDevice_max($r,$g,$b);
       #my $bri  = $Y;
 
     $obj->{'on'}  = JSON::true;
@@ -290,10 +343,94 @@ HUEDevice_Set($@)
   }
 
   my $list = "off on toggle statusRequest";
-  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
+}
+
+sub
+cttorgb($)
+{
+  my ($ct) = @_;
+
+  # calculation from http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code
+  # adjusted by 1000K
+  my $temp = (1000000/$ct)/100 + 10;
+
+  my $r = 0;
+  my $g = 0;
+  my $b = 0;
+
+  $r = 255;
+  $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if( $temp > 66 );
+  $r = 0 if( $r < 0 );
+  $r = 255 if( $r > 255 );
+
+  if( $temp <= 66 ) {
+    $g = 99.4708025861 * log($temp) - 161.1195681661;
+  } else {
+    $g = 288.1221695283 * ($temp - 60) ** -0.0755148492;
+  }
+  $g = 0 if( $g < 0 );
+  $g = 255 if( $g > 255 );
+
+  $b = 255;
+  $b = 0 if( $temp <= 19 );
+  if( $temp < 66 ) {
+    $b = 138.5177312231 * log($temp-10) - 305.0447927307;
+  }
+  $b = 0 if( $b < 0 );
+  $b = 255 if( $b > 255 );
+
+  return( $r, $g, $b );
+}
+
+sub
+xyYtorgb($$$)
+{
+  # calculation from http://www.brucelindbloom.com/index.html
+  my ($x,$y,$Y) = @_;
+#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+
+  my $r = 0;
+  my $g = 0;
+  my $b = 0;
+
+  if( $y > 0 ) {
+    my $X = $x * $Y / $y;
+    my $Z = (1 - $x - $y)*$Y / $y;
+
+    if( $X > 1
+        || $Y > 1
+        || $Z > 1 ) {
+      my $f = HUEDevice_max($X,$Y,$Z);
+      $X /= $f;
+      $Y /= $f;
+      $Z /= $f;
+    }
+#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+
+    $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
+    $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
+    $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
+
+    if( $r > 1
+        || $g > 1
+        || $b > 1 ) {
+      my $f = HUEDevice_max($r,$g,$b);
+      $r /= $f;
+      $g /= $f;
+      $b /= $f;
+    }
+#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+
+    $r *= 255;
+    $g *= 255;
+    $b *= 255;
+  }
+
+  return( $r, $g, $b );
 }
 
 sub
@@ -313,88 +450,36 @@ HUEDevice_Get($@)
 
     if( ReadingsVal($name,"colormode","") eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
-        # calculation from http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code
-        # adjusted by 1000K
-        my $temp = (1000000/$1)/100 + 10;
-
-        $r = 255;
-        $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if( $temp > 66 );
-        $r = 0 if( $r < 0 );
-        $r = 255 if( $r > 255 );
-
-        if( $temp <= 66 ) {
-          $g = 99.4708025861 * log($temp) - 161.1195681661;
-        } else {
-          $g = 288.1221695283 * ($temp - 60) ** -0.0755148492;
-        }
-        $g = 0 if( $g < 0 );
-        $g = 255 if( $g > 255 );
-
-        $b = 255;
-        $b = 0 if( $temp <= 19 );
-        if( $temp < 66 ) {
-          $b = 138.5177312231 * log($temp-10) - 305.0447927307;
-        }
-        $b = 0 if( $b < 0 );
-        $b = 255 if( $b > 255 );
+        ($r,$g,$b) = cttorgb($1);
       }
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
-      # calculation from http://www.brucelindbloom.com/index.html
       my ($x,$y) = ($1, $2);
       my $Y = ReadingsVal($name,"bri","") / 254.0;
-#Log 3, "xyY:". $x . " " . $y ." ". $Y;
 
-      if( $y > 0 ) {
-        my $X = $x * $Y / $y;
-        my $Z = (1 - $x - $y)*$Y / $y;
+      ($r,$g,$b) = xyYtorgb($x,$y,$Y);
+    }
+    return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
+  } elsif($cmd eq "RGB") {
+    my $r = 0;
+    my $g = 0;
+    my $b = 0;
 
-        if( $X > 1
-            || $Y > 1
-            || $Z > 1 ) {
-          my $f = max($X,max($Y,$Z));
-          $X /= $f;
-          $Y /= $f;
-          $Z /= $f;
-        }
-#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
-
-        $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
-        $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
-        $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
-
-        if( $r > 1
-            || $g > 1
-            || $b > 1 ) {
-          my $f = max($r,max($g,$b));
-          $r /= $f;
-          $g /= $f;
-          $b /= $f;
-        }
-#Log 3, "rgb: ". $r . " " . $g ." ". $b;
-
-        $r *= 255;
-        $g *= 255;
-        $b *= 255;
+    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+      if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
+        ($r,$g,$b) = cttorgb($1);
       }
+    } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
+      my ($x,$y) = ($1, $2);
+      my $Y = 1;
+
+      ($r,$g,$b) = xyYtorgb($x,$y,$Y);
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
   } elsif ( $cmd eq "devStateIcon" ) {
-    return '<img src="/fhem/icons/off" alt="off" title="off">'
-           if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
-
-    return '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'
-           if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
-
-    return '<div style="height:19px;'.
-           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
-           '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-           '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
-
-    return '<div style="width:32px;height:19px;'.
-           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
+    return HUEDevice_devStateIcon($hash);
   }
 
-  return "Unknown argument $cmd, choose one of rgb devStateIcon";
+  return "Unknown argument $cmd, choose one of rgb RGB devStateIcon";
 }
 
 
@@ -462,9 +547,11 @@ HUEDevice_GetUpdate($)
                                                                            || !defined($attr{$name}{model})
                                                                            || !defined($hueModels{$attr{$name}{model}}{subType}) );
 
-  $attr{$name}{devStateIcon} = '{CommandGet("","'.$name.' devStateIcon")}';
+  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+
   if( !defined( $attr{$name}{webCmd} ) ) {
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
     $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
   }
@@ -557,7 +644,7 @@ HUEDevice_GetUpdate($)
     </ul>
   </ul><br>
 
-  <a name="SYSSTAT_Readings"></a>
+  <a name="HUEDevice_Readings"></a>
   <b>Readings</b>
   <ul>
     <li>bri<br>
@@ -628,6 +715,7 @@ HUEDevice_GetUpdate($)
     <b>Get</b>
     <ul>
       <li>rgb</li>
+      <li>RGB</li>
       <li>devStateIcon<br>
       returns html code that can be used to create an icon that represents the device color in the room overview.</li>
     </ul><br>
@@ -635,10 +723,13 @@ HUEDevice_GetUpdate($)
   <a name="HUEDevice_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>color-icon<br>
+    1 -> use lamp color as icon color and 100% shape as icon shape<br>
+    2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
       colordimmer, dimmer or switch, default is initialized according to device model.</li>
       <li>devStateIcon<br>
-      will be initialized to <code>{CommandGet("","&lt;name&gt; devStateIcon")}</code> to show device color as default in room overview.</li>
+      will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
       <li>webCmd<br>
       will be initialized to <code>rgb:rgb FF0000:rgb C8FF12:rgb 0000FF:toggle:on:off</code> to show colorpicker and 3 color preset buttons in room overview.</li>
   </ul>

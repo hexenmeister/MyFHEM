@@ -186,7 +186,6 @@ my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
 my $readingsUpdateDelayTrigger; # needed internally
-my $doTriggerCalled;            # needed internally
 my $cvsid = '$Id$';
 my $namedef =
   "where <name> is either:\n" .
@@ -1188,18 +1187,19 @@ DoSet(@)
   return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  $doTriggerCalled = 0;
+  $hash->{".triggerUsed"} = 0; 
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
   return $ret if($ret);
   return undef if($skipTrigger);
 
   # Backward compatibility. Use readingsUpdate in SetFn now
-  if(!$doTriggerCalled) {
+  if(!$hash->{".triggerUsed"}) {
     shift @a;
     # set arg if the module did not triggered events
     my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
     DoTrigger($dev, $arg, 0);
   }
+  delete($hash->{".triggerUsed"});
 
   return undef;
 }
@@ -2337,6 +2337,7 @@ DoTrigger($$@)
   my $hash = $defs{$dev};
   return "" if(!defined($hash));
 
+  $hash->{".triggerUsed"} = 1 if(defined($hash->{".triggerUsed"}));
   if(defined($newState)) {
     if($hash->{CHANGED}) {
       push @{$hash->{CHANGED}}, $newState;
@@ -2359,7 +2360,6 @@ DoTrigger($$@)
 
   my $max = int(@{$hash->{CHANGED}});
   Log 5, "Triggering $dev ($max changes)";
-  $doTriggerCalled = 1;
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################
@@ -2429,7 +2429,8 @@ CallFn(@)
   my $d = shift;
   my $n = shift;
 
-  if(!$defs{$d}) {
+  if(!$d || !$defs{$d}) {
+    $d = "<undefined>" if(!defined($d));
     Log 0, "Strange call for nonexistent $d: $n";
     return undef;
   }
@@ -2832,6 +2833,17 @@ setGlobalAttrBeforeFork($)
 # Functions used to make fhem-oneliners more readable,
 # but also recommended to be used by modules
 sub
+InternalVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{$n})) {
+     return $defs{$d}{$n};
+  }
+  return $default;
+}
+
+sub
 ReadingsVal($$$)
 {
   my ($d,$n,$default) = @_;
@@ -3135,6 +3147,8 @@ readingsEndUpdate($$)
 {
   my ($hash,$dotrigger)= @_;
   my $name = $hash->{NAME};
+
+  $hash->{".triggerUsed"} = 1 if(defined($hash->{".triggerUsed"}));
 
   # process user readings
   if(defined($hash->{'.userReadings'})) {

@@ -1,4 +1,3 @@
-########################################################################################
 #
 # OWCOUNT.pm
 #
@@ -1078,6 +1077,8 @@ sub OWFSCOUNT_GetPage($$) {
     
     $owg_val[0]      = $vval;
     #-- parse float from midnight
+    # $owg_str =~ /([\d\.]+)/;
+    #   a la truchsess
     $owg_str =~ s/[^\d\.]+//g;
     $owg_str = 0.0 unless ($owg_str);
     $owg_str = int($owg_str*100)/100;
@@ -1206,6 +1207,8 @@ sub OWXCOUNT_AfterGetPage($$$$$) {
     if( $page == 14) {
       $owg_val[0] = $value;
       #-- parse float from midnight
+      # $owg_str =~ /([\d\.]+)/;
+      #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
       $owg_str = 0.0 unless ($owg_str);
       $owg_str = int($owg_str*100)/100;
@@ -1213,6 +1216,8 @@ sub OWXCOUNT_AfterGetPage($$$$$) {
     }elsif( $page == 15) {
       $owg_val[1] = $value;
       #-- parse float from midnight
+      # $owg_str =~ /([\d\.]+)/;
+      #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
       $owg_str = 0.0 unless ($owg_str);
       $owg_str = int($owg_str*100)/100;

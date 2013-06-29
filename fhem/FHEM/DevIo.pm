@@ -6,7 +6,7 @@ sub DevIo_SimpleRead($);
 sub DevIo_TimeoutRead($$);
 sub DevIo_SimpleWrite($$$);
 sub DevIo_OpenDev($$$);
-sub DevIo_CloseDev($);
+sub DevIo_CloseDev($@);
 sub DevIo_Disconnected($);
 sub DevIo_SetHwHandshake($);
 
@@ -26,7 +26,7 @@ DevIo_DoSimpleRead($)
 
   } elsif($hash->{TCPDev}) {
     $res = sysread($hash->{TCPDev}, $buf, 256);
-    $buf = undef if(!defined($res));
+    $buf = "" if(!defined($res));
 
   }
   return $buf;
@@ -142,7 +142,8 @@ DevIo_OpenDev($$$)
       return;
     }
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
+    my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => $timeout);
     if($conn) {
       delete($hash->{NEXT_OPEN})
 
@@ -278,9 +279,9 @@ DevIo_SetHwHandshake($)
 
 ########################
 sub
-DevIo_CloseDev($)
+DevIo_CloseDev($@)
 {
-  my ($hash) = @_;
+  my ($hash,$isFork) = @_;
   my $name = $hash->{NAME};
   my $dev = $hash->{DeviceName};
 
@@ -291,7 +292,11 @@ DevIo_CloseDev($)
     delete($hash->{TCPDev});
 
   } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
+    if($isFork) { # SerialPort close resets the serial parameters.
+      POSIX::close($hash->{USBDev}{FD});
+    } else {
+      $hash->{USBDev}->close() ;
+    }
     delete($hash->{USBDev});
 
   } elsif($hash->{DIODev}) {
@@ -323,7 +328,7 @@ DevIo_Disconnected($)
 
   # Without the following sleep the open of the device causes a SIGSEGV,
   # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
+  sleep(5) if($hash->{USBDEV});
 
   DoTrigger($name, "DISCONNECTED");
 }

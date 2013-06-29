@@ -96,8 +96,10 @@
     <a href="#PID">PID</a> &nbsp;
     <a href="#PRESENCE">PRESENCE</a> &nbsp;
     <a href="#PachLog">PachLog</a> &nbsp;
+	<a href="#remotecontrol">remotecontrol</a> &nbsp;
     <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
     <a href="#sequence">sequence</a> &nbsp;
+    <a href="#speedtest">speedtest</a> &nbsp;
     <a href="#structure">structure</a> &nbsp;
     <a href="#telnet">telnet</a> &nbsp;
     <a href="#Twilight">Twilight</a> &nbsp;
@@ -213,6 +215,15 @@ off at 07:00.<br>
   <ul>
   define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
   define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
+  </ul>
+For every further indirection you need to double the semicolons:, e.g. to
+switch on every day 2 devices at 7:00 for 10 minutes you have to write:<br>
+  <ul>
+  define onAt at 07:00 set Lamp1 on;;set Lamp2 on;; define offAt at +00:10 set Lamp1 off;;;;set Lamp2 off
+  </ul>
+Don't dispair, the previous example can also be written as 
+  <ul>
+  define onAt at 07:00 set Lamp1,Lamp2 on-for-timer 600
   </ul>
 <br>
 
@@ -1277,15 +1288,15 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>Value(&lt;devicename&gt;)<br>
         returns the state of the device (the string you see in paranthesis in
         the output of the list command).
-        <br><br>
+        </li><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
         returns the old value/timestamp of the device.
-        <br><br>
+        </li><br>
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Return the reading (the value in the Readings section of "list device")
-        <br><br>
+        </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
         Return the attribute of the device
@@ -1296,6 +1307,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         { ReadingsVal("wz", "measured-temp", "20")+0 }<br>
         { ReadingsTimestamp("wz", "measured-temp", 0)}<br>
         { AttrVal("wz", "room", "none") }<br>
+        </li><br>
+      <li>
+        InternalVal(&lt;devicename&gt;,&lt;property&gt;,&lt;defaultvalue&gt;)
+        <br>
+        Return the internal value (the value in the Internals section of "list
+        device").
+        </li><br>
       </ul>
 
 

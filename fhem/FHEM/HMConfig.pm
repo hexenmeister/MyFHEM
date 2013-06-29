@@ -165,7 +165,7 @@ my %culHmModel=(
   "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons
   "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Rotary Handle Sensor
   "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Shutter Contact
-  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,st=>'switch'            ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
+  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,st=>'swi'               ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
   "0084" => {name=>"Schueco_263-160"         ,st=>'smokeDetector'     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM SENSOR_FOR_CARBON_DIOXIDE
   "0086" => {name=>"Schueco_263-146"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "0087" => {name=>"Schueco_263-147"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)   						
@@ -182,6 +182,7 @@ my %culHmModel=(
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"Schueco_263-157"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
+  "00A0" => {name=>"HM-RC-4-2"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "00A1" => {name=>"HM-LC-SW1-PL2"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -189,6 +190,9 @@ my %culHmModel=(
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   #263 167                        HM Smoke Detector Schueco 
+  #"HM-RC-Key4-2"
+  #"HM-RC-Sec4-2"
+  
 );
 
 
@@ -341,10 +345,12 @@ my %culHmRegDefine = (
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
 # SEC-WDS  02:01 16:01(sabotage) ?
+# HM-SEC-MDIR  02:01 ?
 # SEC-SC   02:00 ?
 # Blind     9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
+#Keymatic 3.3 unknown, seen 1 here
   
 #--- list 1, Channel level------------------
 #blindActuator mainly                                                                             
@@ -500,8 +506,9 @@ my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
 	);
 my %culHmRegType = (
+  swi               =>{peerNeedsBurst  =>1,expectAES       =>1},
   remote            =>{peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1,
-					   sign            =>1,
+					   sign            =>1
                       },
   blindActuator     =>{driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
                        sign            =>1,
@@ -514,7 +521,7 @@ my %culHmRegType = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,CtRefOn         =>1,
 				       CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1,
-				       lgMultiExec     =>1,
+				       lgMultiExec     =>1
 				       },
   dimmer            =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
   
@@ -530,7 +537,7 @@ my %culHmRegType = (
                        CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
                        CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 		               OffDlyNewTime   =>1,OffDlyOldTime   =>1,
-		               lgMultiExec     =>1,
+		               lgMultiExec     =>1
 		               },
   switch            =>{sign            =>1,
                        OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
@@ -538,7 +545,7 @@ my %culHmRegType = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 		               ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
- 		               lgMultiExec     =>1,
+ 		               lgMultiExec     =>1
 		               },
   winMatic          =>{signal          =>1,signalTone      =>1,keypressSignal  =>1},                                  
   keyMatic          =>{signal          =>1,signalTone      =>1,keypressSignal  =>1,
@@ -548,15 +555,15 @@ my %culHmRegType = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtOff           =>1,
                        KeyJtOn         =>1,KeyJtOff        =>1,
-					   OnTime          =>1,
+					   OnTime          =>1
 			           },
   motionDetector    =>{evtFltrPeriod   =>1,evtFltrNum      =>1,minInterval     =>1,
 			           captInInterval  =>1,brightFilter    =>1,ledOnTime       =>1,
-					   peerNeedsBurst  =>1,
+					   peerNeedsBurst  =>1
 			           },
   threeStateSensor  =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
 					                                          ,transmitTryMax  =>1,
-                       peerNeedsBurst  =>1,expectAES       =>1,
+                       peerNeedsBurst  =>1,expectAES       =>1
 					   },
 );
 #clones - - - - - - - - - - - - - - -   
@@ -564,18 +571,18 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 
 my %culHmRegModel = (
   "HM-RC-12"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1,},
+  "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
  
-  "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1,},
+  "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
 
-  "HM-LC-Dim1L-Pl-2"=>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
+  "HM-LC-Dim1L-Pl-2"=>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1
                       },
   "HM-LC-Dim1L-CV"  =>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
 		               logicCombination=>1,
 		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
   "HM-LC-Dim1PWM-CV"=>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
 		               characteristic  =>1,
@@ -583,7 +590,7 @@ my %culHmRegModel = (
 		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
   "HM-LC-Dim1T-Pl"  =>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
                        fuseDelay	   =>1,
@@ -591,10 +598,10 @@ my %culHmRegModel = (
 		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1
                       },
   "HM-LC-Dim1T-Pl-2"=>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
-                       fuseDelay	   =>1,
+                       fuseDelay	   =>1
                       },
   "HM-LC-Dim1TPBU-FM"=>{                   ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
                        fuseDelay	   =>1,
@@ -602,7 +609,7 @@ my %culHmRegModel = (
 		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
   "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
@@ -616,11 +623,11 @@ my %culHmRegModel = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			           ActionType      =>1,ActNum          =>1,lgMultiExec     =>1},
-  "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1,},
+  "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1},
   "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
                                                                transmitTryMax  =>1,evtFltrTime     =>1,
-                       msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1,},
+                       msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1},
   "HM-SEC-RHS"      =>{msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
                                            ledOnTime       =>1,eventDlyTime    =>1},
   "HM-SEC-SC"       =>{                    sabotageMsg     =>1,
@@ -635,16 +642,16 @@ my %culHmRegModel = (
 					                                           eventFilterTime =>1},
   "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                        lowBatLimit     =>1,batDefectLimit  =>1,
-                                                               transmitTryMax  =>1,},
+                                                               transmitTryMax  =>1},
   "HM-LC-SW1-BA-PCB"=>{lowBatLimitBA   =>1,ledMode         =>1},
-  "HM-Sys-sRP-Pl"   =>{compMode        =>1,},
+  "HM-Sys-sRP-Pl"   =>{compMode        =>1},
   "KFM-Display"     =>{CtDlyOn         =>1,CtDlyOff        =>1,
                        CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
                        CtValLo         =>1,CtValHi         =>1,
                        ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1,
                        DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,DimJtDlyOff     =>1,
                        DimJtRampOn     =>1,DimJtRampOff    =>1,
-                       lgMultiExec     =>1,
+                       lgMultiExec     =>1
 					   },
   "HM-Sen-Wa-Od"    =>{cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1,
                                            ledOnTime       =>1,transmitTryMax  =>1,
@@ -652,8 +659,8 @@ my %culHmRegModel = (
                        fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1,
                        useCustom       =>1,					   
                        fillLvlUpThr    =>1,fillLvlLoThr    =>1,
-                       expectAES       =>1,peerNeedsBurst  =>1,},
-  "HM-WDS10-TH-O"   =>{burstRx         =>1,},
+                       expectAES       =>1,peerNeedsBurst  =>1},
+  "HM-WDS10-TH-O"   =>{burstRx         =>1},
   );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
@@ -686,7 +693,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
                        "day-temp"      =>1,"night-temp"    =>1,"party-temp"    =>1,
 			           mdTempValve     =>1,partyEndDay     =>1,
 			           partyEndMin     =>1,partyEndHr      =>1,
-			           decalHr         =>1,decalMin        =>1,
+			           decalHr         =>1,decalMin        =>1
                     },    
   "HM-CC-TC03"      =>{tempWinOpen     =>1, }, #window channel
   "HM-RC-1912"      =>{msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1,
@@ -748,55 +755,70 @@ my %culHmGlobalSetsChn = (# all channels but virtuals
   peerBulk      => "<peer1,peer2,...>",
 );
 my %culHmSubTypeSets = (# channels of this subtype
-  switch           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
-		               on=>"", off=>"", toggle=>"",
-					   press      => "[long|short] [on|off] ...",
-					   inhibit    =>"[on|off]"},
-  dimmer           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
-		               on=> "", off=> "", toggle=> "", pct=>"[value] ... [time] [ramp]", stop=>"",
-					   press      => "[long|short] [on|off] ...",
-					   up         => "[<changeValue>] [ontime] [ramptime]...",
-					   down       => "[<changeValue>] [ontime] [ramptime]...",
-					   inhibit    => "[on|off]"},
-  blindActuator    =>{ on=> "", off=>" ", toggle=> "", pct=>"[value] ... [time] [ramp]", stop=>"",
-					   press      => "[long|short] [on|off] ...",
-					   up         => "[<changeValue>] [ontime] [ramptime]...",
-					   down       => "[<changeValue>] [ontime] [ramptime]...",
-					   inhibit    =>"[on|off]"},
-  remote           =>{ peerChan   => "<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]",},
-  threeStateSensor =>{ peerChan   => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",},
-  virtual          =>{ peerChan   => "<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]",
-		               press      => "[long|short]...",
-                       valvePos   => "position", },#acting as TC
-  smokeDetector    =>{ test       => "", alarmOn=>"", alarmOff=>"", 
-		               peerChan   => "<btnNumber> <actChn> ... single [set|unset] actor",},
-  winMatic         =>{ matic      => "<btn>",
-                       keydef     => "<btn> <txt1> <txt2>",
-                       create     => "<txt>",
-					   inhibit    =>"[on|off]"},
-  keyMatic         =>{ lock       =>"",
-  	                   unlock     =>"[sec] ...",
-  	                   open       =>"[sec] ...",
-  	                   inhibit    =>"[on|off]"},
+  switch           =>{ "on-for-timer"=>"<sec>"
+                      ,"on-till"  =>"<time>"
+		              ,on         =>""
+					  ,off        =>""
+					  ,toggle     =>""
+					  ,press      =>"[long|short] [on|off] ..."
+					  ,inhibit    =>"[on|off]"},
+  dimmer           =>{ "on-for-timer"=>"<sec>"
+                      ,"on-till"  =>"<time>"
+		              ,on         =>""
+					  ,off        =>""
+					  ,toggle     =>""
+					  ,pct        =>"<value> ... [<ontime>] [<ramptime>]"
+					  ,stop       =>""
+					  ,press      =>"[long|short] [on|off] ..."
+					  ,up         =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,down       =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,inhibit    =>"[on|off]"},
+  blindActuator    =>{ on         =>""
+                      ,off        =>""
+                      ,toggle     =>""
+                      ,pct        =>"[<value>] ... [<ontime>]"
+					  ,stop       =>""
+					  ,press      =>"[long|short] [on|off] ..."
+					  ,up         =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,down       =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+					  ,inhibit    =>"[on|off]"},
+  remote           =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
+  threeStateSensor =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  virtual          =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
+		              ,press      =>"[long|short]..."
+                      ,valvePos   =>"<position>"},#acting as TC
+  smokeDetector    =>{ test       =>""
+                      ,alarmOn    =>""
+					  ,alarmOff   =>""
+		              ,peerChan   =>"<btnNumber> <actChn> ... single [set|unset] actor"},
+  winMatic         =>{ matic      =>"<btn>"
+                      ,keydef     =>"<btn> <txt1> <txt2>"
+                      ,create     =>"<txt>"
+					  ,inhibit    =>"[on|off]"},
+  keyMatic         =>{ lock       =>""
+  	                  ,unlock     =>"[<sec>] ..."
+  	                  ,open       =>"[<sec>] ..."
+  	                  ,inhibit    =>"[on|off]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmSubTypeSets{pushButton}     = $culHmSubTypeSets{remote};
+$culHmSubTypeSets{swi}            = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{motionDetector} = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"     =>{valvePos  => "position"},
-  "HM-RC-19"     =>{service   => "<count>", 
-		            alarm     => "<count>", 
-		            display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"=>{   text       => "<txt1> <txt2>...",
+  "HM-CC-VD"     =>{ valvePos     => "position"},
+  "HM-RC-19"     =>{ service      => "<count>"
+		            ,alarm        => "<count>"
+		            ,display      => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"=>{ text         => "<txt1> <txt2>..."
                       #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
 				   },
-  "HM-OU-LED16"  =>{   led        =>"[off|red|green|orange]" ,
-		               ilum       =>"[0-15] [0-127]" },
-  "HM-OU-CFM-PL" =>{   press      => "[long|short] [on|off] ...",
-                       inhibit    =>"[on|off]"},
-  "HM-Sys-sRP-Pl"=>{   setRepeat  => "[no1..36] <sendName> <recName> [bdcast-yes|no]",
-					   inhibit    =>"[on|off]"},
+  "HM-OU-LED16"  =>{ led          =>"[off|red|green|orange]"
+		            ,ilum         =>"[0-15] [0-127]"},
+  "HM-OU-CFM-PL" =>{ press        => "[long|short] [on|off] ..."
+                    ,inhibit      =>"[on|off]"},
+  "HM-Sys-sRP-Pl"=>{ setRepeat    => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
+					,inhibit      =>"[on|off]"},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};

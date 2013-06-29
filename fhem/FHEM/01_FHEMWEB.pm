@@ -1,8 +1,6 @@
 ##############################################
 # $Id$
 package main;
-# BUG: smallscreen webapp icon (works for touchpad?)
-# BUG: iPhone5 webapp black margin
 
 use strict;
 use warnings;
@@ -17,6 +15,7 @@ sub FW_iconPath($);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
 sub FW_dev2image($);
+sub FW_devState($$@);
 sub FW_digestCgi($);
 sub FW_doDetail($);
 sub FW_fatal($);
@@ -25,7 +24,7 @@ sub FW_htmlEscape($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeImage(@);
-sub FW_makeTable($$@);
+sub FW_makeTable($$$@);
 sub FW_makeTableFromArray($@);
 sub FW_pF($@);
 sub FW_pH(@);
@@ -87,6 +86,7 @@ my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
 my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
+my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
@@ -118,12 +118,12 @@ FHEMWEB_Initialize($)
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
     "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
     "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
-    "refresh longpoll:1,0 redirectCmds:0,1 reverseLogs:0,1 menuEntries ".
-    "roomIcons SVGcache";
+    "refresh longpoll:0,1 longpollSVG:1,0 redirectCmds:0,1 reverseLogs:0,1 ".
+    "menuEntries roomIcons SVGcache iconPath";
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby");
+  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -355,6 +355,7 @@ FW_answerCall($)
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+  @FW_iconDirs = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default"));
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -549,7 +550,7 @@ FW_answerCall($)
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
 
-  my $onload = AttrVal($FW_wname, "longpoll", undef) ?
+  my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
 
@@ -663,11 +664,12 @@ FW_updateHashes()
 
 ##############################
 sub
-FW_makeTable($$@)
+FW_makeTable($$$@)
 {
-  my($name, $hash, $cmd) = (@_);
+  my($title, $name, $hash, $cmd) = (@_);
 
   return if(!$hash || !int(keys %{$hash}));
+  FW_pO $title;
   FW_pO "<table class=\"block wide\">";
   my $si = AttrVal("global", "showInternalValues", 0);
 
@@ -689,34 +691,56 @@ FW_makeTable($$@)
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
 
-    } else {
+    } 
+	else {
 
       FW_pO "<td><div class=\"dname\">$n</div></td>";
-      if(ref($val)) {
+      if(ref($val)) {#handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
         $v = FW_htmlEscape($v);
         if($FW_ss) {
           $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
-
-        } else {
+        } else {		
           $t = "" if(!$t);
           FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
           FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
-
         }
-
-      } else {
+      } 
+	  else {
         $val = FW_htmlEscape($val);
-        FW_pO "<td><div class=\"dval\">$val</div></td>";
-
+		# if possible provide link to reference
+		if ($n eq "room"){
+		  my @tmp;
+          push @tmp,FW_pH("room=$_" , $_ ,0,"",1,1)foreach(split(",",$val));
+		  FW_pO "<td><div class=\"dval\">"
+		        .join(",",@tmp)
+		        ."</div></td>";	
+		}
+		elsif ($n eq "webCmd"){
+		  my @tmp;
+          push @tmp,FW_pH("cmd.$name=set $name $_&detail=$name" , $_ ,0,"",1,1)foreach(split(":",$val));
+		  FW_pO "<td><div id=\"$name-$n\">"
+		       .join(":",@tmp)
+		       ."</div></td>";	
+		}	
+		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
+		  FW_pH "detail=$1", $val,1;
+		}
+		else{
+		  my @tmp;
+          foreach(split(",",$val)){
+		    if ($defs{$_}){ push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);}
+			else{		    push @tmp, $_;}
+		  }
+		  FW_pO "<td><div class=\"dval\">"
+		        .join(",",@tmp)
+		        ."</div></td>";				
+	    }
       }
-
     }
     FW_pH "cmd.$name=$cmd $name $n&amp;detail=$name", $cmd, 1
         if($cmd && !$FW_ss);
-
-
     FW_pO "</tr>";
   }
   FW_pO "</table>";
@@ -733,7 +757,7 @@ FW_makeSelect($$$$)
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
-  my $selEl = $al[0];
+  my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 
@@ -749,7 +773,7 @@ FW_makeSelect($$$$)
   # Initial setting
   FW_pO "<script type=\"text/javascript\">" .
         "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
-  FW_pO "</form>";
+  FW_pO "</form><br><br>";
 }
 
 ##############################
@@ -789,17 +813,15 @@ FW_doDetail($)
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeTable($d, $h);                         # Internal values
-  FW_pO "Readings" if($h->{READINGS});
-  FW_makeTable($d, $h->{READINGS});             # Readings
+  FW_makeTable("Internals", $d, $h);
+  FW_makeTable("Readings", $d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
   my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
-
   FW_makeSelect($d, "attr", $attrList,"attr");
-  FW_makeTable($d, $attr{$d}, "deleteattr");    # Attributes
 
+  FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
   foreach my $dn (sort keys %defs) { 
@@ -829,7 +851,7 @@ FW_makeTableFromArray($@) {
   my ($txt,@obj) = @_;
   if (@obj>0) {
     my $row=1;
-    FW_pO "<br><br>";
+    FW_pO "<br>";
     FW_pO "$txt";
     FW_pO '<table class="block wide">';
     foreach (sort @obj) {
@@ -975,7 +997,8 @@ FW_roomOverview($)
         my $icoName = "ico$l1";
         map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/$n/); }
                         split(" ", AttrVal($FW_wname, "roomIcons", ""));
-        my $icon = FW_iconName($icoName) ? FW_makeImage($icoName)."&nbsp;" : "";
+        my $icon = FW_iconName($icoName) ?
+                        FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "$td<a href=\"$l2\">$icon$l1</a></td>";
@@ -1063,7 +1086,7 @@ FW_showRoom()
       FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       my $devName = AttrVal($d, "alias", $d);
       my $icon = AttrVal($d, "icon", "");
-      $icon = FW_makeImage($icon) . "&nbsp;" if($icon);
+      $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
       if($FW_hiddenroom{detail}) {
         FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
@@ -1072,23 +1095,9 @@ FW_showRoom()
       }
       $row++;
 
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
-      my $sfn = $modules{$type}{FW_summaryFn};
-      my $newtxt;
-      if($sfn) {
-        no strict "refs";
-        $newtxt = &{$sfn}($FW_wname, $d, $FW_room, \%extPage);
-        use strict "refs";
-      }
-
-      if(defined($newtxt)) {
-        FW_pO "<td id=\"$type.$d\">$newtxt</td>";
-
-      } else {
-        FW_pO "<td id=\"$d\">$txt</td>";
-
-      }
+      FW_pO "<td id=\"$d\">$txt</td>";
 
 
       ######
@@ -1357,6 +1366,11 @@ FW_substcfg($$$$$$)
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
 
+  if($file eq "CURRENT") {
+    my @a = split(":", $defs{$wl}{LINK});
+    $file = $defs{$a[0]}{currentlogfile};
+    $file =~ s+.*/++;
+  }
   my $fileesc = $file;
   $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
   my $title = AttrVal($wl, "title", "\"$fileesc\"");
@@ -1522,7 +1536,8 @@ FW_showLog($)
 
     $FW_RETTYPE = "image/svg+xml";
 
-    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt TimeNow());
+    (my $cachedate = TimeNow()) =~ s/ /_/g;
+    my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt $cachedate);
     my $cDir = "$FW_dir/SVGcache";
     my $cName = "$cDir/$wl-$f-$t.svg";
     if($SVGcache && open(CFH, $cName)) {
@@ -1530,10 +1545,10 @@ FW_showLog($)
       close(CFH);
 
     } else {
-      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
+      FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
       ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       $ret = SVG_render($wl, $f, $t, $cfg,
-                        $internal_data, $plot, $FW_wname, $FW_cssdir);
+                        $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
       FW_pO $ret;
       if($SVGcache) {
         mkdir($cDir) if(! -d $cDir);
@@ -1916,15 +1931,15 @@ FW_style($$)
     $ret = "";
 
   } elsif($a[1] eq "iconFor") {
-    FW_iconTable("iconFor", "^ico", "style setIF $a[2] %s", undef);
+    FW_iconTable("iconFor", "icon", "style setIF $a[2] %s", undef);
 
   } elsif($a[1] eq "setIF") {
     FW_fC("attr $a[2] icon $a[3]");
     FW_doDetail($a[2]);
 
   } elsif($a[1] eq "showDSI") {
-    FW_iconTable("devStateIcon", '^((?!(weather|_big|fhemicon|darklogo)).)*$',
-        "style addDSI $a[2] %s", "Enter value/regexp for STATE");
+    FW_iconTable("devStateIcon", "",
+                 "style addDSI $a[2] %s", "Enter value/regexp for STATE");
 
   } elsif($a[1] eq "addDSI") {
     my $dsi = AttrVal($a[2], "devStateIcon", "");
@@ -1948,12 +1963,15 @@ FW_style($$)
 sub
 FW_iconTable($$$$)
 {
-  my ($name, $re, $cmdFmt, $textfield) = @_;
+  my ($name, $class, $cmdFmt, $textfield) = @_;
+
   my %icoList = ();
-  foreach my $style ("default", $FW_sp) {
-    foreach my $imgName (sort grep {/^$re/} keys %{$FW_icons{$style}}) {
+  foreach my $style (@FW_iconDirs) {
+    foreach my $imgName (sort keys %{$FW_icons{$style}}) {
       $imgName =~ s/\.[^.]*$//; # Cut extension
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
+      next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
+      next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|darklogo)+);
       $icoList{$imgName} = 1;
     }
   }
@@ -1964,8 +1982,8 @@ FW_iconTable($$$$)
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
   }
   foreach my $i (sort keys %icoList) {
-    FW_pF "<button type='submit' class='dist' name='cmd' value='$cmdFmt'>%s".
-                '</button>', $i, FW_makeImage($i);
+    FW_pF "<button title='%s' type='submit' class='dist' name='cmd' ".
+              "value='$cmdFmt'>%s</button>", $i, $i, FW_makeImage($i,$i,$class);
   }
   FW_pO "</form>";
   FW_pO "</div>";
@@ -1987,23 +2005,23 @@ FW_pO(@)
 sub
 FW_pH(@)
 {
-  my ($link, $txt, $td, $class, $doRet) = @_;
-  my $ret = "";
+  my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
+  my $ret;
 
-  $ret .= "<td>" if($td);
   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
-  $class = "" if(!defined($class));
-  $class = " class=\"$class\"" if($class);
-
+  #actually 'div' should be removed if no class is defined
+  #  as I can't check all code for consistancy I add nonl instead
+  $class = ($class)?" class=\"$class\"":"";
+  $txt =  "<div$class>$txt</div>" if (!$nonl);
+  
   # Using onclick, as href starts safari in a webapp.
   # Known issue: the pointer won't change
   if($FW_ss || $FW_tp) { 
-    $ret .= "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
-
+    $ret = "<a onClick=\"location.href='$link'\">$txt</a>";
   } else {
-    $ret .= "<a href=\"$link\"><div$class>$txt</div></a>";
+    $ret = "<a href=\"$link\">$txt</a>";
   }
-  $ret .= "</td>" if($td);
+  $ret = "<td>$ret</td>" if($td);
   return $ret if($doRet);
   FW_pO $ret;
 }
@@ -2031,9 +2049,41 @@ FW_pHPlain(@)
 sub
 FW_makeImage(@)
 {
-  my ($name, $txt)= @_;
+  my ($name, $txt, $class)= @_;
+
   $txt = $name if(!defined($txt));
-  return "<img src=\"$FW_ME/icons/$name\" alt=\"$txt\" title=\"$txt\">";
+  $class = "" if(!$class);
+  $class = "$class $name";
+  $class =~ s/\./_/g;
+  $class =~ s/@/ /g;
+
+  my $p = FW_iconPath($name);
+  return $name if(!$p);
+  if($p =~ m/\.svg$/i) {
+    if(open(FH, "$FW_icondir/$p")) {
+      <FH>; <FH>; <FH>; # Skip the first 3 lines;
+      my $data = join("", <FH>);
+      close(FH);
+      $data =~ s/[\r\n]/ /g;
+      $data =~ s/ *$//g;
+      $data =~ s/<svg/<svg class="$class"/;
+      $name =~ m/(@.*)$/;
+      my $col = $1 if($1);
+      if($col) {
+        $col =~ s/@//;
+        $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
+        $data =~ s/fill="#000000"/fill="$col"/;
+      } else {
+        $data =~ s/fill="#000000"//;
+      }
+      return $data;
+    } else {
+      return $name;
+    }
+  } else {
+    $class = "class='$class'" if($class);
+    return "<img $class src=\"$FW_ME/images/$p\" alt=\"$txt\" title=\"$txt\">";
+  }
 }
 
 ####
@@ -2096,8 +2146,15 @@ FW_Attr(@)
     } else {
       delete $attr{$name}{$sP};
     }
-
   }
+
+  if($a[2] eq "iconPath" && $a[0] eq "set") {
+    foreach my $pe (split(":", $a[3])) {
+      $pe =~ s+\.\.++g;
+      FW_readIcons($pe);
+    }
+  }
+
   return $retMsg;
 }
 
@@ -2109,7 +2166,6 @@ FW_readIconsFrom($$)
 {
   my ($dir,$subdir)= @_;
 
-  #Log 1, "OPENDIR: $dir $subdir";
   my $ldir = ($subdir ? "$dir/$subdir" : $dir);
   my @entries;
   if(opendir(DH, "$FW_icondir/$ldir")) {
@@ -2123,14 +2179,23 @@ FW_readIconsFrom($$)
         unless($entry eq "." || $entry eq ".." || $entry eq ".svn");
 
     } else {
-      my $filename = $subdir ? "$subdir/$entry" : $entry;
-      $FW_icons{$dir}{$filename} = $filename;
+      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")) {
+        while(my $l = <FH>) {
+          chomp($l);
+          my @a = split(" ", $l);
+          next if($l =~ m/^#/ || @a < 2);
+          $FW_icons{$dir}{$a[0]} = $a[1];
+        }
+        close(FH);
+      } elsif($entry =~ m/(gif|ico|jpg|png|jpeg|svg)$/i) {
+        my $filename = $subdir ? "$subdir/$entry" : $entry;
+        $FW_icons{$dir}{$filename} = $filename;
 
-      my $tag = $filename;     # Add it without extension too
-      $tag =~ s/\.[^.]*$//;
-      #Log 1, "Adding $dir $tag -> $filename";
-      $FW_icons{$dir}{$tag} = $filename;
-
+        my $tag = $filename;     # Add it without extension too
+        $tag =~ s/\.[^.]*$//;
+        #Log 1, "Adding $dir $tag -> $filename";
+        $FW_icons{$dir}{$tag} = $filename;
+      }
     }
   }
 }
@@ -2149,8 +2214,10 @@ sub
 FW_iconName($)
 {
   my ($name)= @_;
-  return $name if($FW_icons{$FW_sp} && $FW_icons{$FW_sp}{$name});
-  return $name if($FW_icons{default}{$name});
+  $name =~ s/@.*//;
+  foreach my $pe (@FW_iconDirs) {
+    return $name if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
+  }
   return undef;
 }
 
@@ -2162,9 +2229,11 @@ sub
 FW_iconPath($)
 {
   my ($name) = @_;
-  my $sp = ($FW_sp && $FW_icons{$FW_sp} ? $FW_icons{$FW_sp} : undef);
-  return "$FW_sp/$sp->{$name}" if($sp && $sp->{$name});
-  return "default/$FW_icons{default}{$name}" if($FW_icons{default}{$name});
+  $name =~ s/@.*//;
+  foreach my $pe (@FW_iconDirs) {
+    return "$pe/$FW_icons{$pe}{$name}"
+        if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
+  }
   return undef;
 }
 
@@ -2184,14 +2253,14 @@ FW_dev2image($)
 
   my ($icon, $rlink);
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
-  if(defined($devStateIcon)) {
-    if($devStateIcon =~ m/^{.*}$/) {
-      my ($html, $link) = eval $devStateIcon;
-      Log 1, "devStateIcon $name: $@" if($@);
-      return ($link, undef, 1) if(!$html); # only one value returned by the {}
-      return ($html, $link, 1);
-    }
+  if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
+    my ($html, $link) = eval $devStateIcon;
+    Log 1, "devStateIcon $name: $@" if($@);
+    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/);
+    $devStateIcon = $html;
+  }
 
+  if(defined($devStateIcon)) {
     my @list = split(" ", $devStateIcon);
     foreach my $l (@list) {
       my ($re, $iconName, $link) = split(":", $l, 3);
@@ -2200,7 +2269,11 @@ FW_dev2image($)
           $rlink = $link;
           last;
         }
-        return ($iconName, $link, (defined(FW_iconName($iconName)) ? 0 : 1));
+        if(defined(FW_iconName($iconName)))  {
+          return ($iconName, $link, 0);
+        } else {
+          return ($state, $link, 1);
+        }
       }
     }
   }
@@ -2263,10 +2336,11 @@ FW_roomStatesForInform($)
 
   my $data = "";
   my @rl = devspec2array("room=$room");
+  my %extPage = ();
   foreach my $dn (@rl) {
-    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n"
-        if($defs{$dn} && $defs{$dn}{STATE});
+        if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink");
   }
   return $data;
 }
@@ -2282,6 +2356,7 @@ FW_Notify($$)
   my $ln = $ntfy->{NAME};
   my $dn = $dev->{NAME};
   my $data;
+  my %extPage;
 
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
@@ -2294,7 +2369,7 @@ FW_Notify($$)
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
 
-    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
     $data = "$dn<<$dev->{STATE}<<$txt\n";
 
@@ -2351,9 +2426,9 @@ FW_FlushInform($)
 ###################
 # Compute the state (==second) column
 sub
-FW_devState($$)
+FW_devState($$@)
 {
-  my ($d, $rf) = @_;
+  my ($d, $rf, $extPage) = @_;
 
   my ($hasOnOff, $link);
 
@@ -2387,7 +2462,8 @@ FW_devState($$)
 
   }
 
-  $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
+  my $style = AttrVal($d, "devStateStyle", "");
+  $txt = "<div id=\"$d\" $style class=\"col2\">$txt</div>";
 
   if($hasOnOff) {
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
@@ -2408,7 +2484,7 @@ FW_devState($$)
       }
       $link .= "&room=$room";
     }
-    if(AttrVal($FW_wname, "longpoll", undef)) {
+    if(AttrVal($FW_wname, "longpoll", 1)) {
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
@@ -2419,6 +2495,20 @@ FW_devState($$)
 
     }
   }
+
+  my $type = $defs{$d}{TYPE};
+  my $sfn = $modules{$type}{FW_summaryFn};
+  if($sfn) {
+    if(!defined($extPage)) {
+       my %hash;
+       $extPage = \%hash;
+    }
+    no strict "refs";
+    my $newtxt = &{$sfn}($FW_wname, $d, $FW_room, $extPage);
+    use strict "refs";
+    $txt = $newtxt if(defined($newtxt)); # As specified
+  }
+
   return ($allSets, $cmdList, $txt);
 }
 
@@ -2816,6 +2906,16 @@ FW_dropdownFn()
       rendered differently in this mode to avoid switching back to the "normal"
       browser.
       </li>
+      <br>
+
+    <a name="iconPath"></a>
+    <li>iconPath<br>
+      colon separated list of directories where the icons are read from.
+      The directories start in the fhem/www/images directory. The default is
+      $stylesheetPrefix:default<br>
+      Set it to openautomation only to get a lot of SVG images.
+      </li>
+      <br>
 
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
@@ -2851,8 +2951,24 @@ FW_dropdownFn()
         In this mode status update is refreshed more or less instantaneously,
         and state change (on/off only) is done without requesting a complete
         refresh from the server.
+        Default is on.
         </li>
         <br>
+
+    <a name="longpollSVG"></a>
+    <li>longpollSVG<br>
+        Reloads an SVG weblink, if an event should modify its content. Since 
+        an exact determination of the affected events is too complicated, we
+        need some help from the #FileLog definition in the .gplot file: the
+        filter used there (second parameter) must either contain only the
+        deviceName or have the form deviceName.event or deviceName.*. This is
+        always the case when using the <a href="#weblinkEditor">Plot
+        editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
+        this deviceName.
+        Default is off.
+        </li>
+        <br>
+
 
     <a name="redirectCmds"></a>
     <li>redirectCmds<br>
@@ -2932,11 +3048,30 @@ FW_dropdownFn()
         attr lamp devStateIcon on::A0 off::AI<br>
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
+        Note: if the image is referencing an SVG icon, then you can use the
+        @colorname suffix to color the image. E.g.:<br>
+        <ul>
+        attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
+        </ul>
+
         </ul>
         Second form:<br>
         <ul>
-        Perl regexp enclosed in {}. Example:<br>
+        Perl regexp enclosed in {}. If the code returns undef, then the default
+        icon is used, if it retuns a string enclosed in <>, then it is
+        interpreted as an html string. Else the string is interpreted as a
+        devStateIcon of the first fom, see above.
+        Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        </ul>
+        </li>
+        <br>
+
+    <a name="devStateStyle"></a>
+    <li>devStateStyle<br>
+        Specify an HTML style for the given device, e.g.:<br>
+        <ul>
+        attr sensor devStateStyle style="text-align:left;;font-weight:bold;;"<br>
         </ul>
         </li>
         <br>

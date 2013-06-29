@@ -5,8 +5,17 @@ use strict;
 use warnings;
 use POSIX;
 
-sub CommandXmlList($$);
-sub XmlEscape($);
+sub HMinfo_Initialize($$);
+sub HMinfo_Define($$);
+sub HMinfo_getParam(@);
+sub HMinfo_regCheck(@);
+sub HMinfo_peerCheck(@);
+sub HMinfo_peerCheck(@);
+sub HMinfo_getEntities(@);
+sub HMinfo_SetFn($$);
+sub HMinfo_SetFnDly($);
+sub HMinfo_post($);
+
 use Blocking;
 
 sub HMinfo_Initialize($$) {####################################################
@@ -14,13 +23,33 @@ sub HMinfo_Initialize($$) {####################################################
 
   $hash->{DefFn}     = "HMinfo_Define";
   $hash->{SetFn}     = "HMinfo_SetFn";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 ".
+					   "sumStatus sumERROR ".
+                       $readingFnAttributes;
+
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   $hash->{Version} = "01";
-  $attr{$name}{webCmd} = "protoEvents:rssi:peerXref:configCheck:models";
+  $attr{$name}{webCmd} = "update:protoEvents:rssi:peerXref:configCheck:models";
+  $attr{$name}{sumStatus} =  "battery"
+                            .",sabotageError"
+							.",powerError"
+							.",motor";
+  $attr{$name}{sumERROR}  =  "battery:ok"
+                            .",sabotageError:off"
+							.",powerError:ok"
+							.",overload:off"
+							.",overheat:off"
+							.",reduced:off"
+							.",motorError:no"
+							.",error:none"
+							.",uncertain:yes"
+							.",smoke_detect:none"
+							.",cover:closed"
+							;
   return;
 }
 sub HMinfo_getParam(@) { ######################################################
@@ -159,6 +188,7 @@ use warnings;
 }
 
 sub HMinfo_SetFn($$) {#########################################################
+  my $start = time();
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
@@ -174,19 +204,17 @@ sub HMinfo_SetFn($$) {#########################################################
   }
 
   if   ($cmd eq "?" )         {##actionImmediate: clear parameter--------------
-	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig";
+	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
   }
   elsif($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
 	$opt .= "d" if ($type ne "Readings");# readings apply to all, others device only
 	my @entities;
+	return "unknown parameter - use Protocol,readings or rssi" if ($type !~ m/^(Protocol|readings|rssi)$/);
+	$type = "msgEvents" if ($type eq "Protocol");# translate parameter
 	foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
 	  push @entities,$dName;
-	  if ($type eq "Rssi"){
-	    delete $defs{$dName}{helper}{rssi};
-	    next;
-	  }
-	  CUL_HM_Set($defs{$dName},$dName,"clear",(($type eq "Protocol")?"msgEvents":"readings"));
+	  CUL_HM_Set($defs{$dName},$dName,"clear",$type);
 	}
 	return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
 						 ;
@@ -371,6 +399,9 @@ sub HMinfo_SetFn($$) {#########################################################
 						  )
 			.join"\n  ",grep(/$filter/,sort @model);  
   }
+  elsif($cmd eq "update")     {##update hm counts -----------------------------
+    return HMinfo_status($hash);
+  }
   elsif($cmd eq "help")       {
 	$ret = " Unknown argument $cmd, choose one of "
 		   ."\n ---checks---"
@@ -381,8 +412,9 @@ sub HMinfo_SetFn($$) {#########################################################
 	       ."\n saveConfig [<typeFilter>] <file>               # stores peers and register with saveConfig"       
 	       ."\n autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"       
 		   ."\n ---infos---"                                   
+	       ."\n update                                         # update HMindfo counts"  
 	       ."\n register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"  
-	       ."\n peerXref [<typeFilter>]                         peer cross-reference"
+	       ."\n peerXref [<typeFilter>]                        # peer cross-reference"
 	       ."\n models [<typeFilter>]                          # list of models incl native parameter"
 	       ."\n protoEvents [<typeFilter>]                     # protocol status - names can be filtered"
 	       ."\n param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"   
@@ -422,20 +454,9 @@ sub HMinfo_SetFn($$) {#########################################################
 	my $chCnt = ($hash->{helper}{childCnt}+1)%1000;
     my $childName = "child_".$chCnt;
 	
-	
-#    my $blkH = BlockingCall("HMinfo_SetFnDly", 
-#	                         join( ",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)), 
-#		                     "HMinfo_post", 
-#		                     10);
-#    $hash->{helper}{child}{$childName} = " started:".gettimeofday();
-#    $hash->{helper}{childCnt} = $chCnt;
-#	 my $chPid = $blkH->{pid};
-#    Log 1,"General parent started $childName PID:$chPid ".$hash->{helper}{child}{$childName};
-#    return "unblock started $childName PID:$chPid ".$hash->{helper}{child}{$childName};
-
-
     return HMinfo_SetFnDly(join(",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)));
   }
+  Log 1,"General duration:".(time() - $start);
   return $ret;
 }
 
@@ -472,6 +493,132 @@ sub HMinfo_post($) {###########################################################
   Log 1,"General deleted $childName now++++++++++++++";
   return "finished";
 }
+sub HMinfo_status($){##########################################################
+  # - count defined HM entities, selected readings, errors on filtered readings
+  # - display Assigned IO devices
+  # - show ActionDetector status
+  # - prot events if error
+  # - rssi - eval minimum values
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
+  #--- used for status
+  my @crit = split ",",$attr{$name}{sumStatus};#prepare event
+  my %sum;
+  #--- used for error counts
+  my @erro = split ",",$attr{$name}{sumERROR};
+  my %errFlt;
+  my %err;
+  my @errNames;
+  foreach (@erro){    #prepare reading filter for error counts
+    my ($p,@a) = split ":",$_;
+	$errFlt{$p}{x}=1; # add at least one reading
+	$errFlt{$p}{$_}=1 foreach (@a);
+  }
+  #--- used for IO, protocol  and communication (e.g. rssi)
+  my @IOdev;
+  my %prot = (NACK =>0,IOerr =>0,ResendFail  =>0,CmdDel  =>0,CmdPend =>0);
+  my @protNames;     # devices with current protocol events
+  my @Anames;        # devices with ActionDetector events
+  my %rssiMin;
+  my %rssiMinCnt = ("99>"=>0,"80<"=>0,"60>"=>0,"59<"=>0);
+  my @rssiNames;
+
+  foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
+    my $ehash = $modules{CUL_HM}{defptr}{$id};
+	my $eName = $ehash->{NAME};
+	$nbrE++;
+    $nbrC++ if ($ehash->{helper}{role}{chn});
+    $nbrV++ if ($ehash->{helper}{role}{vrt});
+	foreach my $read (grep {$ehash->{READINGS}{$_}} @crit){      #---- count critical readings
+	  my $val = $ehash->{READINGS}{$read}{VAL};
+	  $sum{$read}{$val} =0 if (!$sum{$read}{$val});
+      $sum{$read}{$val}++;
+	}
+	foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
+	  my $val = $ehash->{READINGS}{$read}{VAL};
+      next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
+	  $err{$read}{$val} =0 if (!$err{$read}{$val});
+      $err{$read}{$val}++;
+      push @errNames,$eName;
+	}
+    if ($ehash->{helper}{role}{dev}){#---restrict to devices
+	  $nbrD++;
+	  push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev});
+	  push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
+      foreach (grep {$ehash->{"prot".$_}} keys %prot){#protocol events reported
+	    $prot{$_}++;
+		push @protNames,$eName;
+	  }
+	  $rssiMin{$eName} = 0;
+      foreach (keys %{$ehash->{helper}{rssi}}){
+        $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
+	      if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
+      }
+	}
+  }
+  #====== collection finished - start data preparation======
+  delete $hash->{$_} foreach (grep(/^(ERR|sum_)/,keys%{$hash}));# remove old 
+
+  foreach my $read(grep {defined $sum{$_}} @crit){       #--- disp crt count
+    $hash->{"sum_".$read} = "";
+    $hash->{"sum_".$read} .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+  }
+  foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
+    $hash->{"ERR_".$read} = "";
+    $hash->{"ERR_".$read} .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
+  }
+
+  my %allE; # remove duplicates
+  $allE{$_}=0 foreach (grep !//, @errNames);
+  @errNames = sort keys %allE;
+  $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
+
+  $hash->{sumDefined} = "entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
+  # ------- display status of action detector ------
+  $hash->{actTotal} = $modules{CUL_HM}{defptr}{"000000"}{STATE};
+  $hash->{ERRactNames} = join",",@Anames;
+  
+  # ------- what about IO devices??? ------
+  my %tmp; # remove duplicates
+  $tmp{$_}=0 for @IOdev;
+  delete $tmp{""}; #remove empties if present
+  @IOdev = sort keys %tmp;
+  foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
+    $_ .= ":".$defs{$_}{READINGS}{cond}{VAL};
+  }
+  $hash->{HM_IOdevices}= join",",@IOdev;
+  
+  # ------- what about protocol events ------
+  # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
+  # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
+  my @tp;
+  push @tp,"$_:$prot{$_}" foreach (grep {$prot{$_}} keys(%prot));
+  $hash->{ERR__protocol}   = join",",@tp        if(@tp);
+
+  my %all; # remove duplicates
+  $all{$_}=0 foreach (grep !//,@protNames);
+  @protNames = sort keys %all;
+  $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
+  
+  # ------- what about rssi low readings ------
+  foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
+    if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
+    elsif ($rssiMin{$_}> -80) {$rssiMinCnt{"60>"}++;}
+    elsif ($rssiMin{$_}< -99) {$rssiMinCnt{"99>"}++;
+	                           push @rssiNames,$_  ;}
+    else                      {$rssiMinCnt{"80<"}++;}
+  }
+ 
+  $hash->{rssiMinLevel} = "";
+  $hash->{rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
+  $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
+
+  # ------- update own status ------
+  $hash->{STATE} = "updated:".TimeNow();
+  return;
+}
+
 1;
 =pod
 =begin html
@@ -481,7 +628,24 @@ sub HMinfo_post($) {###########################################################
 <ul>
   <tr><td>
   HMinfo is a module that shall support in getting an overview of 
-  eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. 
+  eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. <br><br>
+  <B>Status information and counter</B><br>
+  hminfo tries to give an overview on the CUL_HM installed base including current conditions. 
+  Readings and counter will not be updates automatically due to performance issues. <br>
+  Command <a href="#HMinfoupdate">update</a> must be used to refresh the values. 
+  <ul><code>
+           set hm update<br>
+  </code></ul>
+  Webview of HMinfo will provide details, mainly based counter drivern, on how 
+  many CUL_HM entities experience certain conditions. Areas provided are 
+  <li>Action Detector status</li>
+  <li>CUL_HM related IO devices with their condition</li>
+  <li>Device protocol events which are related to communication errors</li>
+  <li>count of certain readings (e.g. batterie) with their condition - <a href="HMinfoattr">attribut controlled</a></li>
+  <li>count of error condition in readings (e.g. overheat, motorError) - <a href="HMinfoattr">attribut controlled</a></li>  
+  
+  <br>
+  
   It also allows some HM wide commands such 
   as store all collected register settings.<br><br>
   
@@ -489,7 +653,7 @@ sub HMinfo_post($) {###########################################################
   If applicable and evident execution is restricted to related entities. 
   This means that rssi is executed only on devices, never channels since 
   they never have support rssi values.<br><br>
-  <b>Filter</b>
+  <a name="HMinfoFilter"><b>Filter</b></a>
   <ul>  can be applied as following:<br><br>
         <code>set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]</code><br>
         whereby filter has two segments, typefilter and name filter<br>
@@ -515,57 +679,59 @@ sub HMinfo_post($) {###########################################################
            set hm param -dcv expert # get attribut expert for all channels,devices or virtuals<br>
         </code></ul>
   </ul>
-  <br>
-  <a name="HMinfodefine"></a>
-  <b>Define</b>
+  <br>  
+  <a name="HMinfodefine"><b>Define</b></a>
   <ul>
     <code>define &lt;name&gt; HMinfo</code><br> 
     Just one entity needs to be defines, no parameter are necessary.<br> 	
   </ul>
   <br>
 
-  <a name="HMinfoset"></a>
-  <b>Set</b>
+  
+  <a name="HMinfoset"><b>Set</b></a>
   <ul>
   even though the commands are more a get funktion they are implemented 
   as set to allow simple web interface usage<br>
     <ul>
-      <li><a href="#models">models</a><br>
+      <li><a name="#HMinfoupdate">update</a><br>
+	      updates HM status counter.
+	  </li>
+      <li><a name="#HMinfomodels">models</a><br>
 	      list all HM models that are supported in FHEM
 	  </li>
-      <li><a href="#param">param &lt;name&gt; &lt;name&gt;...</a><br>
+      <li><a name="#HMinfoparam">param</a> <a href="HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
 	      returns a table parameter values (attribute, readings,...) 
 	  	for all entities as a table
 	  </li>
-      <li><a href="#regCheck">regCheck</a><br>
-	      performs a consistancy check on register readings for completeness
+      <li><a name="#HMinfopeerXref">peerXref</a> <a href="HMinfoFilter">[filter]</a><br>
+	      provides a cross-reference on peerings, a kind of who-with-who summary over HM
 	  </li>
-      <li><a href="#peerCheck">peerCheck</a><br>
+      <li><a name="#HMinforegister">register</a> <a href="HMinfoFilter">[filter]</a><br>
+	      provides a tableview of register of an entity
+	  </li>
+	  
+      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="HMinfoFilter">[filter]</a><br>
+	      performs a consistancy check of HM settings. It includes regCheck and peerCheck
+	  </li>
+      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="HMinfoFilter">[filter]</a><br>
 	      performs a consistancy check on peers. If a peer is set in one channel 
 	  	this funktion will search wether the peer also exist on the opposit side.
 	  </li>
-      <li><a href="#configCheck">configCheck</a><br>
-	      performs a consistancy check of HM settings. It includes regCheck and peerCheck
+      <li><a name="#HMinforegCheck">regCheck</a> <a href="HMinfoFilter">[filter]</a><br>
+	      performs a consistancy check on register readings for completeness
 	  </li>
-      <li><a href="#peerXref">peerXref</a><br>
-	      provides a cross-reference on peerings, a kind of who-with-who summary over HM
+
+      <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="HMinfoFilter">[filter]</a><br>
+	      schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher. 
 	  </li>
-      <li><a href="#saveConfig">saveConfig</a><br>
-	      performs a save for all HM register setting. 
+      <li><a name="#HMinfoclear">clear [Protocol|Readings|Rssi]</a> <a href="HMinfoFilter">[filter]</a><br>
+	      executes a set clear ...  on all HM entities<br>
+		  <li>Protocol relates to set clear msgEvents</li>
+		  <li>Readings relates to set clear readings</li>
+		  <li>Rssi clears all rssi counters </li>
 	  </li>
-      <li><a href="#clearProtocol">clearProtocol</a><br>
-	      executes a set clear msgEvents on all HM devices
-	  </li>
-      <li><a href="#clearReadings">clearReadings</a><br>
-	      executes a set clear readings on all HM devices
-	  </li>
-      <li><a href="#clearRssi">clearRssi</a><br>
-	      executes a set clear rssi on all HM devices
-	  </li>
-      <li><a href="#autoReadReg">autoReadReg</a><br>
-	      stimulates a read of the configuration for the devices.
-	  </li>
-      <li><a href="#sys">sys</a><br>
+      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="HMinfoFilter">[filter]</a><br>
+	      performs a save for all HM register setting and peers. See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>. 
 	  </li>
     </ul>  
   </ul>
@@ -576,9 +742,74 @@ sub HMinfo_post($) {###########################################################
   <ul> N/A </ul>
   <br><br>
 
-  <a name="HMinfoattr"></a>
-  <b>Attributes</b>
-  <ul>N/A</ul>
+  <a name="HMinfoattr"><b>Attributes</b></a>
+   <ul>
+    <li><a name="#HMinfosumStatus">sumStatus</a><br>
+	    List of readings that shall be screend and counted based on current presence. 
+		I.e. counter is the number of entities with this reading and the same value. 
+		Readings to be searched are separated by comma. <br>
+		Example: <br>
+		<code>
+           attr hm sumStatus battery,sabotageError<br>
+        </code>
+		will cause a reading like<br>
+		sum_batterie ok:5 low:3<br>
+		sum_sabotageError on:1<br>
+		<br>
+		Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
+		Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
+	</li>
+    <li><a name="#HMinfosumERROR">sumERROR</a>
+	    Similar to sumStatus but with a focus on error conditions in the system. 
+		Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
+		good-condition that will not be counted.<br>
+		This way user must not know all error values but it is sufficient to supress known non-ciritical ones. 
+		Example: <br>
+		<code>
+           attr hm sumERROR battery:ok,sabotageError:off,overheat:off,Activity:alive:unknown<br>
+        </code>
+		will cause a reading like<br>
+		ERR_batterie low:3<br>
+		ERR_sabotageError on:1<br>
+		ERR_overheat on:3<br>
+		ERR_Activity dead:5<br>
+	</li>
+   </ul>
+   <br>
+  <a name="HMinfovariables"><b>Variables</b></a>
+   <ul>
+    <li><b>ERR___rssiCrit:</b> list of device names with RSSI reading n min level </li>
+    <li><b>rssiMinLevel:</b> counts of rssi min readings per device, clustered in blocks</li>
+
+    <li><b>ERR__protocol:</b> count of non-recoverable protocol events per device. 
+	    Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
+        Coutned are the number of device with those events, not the number of events!</li>
+    <li><b>ERR__protoNames:</b> name-list of devices with non-recoverable protocol events</li>
+    <li><b>HM_IOdevices:</b> list of IO devices used by CUL_HM entities</li>
+    <li><b>actTotal:</b> action detector state, count of devices with ceratin states</li>
+    <li><b>ERRactNames:</b> names of devices that are not alive according to ActionDetector</li>
+    <li><b>sumDefined:</b> count of defines entities in CUL_HM. Entites might be count as 
+	    device AND channel if channel funtion is covered by the device itself. Similar to virtual</li>
+    <li><b>ERR_&lt;reading&gt;:</b> count of readings as defined in attribut 
+	    <a href="#HMinfosumERROR">sumERROR</a>
+	    that do not match the good-content. </li>
+    <li><b>ERR_names:</b> name-list of entities that are counted in any ERR_&lt;reading&gt;
+        sum_&lt;reading&gt;: count of readings as defined in attribut 
+		<a href="#HMinfosumStatus">sumStatus</a>. </li>
+    Example:<br>
+	<li><code>
+      ERR___rssiCrit LightKittchen,WindowDoor,Remote12
+      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1
+      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5
+      ERR_battery: low:2;
+      ERR_names: remote1,buttonClara,
+      rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4
+      sum_battery: ok:5;low:2;
+      sum_overheat: off:7;
+      sumDefined: entities:23 device:11 channel:16 virtual:5;
+	</code></li>
+
+   </ul>
 </ul>
 =end html
 =cut

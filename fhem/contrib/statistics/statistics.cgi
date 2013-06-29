@@ -22,6 +22,25 @@
 #  GNU General Public License for more details.
 #
 ################################################################
+use Time::HiRes qw(gettimeofday);
+
+sub
+Log($)
+{
+  my $text = shift;
+  my @t = localtime;
+  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
+          $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
+  my ($seconds, $microseconds) = gettimeofday();
+  $tim .= sprintf(".%03d", $microseconds/1000);
+  print LOG "$tim  $text\n";
+}
+
+open(LOG, ">>log.out");
+LOG->autoflush(1);
+Log("Starting");
+
+
 use CGI qw(:standard Vars);
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
 use DBI; #requires libdbd-sqlite3-perl
@@ -29,6 +48,7 @@ use lib "./lib";
 use Geo::IP;
 use strict;
 use warnings;
+
 no warnings 'uninitialized';
 
 sub createDB();
@@ -44,6 +64,10 @@ sub drawColumnChartTop10Modules(@);
 sub drawColumnChartTop10ModDef(@);
 sub drawBarChartModules(@);
 sub viewStatistics();
+
+my %tblColName;
+my %tblSum;
+my %tblCnt;
 
 # cascading style sheet
 my $css = "http://fhem.de/../css/style.css";
@@ -79,6 +103,7 @@ if(index($ua,"Fhem") > -1) {
   print header("application/x-www-form-urlencoded");
   insertDB();
   print "==> ok";
+  Log("Upload-End");
 } else {
   viewStatistics();
 }
@@ -198,6 +223,7 @@ sub viewStatistics() {
   </div>
 END
   print end_html;
+  Log("Stat-End");
 }
 
 sub googleVisualizationLib($) {
@@ -306,21 +332,30 @@ sub drawColumnChartTop10ModDef(@) {
   my ($table,$postfix,$rowtitle,$width,$height,$divID) = @_;
   $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
   $sth->execute();
-  my $res = $sth->{NAME};
+  my @res = @{$sth->{NAME}};
+  $tblColName{$table} = \@res;
   $sth->finish;
 
-  my %hash = ();
-  foreach my $column (@$res) {
-    my ($sum) = $dbh->selectrow_array("SELECT sum($column) FROM $table");
-    $hash{$column} = $sum;
+  my @cols = map { "sum($_),count($_)" }
+             grep { $_ ne "uniqueID" } @res;
+  $sth = $dbh->prepare("SELECT ".join(",",@cols)." FROM $table");
+  $sth->execute();
+  my @row = $sth->fetchrow_array;
+  my %sum = ();
+  my %cnt = ();
+  for(my $idx = 0; $idx < @res; $idx++) {
+    $sum{$res[$idx]} = $row[2*$idx];
+    $cnt{$res[$idx]} = $row[2*$idx+1];
   }
+  $sth->finish;
+  $tblSum{$table} = \%sum;
+  $tblCnt{$table} = \%cnt;
 
   my $data;
   my $i=0;
-  foreach my $column (sort {$hash{$b} <=> $hash{$a}} keys %hash) {
-    next if($column eq "uniqueID");
+  foreach my $column (sort {$sum{$b} <=> $sum{$a}} keys %sum) {
     next if($excludeFromTop10definitions =~ /$column/);
-    $data .= "\t['$column',$hash{$column}],\n";
+    $data .= "\t['$column',$sum{$column}],\n";
     $i++;
     last if($i == 10);
   }
@@ -487,6 +522,7 @@ sub drawTable2cols(@) {
 
   my %hash = ();
   foreach my $column (@$res) {
+    next if($column =~ m/["']/);
     my ($sum) = $dbh->selectrow_array("SELECT sum(\"$column\") FROM $table");
     $hash{$column} = $sum;
   }
@@ -531,19 +567,37 @@ END
 
 sub drawTable3cols(@) {
   my ($table,$postfix,$type1,$title1,$type2,$title2,$type3,$title3,$divID) = @_;
-  $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
+
+###################
+# Results in "Internal Error 500", and 1und1 will not give me an error-log
+# extract.
+###################
+#  $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
+#  $sth->execute();
+#  my $res = $sth->{NAME};
+#  $sth->finish;
+#
+#  my %hash = ();
+#
+#  foreach my $column (@$res) {
+#    my ($count) = $dbh->selectrow_array("SELECT count(\"$column\") FROM $table WHERE \"$column\" != 0");
+#    my ($sum)   = $dbh->selectrow_array("SELECT sum(\"$column\") FROM $table");
+#    $hash{$column}{count} = $count;
+#    $hash{$column}{sum}   = $sum;
+#  }
+
+  $sth = $dbh->prepare("SELECT * FROM $table");
   $sth->execute();
-  my $res = $sth->{NAME};
-  $sth->finish;
-
-  my %hash = ();
-  foreach my $column (@$res) {
-    my ($count) = $dbh->selectrow_array("SELECT count(\"$column\") FROM $table WHERE \"$column\" != 0");
-    my ($sum)   = $dbh->selectrow_array("SELECT sum(\"$column\") FROM $table");
-    $hash{$column}{count} = $count;
-    $hash{$column}{sum}   = $sum;
+  my %hash;
+  while(my $h = $sth->fetchrow_hashref) {
+     foreach my $k (keys %{$h}) {
+       next if($k eq "uniqueID");
+       $hash{$k}{count}++ if($h->{$k});
+       $hash{$k}{sum} += $h->{$k} if($h->{$k});
+     }
   }
-
+  $sth->finish;
+  
   my $data;
   foreach my $column (sort {$hash{$b} <=> $hash{$a}} keys %hash) {
     next if($column eq "uniqueID");
@@ -663,12 +717,20 @@ sub checkColumn($$) {
 
   # get table info
   my %column = %{ $dbh->column_info(undef, undef,$t, undef)->fetchall_hashref('COLUMN_NAME') };
-
   # check if column exists
-  if(!exists $column{$k}) {
+  my $found;
+  foreach my $col (keys %column) {
+    if(lc($col) eq lc($k)) {
+      $found = 1;
+      last;
+    } 
+  }
+  if(!$found) {
+    Log "Adding column >$k<";
     $sth = $dbh->prepare("ALTER TABLE $t ADD COLUMN '$k' INTEGER DEFAULT 0");
     $sth->execute();
     $sth->finish;
+    Log "..Add ok";
   }
 
   return;

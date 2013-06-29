@@ -117,8 +117,7 @@ FileLog_Log($$)
   my $max = int(@{$dev->{CHANGED}});
   my $tn = $dev->{NTFY_TRIGGERTIME};
   my $ct = $dev->{CHANGETIME};
-  my $wrotesome;
-  my $fh = $log->{FH};
+  my $fh;
   my $switched;
 
   for (my $i = 0; $i < $max; $i++) {
@@ -132,12 +131,11 @@ FileLog_Log($$)
         FileLog_Switch($log);
         $switched = 1;
       }
-
+      $fh = $log->{FH};
       print $fh "$t $n $s\n";
-      $wrotesome = 1;
     }
   }
-  if($wrotesome) {
+  if($fh) {
     $fh->flush;
     # Skip sync, it costs too much HD strain, esp. on SSD
     # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
@@ -385,9 +383,9 @@ FileLog_Get($@)
     $internal = 1;
   }
 
-      
+
   if($inf eq "-") {
-    # In case the plot is drawn afte midnight, before the first event is logged.
+    # In case now is after midnight, before the first event is logged.
     FileLog_Switch($hash);
     $inf = $hash->{currentlogfile};
 
@@ -401,6 +399,8 @@ FileLog_Get($@)
         $linf =~ s/%Y/$Y/g;
         $linf =~ s/%m/$m/g;
         $linf =~ s/%d/$d/g;
+        $linf =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir});
+        $linf = $hash->{currentlogfile} if($linf =~ m/%/);
       } else {
         $linf = $hash->{currentlogfile};
       }
@@ -415,7 +415,6 @@ FileLog_Get($@)
     if(!-f $linf) {
       # ... or in the archivelog
       $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
-      $linf = "";
     }
     $inf = $linf;
   }
@@ -846,7 +845,7 @@ seekTo($$$$)
           <li>&lt;col&gt;
             The column number to return, starting at 1 with the date.
             If the column is enclosed in double quotes, then it is a fix text,
-            not a column nuber.</li>
+            not a column number.</li>
           <li>&lt;regexp&gt;
             If present, return only lines containing the regexp. Case sensitive.
             </li>

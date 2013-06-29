@@ -436,7 +436,8 @@ MAX_Set($@)
     return "Number of arguments must be even" if(@args%2 == 1);
 
     #Send wakeUp, so we can send the weekprofile pakets without preamble
-    MAX_WakeUp($hash) if( @args > 2 );
+    #Disabled for now. Seems like the first packet is lost. Maybe inserting a delay after the wakeup will fix this
+    #MAX_WakeUp($hash) if( @args > 2 );
 
     for(my $i = 0; $i < @args; $i += 2) {
       return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
@@ -597,6 +598,9 @@ MAX_Parse($$)
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
 
+    my $measOffset = MAX_ReadingsVal($shash,"measurementOffset");
+    $measuredTemperature -= $measOffset if($measuredTemperature ne "" and $measOffset ne "" and $shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN");
+
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
     $shash->{dstsetting} = $dstsetting;
@@ -611,9 +615,13 @@ MAX_Parse($$)
     #The formatting of desiredTemperature must match with in MAX_Set:$templist
     #Sometime we get an MAX_Parse MAX,1,ThermostatState,01090d,180000000000, where desiredTemperature is 0 - ignore it
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature)) if($desiredTemperature != 0);
-    readingsBulkUpdate($shash, "valveposition", $valveposition);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$measuredTemperature));
+      if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
+        readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
+      } else {
+        readingsBulkUpdate($shash, "valveposition", $valveposition);
+      }
     }
 
   }elsif($msgtype ~~ ["WallThermostatState", "WallThermostatControl" ]){
