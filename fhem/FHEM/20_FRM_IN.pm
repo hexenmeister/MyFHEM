@@ -30,7 +30,7 @@ FRM_IN_Initialize($)
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_IN_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
 
 sub
@@ -54,26 +54,29 @@ FRM_IN_observer
 	my ($pin,$old,$new,$hash) = @_;
 	main::Log(6,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--"));
 	my $name = $hash->{NAME};
-	main::readingsBeginUpdate($hash);
-	if (defined my $mode = AttrVal($name,"count-mode",undef)) {
-		if ($mode ne "none" 
-		and ($old ne $new) 
-		and (($mode eq "rising" and $old == PIN_LOW)
-		or ($mode eq "falling" and $old == PIN_HIGH)
-	    or ($mode eq "both"))) {
-	    	my $count = ReadingsVal($name,"count",0);
-	    	$count++;
-	    	if (defined my $threshold = AttrVal($name,"count-threshold",undef)) {
-	    		if ( $count >= $threshold ) {
-	    			main::readingsBulkUpdate($hash,"alarm","on",1);
-	    			$count=0;
-	    		}
-	    	}
-	    	main::readingsBulkUpdate($hash,"count",$count,1);
-	    } 
-	};
-	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
-	main::readingsEndUpdate($hash,1);
+	if ($old ne $new or !defined $hash->{reading} or $hash->{reading} ne $new) { 
+  	main::readingsBeginUpdate($hash);
+  	if (defined (my $mode = AttrVal($name,"count-mode",undef))) {
+  		if ($mode ne "none" 
+  		and (($mode eq "rising" and $old == PIN_LOW)
+  		or ($mode eq "falling" and $old == PIN_HIGH)
+  	    or ($mode eq "both"))) {
+  	    	my $count = ReadingsVal($name,"count",0);
+  	    	$count++;
+  	    	if (defined (my $threshold = AttrVal($name,"count-threshold",undef))) {
+  	    		if ( $count >= $threshold ) {
+  	    			main::readingsBulkUpdate($hash,"alarm","on",1);
+  	    			if (AttrVal($name,"reset-on-threshold-reached","no") ne "no") {
+  	    			  $count=0;
+  	    			}
+  	    		}
+  	    	}
+  	    	main::readingsBulkUpdate($hash,"count",$count,1);
+  	    } 
+  	};
+  	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
+  	main::readingsEndUpdate($hash,1);
+	}
 }
 
 sub
