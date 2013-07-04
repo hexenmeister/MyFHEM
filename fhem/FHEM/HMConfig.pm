@@ -236,8 +236,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 
   OffLevelKm      =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>127.5   ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
   OnLevelKm       =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>127.5   ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
-  OnRampOnSp      =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp on speed"},
-  OnRampOffSp     =>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp off speed"},
+  RampOnSp        =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp on speed"},
+  RampOffSp       =>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp off speed"},
 
   RampSstep       =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"rampStartStep"},
   RampOnTime      =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"rampOnTime"},
@@ -826,6 +826,11 @@ $culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
+  "HM-CC-TC00"     =>{ "day-temp"     => "[on,off,6.0..30.0]",
+                       "night-temp"   => "[on,off,6.0..30.0]",
+                       "party-temp"   => "[on,off,6.0..30.0]",
+                       "desired-temp" => "[on,off,6.0..30.0]", 
+                       sysTime        => ""	  },
   "HM-CC-TC02"     =>{ peerChan       => "<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]",
                        "day-temp"     => "[on,off,6.0..30.0]",
                        "night-temp"   => "[on,off,6.0..30.0]",
@@ -843,14 +848,13 @@ my %culHmChanSets = (
                        displayTempUnit => "[celsius|fahrenheit]",
                        controlMode    => "[manual|auto|central|party]",
                        decalcDay      => "day",       
-                       sysTime        =>	""	  },
+                       sysTime        => ""	  },
   "HM-SEC-WIN01"   =>{ stop         =>"",
                        level        =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01" =>{ led       => "<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02" =>{ playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"}
 );
 # clones- - - - - - - - - - - - - - - - - 
-$culHmChanSets{"HM-CC-TC00"}     = $culHmChanSets{"HM-CC-TC02"};
 $culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
 
 # RC send BCAST to specific address. Is the meaning understood?

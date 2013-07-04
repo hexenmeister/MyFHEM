@@ -18,6 +18,7 @@ sub HMinfo_post($);
 
 use Blocking;
 
+
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
 
@@ -188,7 +189,6 @@ use warnings;
 }
 
 sub HMinfo_SetFn($$) {#########################################################
-  my $start = time();
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
@@ -399,6 +399,9 @@ sub HMinfo_SetFn($$) {#########################################################
 						  )
 			.join"\n  ",grep(/$filter/,sort @model);  
   }
+  elsif($cmd eq "template")   {##template set of register ---------------------
+    return HMinfo_template(@a);
+  }
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     return HMinfo_status($hash);
   }
@@ -456,7 +459,6 @@ sub HMinfo_SetFn($$) {#########################################################
 	
     return HMinfo_SetFnDly(join(",",($childName,$name,$cmd,$opt,$optEmpty,$filter,@a)));
   }
-  Log 1,"General duration:".(time() - $start);
   return $ret;
 }
 
@@ -480,7 +482,7 @@ sub HMinfo_SetFnDly($) {#######################################################
 						 ;
   }
   else{
-	$ret = " Unknown argument ";
+	return "autoReadReg clear configCheck param peerCheck peerXref protoEvents models regCheck register rssi saveConfig update";
   }
   return $ret;
 }
@@ -600,6 +602,13 @@ sub HMinfo_status($){##########################################################
   $all{$_}=0 foreach (grep !//,@protNames);
   @protNames = sort keys %all;
   $hash->{ERR__protoNames} = join",",@protNames if(@protNames);
+
+  if ($modules{CUL_HM}{helper}{autoRdCfgLst}){
+     $hash->{autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{autoRdCfgLst}};
+  }
+  else{
+    delete $hash->{autoReadPend};
+  }
   
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
@@ -609,7 +618,7 @@ sub HMinfo_status($){##########################################################
 	                           push @rssiNames,$_  ;}
     else                      {$rssiMinCnt{"80<"}++;}
   }
- 
+  
   $hash->{rssiMinLevel} = "";
   $hash->{rssiMinLevel} .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
   $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
@@ -619,6 +628,94 @@ sub HMinfo_status($){##########################################################
   return;
 }
 
+
+my %tpl = (
+   autoOff       => {p=>"time"         ,t=>"staircase - auto off after <time>"
+                     ,reg=>{ OnTime          =>"p0"
+                           ,OffTime         =>0        
+					 }}
+  ,autotst       => {p=>"time[s] para2",t=>"testTemplate with 2 parameter"
+                    ,reg=>{ R1              =>"p0"
+                           ,R2              =>"p0"        
+                           ,R3              =>"geLo"        
+                           ,R4              =>"p1"     
+					 }}
+  ,motionOnDim   => {p=>"ontime brightness",t=>"Dimmer:on considering sensor brightness"
+                    ,reg=>{ CtOn            =>"ltLo"        
+                           ,CtDlyOff        =>"ltLo"     
+                           ,CtOn            =>"ltLo"        
+                           ,CtOff           =>"ltLo"        
+                           ,CtValLo         =>"p1"     
+                           ,CtRampOn        =>"ltLo"        
+                           ,CtRampOff       =>"ltLo"     
+                           ,OffTime         =>111600        
+                           ,OnTime          =>"p0"   
+						   
+                           ,ActionTypeDim   =>"jmpToTarget"        
+                           ,DimJtOn         =>"on"        
+                           ,DimJtOff        =>"dlyOn"     
+                           ,DimJtDlyOn      =>"rampOn"        
+                           ,DimJtDlyOff     =>"dlyOn"        
+                           ,DimJtRampOn     =>"on"     
+                           ,DimJtRampOff    =>"dlyOn" 
+					 }}
+  ,motionOnSw    => {p=>"ontime brightness",t=>"Switch:on considering sensor brightness"
+                    ,reg=>{ CtOn            =>"ltLo"        
+                           ,CtDlyOff        =>"ltLo"     
+                           ,CtOn            =>"ltLo"        
+                           ,CtOff           =>"ltLo"        
+                           ,CtValLo         =>"p1"     
+                           ,OffTime         =>111600        
+                           ,OnTime          =>"p0"   
+						   
+                           ,ActionType     =>"jmpToTarget"        
+                           ,SwJtOn         =>"on"        
+                           ,SwJtOff        =>"dlyOn"     
+                           ,SwJtDlyOn      =>"on"        
+                           ,SwJtDlyOff     =>"dlyOn"        
+					}}
+);
+
+
+
+
+sub HMinfo_template(@){########################################################
+  #set hm template LichtF autoOff FB2:short 10
+  #set hm template LichtF autotst FB2:short 10 3
+  #Checks
+  my ($aName,$tmpl,$pSet,@p) = @_;
+  $pSet = "" if (!$pSet);
+  my ($pName,$pTyp) = split(":",$pSet);
+  return "template undefined $tmpl" if (!(grep /$tmpl/, keys%tpl));
+  return "aktor $aName unknown" if (!$defs{$aName});
+  return "give <peer>:[short|long] with peer, not $pSet" if($pName && $pTyp !~ m/(short|long)/);
+  $pSet = $pSet eq "long"?"lg":"sh";
+
+  my @regCh;
+  foreach (keys%{$tpl{$tmpl}{reg}}){
+    my $regN = $pSet.$_;
+    my $regV = $tpl{$tmpl}{reg}{$_};
+	if ($regV =~m /^p(.)$/) {#replace with User parameter
+	  return "insufficient values - at least ".$tpl{p}." are $1 necessary" if (@p < ($1+1));
+	  $regV = $p[$1];
+	}
+	my $ret = CUL_HM_Set($defs{$aName},$aName,"regSet",$regN,"?",$pName);
+	return "Device doesn't support $regN - template $tmpl not applicable"
+	    if ($ret =~ m/failed:/);
+	return "Device doesn't support literal $regV for reg $regN"
+	     if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);#literal supported?
+	return "peer necessary for template"
+	     if ($ret =~ m/peer required/ && !$pName);#
+	#return "range invalid" if (...)
+	push @regCh,"$regN,$regV";
+  }
+  foreach (@regCh){#Finally execute
+#    my $ret = CUL_HM_Set($defs{$aName},$aName,"regSet",split(",",$_),$peer);
+	Log 1,"General template write ".$_." for $pName";
+#	return $ret if ($ret);
+  }
+  #CUL_HM_Set($defs{$dName},$dName,"clear",$type);
+}
 1;
 =pod
 =begin html
@@ -778,6 +875,8 @@ sub HMinfo_status($){##########################################################
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
    <ul>
+    <li><b>autoReadPend:</b> list of entities which are queued to retrieve config and status. 
+	                        This is typically scheduled thru autoReadReg</li>
     <li><b>ERR___rssiCrit:</b> list of device names with RSSI reading n min level </li>
     <li><b>rssiMinLevel:</b> counts of rssi min readings per device, clustered in blocks</li>
 

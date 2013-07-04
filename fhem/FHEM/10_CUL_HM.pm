@@ -162,14 +162,15 @@ sub CUL_HM_reqStatus($){
 sub CUL_HM_autoReadConfig($){
   # will trigger a getConfig and statusrequest for each device assigned.
   #
-  while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
-    my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
+  while(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}){
+    my $name = shift(@{$modules{CUL_HM}{helper}{autoRdCfgLst}});
     my $hash = $defs{$name};
+	delete $hash->{autoRead};
 	if (0 != CUL_HM_getAttrInt($name,"autoReadReg")){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
-	  InternalTimer(gettimeofday()+15,"CUL_HM_autoReadConfig","updateConfig",0);
+	  InternalTimer(gettimeofday()+15,"CUL_HM_autoReadConfig","autoRdCfg",0);
 	  last;
 	}
   }
@@ -179,10 +180,7 @@ sub CUL_HM_updateConfig($){
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
-  my @getConfList;
-  my @nameList = CUL_HM_noDup(@{$modules{CUL_HM}{helper}{updtCfgLst}});
-  while(@nameList){
-    my $name = shift(@nameList);
+  foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
 	my $id = $hash->{DEF};
     my $chn = substr($id."00",6,2);
@@ -282,10 +280,9 @@ sub CUL_HM_updateConfig($){
     no warnings 'numeric';
     my $autoRead = int(AttrVal($name,"autoReadReg",0))+0;
     use warnings 'numeric';
-	push @getConfList,$name if (0 != $autoRead);
+	CUL_HM_queueAutoRead($name) if (0 != $autoRead);
   }
-  $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-  CUL_HM_autoReadConfig("updateConfig");
+  delete $modules{CUL_HM}{helper}{updtCfgLst};
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -321,14 +318,8 @@ sub CUL_HM_Define($$) {##############################
   CUL_HM_ActGetCreateHash() if($HMid eq '000000');#startTimer
   $hash->{DEF} = $HMid;
   CUL_HM_Parse($hash, $a[3]) if(int(@a) == 4);
-  RemoveInternalTimer("updateConfig");
-  InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
  
-  my @arr;
-  if(!$modules{CUL_HM}{helper}{updtCfgLst}){
-    $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
-  }
-  push(@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name);
+  CUL_HM_queueUpdtCfg($name);
   return undef;
 }
 sub CUL_HM_Undef($$) {###############################
@@ -427,15 +418,7 @@ sub CUL_HM_Attr(@) {#################################
 	$updtReq = 1; 
   }
 
-  if ($updtReq){
-    my @arr;
-    if(!$modules{CUL_HM}{helper}{updtCfgLst}){
-      $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
-    }
-    push(@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name);
-    RemoveInternalTimer("updateConfig");
-    InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
-  }
+  CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
 
@@ -450,7 +433,7 @@ sub CUL_HM_Parse($$) {##############################
   my ($len,$mNo,$mFlg,$mTp,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
-  
+
   if ($msgStat){
     return "" if($msgStat eq 'NACK');#discard if lowlevel error
   }
@@ -497,12 +480,13 @@ sub CUL_HM_Parse($$) {##############################
     if(   $shash->{helper}{rpt}                           #was responded
        && $shash->{helper}{rpt}{IO}  eq $ioName           #from same IO
        && $shash->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
-#       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.5 #todo: hack since HMLAN sends duplicate status messages
+       && $shash->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
+	                                                      #todo: hack since HMLAN sends duplicate status messages
 	   ){
 	  my $ack = $shash->{helper}{rpt}{ack};#shorthand
 	  my $i=0;
-      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
 	  $shash->{helper}{rpt}{ts} = gettimeofday();
+      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
       Log GetLogLevel($name,4), "CUL_HM $name dup: repeat ack, dont process";
 	}
 	else{
@@ -511,7 +495,7 @@ sub CUL_HM_Parse($$) {##############################
     return $name; #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
-  $iohash->{HM_CMDNR} = hex($mNo) if($dst eq $id);# updt message cnt to rec
+#  $iohash->{HM_CMDNR} = hex($mNo) if($dst eq $id);# updt message cnt to rec
   delete $shash->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
   
@@ -1258,8 +1242,8 @@ sub CUL_HM_Parse($$) {##############################
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
-    if($mTp =~ m/^4./ && $p =~ m/^(..)(..)/) { #Push Button event
-      my ($recChn,$trigNo) = (hex($1),hex($2));# button number/event count
+    if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
+      my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
 	  my $longPress = ($recChn & 0x40)?"long":"short";
 	  my $recId = $src.sprintf("%02X",($recChn&0x3f));
 	  foreach my $dChId (CUL_HM_getAssChnIds($dname)){# need to check all chan
@@ -1582,13 +1566,32 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   return $ret;
 }
+sub CUL_HM_queueUpdtCfg($){
+  my $name = shift;
+  my @arr;
+  if ($modules{CUL_HM}{helper}{updtCfgLst}){
+    @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
+  }
+  else{
+    push @arr,$name;
+  }
+  $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
+  RemoveInternalTimer("updateConfig");
+  InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
+}
 sub CUL_HM_queueAutoRead($){
   my $name = shift;
   my @arr;
-  @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
-  $modules{CUL_HM}{helper}{updtCfgLst} =\@arr;
-  RemoveInternalTimer("updateConfig");
-  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "updateConfig", 0);
+  if ($modules{CUL_HM}{helper}{autoRdCfgLst}){
+    @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{autoRdCfgLst}}, $name));
+  }
+  else{
+    my @arr = ($name);
+  }
+  $modules{CUL_HM}{helper}{autoRdCfgLst} =\@arr;
+  $defs{$name}{autoRead} = "scheduled";
+  RemoveInternalTimer("autoRdCfg");
+  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "autoRdCfg", 0);
 }
 
 #+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1840,8 +1843,7 @@ sub CUL_HM_Set($@) {
 
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
-  if($cmd =~ m/^(displayMode|displayTemp|controlMode|decalcDay|displayTempUnit)$/ ||
-     $cmd =~ m/^(day|night|party)-temp$/){ #
+  if($cmd =~ m/^(day|night|party)-temp$/){ #
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value
     ($chn,$isChannel) = ("02","true");#force chn 02
   }
@@ -2045,7 +2047,9 @@ sub CUL_HM_Set($@) {
 	   
     my $reg  = $culHmRegDefine{$regName};
 	return $st." - ".$regName            # give some help
-	       ." range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+	       .($reg->{lit}? " liternal:".join(",",keys%{$reg->{lit}})." "
+	                    : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+			 )
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
@@ -2129,14 +2133,15 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
 	                    sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   } 
-  elsif($cmd eq "on") { #######################################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
+  elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
+    my $lvl = ($cmd eq 'on')  ? 'C8':
+	         (($cmd eq 'off') ? '00':(CUL_HM_getChnLvl($name) != 0 ?"00":"C8"));
+	if($st eq "blindActuator") { # need to stop blind to protect relais
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
+	}
+    CUL_HM_PushCmdStack($hash,"++$flag"."11$id$dst"."02$chn$lvl".'0000');
 	$hash = $chnHash; # report to channel if defined
-  } 
-  elsif($cmd eq "off") { ######################################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
-	$hash = $chnHash; # report to channel if defined
-  } 
+  }
   elsif($cmd =~ m/^(on-for-timer|on-till)$/) { ################################
     my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
     if ($cmd eq "on-till"){
@@ -2148,16 +2153,12 @@ sub CUL_HM_Set($@) {
 	  $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
 	  $duration = $eSec - $ltSec;	  
     }
-	return "please enter the duration in seconds" if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+	return "please enter the duration in seconds" 
+	      if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
  	$hash = $chnHash; # report to channel if defined
- } 
-  elsif($cmd eq "toggle") { ###################################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
-	            (CUL_HM_getChnLvl($name) != 0 ?"000000":"C80000"));
-	$hash = $chnHash; # report to channel if defined
-  }
+  } 
   elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
   }
@@ -2187,6 +2188,9 @@ sub CUL_HM_Set($@) {
 	if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       $tval = $a[3]?CUL_HM_encodeTime16($a[3]):"FFFF";# onTime 0.05..85825945.6, 0=forever
       $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
+	}
+	elsif($st eq "blindActuator") { # need to stop blind to protect relais
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn)
 	}
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
@@ -2384,8 +2388,8 @@ sub CUL_HM_Set($@) {
     return "To many arguments, max is 24 pairs" if(@a > 50);
     return "Bad format, use HH:MM TEMP ..."     if(@a % 2);
     return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
-    my $data = "";
-    my $msg = "";
+	
+    my ($data,$msg) = ("","");
     for(my $idx = 2; $idx < @a; $idx += 2) {
       return "$a[$idx] is not in HH:MM format"
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
@@ -2771,6 +2775,7 @@ sub CUL_HM_SndCmd($$) {
 
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? (($io->{HM_CMDNR} +1)&0xff) : 1;
+    $io->{HM_CMDNR} = $mn;
   } 
   elsif($cmd =~ m/^[+-]/){; #continue pure
     IOWrite($hash, "", $cmd);
@@ -2779,7 +2784,6 @@ sub CUL_HM_SndCmd($$) {
   else {
     $mn = hex($mn);
   }
-  $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   CUL_HM_responseSetup($hash,$cmd);	

@@ -75,6 +75,7 @@ use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
+my $FW_activateInform = 0;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -113,6 +114,7 @@ FHEMWEB_Initialize($)
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_SecurityCheck";
+  $hash->{ActivateInformFn} = "FW_ActivateInform";
   $hash->{AttrList}= 
     "loglevel:0,1,2,3,4,5,6 webname fwcompress:0,1 ".
     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 plotfork ".
@@ -123,7 +125,8 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon", "sortby", "devStateStyle");
+  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
+                                "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -355,7 +358,8 @@ FW_answerCall($)
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
   $FW_ss = ($FW_sp =~ m/smallscreen/);
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
-  @FW_iconDirs = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default"));
+  @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
+                                "$FW_sp:fhemSVG:openautomation:default"));
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -553,6 +557,11 @@ FW_answerCall($)
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
+
+  if($FW_activateInform) {
+    $FW_cmdret = $FW_activateInform = "";
+    $cmd = "style eventMonitor";
+  }
 
   if($FW_cmdret) {
     $FW_detail = "";
@@ -1861,7 +1870,7 @@ FW_style($$)
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = FW_fileList("$FW_cssdir/.*style.css");
+    my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
     FW_pO "$start<table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
@@ -2072,9 +2081,9 @@ FW_makeImage(@)
       if($col) {
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
-        $data =~ s/fill="#000000"/fill="$col"/;
+        $data =~ s/fill="#000000"/fill="$col"/g;
       } else {
-        $data =~ s/fill="#000000"//;
+        $data =~ s/fill="#000000"//g;
       }
       return $data;
     } else {
@@ -2256,7 +2265,7 @@ FW_dev2image($)
   if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/) {
     my ($html, $link) = eval $devStateIcon;
     Log 1, "devStateIcon $name: $@" if($@);
-    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/);
+    return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);
     $devStateIcon = $html;
   }
 
@@ -2406,7 +2415,11 @@ FW_Notify($$)
     # Collect multiple changes (e.g. from noties) into one message
     $ntfy->{INFORMBUF} .= $data;
     RemoveInternalTimer($ln);
-    InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+    if(length($ntfy->{INFORMBUF}) > 1024) {
+      FW_FlushInform($ln);
+    } else {
+      InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+    }
   }
 
   return undef;
@@ -2672,6 +2685,12 @@ FW_dropdownFn()
       "$fwsel</form></td>";
   }
   return undef;
+}
+
+sub 
+FW_ActivateInform()
+{
+  $FW_activateInform = 1;
 }
 
 1;
