@@ -165,61 +165,55 @@ sub FRM_OWX_firmata_to_device
 #
 ########################################################################################
 
-sub search() {
-	my ($self) = @_;
-	if ( my $hash = $self->{hash} ) {
-		if ( my $frm = $hash->{IODev} ) {
-			if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
-				$firmata->onewire_search($pin);
-				return 1;
-			};
+sub search($) {
+	my ($self,$hash) = @_;
+	if ( my $frm = $hash->{IODev} ) {
+		if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
+			$firmata->onewire_search($pin);
+			return 1;
 		};
 	};
 	return undef;
 };
 
-sub alarms() {
-	my ($self) = @_;
-	if ( my $hash = $self->{hash} ) {
-		if ( my $frm = $hash->{IODev} ) {
-			if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
-				$firmata->onewire_search_alarms($pin);
-				return 1;
-			};
+sub alarms($) {
+	my ($self,$hash) = @_;
+	if ( my $frm = $hash->{IODev} ) {
+		if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
+			$firmata->onewire_search_alarms($pin);
+			return 1;
 		};
 	};
 	return undef;
 };
 
-sub execute($$$$$$) {
-	my ( $self, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
+sub execute($$$$$$$) {
+	my ( $self, $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
 	
-	if ( my $hash = $self->{hash} ) {
-		if ( my $frm = $hash->{IODev} ) {
-			if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
-				my @data = unpack "C*", $data if defined $data;
-				my $id = $self->{id} if ($numread);
-				my $ow_command = {
-					'reset'  => $reset,
-					'skip'   => defined ($owx_dev) ? undef : 1,
-					'select' => defined ($owx_dev) ? FRM_OWX_device_to_firmata($owx_dev) : undef,
-					'read'   => $numread,
-					'write'  => @data ? \@data : undef, 
-					'delay'  => $delay,
-					'id'     => $numread ? $id : undef
-				};
-				if ($numread) {
-					$owx_dev = '00.000000000000.00' unless defined $owx_dev;
-					$self->{requests}->{$id} = {
-						context => $context,
-						command => $ow_command,
-						device  => $owx_dev
-					};
-					$self->{id} = (($id+1) & 0xFFFF);
-				};		
-				$firmata->onewire_command_series( $pin, $ow_command );
-				return 1;
+	if ( my $frm = $hash->{IODev} ) {
+		if (my $firmata = $frm->{FirmataDevice} and my $pin = $self->{pin} ) {
+			my @data = unpack "C*", $data if defined $data;
+			my $id = $self->{id} if ($numread);
+			my $ow_command = {
+				'reset'  => $reset,
+				'skip'   => defined ($owx_dev) ? undef : 1,
+				'select' => defined ($owx_dev) ? FRM_OWX_device_to_firmata($owx_dev) : undef,
+				'read'   => $numread,
+				'write'  => @data ? \@data : undef, 
+				'delay'  => $delay,
+				'id'     => $numread ? $id : undef
 			};
+			if ($numread) {
+				$owx_dev = '00.000000000000.00' unless defined $owx_dev;
+				$self->{requests}->{$id} = {
+					context => $context,
+					command => $ow_command,
+					device  => $owx_dev
+				};
+				$self->{id} = (($id+1) & 0xFFFF);
+			};		
+			$firmata->onewire_command_series( $pin, $ow_command );
+			return 1;
 		};
 	};
 	return undef;
