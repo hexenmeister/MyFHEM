@@ -2082,8 +2082,10 @@ FW_makeImage(@)
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
         $data =~ s/fill="#000000"/fill="$col"/g;
+        $data =~ s/fill:#000000/fill:$col/g;
       } else {
         $data =~ s/fill="#000000"//g;
+        $data =~ s/fill:#000000//g;
       }
       return $data;
     } else {
@@ -2188,7 +2190,7 @@ FW_readIconsFrom($$)
         unless($entry eq "." || $entry eq ".." || $entry eq ".svn");
 
     } else {
-      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")) {
+      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")){
         while(my $l = <FH>) {
           chomp($l);
           my @a = split(" ", $l);
@@ -2202,7 +2204,6 @@ FW_readIconsFrom($$)
 
         my $tag = $filename;     # Add it without extension too
         $tag =~ s/\.[^.]*$//;
-        #Log 1, "Adding $dir $tag -> $filename";
         $FW_icons{$dir}{$tag} = $filename;
       }
     }
@@ -2343,14 +2344,16 @@ FW_roomStatesForInform($)
   my ($room) = @_;
   return "" if(!$room);
 
-  my $data = "";
   my @rl = devspec2array("room=$room");
   my %extPage = ();
+  my @data;
   foreach my $dn (@rl) {
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
-    $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n"
-        if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink");
+    if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
+      push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
+    }
   }
+  my $data = join("\n", map { s/\n/ /gm; $_ } @data)."\n";
   return $data;
 }
 
@@ -2364,7 +2367,7 @@ FW_Notify($$)
 
   my $ln = $ntfy->{NAME};
   my $dn = $dev->{NAME};
-  my $data;
+  my @data;
   my %extPage;
 
   my $rn = AttrVal($dn, "room", "");
@@ -2380,7 +2383,7 @@ FW_Notify($$)
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
-    $data = "$dn<<$dev->{STATE}<<$txt\n";
+    push @data, "$dn<<$dev->{STATE}<<$txt";
 
     #Add READINGS
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
@@ -2391,8 +2394,8 @@ FW_Notify($$)
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$dev->{CHANGED}[$i],2);
-        $data .= "$dn-$readingName<<$readingVal<<$readingVal\n";
-        $data .= "$dn-$readingName-ts<<$tn<<$tn\n";
+        push @data, "$dn-$readingName<<$readingVal<<$readingVal";
+        push @data, "$dn-$readingName-ts<<$tn<<$tn";
       }
     }
   } elsif($filter eq "console") {
@@ -2405,15 +2408,14 @@ FW_Notify($$)
       my $max = int(@{$dev->{CHANGED}});
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
-        $data .= "$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>\n";
+        push @data,("$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>");
       }
     }
-
   }
 
-  if($data) {
+  if(@data) {
     # Collect multiple changes (e.g. from noties) into one message
-    $ntfy->{INFORMBUF} .= $data;
+    $ntfy->{INFORMBUF} .= join("\n", map { s/\n/ /gm; $_ } @data)."\n";
     RemoveInternalTimer($ln);
     if(length($ntfy->{INFORMBUF}) > 1024) {
       FW_FlushInform($ln);
