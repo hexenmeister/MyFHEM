@@ -178,7 +178,6 @@ sub work(;$) {
 	my $item = undef;
 	foreach my $address (keys %$delayed) {
 		next if (tv_interval($delayed->{$address}->{'until'}) < 0);
-		my @now = gettimeofday;
 		my @delayed_items = @{$delayed->{$address}->{'items'}}; 
 		$item = shift @delayed_items;
 		delete $delayed->{$address} unless scalar(@delayed_items);# or $item->{delay};

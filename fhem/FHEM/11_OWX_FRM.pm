@@ -27,6 +27,7 @@ use strict;
 use warnings;
 
 use Device::Firmata::Constants qw/ :all /;
+use Time::HiRes qw(gettimeofday tv_interval);
 
 sub new() {
 	my ($class) = @_;
@@ -197,6 +198,32 @@ sub alarms($) {
 
 sub execute($$$$$$$) {
 	my ( $self, $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
+
+  my $delayed = $self->{delayed};
+  
+  if ($owx_dev and my $queue = $delayed->{$owx_dev}) {
+    if ($context or $reset or $data or $numread or $delay) {
+      push @$queue->{items}, {
+        context => $context,
+        'reset' => $reset,
+        device  => $owx_dev,
+        data    => $data,
+        numread => $numread,
+        delay   => $delay
+      };
+    }
+    if (tv_interval($queue->{'until'}) >= 0) {
+      my $item = shift @$queue->{items};
+      $context = $item->{context};
+      $reset   = $item->{'reset'};
+      $data    = $item->{data};
+      $numread = $item->{numread};
+      $delay   = $item->{delay};
+      delete $self->{delayed}->{$owx_dev} unless (@$queue);
+    } else {
+      return 1;
+    }
+  }
 	
 	my $success = undef;
 	eval {
@@ -209,7 +236,7 @@ sub execute($$$$$$$) {
   			'select' => defined ($owx_dev) ? FRM_OWX_device_to_firmata($owx_dev) : undef,
   			'read'   => $numread,
   			'write'  => @data ? \@data : undef, 
-  			'delay'  => $delay,
+  			'delay'  => undef,
   			'id'     => $numread ? $id : undef
   		};
   		if ($numread) {
@@ -228,6 +255,21 @@ sub execute($$$$$$$) {
 	if ($@) {
 	  $self->exit($hash);
 	};
+	if ($success and $delay and $owx_dev) {
+		unless ($delayed->{$owx_dev}) {
+      $delayed->{$owx_dev} = { items => [] };
+		}
+		my ($seconds,$micros) = gettimeofday;
+		my $len = length ($delay); #delay is millis, tv_address works with [sec,micros]
+		if ($len>3) {
+			$seconds += substr($delay,0,$len-3);
+			$micros += (substr ($delay,$len-8).000);
+		} else {
+			$micros += ($delay.000);
+		}
+		$delayed->{$owx_dev}->{'until'} = [$seconds,$micros];
+		main::InternalTimer("$seconds.$micros","OWX_Poll",$hash,1);
+	}
 	return $success;
 };
 
@@ -237,10 +279,20 @@ sub exit($) {
 };
 
 sub poll($) {
-	my ($self,$hash) = @_;
+  my ($self,$hash) = @_;
 	if (my $frm = $hash->{IODev} ) {
-		main::FRM_poll($frm);
-	};		
+    main::FRM_poll($frm);
+    my $delayed = $self->{delayed};
+    foreach my $address (keys %$delayed) {
+      next if (tv_interval($delayed->{$address}->{'until'}) < 0);
+      my @delayed_items = @{$delayed->{$address}->{'items'}}; 
+  		my $item = shift @delayed_items;
+  		delete $delayed->{$address} unless scalar(@delayed_items);# or $item->{delay};
+  		$self->execute($hash,$item->{context},$item->{'reset'},$item->{device},$item->{data},$item->{numread},$item->{delay});
+  		main::FRM_poll($frm);
+  		last;
+    }
+	}   
 };
 
 1;
