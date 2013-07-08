@@ -81,11 +81,15 @@ sub Define ($$) {
 	}
 	my $dev = $a[2];
     
-    #-- when the specified device name contains @<digits> already, use it as supplied
-    if ( $dev !~ m/\@\d*/ ){
-      $hash->{DeviceName} = $dev."\@9600";
-    }
-    return undef;
+  #-- when the specified device name contains @<digits> already, use it as supplied
+  if ( $dev !~ m/\@\d*/ ){
+    $hash->{DeviceName} = $dev."\@9600";
+  }
+  $dev = split('@',$dev);
+  #-- let fhem.pl MAIN call OWX_Ready when setup is done.
+  $main::readyfnlist{"$hash->{NAME}.$dev"} = $hash;
+    
+  return undef;
 }
 
 ########################################################################################

@@ -87,6 +87,11 @@ sub Define($) {
       main::Log(1, "OWX_CCC: Can't open ".$dev) if( $hwdevice->{STATE} ne "Initialized");
       #-- reset the 1-Wire system in COC/CUNO
       main::CUL_SimpleWrite($hwdevice, "Oi");
+      
+      $dev = split('@',$dev);
+      #-- let fhem.pl MAIN call OWX_Ready when setup is done.
+      $main::readyfnlist{"$hash->{NAME}.$dev"} = $hash;
+      
       return undef;
     }else{
       main::Log(1, $msg." not defined");

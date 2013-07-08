@@ -198,9 +198,8 @@ sub OWX_Define ($$) {
   $hash->{INTERFACE} = $owx->{interface};
 
   $hash->{STATE} = "Defined";
-  $dev = split('@',$dev);
-  #-- let fhem.pl MAIN call OWX_Ready when setup is done.
-  $main::readyfnlist{"$hash->{NAME}.$dev"} = $hash;
+  
+  main::InternalTimer(gettimeofday()+5, "OWX_Init", $hash,0);
 	return undef;
 }
 
@@ -208,7 +207,10 @@ sub OWX_Ready ($) {
   my $hash = shift;
   unless ( $hash->{STATE} eq "Active" ) {
     my $ret = OWX_Init($hash);
-    Log (GetLogLevel($hash->{NAME},2),"OWX: Error initializing ".$hash->{NAME}.": ".$ret) if ($ret);
+    if ($ret) {
+      Log (GetLogLevel($hash->{NAME},2),"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
+      return undef;
+    }
   }
 	return 1;
 };
@@ -239,7 +241,7 @@ sub OWX_Disconnect($) {
 sub OWX_Disconnected($) {
 	my ($hash) = @_;
 	Log (GetLogLevel($hash->{NAME},4), "OWX_Disconnected");
-	if (my $async = $hash->{ASYNC}) {
+	if ($hash->{ASYNC} and $hash->{ASYNC} != $hash->{OWX}) {
 		delete $hash->{ASYNC};
 	};
 	if (my $owx = $hash->{OWX}) {
@@ -615,8 +617,7 @@ sub OWX_Search($) {
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async) {
 		delete $hash->{DEVS};
-		$async->search($hash);
-		return 1;		
+		return $async->search($hash);
 	} else {
 		my $owx_interface = $hash->{INTERFACE};
 		if( !defined($owx_interface) ) {
@@ -646,7 +647,7 @@ sub OWX_AwaitSearchResponse($) {
 
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async) {
-		my $times = AttrVal($hash,"timeout",50000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
+		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
 		for (my $i=0;$i<$times;$i++) {
 			if(! defined $hash->{DEVS} ) {
 				select (undef,undef,undef,0.05);
@@ -876,6 +877,7 @@ sub OWX_Get($@) {
 sub OWX_Init ($) {
   my ($hash)=@_;
   
+  RemoveInternalTimer($hash);
   if (defined ($hash->{ASNYC})) {
   	$hash->{ASYNC}->exit($hash);
   	$hash->{ASYNC} = undef; #TODO should we call delete on $hash->{ASYNC}?
@@ -886,11 +888,12 @@ sub OWX_Init ($) {
   if (defined $owx) {
 	$hash->{INTERFACE} = $owx->{interface};
   	  #-- Third step: see, if a bus interface is detected
-  	if ($owx->Init($hash)) {
+  	if (my $ret = $owx->Init($hash)) {
       $hash->{PRESENT} = 0;
-      readingsSingleUpdate($hash,"state","failed",1);
-      $main::init_done = 1; 
-      return "OWX_Init failed";
+      $hash->{STATE} = "Init Failed";
+      #readingsSingleUpdate($hash,"state","failed",1);
+      #$main::init_done = 1; 
+      return "OWX_Init failed: $ret";
     }
    	$hash->{INTERFACE} = $owx->{interface};
   } else {
@@ -919,7 +922,7 @@ sub OWX_Init ($) {
   #-- InternalTimer blocks if init_done is not true
   my $oid = $main::init_done;
   $hash->{PRESENT} = 1;
-  readingsSingleUpdate($hash,"state","defined",1);
+  #readingsSingleUpdate($hash,"state","defined",1);
   $main::init_done = 1;
   #-- Intiate first alarm detection and eventually conversion in a minute or so
   InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
@@ -1096,9 +1099,8 @@ sub OWX_Verify ($$) {
 				};
 			};
 		};
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
 ########################################################################################
