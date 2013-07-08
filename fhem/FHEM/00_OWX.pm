@@ -335,9 +335,11 @@ sub OWX_AfterAlarms($$) {
   	my ($hash,$alarmed_devs) = @_;
   	my $romid = $hash->{ROM_ID};
   	if (grep {/$romid/} @$alarmed_devs) {
-  		readingsSingleUpdate($hash,"ALARM",1,1) unless ($hash->{PRESENT});
+  		readingsSingleUpdate($hash,"alarm",1,!$hash->{ALARM});
+  		$hash->{ALARM}=1;
   	} else {
-  		readingsSingleUpdate($hash,"ALARM",0,1) if ($hash->{PRESENT});
+  		readingsSingleUpdate($hash,"alarm",0, $hash->{ALARM});
+  		$hash->{ALARM}=0;
   	}
   });
 };
@@ -683,11 +685,13 @@ sub OWX_AfterSearch($$) {
   		my ($hash,$owx_devs) = @_;
   		my $romid = $hash->{ROM_ID};
   		if (grep {/$romid/} @$owx_devs) {
-  			readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
+  			readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT});
+  			$hash->{PRESENT} = 1;
   		} else {
-  			readingsSingleUpdate($hash,"PRESENT",0,1) if ($hash->{PRESENT});
+  			readingsSingleUpdate($hash,"present",0,$hash->{PRESENT});
+  			$hash->{PRESENT} = 0;
   		}
-  	});
+  	},$owx_devs);
   }
 }
 
@@ -948,20 +952,21 @@ sub OWX_Kick($) {
 
   #-- Call us in n seconds again.
   InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
-  #-- During reset we see if an alarmed device is present.
-  OWX_Reset($hash);
-   
+
   #-- Only if we have the dokick attribute set to 1
-  if( defined($attr{$hash->{NAME}}{dokick}) &&  ($attr{$hash->{NAME}}{dokick} eq "1") ){
+  if (main::AttrVal($hash->{NAME},"dokick",0)) {
     #-- issue the skip ROM command \xCC followed by start conversion command \x44 
-    $ret = OWX_Complex($hash,"","\xCC\x44",0);
-    if( $ret eq 0 ){
+    $ret = OWX_Execute($hash,"kick",1,undef,"\xCC\x44",0,undef);
+    if( !$ret ){
       Log (GetLogLevel($hash->{NAME},3), "OWX: Failure in temperature conversion\n");
       return 0;
     }
-    #-- sleeping for some time
-    select(undef,undef,undef,0.5);
   }
+  
+  if (OWX_Search($hash)) {
+    OWX_Alarms($hash);
+  };
+  
   return 1;
 }
 
@@ -1036,7 +1041,7 @@ sub OWX_Set($@) {
   if( $a[0] eq "interval" ){
     #-- only values >= 15 secs allowed
     if( $a[1] >= 15){
-      $hash->{interval} = $a[1];  
+      $hash->{interval} = $a[1];
   	  $res = 1;
   	} else {
   	  $res = 0;
@@ -1047,10 +1052,10 @@ sub OWX_Set($@) {
   if( $a[0] eq "followAlarms" ){
     #-- only values >= 15 secs allowed
     if( (lc($a[1]) eq "off") && ($hash->{followAlarms} eq "on") ){
-      $hash->{interval} = "off";  
+      $hash->{followAlarms} = "off";  
   	  $res = 1;
   	}elsif( (lc($a[1]) eq "on") && ($hash->{followAlarms} eq "off") ){
-      $hash->{interval} = "off";  
+      $hash->{followAlarms} = "on";  
   	  $res = 1;
   	} else {
   	  $res = 0;
@@ -1093,10 +1098,8 @@ sub OWX_Verify ($$) {
 	my $address = substr($dev,0,15);
 	if (OWX_Search($hash)) {
 		if (my $owx_devices = OWX_AwaitSearchResponse($hash)) {
-			foreach my $found (@{$owx_devices}) {
-				if ($address eq substr($found,0,15)) {
-					return 1;
-				};
+		  if (grep {/$address/} @{$owx_devices}) {
+		    return 1;
 			};
 		};
 	}

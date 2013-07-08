@@ -5,6 +5,7 @@
 # FHEM module to commmunicate with general 1-Wire ID-ROMS
 #
 # Prof. Dr. Peter A. Henning
+# Norbert Truchsess
 #
 # $Id$
 #
@@ -52,7 +53,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="4.00";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -190,7 +191,12 @@ sub OWID_Define ($$) {
   InternalTimer(time()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
   
   #--
-  readingsSingleUpdate($hash,"state","Initialized",1); 
+  readingsSingleUpdate($hash,"state","Initialized",1);
+  
+  if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
+		$main::attr{$hash->{NAME}}{"stateFormat"} = "{\$hash->{READINGS}{present} ? \"present\" : \"not present\"}";
+	}
+   
   return undef; 
 }
 
@@ -238,12 +244,12 @@ sub OWID_Get($@) {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
-    $hash->{PRESENT} = $value;
     if( $value == 0 ){
-      readingsSingleUpdate($hash,"state","not present",1); 
+      readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
     } else {
-      readingsSingleUpdate($hash,"state","present",1); 
+      readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
     }
+    $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
   
@@ -279,12 +285,12 @@ sub OWID_GetValues($) {
   #-- hash of the busmaster
   my $master       = $hash->{IODev};
   $value           = OWX_Verify($master,$hash->{ROM_ID});
-  $hash->{PRESENT} = $value;
   if( $value == 0 ){
-    readingsSingleUpdate($hash,"state","not present",1); 
+    readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
   } else {
-    readingsSingleUpdate($hash,"state","present",1); 
+    readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
   }
+  $hash->{PRESENT} = $value;
 }
 
 #######################################################################################
