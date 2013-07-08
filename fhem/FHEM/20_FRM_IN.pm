@@ -10,6 +10,7 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "alarm" => "",
+  "count" => 0,
 );
 
 my %gets = (
@@ -26,6 +27,7 @@ FRM_IN_Initialize($)
 
   $hash->{SetFn}     = "FRM_IN_Set";
   $hash->{GetFn}     = "FRM_IN_Get";
+  $hash->{AttrFn}    = "FRM_IN_Attr";
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_IN_Undef";
@@ -56,18 +58,20 @@ FRM_IN_observer
 	my $name = $hash->{NAME};
 	if ($old ne $new or !defined $hash->{reading} or $hash->{reading} ne $new) { 
   	main::readingsBeginUpdate($hash);
-  	if (defined (my $mode = AttrVal($name,"count-mode",undef))) {
+  	if (defined (my $mode = main::AttrVal($name,"count-mode",undef))) {
   		if ($mode ne "none" 
   		and (($mode eq "rising" and $old == PIN_LOW)
   		or ($mode eq "falling" and $old == PIN_HIGH)
   	    or ($mode eq "both"))) {
-  	    	my $count = ReadingsVal($name,"count",0);
+  	    	my $count = main::ReadingsVal($name,"count",0);
   	    	$count++;
-  	    	if (defined (my $threshold = AttrVal($name,"count-threshold",undef))) {
-  	    		if ( $count >= $threshold ) {
-  	    			main::readingsBulkUpdate($hash,"alarm","on",1);
-  	    			if (AttrVal($name,"reset-on-threshold-reached","no") ne "no") {
+  	    	if (defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
+  	    		if ( $count > $threshold ) {
+  	    			if (AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
   	    			  $count=0;
+  	    			  main::readingsBulkUpdate($hash,"alarm","on",1);
+  	    			} elsif ( main::ReadingsVal($name,"alarm","off") ne "on" ) {
+  	    			  main::readingsBulkUpdate($hash,"alarm","on",1);
   	    			}
   	    		}
   	    	}
@@ -93,7 +97,11 @@ FRM_IN_Set
       return undef if (!($value eq "off" or $value eq "on"));
       main::readingsSingleUpdate($hash,"alarm",$value,1);
       last;
-    }
+    };
+    $command eq "count" and do {
+      main::readingsSingleUpdate($hash,"count",$value,1);
+      last;
+    };
   }
 }
 
@@ -118,6 +126,44 @@ FRM_IN_Get($)
     };
   }
   return undef;
+}
+
+sub
+FRM_IN_Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+  if ($command eq "set") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "count-mode" and do {
+        if ($value ne "none" and !defined main::ReadingsVal($name,"count",undef)) {
+          main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
+        }
+        last;
+      }; 
+      $attribute eq "reset-on-threshold-reached" and do {
+        if ($value eq "yes"
+        and defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
+          if (main::ReadingsVal($name,"count",0) > $threshold) {
+            main::readingsSingleUpdate($main::defs{$name},"count",$sets{count},1);
+          }
+        }
+        last;
+      };
+      $attribute eq "count-threshold" and do {
+        if (main::ReadingsVal($name,"count",0) > $value) {
+          my $hash = $main::defs{$name};
+          main::readingsBeginUpdate($hash);
+          if (main::ReadingsVal($name,"alarm","off") ne "on") {
+            main::readingsBulkUpdate($hash,"alarm","on",1);
+          }
+          if (main::AttrVal($name,"reset-on-threshold-reached","no") eq "yes") {
+            main::readingsBulkUpdate($main::defs{$name},"count",0,1);
+          }
+          main::readingsEndUpdate($hash,1);
+        }
+        last;
+      };
+    }
+  }
 }
 
 sub
