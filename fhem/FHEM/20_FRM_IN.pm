@@ -32,7 +32,7 @@ FRM_IN_Initialize($)
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_IN_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
 
 sub
@@ -41,8 +41,14 @@ FRM_IN_Init($$)
 	my ($hash,$args) = @_;
 	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_INPUT);
 	return $ret if (defined $ret);
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	$firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
+	eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    $firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
+  	if (defined (my $pullup = AttrVal($hash->{NAME},"internal-pullup",undef))) {
+  	  $firmata->digital_write($hash->{PIN},$pullup eq "on" ? 1 : 0);
+  	}
+	}
+	return $@ if (defined $@);
 	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
 		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
 	}
@@ -162,6 +168,12 @@ FRM_IN_Attr($$$$) {
         }
         last;
       };
+      $attribute eq "internal-pullup" and do {
+      	eval {
+          my $firmata = FRM_Client_FirmataDevice($hash);
+          $firmata->digital_write($hash->{PIN},$value eq "on" ? 1 : 0);
+      	};
+      }      
     }
   }
 }
