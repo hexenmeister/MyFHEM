@@ -47,7 +47,7 @@ FRM_IN_Init($$)
   	if (defined (my $pullup = AttrVal($hash->{NAME},"internal-pullup",undef))) {
   	  $firmata->digital_write($hash->{PIN},$pullup eq "on" ? 1 : 0);
   	}
-	}
+	};
 	return $@ if (defined $@);
 	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
 		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
@@ -173,7 +173,9 @@ FRM_IN_Attr($$$$) {
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($hash->{PIN},$value eq "on" ? 1 : 0);
       	};
-      }      
+      	#ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
+      	last;
+      };  
     }
   }
 }
