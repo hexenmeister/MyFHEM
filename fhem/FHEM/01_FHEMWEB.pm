@@ -14,7 +14,7 @@ sub FW_iconName($);
 sub FW_iconPath($);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
-sub FW_dev2image($);
+sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
 sub FW_doDetail($);
@@ -72,10 +72,12 @@ use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
 use vars qw(%FW_webArgs); # all arguments specified in the GET
+use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
 
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
+my $FW_formmethod = "post";
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -133,6 +135,10 @@ FHEMWEB_Initialize($)
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
+  if(opendir(DH, "$FW_dir/pgm2")) {
+    @FW_fhemwebjs = sort grep /^fhemweb.*js$/, readdir(DH);
+    closedir(DH);
+  }
 
   $data{webCmdFn}{slider}     = "FW_sliderFn";
   $data{webCmdFn}{timepicker} = "FW_timepickerFn";
@@ -238,10 +244,19 @@ FW_Read($)
   }
 
   $hash->{BUF} .= $buf;
-  return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
-
-  @FW_httpheader = split("[\r\n]", $hash->{BUF});
-
+  if(!$hash->{HDR}) {
+    return if($hash->{BUF} !~ m/^(.*)(\n\n|\r\n\r\n)(.*)$/s);
+    $hash->{HDR} = $1;
+    $hash->{BUF} = $3;
+    if($hash->{HDR} =~ m/Content-Length: ([^\r\n]*)/s) {
+      $hash->{CONTENT_LENGTH} = $1;
+    }
+  }
+  return if($hash->{CONTENT_LENGTH} &&
+            length($hash->{BUF})<$hash->{CONTENT_LENGTH});
+    
+  @FW_httpheader = split("[\r\n]", $hash->{HDR});
+  delete($hash->{HDR});
 
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
@@ -257,8 +272,9 @@ FW_Read($)
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   my @headerOptions = grep /OPTIONS/, @FW_httpheader;
   if($basicAuth) {
-    $hash->{BUF} =~ m/Authorization: Basic ([^\r\n]*)/s;
-    my $secret = $1;
+    my @authLine = grep /Authorization: Basic/, @FW_httpheader;
+    my $secret = $authLine[0];
+    $secret =~ s/^Authorization: Basic // if($secret);
     my $pwok = ($secret && $secret eq $basicAuth);
     if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
@@ -275,7 +291,8 @@ FW_Read($)
       print $c "HTTP/1.1 200 OK\r\n",
              $FW_headercors,
              "Content-Length: 0\r\n\r\n";
-      $hash->{BUF}="";
+      delete $hash->{CONTENT_LENGTH};
+      delete $hash->{BUF};
       return;
       exit(1);
     };
@@ -285,7 +302,8 @@ FW_Read($)
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
              $FW_headercors,
              "Content-Length: 0\r\n\r\n";
-      $hash->{BUF}="";
+      delete $hash->{CONTENT_LENGTH};
+      delete $hash->{BUF};
       return;
     };
   }
@@ -293,8 +311,10 @@ FW_Read($)
   
   my $now = time();
   @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
-  my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
-  $hash->{BUF} = "";
+  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
+  $arg .= "&".$hash->{BUF} if($hash->{CONTENT_LENGTH});
+  delete $hash->{CONTENT_LENGTH};
+  delete $hash->{BUF};
   $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
@@ -552,7 +572,9 @@ FW_answerCall($)
 
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/fhemweb.js");
+  foreach my $js (@FW_fhemwebjs) {
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
+  }
 
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
@@ -614,6 +636,7 @@ FW_digestCgi($)
   #Remove (nongreedy) everything including the first '?'
   $arg =~ s,^.*?[?],,;
   foreach my $pv (split("&", $arg)) {
+    next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
     my ($p,$v) = split("=",$pv, 2);
@@ -700,11 +723,16 @@ FW_makeTable($$$@)
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
 
-    } 
-	else {
+    } else {
+      if( $title eq "Attributes" ) {
+        FW_pO "<td><div class=\"dname\">".
+                "<a onClick='FW_querySetSelected(\"sel.attr$name\",\"$n\")'>".
+              "$n</a></div></td>";
+      } else {
+         FW_pO "<td><div class=\"dname\">$n</div></td>";
+      }
 
-      FW_pO "<td><div class=\"dname\">$n</div></td>";
-      if(ref($val)) {#handle readings
+      if(ref($val)) { #handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
         $v = FW_htmlEscape($v);
         if($FW_ss) {
@@ -712,42 +740,37 @@ FW_makeTable($$$@)
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
         } else {		
           $t = "" if(!$t);
-          FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
-          FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
+          FW_pO "<td><div informId=\"$name-$n\">$v</div></td>";
+          FW_pO "<td><div informId=\"$name-$n-ts\">$t</div></td>";
         }
-      } 
-	  else {
+      } else {
         $val = FW_htmlEscape($val);
-		# if possible provide link to reference
-		if ($n eq "room"){
-		  my @tmp;
-          push @tmp,FW_pH("room=$_" , $_ ,0,"",1,1)foreach(split(",",$val));
-		  FW_pO "<td><div class=\"dval\">"
-		        .join(",",@tmp)
-		        ."</div></td>";	
-		}
-		elsif ($n eq "webCmd"){
-		  my @tmp;
-          push @tmp,FW_pH("cmd.$name=set $name $_&detail=$name" , $_ ,0,"",1,1)foreach(split(":",$val));
-		  FW_pO "<td><div id=\"$name-$n\">"
-		       .join(":",@tmp)
-		       ."</div></td>";	
-		}	
-		elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){#special for Floorplan
-		  FW_pH "detail=$1", $val,1;
-		}
-		else{
-		  my @tmp;
-          foreach(split(",",$val)){
-		    if ($defs{$_}){ push @tmp, FW_pH( "detail=$_", $_ ,0,"",1,1);}
-			else{		    push @tmp, $_;}
-		  }
-		  FW_pO "<td><div class=\"dval\">"
-		        .join(",",@tmp)
-		        ."</div></td>";				
-	    }
+
+        # if possible provide som links
+        if ($n eq "room"){
+          FW_pO "<td><div class=\"dval\">".
+                join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
+                "</div></td>";	
+
+        } elsif ($n eq "webCmd"){
+          my $lc = "detail=$name&cmd.$name=set $name";
+          FW_pO "<td><div name=\"$name-$n\">".
+                  join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
+                "</div></td>";	
+
+        } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){ #special for Floorplan
+          FW_pH "detail=$1", $val,1;
+
+        } else {
+	  FW_pO "<td><div class=\"dval\">".
+	        join(",", map { ($_ ne $name && $defs{$_}) ?
+                    FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
+		"</div></td>";				
+        }
       }
+
     }
+
     FW_pH "cmd.$name=$cmd $name $n&amp;detail=$name", $cmd, 1
         if($cmd && !$FW_ss);
     FW_pO "</tr>";
@@ -770,13 +793,13 @@ FW_makeSelect($$$$)
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 
-  FW_pO "<form method=\"get\" ".
+  FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
   FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
-  FW_pO FW_select("","arg.$cmd$d",\@al, $selEl, $class,
+  FW_pO FW_select("sel.$cmd$d","arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
   # Initial setting
@@ -818,7 +841,7 @@ FW_doDetail($)
     use strict "refs";
   }
 
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
 
   FW_makeSelect($d, "set", getAllSets($d), "set");
@@ -990,7 +1013,7 @@ FW_roomOverview($)
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
         FW_pO "</table></td></tr>" if($idx);
-        FW_pO "<tr><td><table id=\"room\">"
+        FW_pO "<tr><td><table class=\"room\">"
           if($idx<int(@list1)-1);
 
       } else {
@@ -1027,7 +1050,7 @@ FW_roomOverview($)
   # HEADER
   FW_pO "<div id=\"hdr\">";
   FW_pO '<table border="0"><tr><td style="padding:0">';
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
   FW_pO "</form>";
@@ -1050,7 +1073,8 @@ FW_showRoom()
     $FW_hiddengroup{$r} = 1;
   }
   
-  FW_pO "<form method=\"get\" action=\"$FW_ME\" autocomplete=\"off\">";
+  FW_pO "<form method=\"$FW_formmethod\" ".
+                "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
 
@@ -1106,8 +1130,7 @@ FW_showRoom()
 
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 
-      FW_pO "<td id=\"$d\">$txt</td>";
-
+      FW_pO "<td informId=\"$d\">$txt</td>";
 
       ######
       # Commands, slider, dropdown
@@ -1812,7 +1835,7 @@ FW_displayFileList($@)
 {
   my ($heading,@files)= @_;
   FW_pO "$heading<br>";
-  FW_pO "<table class=\"block\" id=\"at\">";
+  FW_pO "<table class=\"block fileList\">";
   my $row = 0;
   foreach my $f (@files) {
     FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
@@ -1871,7 +1894,7 @@ FW_style($$)
 
   } elsif($a[1] eq "select") {
     my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
-    FW_pO "$start<table class=\"block\" id=\"at\">";
+    FW_pO "$start<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
       next if($file =~ m/svg_/);
@@ -1905,7 +1928,7 @@ FW_style($$)
 
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
-    FW_pO "<form>";
+    FW_pO "<form method=\"$FW_formmethod\">";
     FW_pO     FW_submit("save", "Save $fileName");
     FW_pO     "&nbsp;&nbsp;";
     FW_pO     FW_submit("saveAs", "Save as");
@@ -1986,7 +2009,7 @@ FW_iconTable($$$$)
   }
 
   FW_pO "<div id=\"content\">";
-  FW_pO "<form>";
+  FW_pO "<form method=\"$FW_formmethod\">";
   if($textfield) {
     FW_pO "$textfield:&nbsp;".FW_textfieldv("data",20,"iconTable",".*")."<br>";
   }
@@ -2248,13 +2271,14 @@ FW_iconPath($)
 }
 
 sub
-FW_dev2image($)
+FW_dev2image($;$)
 {
-  my ($name) = @_;
+  my ($name, $state) = @_;
   my $d = $defs{$name};
   return "" if(!$name || !$d);
 
-  my ($type, $state) = ($d->{TYPE}, $d->{STATE});
+  my $type = $d->{TYPE};
+  $state = $d->{STATE} if(!defined($state));
   return "" if(!$type || !defined($state));
 
   my $model = $attr{$name}{model} if(defined($attr{$name}{model}));
@@ -2326,11 +2350,12 @@ FW_makeEdit($$$)
   FW_pO  "</td>";
 
   FW_pO  "</tr><tr><td colspan=\"2\">";
-  FW_pO   "<div id=\"edit\" style=\"display:none\"><form>";
-  FW_pO      FW_hidden("detail", $name);
+  FW_pO   "<div id=\"edit\" style=\"display:none\">";
+  FW_pO   "<form method=\"$FW_formmethod\">";
+  FW_pO       FW_hidden("detail", $name);
   my $cmd = "modify";
   my $ncols = $FW_ss ? 30 : 60;
-  FW_pO     "<textarea name=\"val.${cmd}$name\" ".
+  FW_pO      "<textarea name=\"val.${cmd}$name\" ".
                 "cols=\"$ncols\" rows=\"10\">$val</textarea>";
   FW_pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   FW_pO   "</form></div>";
@@ -2609,7 +2634,7 @@ FW_htmlEscape($)
 }
 
 sub
-FW_sliderFn($$$)
+FW_sliderFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
@@ -2618,17 +2643,18 @@ FW_sliderFn($$$)
   my ($min,$stp, $max) = ($1, $2, $3);
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
-  $cmd = "" if($cmd eq "state");
   my $id = ($cmd eq "state") ? "" : "-$cmd";
+  $cmd = "" if($cmd eq "state");
   $cv =~ s/.*?(\d+).*/$1/; # get first number
   $cv = 0 if($cv !~ m/\d/);
   return "<td colspan='2'>".
-           "<div class='slider' id='slider.$d$id' ".
-                "min='$min' stp='$stp' max='$max' ".
-                "cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
-             "<div class='handle'>$min</div></div>".
-           "<script type=\"text/javascript\">" .
-               "Slider(document.getElementById('slider.$d$id'),'$cv')</script>".
+           "<div class='slider' id='slider.$d$id' min='$min' stp='$stp' ".
+                 "max='$max' cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
+             "<div class='handle'>$min</div>".
+           "</div>".
+           "<script type=\"text/javascript\">".
+             "FW_sliderCreate(document.getElementById('slider.$d$id'),'$cv');".
+           "</script>".
          "</td>";
 }
 
@@ -2645,7 +2671,7 @@ FW_timepickerFn()
   my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
   return "<td colspan='2'>".
             "<input name='time.$d' value='$cv' type='text' readonly size='5'>".
-            "<input type='button' value='+' onclick='addTime(this,$c)'>".
+            "<input type='button' value='+' onclick='FW_timeCreate(this,$c)'>".
           "</td>";
 }
 
@@ -2680,7 +2706,7 @@ FW_dropdownFn()
                FW_hidden("cmd.$d", "set");
     }
 
-    return "<td colspan='2'><form>".
+    return "<td colspan='2'><form method=\"$FW_formmethod\">".
       FW_hidden("arg.$d", $cmd) .
       FW_hidden("dev.$d", $d) .
       ($FW_room ? FW_hidden("room", $FW_room) : "") .

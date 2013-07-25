@@ -49,7 +49,8 @@ sub AnalyzePerlCommand($$);
 sub AssignIoPort($);
 sub AttrVal($$$);
 sub CallFn(@);
-sub CheckDuplicate($$);
+sub CheckDuplicate($$@);
+sub rejectDuplicate($$$);
 sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
@@ -194,7 +195,7 @@ my $namedef =
   "- a regexp, if it contains one of the following characters: *[]^\$\n" .
   "- a range separated by dash (-)\n";
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
-my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
 
 $init_done = 0;
 
@@ -204,10 +205,10 @@ $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title userattr " .
   "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
-  "autoload_undefined_devices:1,0 dupTimeout latitude longitude " .
+  "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
-  "sendStatistics:onUpdate,manually,never updateInBackground:1,0".
+  "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
   "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
@@ -264,12 +265,14 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>"[restart],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
-            Hlp=>"<sec>,sleep for sec, 3 decimal places" },
+            Hlp=>"<sec> [quiet],sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
   "update" => {
             Hlp => "[development|stable] [<file>|check|fhem],update Fhem" },
   "updatefhem" => { ReplacedBy => "update" },
+  "version" => { Fn => "CommandVersion",
+            Hlp=>"[filter],print SVN version of loaded modules" },
 );
 
 ###################################################
@@ -785,7 +788,12 @@ devspec2array($)
   my ($name) = @_;
 
   return "" if(!defined($name));
-  return $name if(defined($defs{$name}));
+  if(defined($defs{$name})) {
+    # FHEM2FHEM LOG mode fake device, avoid local set/attr/etc operations on it
+    return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
+    return $name;
+  }
+  # FAKE is set by FHEM2FHEM LOG
 
   my ($isattr, @ret);
 
@@ -1191,7 +1199,8 @@ DoSet(@)
   return undef if($skipTrigger);
 
   # Backward compatibility. Use readingsUpdate in SetFn now
-  if(!$hash->{".triggerUsed"}) {
+  # case: DoSet is called from a notify triggered by DoSet with same dev
+  if(defined($hash->{".triggerUsed"}) && $hash->{".triggerUsed"} == 0) {
     shift @a;
     # set arg if the module did not triggered events
     my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
@@ -2062,34 +2071,63 @@ CommandInform($$)
 
 #####################################
 sub
-CommandSleep($$)
-{
-  my ($cl, $param) = @_;
-
-  return "Cannot interpret $param as seconds" if($param !~ m/^[0-9\.]+$/);
-  Log 4, "sleeping for $param";
-
-  if(!$cl && @cmdList && $param && $init_done) {
-    my %h = (cmd=>join(";", @cmdList), evalSpecials=>$evalSpecials);
-    InternalTimer(gettimeofday()+$param, "WakeUpFn", \%h, 0);
-    @cmdList=();
-
-  } else {
-    select(undef, undef, undef, $param);
-
-  }
-  return undef;
-}
-
-sub
 WakeUpFn($)
 {
   my $h = shift;
   $evalSpecials = $h->{evalSpecials};
   my $ret = AnalyzeCommandChain(undef, $h->{cmd});
-  Log 2, "After sleep: $ret" if($ret);
+  Log 2, "After sleep: $ret" if($ret && !$h->{quiet});
 }
 
+
+sub
+CommandSleep($$)
+{
+  my ($cl, $param) = @_;
+  my ($sec, $quiet) = split(" ", $param);
+
+  return "Argument missing" if(!defined($sec));
+  return "Cannot interpret $sec as seconds" if($sec !~ m/^[0-9\.]+$/);
+  return "Second parameter must be quiet" if($quiet && $quiet ne "quiet");
+
+  Log 4, "sleeping for $sec";
+
+  if(!$cl && @cmdList && $sec && $init_done) {
+    my %h = (cmd          => join(";", @cmdList),
+             evalSpecials => $evalSpecials,
+             quiet        => $quiet);
+    InternalTimer(gettimeofday()+$sec, "WakeUpFn", \%h, 0);
+    @cmdList=();
+
+  } else {
+    select(undef, undef, undef, $sec);
+
+  }
+  return undef;
+}
+
+#####################################
+sub
+CommandVersion($$)
+{
+  my ($cl, $param) = @_;
+
+  my @ret = ("# $cvsid");
+  foreach my $m (sort keys %modules) {
+    next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
+    my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
+    if(!open(FH, $fn)) {
+      push @ret, "$fn: $!";
+    } else {
+      push @ret, map { chomp; $_ } grep(/# \$Id:/, <FH>);
+    }
+  }
+  if($param) {
+    return join("\n", grep /$param/, @ret);
+  } else {
+    return join("\n", @ret);
+  }
+}
 
 #####################################
 # Return the time to the next event (or undef if there is none)
@@ -2375,6 +2413,7 @@ DoTrigger($$@)
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
       $ret .= $r if($r);
     }
+    delete($hash->{NTFY_TRIGGERTIME});
 
     ################
     # Inform
@@ -2565,20 +2604,8 @@ Dispatch($$$)
 
   Log 5, "$name dispatch $dmsg";
 
-  my ($isdup, $idx) = CheckDuplicate($name, $dmsg);
-  if($isdup) {
-    my $found = $duplicate{$idx}{FND};
-    foreach my $found (@{$found}) {
-      if($addvals) {
-        foreach my $av (keys %{$addvals}) {
-          $defs{$found}{"${name}_$av"} = $addvals->{$av};
-        }
-      }
-      $defs{$found}{"${name}_MSGCNT"}++;
-      $defs{$found}{"${name}_TIME"} = TimeNow();
-    }
-    return $duplicate{$idx}{FND};
-  }
+  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
+  return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
 
@@ -2588,6 +2615,11 @@ Dispatch($$$)
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
     next if($dmsg !~ m/$modules{$m}{Match}/i);
+
+    if( my $ffn = $modules{$m}{FingerprintFn} ) {
+      (my $isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
+      return rejectDuplicate($name,$idx,$addvals) if($isdup);
+    }
 
     no strict "refs"; $readingsUpdateDelayTrigger = 1;
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
@@ -2676,12 +2708,17 @@ Dispatch($$$)
 }
 
 sub
-CheckDuplicate($$)
+CheckDuplicate($$@)
 {
-  my ($ioname, $msg) = @_;
+  my ($ioname, $msg, $ffn) = @_;
 
-  # Store only the "relevant" part, as the CUL won't compute the checksum
-  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+  if($ffn) {
+    no strict "refs";
+    ($ioname,$msg) = &{$ffn}($ioname,$msg);
+    use strict "refs";
+    return (0, undef) if( !defined($msg) );
+    #Debug "got $ffn ". $ioname .":". $msg;
+  }
 
   my $now = gettimeofday();
   my $lim = $now-AttrVal("global","dupTimeout", 0.5);
@@ -2691,16 +2728,39 @@ CheckDuplicate($$)
       delete($duplicate{$oidx});
 
     } elsif($duplicate{$oidx}{MSG} eq $msg &&
+            $duplicate{$oidx}{ION} eq "") {
+      return (1, $oidx);
+
+    } elsif($duplicate{$oidx}{MSG} eq $msg &&
             $duplicate{$oidx}{ION} ne $ioname) {
       return (1, $oidx);
 
     }
   }
+  #Debug "is unique";
   $duplicate{$duplidx}{ION} = $ioname;
   $duplicate{$duplidx}{MSG} = $msg;
   $duplicate{$duplidx}{TIM} = $now;
   $duplidx++;
   return (0, $duplidx-1);
+}
+
+sub
+rejectDuplicate($$$)
+{
+  #Debug "is duplicate";
+  my ($name,$idx,$addvals) = @_;
+  my $found = $duplicate{$idx}{FND};
+  foreach my $found (@{$found}) {
+    if($addvals) {
+      foreach my $av (keys %{$addvals}) {
+        $defs{$found}{"${name}_$av"} = $addvals->{$av};
+      }
+    }
+    $defs{$found}{"${name}_MSGCNT"}++;
+    $defs{$found}{"${name}_TIME"} = TimeNow();
+  }
+  return $duplicate{$idx}{FND};
 }
 
 sub
@@ -3082,7 +3142,7 @@ readingsBeginUpdate($)
     $hash->{".attreour"} = \@a;
   }
 
-  $hash->{CHANGED}= ();
+  $hash->{CHANGED}= () if(!defined($hash->{CHANGED}));
   return $fmtDateTime;
 }
 

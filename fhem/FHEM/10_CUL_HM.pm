@@ -62,7 +62,7 @@ sub CUL_HM_respPendTout($);
 sub CUL_HM_respPendToutProlong($);
 sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
-sub CUL_HM_pushConfig($$$$$$$$);
+sub CUL_HM_pushConfig($$$$$$$$@);
 sub CUL_HM_Resend($);
 sub CUL_HM_ID2PeerList ($$$);
 sub CUL_HM_peerChId($$$);
@@ -162,6 +162,7 @@ sub CUL_HM_reqStatus($){
 sub CUL_HM_autoReadConfig($){
   # will trigger a getConfig and statusrequest for each device assigned.
   #
+  return if (!$modules{CUL_HM}{helper}{autoRdCfgLst});
   while(@{$modules{CUL_HM}{helper}{autoRdCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{autoRdCfgLst}});
     my $hash = $defs{$name};
@@ -423,6 +424,14 @@ sub CUL_HM_Attr(@) {#################################
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
+# translate level to readable
+    my %lvlStr = ( md =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
+	                     ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
+	                    }
+				  ,st =>{ "smokeDetector"   =>{"01"=>"no alarm","C7"=>"tone off","C8"=>"Smoke Alarm"}
+				         ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
+		                }
+	              );
 sub CUL_HM_Parse($$) {##############################
   my ($iohash, $msgIn) = @_;
   my $id = CUL_HM_Id($iohash);
@@ -443,6 +452,8 @@ sub CUL_HM_Parse($$) {##############################
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
 
+  
+  
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
@@ -502,8 +513,11 @@ sub CUL_HM_Parse($$) {##############################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p);
+  my $parse = CUL_HM_parseCommon($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$model);
   push @event, "powerOn"   if($parse eq "powerOn");
+  if ($parse =~ s/entities://){#common generated trigger for some entities
+    push @entities,split(",",$parse);
+  }
   
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
@@ -553,7 +567,7 @@ sub CUL_HM_Parse($$) {##############################
     if($mTp eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
-      $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
+      $t = sprintf("%2.1f",($t & 0x3fff)/10*(($t & 0x4000)?-1:1));
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  push @entities,CUL_HM_UpdtReadBulk($chnHash,1,"state:T: $t H: $h", 
 	                                                "measured-temp:$t",
@@ -757,16 +771,14 @@ sub CUL_HM_Parse($$) {##############################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($mTp eq "41"))                { 
-	  my $level = substr($p,4,2);
-	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
-	  if($model eq "HM-Sen-Wa-Od"){
-        $level = hex($level)/2 ;
-	    push @event, "level:$level %";
-	  }
-	  $level = $lvl{$level}  if($model eq "HM-CC-SCD");
-	  push @event, "state:".$level." %";
-	  
+	  my $lvl = substr($p,4,2);
 	  my $err = hex(substr($p,6,2));
+	  if    ($lvlStr{md}{$model}){$lvl = $lvlStr{md}{$model}{$lvl}}
+	  elsif ($lvlStr{st}{$st})   {$lvl = $lvlStr{st}{$st}{$lvl} }
+	  else                       {$lvl = hex($lvl)/2}
+
+	  push @event, "level:$lvl %" if($model eq "HM-Sen-Wa-Od");
+	  push @event, "state:$lvl %";	  
 	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
 	}  
   }
@@ -817,6 +829,16 @@ sub CUL_HM_Parse($$) {##############################
 	    }
 	  }
       push @event, $statemsg;
+	}
+    elsif ($mTp eq "53"){
+      my ($mChn,@dat) = unpack 'A2(A6)*',$p;
+      my %dField = (41=>"temp_T1",42=>"temp_T2",43=>"temp_T1-T2",44=>"temp_T2-T1");
+	  foreach (@dat){
+	    my ($a,$d) = unpack 'A2A4',$_;
+		$d = hex($d);
+		$d -= 0x10000 if($d & 0x4000); 
+        push @event, sprintf("Val_$dField{$a}:%0.1f",$d/10);
+	  }
 	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
@@ -1165,12 +1187,11 @@ sub CUL_HM_Parse($$) {##############################
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	
 	}
 	if (defined($state)){# if state was detected post events
-      my %txt;
-      %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
-      %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  
-                 if($model eq "HM-SEC-WDS");
-	  my $txt = $txt{$state};
-	  $txt = "unknown:$state" if(!$txt);
+	  my $txt;
+	  if    ($lvlStr{md}{$model}){$txt = $lvlStr{md}{$model}{$state}}
+	  elsif ($lvlStr{st}{$st})   {$txt = $lvlStr{st}{$st}{$state} }
+	  else                       {$txt = "unknown:$state"}
+
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
     }
@@ -1339,7 +1360,7 @@ sub CUL_HM_Parse($$) {##############################
 }
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independant
-  my ($mNo,$mFlg,$mTp,$src,$dst,$p) = @_;
+  my ($mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   return "" if(!$shash->{DEF});# this should be from ourself 
@@ -1350,7 +1371,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202 
   #                  9610
-  if(  $shash->{cmdStack}              && 
+  if(  $shash->{cmdStack}           && 
       ((hex($mFlg) & 0xA2) == 0x82) && 
 	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup #####
 	#send wakeup and process command stack
@@ -1556,8 +1577,30 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  }
 	}
   }
-  elsif($mTp eq "40"){ #someone is triggere#################
+  elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
 	CUL_HM_qStateUpdatIfEnab($dst)if (hex($mFlg) & 0x20 && $dhash);
+    my $cName = CUL_HM_id2Hash($src.sprintf("%02X",hex(substr($p,0,2))& 0x3f));
+	$cName = $cName->{NAME};
+	my $level = "-";
+
+	if (length($p)>5){
+	  my $l = substr($p,4,2);
+	  if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
+	  elsif ($lvlStr{st}{$st} && $lvlStr{st}{$st}{$l}){$level = $lvlStr{st}{$st}{$l}}
+	  else                                                      {$level = hex($l)};
+	} 
+	
+	my @peers = split(",",AttrVal($cName,"peerIDs",""));
+	my @entities;
+	foreach my $peer (@peers){
+	  my $pName = CUL_HM_id2Name($peer);
+	  $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
+	  next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
+	  push @entities,CUL_HM_UpdtReadBulk($defs{$pName},1
+	                        ,"trig_$cName:$level"
+	                        ,"trigLast:$cName".(($level ne "-")?":$level":""));
+	}
+	return "entities:".join(",",@entities);
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
@@ -1613,6 +1656,9 @@ sub CUL_HM_Get($@) {
   my $isChannel = (length($dst) == 8)?"true":"";
   my $chn = ($isChannel)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
+  my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
+  my $roleD = $hash->{helper}{role}{dev}?1:0;
+  my $roleV = $hash->{helper}{role}{vrt}?1:0;
 
   my $h = $culHmGlobalGets{$cmd};
   $h = $culHmSubTypeGets{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets{$st});
@@ -1727,7 +1773,8 @@ sub CUL_HM_Get($@) {
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
               (($reg->{d} != 1)?"exp":""),
 			  $help)
-	        if (!($isChannel && $reg->{l} == 0));
+	        if (($roleD && $reg->{l} == 0)||
+			    ($roleC && $reg->{l} != 0));
 	}
 	
     my $info = sprintf("list: %16s | %-18s | %-8s |%-3s| %s\n",
@@ -1746,7 +1793,7 @@ sub CUL_HM_Get($@) {
 	  my $eName = CUL_HM_id2Name($e);
 	  push @eNames, $eName if($eName !~ m/_chn:/);
 	}
-	
+
 	foreach my $eName (@eNames){
 	  print aSave "\n#---      entity:".$eName;
 	  my $pIds = AttrVal($eName, "peerIDs", "");
@@ -1757,7 +1804,7 @@ sub CUL_HM_Get($@) {
 	    print aSave "\nset ".$eName." peerBulk ".$pIds;
 	  }
 	  my $ehash = $defs{$eName};
-	  foreach my $read (sort grep(!/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
+	  foreach my $read (sort grep(/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
 	    print aSave "\nset ".$eName." regBulk ".$read." "
 		      .ReadingsVal($eName,$read,"");
 		$timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
@@ -1879,7 +1926,7 @@ sub CUL_HM_Set($@) {
     $l2 = substr($l2."\x00", 0, 13);
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
-	@a = ($a[0],"regBulk","RegL_00:",split(" ",$l1.$l2));
+	@a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   } 
 
   $cmd = $a[1];# get converted command
@@ -1946,9 +1993,8 @@ sub CUL_HM_Set($@) {
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
-	my $chFound = 0;
 	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
-	       if (!$isChannel);
+	       if ($roleD);
 	my @chnIdList = CUL_HM_getAssChnIds($name);
 	foreach my $channel (@chnIdList){
 	  my $chnHash = CUL_HM_id2Hash($channel);
@@ -2031,8 +2077,10 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
-    #set <name> regSet <regName> <value> <peerChn> 
-	my ($regName,$data,$peerChnIn) = ($a[2],$a[3],$a[4]);
+    #set <name> regSet <regName> <value> [<peerChn>] [prep]
+	#prep is internal use only. It allowes to prepare shadowreg only but supress
+	#writing. Application necessarily needs to execute writing subsequent.
+	my (undef,undef,$regName,$data,$peerChnIn,$prep) = @a;
 	$state = "";
     if (!$culHmRegType{$st}{$regName}      && 
 	    !$culHmRegGeneral{$regName}        &&
@@ -2047,9 +2095,9 @@ sub CUL_HM_Set($@) {
 	   
     my $reg  = $culHmRegDefine{$regName};
 	return $st." - ".$regName            # give some help
-	       .($reg->{lit}? " liternal:".join(",",keys%{$reg->{lit}})." "
+	       .($reg->{lit}? " literal:".join(",",keys%{$reg->{lit}})." "
 	                    : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
-			 )
+			)
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
@@ -2116,8 +2164,9 @@ sub CUL_HM_Set($@) {
 	}
 	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
 	$cHash = $hash if (!$cHash);
-     CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list,$addrData);
-   } 
+    CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,hex($peerChn),$list
+	                 ,$addrData,$prep);
+  } 
   elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a; 
@@ -2322,11 +2371,13 @@ sub CUL_HM_Set($@) {
 	}
 	elsif($md eq "HM-OU-CFM-PL"){
 	  my %color = (redL =>18,greenL =>34,orangeL =>50,
-	               redS =>17,greenS =>33,orangeS =>49);
+	               redS =>17,greenS =>33,orangeS =>49,
+				   pause=>01);
 	  my @itemList = split(',',$a[2]);
 	  my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
       my $itemCnt = int(@itemList);
-	  return "no more then 12 entries please"  if ($itemCnt>12);
+	  return "no more then 10 entries please"      if ($itemCnt>10);
+	  return "at least one entry must be entered"  if ($itemCnt<1);
 	  return "repetition $repeat out of range [1..255]"
           if($repeat < 1 ||	$repeat > 255);
       #<entries><multiply><MP3><MP3>
@@ -2337,8 +2388,9 @@ sub CUL_HM_Set($@) {
 	    }
         $msgBytes .= sprintf("%02X",$color{$led});
 	  }
+	  $msgBytes .= "01" if ($itemCnt == 1 && $repeat == 1);#add pause to term LED
 	  # need to fill up empty locations  for LED channel
-	  $msgBytes = substr($msgBytes."000000000000000000000000",0,28);
+	  $msgBytes = substr($msgBytes."000000000000000000",0,(10+2)*2);
       CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
 	}
 	else{
@@ -2531,14 +2583,14 @@ sub CUL_HM_Set($@) {
     my $peerHash;
 	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
     $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
-    return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
+	return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
     return "$single must be single or dual"                       if(defined($single) && ($single !~ m/^(single|dual)$/));
     return "$set must be set or unset"                            if(defined($set)    && ($set    !~ m/^(set|unset)$/));
     return "$target must be [actor|remote|both]"                  if(defined($target) && ($target !~ m/^(actor|remote|both)$/));
 	return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" && $chn ne "02");
 	return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
-	return "use - single - for ".$st                              if(($st eq "threeStateSensor"||
-	                                                                  $st eq "motionDetector" )    && (!$single || $single ne "single"));
+	return "use - single - for ".$st                              if(($st =~ m/(threeStateSensor|thermostat|motionDetector)/)
+	                                                                      && (!$single || $single ne "single"));
 
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set && $set eq "unset")?0:1;
@@ -2557,24 +2609,27 @@ sub CUL_HM_Set($@) {
 	my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
-	my $pSt = AttrVal($peerHash->{NAME}, "subType", "");#peer SubType
+	my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
 	if (!$target || $target =~ m/^(remote|both)$/){
 	  my $burst = ($pSt eq "thermostat"?"0101":"0100");#set burst for target 
+	  my $pnb = 1 if ($culHmRegModel{$md}{peerNeedsBurst}|| #supported?
+	                  $culHmRegType{$st}{peerNeedsBurst});
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         my $b = ($i==1 ? $b1 : $b2);		
   	    if ($st eq "virtual"){
 		  my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
 		  return "button ".$b." not defined for virtual remote ".$name
 		      if (!defined $attr{$btnName});
-		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerChn,$set); #update peerlist
+		  CUL_HM_ID2PeerList ($btnName,$peerDst.$peerChn,$set); #upd. peerlist
 	    }
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	              "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
+  	            "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,$burst)
-				   if($md ne "HM-CC-TC");
-		  CUL_HM_queueAutoRead($name) if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
+				   if($pnb);
+		  CUL_HM_queueAutoRead($name) 
+		           if (2 < CUL_HM_getAttrInt($name,"autoReadReg"));
 	    }
       }
 	}
@@ -2587,8 +2642,8 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
-		CUL_HM_queueAutoRead($peerHash->{name}) 
-		      if (2 < CUL_HM_getAttrInt($peerHash->{name},"autoReadReg"));
+		CUL_HM_queueAutoRead($peerHash->{NAME}) 
+		      if (2 < CUL_HM_getAttrInt($peerHash->{NAME},"autoReadReg"));
 	  }
 	}
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
@@ -2716,8 +2771,8 @@ sub CUL_HM_Pair(@) {
 sub CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
-  foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?(RegL_|R-)/);
+  foreach my $readEntry (grep /^[\.]?(RegL_|R-)/,keys %{$chnhash->{READINGS}}){
+	  delete $chnhash->{READINGS}{$readEntry};
   }
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   if($lstAr){
@@ -2862,8 +2917,14 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     CUL_HM_protState($hash,"CMDs_processing...");                         
   }
   else{# no answer expected
-    CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
+	  CUL_HM_protState($hash,"CMDs_processing..."); 
+      InternalTimer(gettimeofday()+.5, "CUL_HM_ProcessCmdStack", $hash, 0);
+	}
+	else{
+      CUL_HM_protState($hash,"CMDs_done".($hash->{helper}{burstEvtCnt}? 
 	                            ("_events:".$hash->{helper}{burstEvtCnt}):""));
+	}
   }
   if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
     $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
@@ -2984,8 +3045,8 @@ sub CUL_HM_ProcessCmdStack($) {
   }
   return;
 }
-sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
-  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
+sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
+  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
   my $flag = CUL_HM_getFlag($hash);
   my $tl = length($content);
 
@@ -3018,6 +3079,8 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
     }
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs;
+  return if ($prep);#prepare shadowreg only. More data to come. 
+                    #Application takes care about execution
   CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
@@ -3029,6 +3092,7 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
   CUL_HM_queueAutoRead($hash->{NAME}) 
         if (2 < CUL_HM_getAttrInt($hash->{NAME},"autoReadReg"));
+  
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
@@ -3734,7 +3798,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
       next if (!$rName            ||
 	         $rName eq "PairedTo" ||                     # derived
 	         $rName eq "peerList" ||                     # derived
-	         $rName eq "Activity:"||                     # derived
+	         $rName eq "Activity" ||                     # derived
 	         $rName =~ m/^[.]?R-/ ||                     # no Regs - those are derived from Reg
 	         ReadingsVal($eName,$rName,"") =~ m/^set_/); # ignore setting
 	  my $ts = ReadingsTimestamp($eName,$rName,"");
@@ -3825,7 +3889,7 @@ sub CUL_HM_ActCheck() {# perform supervision
 	  }
 	}  
 	if ($oldState ne $state){
-	  readingsSingleUpdate($devHash,"Activity:",$state,1);
+	  readingsSingleUpdate($devHash,"Activity",$state,1);
 	  $attr{$devName}{actStatus} = $state;
 	  Log 4,"Device ".$devName." is ".$state;
 	}
@@ -3887,6 +3951,7 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 }
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val) = @_;
+  return if (!$val);
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
   $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
@@ -4149,7 +4214,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  </li>
 	  <li><B>inhibit [on|off]</B><br>
          Block / unblock all changes to the actor channel, i.e. actor state is frozen 
-		 untill inhibit is set off again. Inhibit can be executed on any actor channel 
+		 until inhibit is set off again. Inhibit can be executed on any actor channel 
 		 but obviously not on sensors - would not make any sense.<br>
 		 Practically it can be used to suspend any notifies as well as peered channel action 
 		 temporarily without the need to delete them. <br>
@@ -4500,7 +4565,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..] [&lt;repeat&gt..]</B><br>
-        Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
+        Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS|pause]. A
         sequence of colors can be given separating the color entries by ','.
         White spaces must not be used in the list. 'S' indicates short and
         'L' long ilumination. <br>
@@ -4666,7 +4731,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		 Recommended work-order for device 'HMdev':<br>
 		 set HMdev clear msgEvents  # clear old events to better check flow<br>
 		 set HMdev getConfig        # read device & channel inforamtion<br>
-		 # wait untill operation is complete<br>
+		 # wait until operation is complete<br>
 		 # protState should be CMDs_done<br>
 		 #           there shall be no warnings amongst prot... variables<br>
 		 get configSave myActorFile<br>
@@ -4768,7 +4833,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		'3' includes '2' plus updates on writes to the device<br>
 		'4' includes '3' plus tries to request status if it seems to be missing<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
-		of the readings and the display will be delayed depending on the sice of the database.<br>
+		of the readings and the display will be delayed depending on the size of the database.<br>
 		Recommendations and constrains upon usage:<br>
         <ul>
           use this attribute on the device or channel 01. Do not use it separate on each channel 
@@ -4806,6 +4871,10 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	  ValveErrorPosition $vep %<br>
 	  ValveOffset $of %<br>
       time-request<br>
+	  trig_&lt;src&gt; &lt;value&gt; #channel was triggered by &lt;src&gt; channel. 
+	  This event relies on complete reading of channels configuration, otherwise Data can be
+	  incomplete or incorrect.<br>
+	  trigLast &lt;channel&gt; #last receiced trigger<br>
   </li>
   <li><B>HM-CC-VD</B><br>
       $vp %<br>

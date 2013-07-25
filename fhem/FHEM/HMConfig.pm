@@ -158,7 +158,7 @@ my %culHmModel=(
   "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, #
   "007A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
   "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
-  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>'remote'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel				
+  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>'remote'            ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel				
   "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
   "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,st=>'remote'            ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons Roto
   "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
@@ -188,6 +188,7 @@ my %culHmModel=(
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",},
+  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:05' ,rxt=>'c:w' ,lst=>'p'            ,chn=>"Th:1:2",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   #263 167                        HM Smoke Detector Schueco 
   #"HM-RC-Key4-2"
@@ -253,7 +254,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit                                                                                       
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
-  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"    ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
+  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"          ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
+  ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED"  ,lit=>{no=>0,short=>1,long=>2}},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Number of repetitions"},
   Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},  
 # statemachines
@@ -323,7 +325,7 @@ my %culHmRegDefine = (
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},          
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},     
   btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"             ,lit=>{unlock=>0,lock=>1}},
-                                                                                                                                        
+                                                                                                                                       
   confBtnTime     =>{a=> 21.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>'min' ,d=>0,t=>"255=permanent"},         
 # keymatic/winmatic secific register                                                                                                    
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"           ,lit=>{off=>0,on=>1}},
@@ -337,10 +339,12 @@ my %culHmRegDefine = (
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message" ,lit=>{off=>0,on=>1}},
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
-  lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
+  lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
+  lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
+  regL0_1b        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"unknown test on own risk"},
 #un-identified List0
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
@@ -358,7 +362,7 @@ my %culHmRegDefine = (
 
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
-  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
+  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"Engine uncharge time, typically 0.5s. Do NOT set to 0 if operated with engine"},
   refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"reference run counter"},
 #remote mainly                                                                                      
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
@@ -623,6 +627,7 @@ my %culHmRegModel = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			           ActionType      =>1,ActNum          =>1,lgMultiExec     =>1},
+  "HM-OU-CF-PL"     =>{ActTypeOuCf     =>1,ActNum          =>1},
   "HM-SEC-MDIR"     =>{                    sabotageMsg     =>1},
   "HM-CC-TC"        =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
@@ -643,6 +648,7 @@ my %culHmRegModel = (
   "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1},
+  "HM-Dis-TD-T"     =>{lowBatLimitFS   =>1,ledMode         =>1},
   "HM-LC-SW1-BA-PCB"=>{lowBatLimitBA   =>1,ledMode         =>1},
   "HM-Sys-sRP-Pl"   =>{compMode        =>1},
   "KFM-Display"     =>{CtDlyOn         =>1,CtDlyOff        =>1,
@@ -661,6 +667,7 @@ my %culHmRegModel = (
                        fillLvlUpThr    =>1,fillLvlLoThr    =>1,
                        expectAES       =>1,peerNeedsBurst  =>1},
   "HM-WDS10-TH-O"   =>{burstRx         =>1},
+  "HM-WDS30-OT2-SM" =>{burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,regL0_1b        =>1},
   );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
@@ -680,7 +687,6 @@ $culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl-2"};
 
 $culHmRegModel{"ASH550I"}          = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"ASH550"}           = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"HM-WDS10-TH-O"}    = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"Schueco_263-158"}  = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"HM-WDS20-TH-O"}    = $culHmRegModel{"HM-WDS10-TH-O"};
 $culHmRegModel{"HM-WDS40-TH-I"}    = $culHmRegModel{"HM-WDS10-TH-O"};
@@ -784,6 +790,7 @@ my %culHmSubTypeSets = (# channels of this subtype
 					  ,inhibit    =>"[on|off]"},
   remote           =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  THSensor         =>{ peerChan   =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan   =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
 		              ,press      =>"[long|short]..."
                       ,valvePos   =>"<position>"},#acting as TC
@@ -855,7 +862,7 @@ my %culHmChanSets = (
   "HM-OU-CFM-PL02" =>{ playTone  => "<MP3No>[,<MP3No>...] [<repeat>]"}
 );
 # clones- - - - - - - - - - - - - - - - - 
-$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
+#$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
 
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -989,15 +996,15 @@ my %culHmBits = (
                      MODE     => '04,2,$val=hex($val)', 
 					 } }, 
   "12"          => { txt => "HAVE_DATA"},
-  "3E"          => { txt => "SWITCH", params => {
+  "3E"          => { txt => "SWITCH"      , params => {
                      DST      => "00,6", 
                      UNKNOWN  => "06,2", 
                      CHANNEL  => "08,2", 
                      COUNTER  => "10,2", } },
-  "3F"          => { txt => "TimeStamp", params => {
+  "3F"          => { txt => "TimeStamp"   , params => {
                      UNKNOWN  => "00,4", 
                      TIME     => "04,2", } },
-  "40"          => { txt => "REMOTE", params => {
+  "40"          => { txt => "REMOTE"      , params => {
                      BUTTON   => '00,2,$val=(hex($val)&0x3F)',
                      LONG     => '00,2,$val=(hex($val)&0x40)?1:0',
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
@@ -1008,12 +1015,16 @@ my %culHmBits = (
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      VALUE    => '02,2,$val=(hex($val))',
                      NEXT     => '04,2,$val=(hex($val))',} },
-  "53"          => { txt => "WaterSensor", params => {
-                     CMD      => "00,2",
-                     SEQ => '02,2,$val=(hex($val))-64', 
-                     V1  => '08,2,$val=(hex($val))', 
-                     V2  => '10,2,$val=(hex($val))', 
-                     V3  => '12,2,$val=(hex($val))'} },
+  "53"          => { txt => "SensorData"  , params => {
+                     CMD => "00,2",
+                     Fld1=> "02,2", 
+                     Val1=> '04,4,$val=(hex($val))', 
+                     Fld2=> "08,2", 
+                     Val2=> '10,4,$val=(hex($val))', 
+                     Fld3=> "14,2", 
+                     Val3=> '16,4,$val=(hex($val))', 
+                     Fld4=> "20,2", 
+                     Val4=> '24,4,$val=(hex($val))'} },
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },

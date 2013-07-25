@@ -309,24 +309,27 @@ PRESENCE_Attr(@)
   {
     if($a[3] eq "0")
     {
-	$hash->{helper}{DISABLED} = 0;
-	readingsSingleUpdate($hash, "state", "defined",0);
+	
+	readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
 	if(defined($hash->{DeviceName}))
 	{
 	    if(defined($hash->{FD}))
 	    {
-		PRESENCE_DoInit($hash);
+		PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
+		$hash->{helper}{DISABLED} = 0;
 	    }
 	    else
 	    {
+		$hash->{helper}{DISABLED} = 0;
 		DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
 	    }
 	}
 	else
 	{
+	    $hash->{helper}{DISABLED} = 0;
 	    PRESENCE_StartLocalScan($hash);
 	}
-	
+	$hash->{helper}{DISABLED} = 0;
     }
     elsif($a[3] eq "1")
     {
@@ -345,21 +348,24 @@ PRESENCE_Attr(@)
   }
   elsif($a[0] eq "del" && $a[2] eq "disable")
   {
-    $hash->{helper}{DISABLED} = 0;
-    readingsSingleUpdate($hash, "state", "defined",0);
+    
+    readingsSingleUpdate($hash, "state", "defined",0) if(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1);
     if(defined($hash->{DeviceName}))
     {
         if(defined($hash->{FD}))
 	    {
-		PRESENCE_DoInit($hash);
+		PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
+		$hash->{helper}{DISABLED} = 0;
 	    }
 	    else
 	    {
+		$hash->{helper}{DISABLED} = 0;
 		DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
 	    }
     }
     else
     {
+	$hash->{helper}{DISABLED} = 0;
         PRESENCE_StartLocalScan($hash);
     }
   }
@@ -438,13 +444,10 @@ PRESENCE_DoInit($)
 
     my ($hash) = @_;
 
-    unless($hash->{helper}{DISABLED})
+    if( not exists($hash->{helper}{DISABLED}) or exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 1)
     {
+	readingsSingleUpdate($hash, "state", "active",0);
 	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 0);
-    }
-    else
-    {
-	readingsSingleUpdate($hash, "state", "disabled",1);
     }
 }
 
@@ -992,9 +995,9 @@ Options:
     
     The presenced is available as:<br><br>
     <ul>
-    <li>direct perl script file: <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-1.0.deb" target="_new">presenced-1.0.deb</a></li>
-    <li>.deb package for Raspberry Pi (raspbian): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.0.deb" target="_new">presenced-rpi-1.0.deb</a></li>
+    <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
+    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.1.deb" target="_new">presenced-1.1.deb</a></li>
+    <li>.deb package for Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.1.deb" target="_new">presenced-rpi-1.1.deb</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1048,8 +1051,8 @@ Options:
     The collectord is available as:<br><br>
     
     <ul>
-    <li>direct perl script file: <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
+    <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
+    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
     </ul>
     </ul><br><br>
 
@@ -1213,9 +1216,9 @@ Options:
     
     Der presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
-    <li>Perl Skript: <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-1.0.deb" target="_new">presenced-1.0.deb</a></li>
-    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.0.deb" target="_new">presenced-rpi-1.0.deb</a></li>
+    <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.1.deb" target="_new">presenced-1.1.deb</a></li>
+    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.1.deb" target="_new">presenced-rpi-1.1.deb</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1269,8 +1272,8 @@ Options:
     Der collectord ist zum Download verf&uuml;gbar als:<br><br>
     
     <ul>
-    <li>Perl Skript:  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
+    <li>Perl Skript:  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
     </ul>
     </ul>
 

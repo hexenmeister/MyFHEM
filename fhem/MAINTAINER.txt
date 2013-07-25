@@ -53,6 +53,7 @@ FHEM/14_CUL_TX.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/14_CUL_WS.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/15_CUL_EM.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstiges
@@ -84,6 +85,8 @@ FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige 
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterst�tzende Dienste
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
+FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstiges Systeme
+FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
@@ -107,6 +110,7 @@ FHEM/63_EMGZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/64_ESA2000.pm           stromer-12           http://forum.fhem.de SlowRF
 FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
 FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
+FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/70_SISPM.pm             real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_SML.pm               bentele              http://forum.fhem.de Sonstiges
@@ -115,7 +119,8 @@ FHEM/70_TellStick.pm         real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
 FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
 FHEM/70_WS3600.pm            painseeker           http://forum.fhem.de Sonstiges
-FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Sonstiges
+FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
+FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstützende Dienste
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstützende Dienste
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
