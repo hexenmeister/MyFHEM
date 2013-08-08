@@ -237,7 +237,13 @@ FRM_IN_Undef($$)
       edges (or 'both') are counted. Defaults to 'none'</li>
       <li>count-threshold &lt;number&gt;<br>
       sets the theshold-value for the counter. Whenever 'count' reaches the 'count-threshold' 'alarm' is<br>
-      set to 'on' and count is reset to 0. Use 'set alarm off' to clear the alarm.</li>
+      set to 'on'. Use 'set alarm off' to clear the alarm.</li>
+      <li>reset-on-threshold-reached yes|no<br>
+      if set to 'yes' reset the counter to 0 when the threshold is reached (defaults to 'no').
+      </li>
+      <li>internal-pullup on|off<br>
+      allows to switch the internal pullup resistor of arduino to be en-/disabled. Defaults to off.
+      </li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)
