@@ -178,6 +178,17 @@ FRM_IN_Attr($$$$) {
       	last;
       };  
     }
+  } elsif ($command eq "del") {
+    ARGUMENT_HANDLER: {
+      $attribute eq "internal-pullup" and do {
+      	eval {
+          my $hash = $main::defs{$name};
+          my $firmata = FRM_Client_FirmataDevice($hash);
+          $firmata->digital_write($hash->{PIN},0);
+      	};
+        last;
+      };
+    }
   }
 }
 
