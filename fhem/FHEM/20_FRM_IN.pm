@@ -170,6 +170,7 @@ FRM_IN_Attr($$$$) {
       };
       $attribute eq "internal-pullup" and do {
       	eval {
+          my $hash = $main::defs{$name};
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($hash->{PIN},$value eq "on" ? 1 : 0);
       	};
