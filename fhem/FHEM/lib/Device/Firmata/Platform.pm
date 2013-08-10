@@ -455,7 +455,7 @@ sub digital_write {
 		$port_state &= $pin_mask ^ 0xff;
 	}
 	$self->{ports}[$port_number] = $port_state;
-	$self->{io}->data_write($self->{protocol}->message_prepare( DIGITAL_MESSAGE => $port_number, $port_state ));
+	$self->{io}->data_write($self->{protocol}->message_prepare( DIGITAL_MESSAGE => $port_number, $port_state & 0x7f, $port_state >> 7 ));
 	return 1;
 }
 
