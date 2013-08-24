@@ -448,7 +448,7 @@ _getDeviceValueNumeric($)
   return _convertSymParams(Value($_[0]));
 }
 
-# Setzt Parameter-Werte f�r Ensdtellungen in ihre Zahlenwerte um.
+# Setzt Parameter-Werte fuer symbolische Werte in ihre Zahlenwerte um.
 # up = 100, down = 0
 sub
 _convertSymParams($)
@@ -471,8 +471,19 @@ _convertSymParams($)
   return 100; 
 }
 
+# --- tick alive / watchdog ---->
+sub tickAlive($)
+{
+	my ($device) = @_;
+	my $v = _getDeviceValueNumeric($device);
+	$v = $v+1; 
+	if($v>=15) {$v=0;} 
+	fhem("set $device $v");
+}
+
 # --- utils ---->
 
+# Liefert aktueller Zeitstempel
 sub
 CurrentTime()
 {
