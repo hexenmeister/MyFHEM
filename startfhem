@@ -37,4 +37,7 @@ if test "$?" -ne "0"; then
 fi 
 ## END:fhem-user
 
+# Start watchdog
+runwatchdog.sh
+
 perl fhem.pl fhem.cfg
