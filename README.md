@@ -1,4 +1,4 @@
 MyFHEM
 ======
 
-Meine FHEM-Scripte
+Meine Anpassungen und Erweiterungen für FHEM.
