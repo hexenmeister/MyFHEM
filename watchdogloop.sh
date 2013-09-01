@@ -6,10 +6,8 @@
 home=/var/InternerSpeicher/fhem
 cd $home
 
-# Zu ueberwachende Log-Datei
-currentYear=$(date +"%Y");
-currentMonth=$(date +"%m");
-aliveLog=./log/NN_TE_DMST01.Server_Alive-$currentYear-$currentMonth.log;
+# Zu ueberwachende Log-Datei (erst als Dummy)
+aliveLog=./log/undefined.log;
 
 # Logdatei für Watchdog-Script
 log=./log/watchdog.log
@@ -18,6 +16,13 @@ log=./log/watchdog.log
 maxTime=910;
 
 ## --- Methoden ----------------------------
+
+# Bestimmt den Namen der zu ueberwachenden Log-Datei (Datumsanhaengig)
+getLogName() {
+  currentYear=$(date +"%Y");
+  currentMonth=$(date +"%m");
+  aliveLog=./log/NN_TE_DMST01.Server_Alive-$currentYear-$currentMonth.log;
+}
 
 # Methode schreibt Meldungen in die Logdatei
 log(){
@@ -36,6 +41,7 @@ checkAlive(){
   currentTime=$(date +%s);
   
   # Letzte Dateiaenderung der 'Alive'-Log (Sekunden seit 1. Januar 1970 00:00)
+  getLogName;
   lastChangeTime=$(stat -c %Z $aliveLog);
 
   # Different in Sekunden (wie lange liegt die letzte 'Alive'-Meldung zuruech?)
@@ -77,6 +83,7 @@ then
 else
  print "FHEM not running. starting FHEM...";
  log "MSG: FHEM not runing. starting FHEM...";
+ getLogName;
  touch $aliveLog;
  ./startfhem &
  sleep 60;
