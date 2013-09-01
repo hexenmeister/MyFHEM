@@ -1,5 +1,16 @@
 #!/bin/sh
 
+# ------------------------------------------------------------
+#
+# Watchdog - FHEM-Überwachung
+# Prueft in regelmaessigen Abstaenden, ob noch Lebenszeichen
+# von FHEM zu erkenen sind. 
+# Startet bei Bedarf den FHEM-Prozess neu.
+#
+# Copyright (c) 2013 Alexander Schulz.  All right reserved.
+#
+# ------------------------------------------------------------
+
 ## --- Variablen ---------------------------
 
 # Home-Verzeichnis
