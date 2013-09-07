@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_myUtils.pm 0001 2013-07-26 13:21:15Z a_schulz $
+# $Id: 99_myUtils.pm 0001 2013-09-07 13:21:15Z a_schulz $
 package main;
 
 use strict;
@@ -233,7 +233,7 @@ _steuerungZirkulationspumpe_getCtrlTable() {
   if($we) {
 		if($hour < 1) {
 		  return  $ctrlTable_Reduced;
-		} elsif($hour < 7) {
+		} elsif($hour < 6) {
 			return  $ctrlTable_Night;
 		} elsif($hour < 23) {
 			return  $ctrlTable_Normal;
