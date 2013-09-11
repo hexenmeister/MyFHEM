@@ -85,6 +85,17 @@ checkAlive(){
 print "starting watchdig";
 log "MSG: starting watchdog";
 
+# Workaround
+# Beim Start gibt FritzBox eine kurze Zeit lang ein falsches Datum an!
+# Es wird so etwas wie '1970-01-01_01:01:12' geliefert
+# Daher etwas abwarten, bis die Box ein gültiges Datum holt.
+cYear=$(date +"%Y");
+if test $cYear -eq '1970'
+then
+ sleep 300;
+fi
+
+
 # FHEM PID suchen
 pid=$(ps | grep -v grep | grep fhem.pl | cut -c1-5);
 if test $pid 
