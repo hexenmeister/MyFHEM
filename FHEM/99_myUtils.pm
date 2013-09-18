@@ -320,6 +320,81 @@ readCalValue($$$) {
 	return $ret;
 }
 
+# --- Refreshing AT commands --->
+# Liest die Definition zu dem angegebenen Device-Namen. Löscht und redefiniert AT-Befehl.
+# Es wird geprüft, ob es sich um ein AT Befehl handelt.
+#
+# Es gibt ganz bestimmt eine elegantere, schnellere und sicherere Methode (ohne globale Variablen wie $defs zu verwenden), 
+# die Zeit für AT-Befeh neu zu berechnen. Leider ist diese mir (noch)I nicht bekannt ;-)
+sub
+refreshAtCmd($) {
+	my ($name) = @_;
+	my $type = $defs{$name}{TYPE};
+	Log 5, "refreshAtCmd: type: $type; name: $name"; 
+	if(length($type)>0 && $type eq 'at') {
+	  my $def = $defs{$name}{DEF};
+	  if(length($def)>0) {
+	  	# Attribute speichern
+	  	# TODO: alle existierende Attribute auslesen (wie?)
+	  	my $room = AttrVal($name,'room','');
+	    my $group = AttrVal($name,'group','');
+	    my $disable = AttrVal($name,'disable','');
+
+	    my $cmd ='delete '.$name;
+	    fhem($cmd);
+	    
+	    # Es ist wichtig, alle ;-Zeichen zu verdoppeln! Ansonsten wird ab ersten Semikolon der Befehl abgeschnitten!
+	    $def =~ s/;/;;/g; 
+	    $cmd ='define '.$name.' at '.$def;
+	    fhem($cmd);
+	    
+	    # Attribute (wieder) setzen
+	    fhem('attr '.$name.' room '.$room);
+	    fhem('attr '.$name.' group '.$group);
+	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
+	  } else {
+  	  Log 3, "refreshAtCmd: no defs found for $name"; 
+    }
+  } else {
+  	Log 3, "refreshAtCmd: undefined or wrong type ($type) for $name"; 
+  }
+}
+
+# Definierte Liste von AT-Befehlen refreshen.
+sub
+refreshMyAtCmds() {
+	my @names = ('bz_rl_auf_nonwe',
+               'bz_rl_auf_we',
+               'bz_rl_runter',
+	
+               'ka_rl_auf_nonwe',
+               'ka_rl_auf_we',
+               'ka_rl_runter',
+	
+               'ku_rl_auf_nonwe',
+               'ku_rl_auf_v1_nonwe',
+               'ku_rl_auf_v2',
+               'ku_rl_auf_we',
+               'ku_rl_runter',
+               'ku_rl_runter_V',
+
+               'sz_rl_auf_nonwe',
+               'sz_rl_auf_we',
+               'sz_rl_runter',
+
+               'wz_rl_auf_nonwe',
+               'wz_rl_auf_v1',
+               'wz_rl_auf_we',
+               'wz_rl_runter',
+               'wz_rl_runter_V',
+               'wz_rl_sunriseTest',
+               'wz_rl_SunsetTest');
+
+	foreach my $name (@names) {
+		Log 5, "refreshMyAtCmds: name: $name";
+    refreshAtCmd($name);
+  } 
+}
 
 # --- obsolet --->
 sub
@@ -454,7 +529,7 @@ sub
 _convertSymParams($)
 {
   my $value = $_[0];
-  # Endwerte ber�cksichtigen, Gro�-/Kleinschreibung ignorieren
+  # Endwerte beruecksichtigen, Gross-/Kleinschreibung ignorieren
   $value = lc($value);
   if($value eq "down" || $value eq "runter" || $value eq "off") { return 0; } 
   elsif($value eq "up" || $value eq "hoch" || $value eq "on") { return 100; } 
@@ -465,7 +540,7 @@ _convertSymParams($)
   if($ivalue < 0) { return 0; }
   elsif($ivalue > 100) { return 100; }
   elsif($ivalue > 0) { return $ivalue; }
-  # Pr�fung, ob bei 0 da wirklich eine Nummer war 
+  # Pruefung, ob bei 0 da wirklich eine Nummer war 
   if($value eq $ivalue or $value eq "0 %" or $value eq "0%") { return 0; }
   # Default-Fall: Bei unbekannten Werten soll Rollo offen sein
   return 100; 
