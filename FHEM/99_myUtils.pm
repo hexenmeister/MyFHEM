@@ -327,12 +327,12 @@ readCalValue($$$) {
 # Es gibt ganz bestimmt eine elegantere, schnellere und sicherere Methode (ohne globale Variablen wie $defs zu verwenden), 
 # die Zeit für AT-Befeh neu zu berechnen. Leider ist diese mir (noch)I nicht bekannt ;-)
 sub
-refreshAtCmd($) {
+_refreshAtCmd($) {
 	my ($name) = @_;
 	# pruefen, ob FHEM-Device mit dem gegebenen Namen vorhanden ist
 	if(defined($defs{$name})) {
   	my $type = $defs{$name}{TYPE};
-  	Log 3, "refreshAtCmd: type: $type; name: $name"; 
+  	Log 5, "refreshAtCmd: type: $type; name: $name"; 
   	if($type eq 'at') {
   	  my $def = $defs{$name}{DEF};
   	  if(length($def)>0) {
@@ -359,7 +359,7 @@ refreshAtCmd($) {
   	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
   	    if(length($refresh)>0) { fhem('attr '.$name.' my_autorefresh '.$refresh); }
   	  } else {
-    	  Log 3, "refreshAtCmd: no defs found for $name"; 
+    	  Log 3, "refreshAtCmd: no device found for $name"; 
       }
     } else {
     	Log 3, "refreshAtCmd: undefined or wrong type ($type) for $name"; 
@@ -370,37 +370,16 @@ refreshAtCmd($) {
 # Definierte Liste von AT-Befehlen refreshen.
 sub
 refreshMyAtCmds() {
-	my @names = ('bz_rl_auf_nonwe',
-               'bz_rl_auf_we',
-               'bz_rl_runter',
-	
-               'ka_rl_auf_nonwe',
-               'ka_rl_auf_we',
-               'ka_rl_runter',
-	
-               'ku_rl_auf_nonwe',
-               'ku_rl_auf_v1_nonwe',
-               'ku_rl_auf_v2',
-               'ku_rl_auf_we',
-               'ku_rl_runter',
-               'ku_rl_runter_V',
-
-               'sz_rl_auf_nonwe',
-               'sz_rl_auf_we',
-               'sz_rl_runter',
-
-               'wz_rl_auf_nonwe',
-               'wz_rl_auf_v1',
-               'wz_rl_auf_we',
-               'wz_rl_runter',
-               'wz_rl_runter_V',
-               'wz_rl_sunriseTest',
-               'wz_rl_SunsetTest');
-
-	foreach my $name (@names) {
-		Log 5, "refreshMyAtCmds: name: $name";
-    refreshAtCmd($name);
-  } 
+  # Alle FHEM-Devices durchgehen
+	foreach my $d (keys %defs) {
+    my $name = $defs{$d}{NAME};
+    my $type = $defs{$d}{TYPE};
+    # Nur Geraete aussuchen, die ein benutzerdefiniertes Attribut 'my_autorefresh' besitzen und vom Typ 'at' sind.
+    if(AttrVal($name, 'my_autorefresh', '0') == 1 && $type eq 'at') {      
+      #Log 5, "refreshMyAtCmds: name: $name";
+      _refreshAtCmd($name);
+    }
+  }
 }
 
 sub
