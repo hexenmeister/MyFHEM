@@ -329,34 +329,41 @@ readCalValue($$$) {
 sub
 refreshAtCmd($) {
 	my ($name) = @_;
-	my $type = $defs{$name}{TYPE};
-	Log 5, "refreshAtCmd: type: $type; name: $name"; 
-	if(length($type)>0 && $type eq 'at') {
-	  my $def = $defs{$name}{DEF};
-	  if(length($def)>0) {
-	  	# Attribute speichern
-	  	# TODO: alle existierende Attribute auslesen (wie?)
-	  	my $room = AttrVal($name,'room','');
-	    my $group = AttrVal($name,'group','');
-	    my $disable = AttrVal($name,'disable','');
-
-	    my $cmd ='delete '.$name;
-	    fhem($cmd);
-	    
-	    # Es ist wichtig, alle ;-Zeichen zu verdoppeln! Ansonsten wird ab ersten Semikolon der Befehl abgeschnitten!
-	    $def =~ s/;/;;/g; 
-	    $cmd ='define '.$name.' at '.$def;
-	    fhem($cmd);
-	    
-	    # Attribute (wieder) setzen
-	    fhem('attr '.$name.' room '.$room);
-	    fhem('attr '.$name.' group '.$group);
-	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
-	  } else {
-  	  Log 3, "refreshAtCmd: no defs found for $name"; 
+	# pruefen, ob FHEM-Device mit dem gegebenen Namen vorhanden ist
+	if(defined($defs{$name})) {
+  	my $type = $defs{$name}{TYPE};
+  	Log 3, "refreshAtCmd: type: $type; name: $name"; 
+  	if($type eq 'at') {
+  	  my $def = $defs{$name}{DEF};
+  	  if(length($def)>0) {
+  	  	# Attribute speichern
+  	  	# TODO: alle existierende Attribute auslesen (wie?)
+  	  	my $room = AttrVal($name,'room','');
+  	    my $group = AttrVal($name,'group','');
+  	    my $disable = AttrVal($name,'disable','');
+  	    #my $refresh = AttrVal($name,'my_autorefresh','');
+  	    
+        # Device loeschen
+  	    my $cmd ='delete '.$name;
+  	    fhem($cmd);
+  	    
+  	    # Device neu anlegen
+  	    # Es ist wichtig, alle ;-Zeichen zu verdoppeln! Ansonsten wird ab ersten Semikolon der Befehl abgeschnitten!
+  	    $def =~ s/;/;;/g; 
+  	    $cmd ='define '.$name.' at '.$def;
+  	    fhem($cmd);
+  	    
+  	    # Attribute (wieder) setzen
+  	    fhem('attr '.$name.' room '.$room);
+  	    fhem('attr '.$name.' group '.$group);
+  	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
+  	    #if(length($refresh)>0) { fhem('attr '.$name.' my_autorefresh '.$refresh); }
+  	  } else {
+    	  Log 3, "refreshAtCmd: no defs found for $name"; 
+      }
+    } else {
+    	Log 3, "refreshAtCmd: undefined or wrong type ($type) for $name"; 
     }
-  } else {
-  	Log 3, "refreshAtCmd: undefined or wrong type ($type) for $name"; 
   }
 }
 
@@ -394,6 +401,31 @@ refreshMyAtCmds() {
 		Log 5, "refreshMyAtCmds: name: $name";
     refreshAtCmd($name);
   } 
+}
+
+sub
+myTest() {
+	Log 3, "---: Test";
+	# Alle FHEM-Devices durchgehen
+	foreach my $d (keys %defs) {
+    my $name = $defs{$d}{NAME};
+    my $type = $defs{$d}{TYPE};
+    # Nur Geraete aussuchen, die ein benutzerdefiniertes Attribut 'my_autorefresh' besitzen und vom Typ 'at' sind.
+    if(AttrVal($name, 'my_autorefresh', '0') == 1 && $type eq 'at') {
+      Log 3, "---: ".$name." : ".$type;
+      
+      my $ap = $attr{$name};
+      foreach my $a (keys %{$ap}) {
+        Log 3, "---: ".$a." = ".$ap->{$a};
+      }
+    }
+    
+    
+  }
+  
+  #foreach my $l (sort keys %attr) {
+  #    Log 3, "---: ".$attr{$l}{$name}."---";
+  #  }
 }
 
 # --- obsolet --->
