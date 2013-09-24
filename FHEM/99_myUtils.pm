@@ -336,12 +336,8 @@ _refreshAtCmd($) {
   	if($type eq 'at') {
   	  my $def = $defs{$name}{DEF};
   	  if(length($def)>0) {
-  	  	# Attribute speichern
-  	  	# TODO: alle existierende Attribute auslesen (wie?)
-  	  	my $room = AttrVal($name,'room','');
-  	    my $group = AttrVal($name,'group','');
-  	    my $disable = AttrVal($name,'disable','');
-  	    my $refresh = AttrVal($name,'my_autorefresh','');
+  	  	# Attribute speichern (Map)
+  	    my $ap = $attr{$name};
   	    
         # Device loeschen
   	    my $cmd ='delete '.$name;
@@ -353,11 +349,11 @@ _refreshAtCmd($) {
   	    $cmd ='define '.$name.' at '.$def;
   	    fhem($cmd);
   	    
-  	    # Attribute (wieder) setzen
-  	    fhem('attr '.$name.' room '.$room);
-  	    fhem('attr '.$name.' group '.$group);
-  	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
-  	    if(length($refresh)>0) { fhem('attr '.$name.' my_autorefresh '.$refresh); }
+  	    # Attribute (wieder) setzen (aus dem gespeicherten Map)
+  	    foreach my $a (keys %{$ap}) {
+          Log 5, "Attribute Setzen: ".$name." :  ".$a." = ".$ap->{$a};
+          fhem('attr '.$name.' '.$a.' '.$ap->{$a});
+        }
   	  } else {
     	  Log 3, "refreshAtCmd: no device found for $name"; 
       }
@@ -367,7 +363,7 @@ _refreshAtCmd($) {
   }
 }
 
-# Definierte Liste von AT-Befehlen refreshen.
+# Makierte (Attribut 'my_autorefresh') AT-Befehle refreshen.
 sub
 refreshMyAtCmds() {
   # Alle FHEM-Devices durchgehen
@@ -382,30 +378,30 @@ refreshMyAtCmds() {
   }
 }
 
-sub
-myTest() {
-	Log 3, "---: Test";
-	# Alle FHEM-Devices durchgehen
-	foreach my $d (keys %defs) {
-    my $name = $defs{$d}{NAME};
-    my $type = $defs{$d}{TYPE};
-    # Nur Geraete aussuchen, die ein benutzerdefiniertes Attribut 'my_autorefresh' besitzen und vom Typ 'at' sind.
-    if(AttrVal($name, 'my_autorefresh', '0') == 1 && $type eq 'at') {
-      Log 3, "---: ".$name." : ".$type;
-      
-      my $ap = $attr{$name};
-      foreach my $a (keys %{$ap}) {
-        Log 3, "---: ".$a." = ".$ap->{$a};
-      }
-    }
-    
-    
-  }
-  
-  #foreach my $l (sort keys %attr) {
-  #    Log 3, "---: ".$attr{$l}{$name}."---";
-  #  }
-}
+#sub
+#myTest() {
+#	Log 3, "---: Test";
+#	# Alle FHEM-Devices durchgehen
+#	foreach my $d (keys %defs) {
+#    my $name = $defs{$d}{NAME};
+#    my $type = $defs{$d}{TYPE};
+#    # Nur Geraete aussuchen, die ein benutzerdefiniertes Attribut 'my_autorefresh' besitzen und vom Typ 'at' sind.
+#    if(AttrVal($name, 'my_autorefresh', '0') == 1 && $type eq 'at') {
+#      Log 3, "---: ".$name." : ".$type;
+#      
+#      my $ap = $attr{$name};
+#      foreach my $a (keys %{$ap}) {
+#        Log 3, "---: ".$a." = ".$ap->{$a};
+#      }
+#    }
+#    
+#    
+#  }
+#  
+#  #foreach my $l (sort keys %attr) {
+#  #    Log 3, "---: ".$attr{$l}{$name}."---";
+#  #  }
+#}
 
 # --- obsolet --->
 sub
