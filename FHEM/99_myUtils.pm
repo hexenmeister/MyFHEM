@@ -341,7 +341,7 @@ refreshAtCmd($) {
   	  	my $room = AttrVal($name,'room','');
   	    my $group = AttrVal($name,'group','');
   	    my $disable = AttrVal($name,'disable','');
-  	    #my $refresh = AttrVal($name,'my_autorefresh','');
+  	    my $refresh = AttrVal($name,'my_autorefresh','');
   	    
         # Device loeschen
   	    my $cmd ='delete '.$name;
@@ -357,7 +357,7 @@ refreshAtCmd($) {
   	    fhem('attr '.$name.' room '.$room);
   	    fhem('attr '.$name.' group '.$group);
   	    if(length($disable)>0) { fhem('attr '.$name.' disable '.$disable); }
-  	    #if(length($refresh)>0) { fhem('attr '.$name.' my_autorefresh '.$refresh); }
+  	    if(length($refresh)>0) { fhem('attr '.$name.' my_autorefresh '.$refresh); }
   	  } else {
     	  Log 3, "refreshAtCmd: no defs found for $name"; 
       }
