@@ -5,7 +5,7 @@ home=/opt/fhem
 cd $home
 
 # Start watchdog
-runwatchdog.sh
+./runwatchdog.sh
 
 cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
 if [ "$cnt" -eq "0" ] ; then

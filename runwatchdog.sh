@@ -14,7 +14,7 @@
 ## --- Variablen ---------------------------
 
 # Home-Verzeichnis
-home=/var/InternerSpeicher/fhem
+home=/opt/fhem
 cd $home
 
 # Logdatei für Watchdog-Script
@@ -43,7 +43,7 @@ print(){
 ## --- Start -------------------------------
 
 # Prüfen, ob Watchdog bereits laeuft: PID suchen
-wpid=$(ps | grep -v grep | grep $wdproc | cut -c1-5);
+wpid=$(ps -ef | grep -v grep | grep $wdproc | cut -c1-5);
 
 # Prüfen, ob leer
 if test $wpid 
