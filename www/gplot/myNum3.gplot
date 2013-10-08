@@ -1,0 +1,24 @@
+# Plot fuer Visualisierung von Server-Alive-log
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+
+set title '<TL>'
+
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set grid xtics y2tics
+
+set ytics ("" 0, "" 7, "" 14)
+set ylabel ""
+set yrange [-1:15]
+
+set y2tics ("" 0, "" 7, "" 14)
+set y2label ""
+set y2range [-1:15]
+
+#FileLog 3:
+
+plot "<IN>" x1y1 notitle ls l1fill lw 0.5 with steps
+

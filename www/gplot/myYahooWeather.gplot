@@ -1,0 +1,56 @@
+###########################################################################
+### Display values from a Yahoo Weather.
+### FileLog definition corresponding to this file
+# define <Wetter_Name> Weather <Yahoo-ID> <Intervall>
+# define <filelogname> FileLog /var/log/fhem/Wetter-%M_%Y.log <Wetter_Name>:(temperature|pressure|humidity|wind_chill):.*
+### FileLog content
+#2012-01-01_00:00:00 Wetter_Log temperature: 13
+#2012-01-01_00:00:00 Wetter_Log humidity: 97
+#2012-01-01_00:00:00 Wetter_Log wind_chill: 12
+
+# This is the status line, which is printed to the logfile. For each of
+# the data there is also a separate line available, which you can select 
+# using a different regular expression in the FileLog define. 
+# Try .* as an all quantor to see, which lines are available.
+
+
+### Settings
+#set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+
+set terminal size <SIZE>
+set title '<TL>'
+set ylabel "Temperature in C"
+set y2label "Humidity (%)"
+set y3label "Windchill C"
+
+set ytics
+set y2tics
+set y3tics
+
+set grid xtics ytics
+
+# Maybe define your own ranges (disturbing,really!)
+
+#set y3range [50:100]
+
+
+### Data extraction
+
+#FileLog 4:temperature::
+#FileLog 4:wind_chill::
+#FileLog 4:humidity::
+
+plot \
+  "< egrep 'temperature' <IN>"\
+         using 1:1 ls l0 axes x1y1 title 'Temperatur (C)' with lines lw 3,\
+  "< egrep 'wind_chill' <IN>"\
+        using 1:2 ls l1 axes x1y1 title 'Gefuehlte Temperatur (C)' with lines lw 5,\
+  "< egrep 'humidity' <IN>"\
+        using 1:3 ls l2fill axes x1y2 title 'Luftfeuchtigkeit (%)' with lines
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
