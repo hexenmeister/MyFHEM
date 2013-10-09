@@ -82,7 +82,7 @@ checkAlive(){
 }
 
 ## --- Start -------------------------------
-print "starting watchdig";
+print "starting watchdog";
 log "MSG: starting watchdog";
 
 # Workaround
