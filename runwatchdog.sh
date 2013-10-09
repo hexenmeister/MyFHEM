@@ -43,7 +43,7 @@ print(){
 ## --- Start -------------------------------
 
 # Prüfen, ob Watchdog bereits laeuft: PID suchen
-wpid=$(ps -ef | grep -v grep | grep $wdproc | cut -c1-5);
+wpid=$(ps -ef | grep -v grep | grep $wdproc | cut -c10-14);
 
 # Prüfen, ob leer
 if test $wpid 

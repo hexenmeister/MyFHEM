@@ -97,7 +97,7 @@ fi
 
 
 # FHEM PID suchen
-pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c1-5);
+pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
 if test $pid 
 then
  print "FHEM running";
@@ -129,7 +129,7 @@ else
  # TODO: Pruefen, ob FHEM gerade Update durchführt (dauert ca. 15 min.)
  print "Server dead";
  # FHEM PID suchen
- pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c1-5);
+ pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
  print "killing FHEM. PID: $pid";
  log "MSG: killing FHEM PID: $pid";
  # Prozess beenden
