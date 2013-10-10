@@ -26,7 +26,7 @@ log=./log/watchdog.log
 # Grenzwert (Sekunden der Inaktivitaet)
 maxTime=270;
 # Pruefintervall
-pollTime = 125;
+pollTime=60;
 
 ## --- Methoden ----------------------------
 
@@ -50,37 +50,49 @@ print(){
 
 # Methode testet, ob in der erwarteten Zeit eine Rueckmeldung des Servers erfolgt ist.
 checkAlive(){
-  # Aktuelle Zeit (Sekunden seit 1. Januar 1970 00:00)
-  currentTime=$(date +%s);
-  
-  # Letzte Dateiaenderung der 'Alive'-Log (Sekunden seit 1. Januar 1970 00:00)
-  getLogName;
-  lastChangeTime=$(stat -c %Z $aliveLog);
-
-  # Different in Sekunden (wie lange liegt die letzte 'Alive'-Meldung zuruech?)
-  diff=$(($currentTime-$lastChangeTime));
-  
-  print "FHEM-Watchdog: Letzte 'Alive'-Meldung vor $diff Sekunden";
-  
-  if test $diff -gt $maxTime 
+  pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
+  if test $pid 
   then
-   if test $diff -gt 1000000000
-   then
-    # Wert unplausibel
-    log "V: $diff S: error MSG: value to big";
-    #log "S: error";
-    return 0;
-   fi
-   # Server (vermutlich) abgestürzt
-   log "V: $diff S: dead MSG: no response from FHEM Server for $diff sekonds";
-   #log "S: dead";
-   return 1;
+  
+    # Aktuelle Zeit (Sekunden seit 1. Januar 1970 00:00)
+    currentTime=$(date +%s);
+  
+    # Letzte Dateiaenderung der 'Alive'-Log (Sekunden seit 1. Januar 1970 00:00)
+    getLogName;
+    lastChangeTime=$(stat -c %Z $aliveLog);
+
+    # Different in Sekunden (wie lange liegt die letzte 'Alive'-Meldung zuruech?)
+    diff=$(($currentTime-$lastChangeTime));
+  
+    print "FHEM-Watchdog: Letzte 'Alive'-Meldung vor $diff Sekunden";
+  
+    if test $diff -gt $maxTime 
+    then
+     if test $diff -gt 1000000000
+     then
+      # Wert unplausibel
+      log "V: $diff S: error MSG: value to big";
+      #log "S: error";
+      return 0;
+     fi
+     # Server (vermutlich) abgestürzt
+     log "V: $diff S: dead MSG: no response from FHEM Server for $diff sekonds";
+     #log "S: dead";
+     return 1;
+    else
+     # Server am Leben
+     log "V: $diff S: alive MSG: FHEM Server alive";
+     #log "S: alive";
+     return 0;
+    fi
+  
   else
-   # Server am Leben
-   log "V: $diff S: alive MSG: FHEM Server alive";
-   #log "S: alive";
-   return 0;
+    # Server abgestürzt, Prozess nicht (mehr) vorhanden.
+    log "MSG: no FHEM Server process found";
+    #log "S: dead";
+    return 1;
   fi
+  
 }
 
 ## --- Start -------------------------------
@@ -132,14 +144,17 @@ else
  print "Server dead";
  # FHEM PID suchen
  pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
- print "killing FHEM. PID: $pid";
- log "MSG: killing FHEM PID: $pid";
- # Prozess beenden
- kill $pid;
- # Etwas warten
- sleep 3;
- # Wenn nicht beendet - hart terminieren
- kill -9 $pid;
+ if test $pid 
+ then
+   print "killing FHEM. PID: $pid";
+   log "MSG: killing FHEM PID: $pid";
+   # Prozess beenden
+   kill $pid;
+   # Etwas warten
+   sleep 3;
+   # Wenn nicht beendet - hart terminieren
+   kill -9 $pid;
+ fi
  # FHEM neu starten
  print "restarting FHEM";
  ./startfhem &
