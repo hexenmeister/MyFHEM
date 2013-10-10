@@ -20,7 +20,7 @@ cd $home
 # Logdatei für Watchdog-Script
 log=./log/watchdog.log
 touch $log;
-chmod 777 $log;
+chmod 666 $log;
 
 # Watchdog Script
 wdproc=watchdogloop.sh;

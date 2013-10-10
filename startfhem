@@ -5,12 +5,18 @@ home=/opt/fhem
 cd $home
 
 # Start watchdog
-sudo -u fhem ./runwatchdog.sh
+#sudo -u fhem ./runwatchdog.sh
+./runwatchdog.sh
 
 cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
 if [ "$cnt" -eq "0" ] ; then
   echo "Starting fhem..."
-  sudo -u fhem perl fhem.pl fhem.cfg
+  #sudo -u fhem perl fhem.pl fhem.cfg
+  perl fhem.pl fhem.cfg
+  RETVAL=$?
 else
   echo "fhem is allready running"
+  RETVAL=0
 fi
+
+exit $RETVAL
