@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_myUtils.pm 0001 2013-09-07 13:21:15Z a_schulz $
+# $Id: 99_myUtils.pm 0001 2013-10-10 22:49:15Z a_schulz $
 package main;
 
 use strict;
@@ -553,13 +553,13 @@ _convertSymParams($)
   return 100; 
 }
 
-# --- tick alive / watchdog ---->
-sub tickAlive($)
+# --- server heartbeat / watchdog ---->
+sub tickHeartbeat($)
 {
 	my ($device) = @_;
 	my $v = _getDeviceValueNumeric($device);
 	$v = $v+1; 
-	if($v>=15) {$v=0;} 
+	if($v>=60) {$v=0;} 
 	fhem("set $device $v");
 }
 
