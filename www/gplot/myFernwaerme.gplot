@@ -1,0 +1,28 @@
+#
+# Eigene Definition für 3 Temperaturlinien in einem Graph (Heizung)
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set yrange [10:90]
+set y2range [10:90]
+
+set title 'Fernwaerme / Heizung'
+set y2label "Temperature in C"
+
+#FileLog 4:EG_HA_OWTS21.Fernwaerme_Vorlauf_Heizung:0:
+#FileLog 4:EG_HA_OWTS22.Fernwaerme_Vorlauf_Warmwasser:0:
+#FileLog 4:EG_HA_OWTS23.Fernwaerme_Rueckflauf:0:
+
+plot \
+
+  "< awk '/EG_HA_OWTS21\.Fernwaerme_Vorlauf_Heizung/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Vorlauf Heizung' with lines lw 2,\
+  "< awk '/EG_HA_OWTS22\.Fernwaerme_Vorlauf_Warmwasser/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Vorlauf Warmwasser' with lines lw 2,\
+  "< awk '/EG_HA_OWTS23\.Fernwaerme_Rueckflauf/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Rueckflauf' with lines lw 2\
+ 
