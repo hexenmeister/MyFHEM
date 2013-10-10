@@ -34,7 +34,7 @@ pollTime=60;
 getLogName() {
   currentYear=$(date +"%Y");
   currentMonth=$(date +"%m");
-  aliveLog=./log/NN_TE_DMST01.Server_Alive-$currentYear-$currentMonth.log;
+  aliveLog=./log/NN_TE_DMST01.Server_Heartbeat-$currentYear-$currentMonth.log;
 }
 
 # Methode schreibt Meldungen in die Logdatei
