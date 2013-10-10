@@ -24,7 +24,9 @@ aliveLog=./log/undefined.log;
 log=./log/watchdog.log
 
 # Grenzwert (Sekunden der Inaktivitaet)
-maxTime=910;
+maxTime=270;
+# Pruefintervall
+pollTime = 125;
 
 ## --- Methoden ----------------------------
 
@@ -126,7 +128,7 @@ if ( checkAlive )
 then 
  print "Server alive";
 else
- # TODO: Pruefen, ob FHEM gerade Update durchführt (dauert ca. 15 min.)
+ # TODO: Pruefen, ob FHEM gerade Update durchführt (dauert ca. 15 min. auf einer FB)
  print "Server dead";
  # FHEM PID suchen
  pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
@@ -144,6 +146,6 @@ else
 fi
 
 # Etwas Zeit vor dem naechsten Check verstreichen lassen.
-sleep 300;
+sleep $pollTime;
 
 done
