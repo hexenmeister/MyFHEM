@@ -1,4 +1,4 @@
-# Plot fuer Visualisierung von Server-Alive-log
+# Plot fuer Visualisierung von Server-Hearbeat-log
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'

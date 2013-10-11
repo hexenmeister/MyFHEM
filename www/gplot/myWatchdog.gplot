@@ -21,7 +21,7 @@ set ylabel "Status"
 
 
 plot "<IN>" x1y2 notitle ls l5 lw 0.5 with steps, \
-            x1y1 notitle ls l8fill lw 0 with steps, 
+            x1y1 notitle ls l8fill lw 0 with steps
 
 
 #plot \
