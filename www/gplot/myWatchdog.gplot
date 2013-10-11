@@ -1,0 +1,33 @@
+#
+# Anzeige der Watchdog-Log-Informationen
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title 'Watchdog'
+set yrange [-10:300]
+set y2label "Zeit (s)"
+
+set ytics ("alive" 0, "dead" 1)
+set yrange [-0.1:1.1]
+set ylabel "Status"
+
+#FileLog 4:\x20V\x3a:0:
+#FileLog 6:\x20S\x3a:0:$fld[5]=~"dead"?1:0
+
+
+plot "<IN>" x1y2 notitle ls l5 lw 0.5 with steps, \
+            x1y1 notitle ls l8fill lw 0 with steps, 
+
+
+#plot \
+#
+#  "< awk '/V\:/ {print $1, $4}' <IN>"\
+#     using 1:2 axes x1y2 title 'letzte Zeitmeldung' with lines lw 0.5,\
+#  "< awk '/S\:/ {print $1, $6~/dead/? 1 : 0; }' <IN>"\
+#     using 1:2 axes x1y1 title 'Status' with dots lw 0.5\
+ 
