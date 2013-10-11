@@ -5,8 +5,14 @@ home=/opt/fhem
 cd $home
 
 # Start watchdog
-#sudo -u fhem ./runwatchdog.sh
-./runwatchdog.sh
+cnt=`ps -ef | grep "watchdogloop" | grep -v grep | wc -l`
+if [ "$cnt" -eq "0" ] ; then
+  cnt=`ps -ef | grep "runwatchdog" | grep -v grep | wc -l`
+  if [ "$cnt" -eq "0" ] ; then
+    #sudo -u fhem ./runwatchdog.sh
+    ./runwatchdog.sh
+  fi
+fi
 
 cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
 if [ "$cnt" -eq "0" ] ; then
@@ -19,4 +25,6 @@ else
   RETVAL=0
 fi
 
-exit $RETVAL
+#exit $RETVAL
+
+return $RETVAL

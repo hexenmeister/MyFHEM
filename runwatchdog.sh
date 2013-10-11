@@ -58,3 +58,7 @@ fi
 
 # Fertig
 print "startwatchdog done";
+
+#exit 0;
+
+return 0

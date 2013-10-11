@@ -31,4 +31,6 @@ then
   RETVAL=0
 fi
 
-exit $RETVAL
+#exit $RETVAL
+
+return $RETVAL
