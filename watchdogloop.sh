@@ -158,6 +158,8 @@ else
  # FHEM neu starten
  print "restarting FHEM";
  ./startfhem &
+ # Etwas Zeit zum Starten lassen.
+ sleep 120;
 fi
 
 # Etwas Zeit vor dem naechsten Check verstreichen lassen.
