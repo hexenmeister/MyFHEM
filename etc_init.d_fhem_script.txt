@@ -31,6 +31,12 @@ case "$1" in
         RETVAL=$?
         ;;
 'status')
+        cnt=`ps -ef | grep "watchdogloop.sh" | grep -v grep | wc -l`
+        if [ "$cnt" -eq "0" ] ; then
+                echo "watchdog is not running"
+        else
+                echo "watchdog is running"
+        fi
         cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
         if [ "$cnt" -eq "0" ] ; then
                 echo "fhem is not running"
