@@ -9,7 +9,7 @@ cd $home
 
 #echo Stop watchdog and fhem
 
-./killwatchdog.sh
-./killfhem.sh
+sudo -u fhem ./killwatchdog.sh
+sudo -u fhem ./killfhem.sh
 
 return $?

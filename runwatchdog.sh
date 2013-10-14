@@ -52,14 +52,14 @@ wdproc=watchdogloop.sh;
 # Pruefen, ob Haupt- oder Start-Script bereits aktiv sind
 cnt=$(ps -ef | grep "watchdogloop" | grep -v grep | wc -l)
 if [ "$cnt" -eq "0" ] ; then
-  cnt=$(ps -ef | grep "runwatchdog" | grep -v grep | wc -l)
-  if [ "$cnt" -eq "0" ] ; then
+  #cnt=$(ps -ef | grep "runwatchdog" | grep -v grep | wc -l)
+  #if [ "$cnt" -eq "0" ] ; then
     echo "starting watchdog";
     ./$wdproc &
-  else
-    echo "another watchdog instance starting. skipping"; 
-    return 1;
-  fi
+  #else
+  #  echo "another watchdog instance starting. skipping"; 
+  #  return 1;
+  #fi
 else
   echo "watchdog already running. skipping";
   return 1;

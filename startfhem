@@ -14,7 +14,7 @@ cd $home
 #  fi
 #fi
 
-./runwatchdog.sh
+sudo -u fhem ./runwatchdog.sh
 
 
 #cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
@@ -28,6 +28,6 @@ cd $home
 #  RETVAL=0
 #fi
 
-./runfhem.sh
+sudo -u fhem ./runfhem.sh
 
 return $RETVAL
