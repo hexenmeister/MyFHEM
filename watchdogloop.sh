@@ -17,16 +17,23 @@
 home=/opt/fhem
 cd $home
 
-# Zu ueberwachende Log-Datei (erst als Dummy)
-aliveLog=./log/undefined.log;
+# Log-Verzeichnis
+logDir=./log
 
-# Logdatei für Watchdog-Script
-log=./log/watchdog.log
+# Logdatei für Watchdog-Script (Grundname)
+logName=watchdog
+
+# Zu ueberwachende Log-Datei (Grundname)
+activeLogName=NN_TE_DMST01.Server_Heartbeat
 
 # Grenzwert (Sekunden der Inaktivitaet)
 maxTime=270;
+
 # Pruefintervall
 pollTime=60;
+
+# Zu ueberwachende Log-Datei (erst als Dummy)
+aliveLog=$logDir/undefined.log;
 
 ## --- Methoden ----------------------------
 
@@ -34,12 +41,17 @@ pollTime=60;
 getLogName() {
   currentYear=$(date +"%Y");
   currentMonth=$(date +"%m");
-  aliveLog=./log/NN_TE_DMST01.Server_Heartbeat-$currentYear-$currentMonth.log;
+  aliveLog=$logDir/$activeLogName-$currentYear-$currentMonth.log;
 }
 
 # Methode schreibt Meldungen in die Logdatei
 log(){
   currentTimeStr=$(date +"%Y-%m-%d_%H:%M:%S");
+  currentYear=$(date +"%Y");
+  currentMonth=$(date +"%m");
+  log=$logDir/$logName-$currentYear-$currentMonth.log
+  touch $log;
+  chmod 666 $log;
   echo "$currentTimeStr fhem_server $1" >> $log;
 }
 

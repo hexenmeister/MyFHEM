@@ -5,26 +5,29 @@ home=/opt/fhem
 cd $home
 
 # Start watchdog
-cnt=`ps -ef | grep "watchdogloop" | grep -v grep | wc -l`
-if [ "$cnt" -eq "0" ] ; then
-  cnt=`ps -ef | grep "runwatchdog" | grep -v grep | wc -l`
-  if [ "$cnt" -eq "0" ] ; then
-    #sudo -u fhem ./runwatchdog.sh
-    ./runwatchdog.sh
-  fi
-fi
+#cnt=`ps -ef | grep "watchdogloop" | grep -v grep | wc -l`
+#if [ "$cnt" -eq "0" ] ; then
+#  cnt=`ps -ef | grep "runwatchdog" | grep -v grep | wc -l`
+#  if [ "$cnt" -eq "0" ] ; then
+#    #sudo -u fhem ./runwatchdog.sh
+#    ./runwatchdog.sh
+#  fi
+#fi
 
-cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
-if [ "$cnt" -eq "0" ] ; then
-  echo "Starting fhem..."
-  #sudo -u fhem perl fhem.pl fhem.cfg
-  perl fhem.pl fhem.cfg
-  RETVAL=$?
-else
-  echo "fhem is allready running"
-  RETVAL=0
-fi
+./runwatchdog.sh
 
-#exit $RETVAL
+
+#cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
+#if [ "$cnt" -eq "0" ] ; then
+#  echo "Starting fhem..."
+#  #sudo -u fhem perl fhem.pl fhem.cfg
+#  perl fhem.pl fhem.cfg
+#  RETVAL=$?
+#else
+#  echo "fhem is allready running"
+#  RETVAL=0
+#fi
+
+./runfhem.sh
 
 return $RETVAL
