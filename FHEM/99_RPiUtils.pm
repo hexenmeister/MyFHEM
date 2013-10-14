@@ -358,7 +358,7 @@ sub ShowRPiValues ()
 
 # if necessary use summarizing end line
 #  $htmlcode .= "<tr><td></td></tr>\n";
-#  $htmlcode .= "</table></div><br>";
+  $htmlcode .= "</table></div><br>";
 #  $htmlcode .= "--------------------------------------------------------------------------";
 
   return $htmlcode;
