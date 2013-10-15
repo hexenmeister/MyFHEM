@@ -16,12 +16,10 @@ at_Initialize($)
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6 ".
-                      "alignTime";
+  $hash->{AttrList} = "disable:0,1 skip_next:0,1 alignTime";
 }
 
 
-my $oldattr;
 my $at_stt_sec;
 my $at_stt_day;
 
@@ -97,9 +95,8 @@ at_Define($$)
   RemoveInternalTimer($hash);
   InternalTimer($nt, "at_Exec", $hash, 0);
 
-  $hash->{STATE} = ($oldattr && $oldattr->{disable} ?
-        "disabled" : ("Next: ".FmtTime($nt)));
-  
+  $hash->{STATE} = AttrVal($name, "disable", undef) ?
+                        "disabled" : ("Next: ".FmtTime($nt));
   return undef;
 }
 
@@ -116,50 +113,39 @@ sub
 at_Exec($)
 {
   my ($hash) = @_;
-  my ($skip, $disable) = ("","");
 
   return if($hash->{DELETED});           # Just deleted
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "exec at command $name";
+  Log3 $name, 5, "exec at command $name";
 
-  if(defined($attr{$name})) {
-    $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
-    $disable = 1 if($attr{$name} && $attr{$name}{disable});
-  }
+  my $skip    = AttrVal($name, "skip_next", undef);
+  my $disable = AttrVal($name, "disable", undef);
 
   delete $attr{$name}{skip_next} if($skip);
   my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
-  Log GetLogLevel($name,3), "$name: $ret" if($ret);
+  Log3 $name, 3, "$name: $ret" if($ret);
 
   return if($hash->{DELETED});           # Deleted in the Command
 
   my $count = $hash->{REP};
   my $def = $hash->{DEF};
 
-  $oldattr = $attr{$name};           # delete removes the attributes too
-
   # Avoid drift when the timespec is relative
   $data{AT_TRIGGERTIME} = $hash->{TRIGGERTIME} if($def =~ m/^\+/);
 
-  my $oldCfgfn = $hash->{CFGFN};
-  my $oldNr    = $hash->{NR};
-  CommandDelete(undef, $name);          # Recreate ourselves
-
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
-    Log $ll5, "redefine at command $name as $def";
+    Log3 $name, 5, "redefine at command $name as $def";
 
-    $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
-    CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
-    $hash = $defs{$name};
+    $data{AT_RECOMPUTE} = 1;             # Tell sunrise compute the next day
+    at_Define($hash, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
-    $attr{$name} = $oldattr;
-    $hash->{CFGFN} = $oldCfgfn if($oldCfgfn);
-    $hash->{NR} = $oldNr;
-    $oldattr = undef;
+
+  } else {
+    CommandDelete(undef, $name);          # We are done
+
   }
   delete($data{AT_TRIGGERTIME});
 }
@@ -196,6 +182,7 @@ at_Attr(@)
     RemoveInternalTimer($hash);
     InternalTimer($ttime, "at_Exec", $hash, 0);
     $hash->{TRIGGERTIME} = $ttime;
+    $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
     $hash->{STATE} = "Next: " . FmtTime($ttime);
   }
 
@@ -264,7 +251,8 @@ at_State($$$$)
       The optional <code>{N}</code> after the * indicates,that the command
       should be repeated <i>N-times</i> only.<br>
       &lt;timedet&gt; is either HH:MM, HH:MM:SS or {perlfunc()}, where perlfunc
-      must return a HH:MM or HH:MM:SS date.
+      must return a HH:MM or HH:MM:SS date. Note: {perlfunc()} may not contain
+      any spaces or tabs.
     </ul>
     <br>
 

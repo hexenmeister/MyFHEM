@@ -27,6 +27,8 @@ use strict;
 use warnings;
 #use Data::Dumper;
 
+sub structure_getChangedDevice($);
+
 
 #####################################
 sub
@@ -40,7 +42,7 @@ structure_Initialize($)
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
   $hash->{AttrList}  = "clientstate_priority ".
-                       "clientstate_behavior:relative,absolute,last loglevel:0,5 ".
+                       "clientstate_behavior:relative,absolute,last ".
                        $readingFnAttributes;
 
   addToAttrList("structexclude");
@@ -101,18 +103,33 @@ structure_Undef($$)
 # returns the unique keys of the given array
 # @my_array = ("one","two","three","two","three");
 # print join(" ", @my_array), "\n";
-# print join(" ", uniq(@my_array)), "\n";
+# print join(" ", structure_uniq(@my_array)), "\n";
 
-sub uniq {
-    return keys %{{ map { $_ => 1 } @_ }};
+sub
+structure_uniq
+{
+  return keys %{{ map { $_ => 1 } @_ }};
 }
 
+
+#############################
+# returns the really changed Device
+#############################
+
+sub
+structure_getChangedDevice($) 
+{
+  my ($dev) = @_;
+  my $lastDevice = ReadingsVal($dev, "LastDevice", undef);
+  $dev = structure_getChangedDevice($lastDevice)
+        if($lastDevice && $defs{$dev}->{TYPE} eq "structure");
+  return $dev;
+}
 
 #############################
 sub structure_Notify($$)
 {
   my ($hash, $dev) = @_;
-  #Log 1, Dumper($hash);
   my $me = $hash->{NAME};
   my $devmap = $hash->{ATTR}."_map";
 
@@ -166,7 +183,7 @@ sub structure_Notify($$)
   return "" if($hash->{INSET}); # Do not trigger for our own set
 
   if($hash->{INNTFY}) {
-    Log 1, "ERROR: endless loop detected in structure_Notify $me";
+    Log3 $me, 1, "ERROR: endless loop detected in structure_Notify $me";
     return "";
   }
   $hash->{INNTFY} = 1;
@@ -190,7 +207,7 @@ sub structure_Notify($$)
   }
   undef @foo;
   undef @structPrio;
-  #Log 1, Dumper(%priority) . "\n";
+  #Log3 $me, 1, Dumper(%priority) . "\n";
   
   my $minprio = 99999;
   my $devstate;
@@ -198,14 +215,6 @@ sub structure_Notify($$)
   #ueber jedes Device das zu dieser Struktur gehoert
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
-
-    # wenn zum Device das "structexclude" gesetzt ist, wird dieses nicht
-    # beruecksichtigt
-    if($attr{$d} && $attr{$d}{structexclude}) {
-      my $se = $attr{$d}{structexclude};
-      next if($me =~ m/$se/);
-    }
-
 
     # Status des Devices gemaess den Regeln des gesetztes StrukturAttr
     # umformatieren
@@ -245,7 +254,7 @@ sub structure_Notify($$)
             # wird beim ersten Auftreten sonst nicht weiter geprueft
           }
         }
-        # Log 1, "Dev: ".$d." Anzahl: ".@value." Value:".$value[0]." devstate:
+        # Log3 $me, 1, "Dev:".$d." Anzahl:".@value." Val:".$value[0]." devstate:
         # ".$devstate;
         $minprio = $priority{$devstate}
                 if(defined($devstate) &&
@@ -266,7 +275,7 @@ sub structure_Notify($$)
     last if($minprio == 1);
   } #foreach
 
-  @clientstate = uniq(@clientstate);# eleminiere alle Dubletten
+  @clientstate = structure_uniq(@clientstate);# eleminiere alle Dubletten
 
   #ermittle Endstatus
   my $newState = "undefined";
@@ -283,9 +292,13 @@ sub structure_Notify($$)
 
   }
 
-  Log GetLogLevel($me,5), "Update structure '$me' to $newState" .
+  Log3 $me, 5, "Update structure '$me' to $newState" .
               " because device $dev->{NAME} has changed";
-  readingsSingleUpdate($hash, "state", $newState, 1);
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "LastDevice", $dev->{NAME});
+  readingsBulkUpdate($hash, "LastDevice_Abs", structure_getChangedDevice($dev->{NAME}));
+  readingsBulkUpdate($hash, "state", $newState);
+  readingsEndUpdate($hash, 1);
 
   delete($hash->{INNTFY});
   undef;
@@ -360,7 +373,7 @@ structure_Set($@)
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
-      Log 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
+      Log3 $hash, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
       next;
     }
 
@@ -381,7 +394,7 @@ structure_Set($@)
     }
   }
   delete($hash->{INSET});
-  Log GetLogLevel($hash->{NAME},5), "SET: $ret" if($ret);
+  Log3 $hash, 5, "SET: $ret" if($ret);
   return $list[1] eq "?"
            ? "Unknown argument ?, choose one of " . join(" ", sort keys(%pars))
            : undef;
@@ -392,17 +405,16 @@ sub
 structure_Attr($@)
 {
   my ($type, @list) = @_;
+  my %ignore = ("alias"=>1, "room"=>1, "group"=>1, "icon"=>1,
+                "devStateIcon"=>1, "webCmd"=>1, "stateFormat"=>1 );
 
-  return undef if($list[1] eq "alias" ||
-                  $list[1] eq "room" ||
-                  $list[1] =~ m/clientstate/ ||
-                  $list[1] eq "loglevel");
+  return undef if($ignore{$list[1]} || $list[1] =~ m/clientstate/);
 
   my $me = $list[0];
   my $hash = $defs{$me};
 
   if($hash->{INATTR}) {
-    Log 1, "ERROR: endless loop detected in structure_Attr for $me";
+    Log3 $me, 1, "ERROR: endless loop detected in structure_Attr for $me";
     next;
   }
   $hash->{INATTR} = 1;
@@ -428,7 +440,7 @@ structure_Attr($@)
     }
   }
   delete($hash->{INATTR});
-  Log GetLogLevel($me,4), "Stucture attr $type: $ret" if($ret);
+  Log3 $me, 4, "Stucture attr $type: $ret" if($ret);
   return undef;
 }
 

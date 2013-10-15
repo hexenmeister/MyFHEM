@@ -30,7 +30,7 @@ my %flogpar = (
 
   # Oregon sensors: 
   # * temperature
-  "(THR128|THWR288A|THN132N).*"
+  "(THR128|THWR288A|THN132N|THGR132N).*"
       => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
   "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T|WT450H).*"
@@ -96,8 +96,7 @@ autocreate_Initialize($)
   $hash->{DefFn} = "autocreate_Define";
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrFn}   = "autocreate_Attr";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 " . 
-                     "autosave filelog device_room weblink weblink_room " .
+  $hash->{AttrList}= "autosave filelog device_room weblink weblink_room " .
                      "disable ignoreTypes";
   my %ahash = ( Fn=>"CommandCreateLog",
                 Hlp=>"<device>,create log/weblink for <device>" );
@@ -136,7 +135,6 @@ autocreate_Notify($$)
   my ($ntfy, $dev) = @_;
 
   my $me = $ntfy->{NAME};
-  my ($ll1, $ll2) = (GetLogLevel($me,1), GetLogLevel($me,2));
   my $max = int(@{$dev->{CHANGED}});
   my $ret = "";
   my $nrcreated;
@@ -160,16 +158,18 @@ autocreate_Notify($$)
       ####################
       if(!$hash) {
         $cmd = "$name $type $arg";
-        Log $ll2, "autocreate: define $cmd";
+        Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
-          Log $ll1, "ERROR: $ret";
+          Log3 $me, 1, "ERROR: $ret";
           last;
         }
       }
       $hash = $defs{$name};
       $nrcreated++;
       my $room = replace_wildcards($hash, AttrVal($me, "device_room", "%TYPE"));
+      # preserve room for createlog
+      $room = $attr{$name}{room} if($attr{$name} && $attr{$name}{room}); 
       $attr{$name}{room} = $room if($room);
 
       # BlackList processing
@@ -193,10 +193,10 @@ autocreate_Notify($$)
         last;
       }
       $cmd = "$flname FileLog $fl $filter";
-      Log $ll2, "autocreate: define $cmd";
+      Log3 $me, 2, "autocreate: define $cmd";
       $ret = CommandDefine(undef, $cmd);
       if($ret) {
-        Log $ll1, "ERROR: $ret";
+        Log3 $me, 1, "ERROR: $ret";
         last;
       }
       $attr{$flname}{room} = $room if($room);
@@ -216,15 +216,15 @@ autocreate_Notify($$)
         next if(!$wdef);
         my ($gplotfile, $stuff) = split(/:/, $wdef);
         next if(!$gplotfile);
-        my $wlname = "weblink_$name";
+        my $wlname = "SVG_$name";
         $wlname .= "_$wnr" if($wnr > 1);
         $wnr++;
         delete($defs{$wlname});   # If we are re-creating it with createlog.
-        $cmd = "$wlname weblink fileplot $flname:$gplotfile:CURRENT";
-        Log $ll2, "autocreate: define $cmd";
+        $cmd = "$wlname SVG $flname:$gplotfile:CURRENT";
+        Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
-          Log $ll1, "ERROR: $ret";
+          Log3 $me, 1, "ERROR: $ret";
           last;
         }
         $attr{$wlname}{room} = $room if($room);
@@ -249,17 +249,17 @@ autocreate_Notify($$)
         $hash->{DEF} =~ s/$old/$new/g;
 
         rename($oldlogfile, $hash->{currentlogfile});
-        Log $ll2, "autocreate: renamed FileLog_$old to FileLog_$new";
+        Log3 $me, 2, "autocreate: renamed FileLog_$old to FileLog_$new";
         $nrcreated++;
       }
 
-      if($defs{"weblink_$old"}) {
-        CommandRename(undef, "weblink_$old weblink_$new");
-        my $hash = $defs{"weblink_$new"};
+      if($defs{"SVG_$old"}) {
+        CommandRename(undef, "SVG_$old SVG_$new");
+        my $hash = $defs{"SVG_$new"};
         $hash->{LINK} =~ s/$old/$new/g;
         $hash->{DEF} =~ s/$old/$new/g;
-        $attr{"weblink_$new"}{label} =~ s/$old/$new/g;
-        Log $ll2, "autocreate: renamed weblink_$old to weblink_$new";
+        $attr{"SVG_$new"}{label} =~ s/$old/$new/g;
+        Log3 $me, 2, "autocreate: renamed SVG_$old to SVG_$new";
         $nrcreated++;
       }
     }
@@ -321,7 +321,7 @@ my @usbtable = (
 
     { NAME      => "TCM310",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
-                    "ttyUSB(.*)", "ttyACM(.*)"],
+                    "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
       response  => "^\x55\x00\x05\x01",
@@ -376,7 +376,7 @@ CommandUsb($$)
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-  Log 1, "usb $n starting";
+  Log3 undef, 1, "usb $n starting";
   ################
   # First try to flash unflashed CULs
   if($^O eq "linux") {
@@ -392,7 +392,7 @@ CommandUsb($$)
       $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
       if($culType) {
         $msg = "$culType: flash it with: CULflash none $culType";
-        Log 2, $msg; $ret .= $msg . "\n";
+        Log3 undef, 2, $msg; $ret .= $msg . "\n";
         if(!$scan) {
           AnalyzeCommand(undef, "culflash none $culType"); # Enable autoload
           sleep(4);      # Leave time for linux to load th drivers
@@ -411,7 +411,7 @@ CommandUsb($$)
           $PARAM =~ s/[^A-Za-z0-9]//g;
           my $name = $thash->{NAME};
           $msg = "### $dev: checking if it is a $name";
-          Log 4, $msg; $ret .= $msg . "\n";
+          Log3 undef, 4, $msg; $ret .= $msg . "\n";
 
           # Check if it already used
           foreach my $d (keys %defs) {
@@ -419,7 +419,7 @@ CommandUsb($$)
                $defs{$d}{DeviceName} =~ m/$dev/ &&
                $defs{$d}{FD}) {
               $msg = "already used by the $d fhem device";
-              Log 4, $msg; $ret .= $msg . "\n";
+              Log3 undef, 4, $msg; $ret .= $msg . "\n";
               goto NEXTDEVICE;
             }
           }
@@ -432,7 +432,7 @@ CommandUsb($$)
           if(!defined($hash->{USBDev})) {
             DevIo_CloseDev($hash);      # remove the ReadyFn loop
             $msg = "cannot open the device";
-            Log 4, $msg; $ret .= $msg . "\n";
+            Log3 undef, 4, $msg; $ret .= $msg . "\n";
             goto NEXTDEVICE;
           }
 
@@ -451,7 +451,7 @@ CommandUsb($$)
 
           if($answer !~ m/$thash->{response}/) {
             $msg = "got wrong answer for a $name";
-            Log 4, $msg; $ret .= $msg . "\n";
+            Log3 undef, 4, $msg; $ret .= $msg . "\n";
             next;
           }
 
@@ -459,10 +459,10 @@ CommandUsb($$)
           $define =~ s/PARAM/$PARAM/g;
           $define =~ s,DEVICE,$dir/$dev,g;
           $msg = "create as a fhem device with: define $define";
-          Log 4, $msg; $ret .= $msg . "\n";
+          Log3 undef, 4, $msg; $ret .= $msg . "\n";
 
           if(!$scan) {
-            Log 1, "define $define";
+            Log3 undef, 1, "define $define";
             CommandDefine($cl, $define);
           }
 
@@ -472,7 +472,7 @@ CommandUsb($$)
     }
 NEXTDEVICE:
   }
-  Log 1, "usb $n end";
+  Log3 undef, 1, "usb $n end";
   return ($scan ? $ret : undef);
 }
 
@@ -521,16 +521,16 @@ autocreate_Attr(@)
       "#autoload_undefined_devices">autoload_undefined_devices</a>
       is set, so that modules for unknnown devices are automatically loaded.
       The autocreate module intercepts the UNDEFINED event generated by each
-      module, creates a device and optionally also FileLog and weblink
+      module, creates a device and optionally also FileLog and SVG
       entries.<br>
       <b>Note 1:</b> devices will be created with a unique name, which contains
       the type and a unique id for this type. When <a href="#rename">renaming
-      </a> the device, the automatically created filelog and weblink devices
+      </a> the device, the automatically created filelog and SVG devices
       will also be renamed.<br>
       <b>Note 2:</b> you can disable the automatic creation by setting the
       <a href="#disable">disable</a> attribute, in this case only the rename
       hook is active, and you can use the  <a href="#createlog">createlog</a>
-      command to add FileLog and weblink to an already defined device.
+      command to add FileLog and SVG to an already defined device.
     </ul>
     <br>
 
@@ -573,11 +573,11 @@ autocreate_Attr(@)
 
     <a name="weblinkattr"></a>
     <li>weblink<br>
-        Create a weblink associated with the device/filelog.</li><br>
+        Create an SVG associated with the device/filelog.</li><br>
 
     <a name="weblink_room"></a>
     <li>weblink_room<br>
-        "Put" the newly weblink in this room. The name can contain the
+        "Put" the newly created SVG in this room. The name can contain the
         wildcards %TYPE and %NAME, see the example above.</li><br>
 
     <li><a href="#disable">disable</a></li>
@@ -596,7 +596,7 @@ autocreate_Attr(@)
   <a name="createlog"></a>
   <b>createlog</b>
   <ul>
-      Use this command to manually add a FileLog and a weblink to an existing
+      Use this command to manually add a FileLog and an SVG to an existing
       device. E.g. if a HomeMatic device is created automatically by something
       else then a pairing message, the model is unknown, so no plots will be
       generated.  You can set the model/subtype attribute manually, and then call

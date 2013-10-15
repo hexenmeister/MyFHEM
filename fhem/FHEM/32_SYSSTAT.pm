@@ -17,7 +17,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems raspberrycpufreq:1 raspberrytemperature:0,1,2 showpercent:1 uptime:1,2 useregex:1 ssh_user ".
                        $readingFnAttributes;
 }
 
@@ -61,7 +61,7 @@ SYSSTAT_Define($$)
   return undef;
 }
 sub
-SYSSTAT_InitSys( $ )
+SYSSTAT_InitSys($)
 {
   my ($hash) = @_;
 
@@ -112,7 +112,7 @@ SYSSTAT_Get($@)
     return $ret;
   }
 
-  return "Unknown argument $cmd, choose one of filesystems";
+  return "Unknown argument $cmd, choose one of filesystems:noArg";
 }
 
 sub
@@ -146,8 +146,9 @@ SYSSTAT_Attr($$$)
   return;
 }
 
-sub SYSSTAT_getLoadAVG( $ );
-sub SYSSTAT_getPiTemp( $ );
+sub SYSSTAT_getLoadAVG($);
+sub SYSSTAT_getPiTemp($);
+sub SYSSTAT_getUptime($);
 sub
 SYSSTAT_GetUpdate($)
 {
@@ -223,11 +224,17 @@ SYSSTAT_GetUpdate($)
     readingsBulkUpdate($hash,"cpufreq",$freq);
   }
 
+  if( AttrVal($name, "uptime", "0") > 0 ) {
+    my $uptime = SYSSTAT_getUptime($hash);
+    readingsBulkUpdate($hash,"uptime",$uptime);
+  }
+
+
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
 
 sub
-SYSSTAT_getLoadAVG( $ )
+SYSSTAT_getLoadAVG($ )
 {
   my ($hash) = @_;
 
@@ -322,7 +329,7 @@ SYSSTAT_readFile($$$)
 }
 
 sub
-SYSSTAT_getPiTemp( $ )
+SYSSTAT_getPiTemp($)
 {
   my ($hash) = @_;
 
@@ -332,13 +339,39 @@ SYSSTAT_getPiTemp( $ )
 }
 
 sub
-SYSSTAT_getPiFreq( $ )
+SYSSTAT_getPiFreq($)
 {
   my ($hash) = @_;
 
   my $freq = SYSSTAT_readFile($hash,"/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq",0);
 
   return $freq / 1000;
+}
+
+sub
+SYSSTAT_getUptime($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
+
+  $uptime = $1 if( $uptime =~ m/up\s+(((\d+)\D+,\s+)?(\d+):(\d+))/ ); 
+  $uptime = "0 days, $uptime" if( !$2);
+
+  if( AttrVal($name, "uptime", "0") == 2 ) {
+    my $days = $3?$3:0;
+    my $hours = $4; 
+    my $minutes = $5; 
+ 
+    $uptime = $days * 24; 
+    $uptime += $hours;
+    $uptime *= 60; 
+    $uptime += $minutes;
+    $uptime *= 60; 
+  }
+
+  return $uptime;
 }
 
 
@@ -434,6 +467,9 @@ SYSSTAT_getPiFreq( $ )
     <li>raspberrycpufreq<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
+    <li>uptime<br>
+      If set and > 0 the system uptime is read.<br>
+      If set to 2 the uptime is displayed in seconds.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>

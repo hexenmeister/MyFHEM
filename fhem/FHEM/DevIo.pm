@@ -82,8 +82,7 @@ DevIo_SimpleWrite($$$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "SW: $msg";
+  Log3 $name, 5, "SW: $msg";
 
   $msg = pack('H*', $msg) if($ishex);
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
@@ -105,7 +104,7 @@ DevIo_OpenDev($$$)
   ($dev, $baudrate) = split("@", $dev);
 
   $hash->{PARTIAL} = "";
-  Log 3, "Opening $name device $dev"
+  Log3 $name, 3, "Opening $name device $dev"
         if(!$reopen);
 
   if($dev =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/) { # FBAHA
@@ -117,12 +116,12 @@ DevIo_OpenDev($$$)
         Type=>($type eq "STREAM" ? SOCK_STREAM:SOCK_SEQPACKET), Peer=>$fname);
     };
     if($@) {
-      Log 1, $@;
+      Log3 $name, 1, $@;
       return $@;
     }
 
     if(!$conn) {
-      Log(3, "Can't connect to $dev: $!") if(!$reopen);
+      Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
       return "";
@@ -148,7 +147,7 @@ DevIo_OpenDev($$$)
       delete($hash->{NEXT_OPEN})
 
     } else {
-      Log(3, "Can't connect to $dev: $!") if(!$reopen);
+      Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
       $hash->{NEXT_OPEN} = time()+60;
@@ -164,7 +163,7 @@ DevIo_OpenDev($$$)
 
     if(!open($po, "+<$dev")) {
       return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
+      Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
       return "";
@@ -195,13 +194,13 @@ DevIo_OpenDev($$$)
      }
     }
     if($@) {
-      Log 1, $@;
+      Log3 $name,  1, $@;
       return $@;
     }
 
     if(!$po) {
       return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
+      Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
       return "";
@@ -217,7 +216,7 @@ DevIo_OpenDev($$$)
 
     if($baudrate) {
       $po->reset_error();
-      Log 3, "Setting $name baudrate to $baudrate";
+      Log3 $name, 3, "Setting $name baudrate to $baudrate";
       $po->baudrate($baudrate);
       $po->databits(8);
       $po->parity('none');
@@ -249,9 +248,9 @@ DevIo_OpenDev($$$)
   }
 
   if($reopen) {
-    Log 1, "$dev reappeared ($name)";
+    Log3 $name, 1, "$dev reappeared ($name)";
   } else {
-    Log 3, "$name device opened";
+    Log3 $name, 3, "$name device opened";
   }
 
   $hash->{STATE}="opened";
@@ -261,7 +260,7 @@ DevIo_OpenDev($$$)
     my $ret  = &$initfn($hash);
     if($ret) {
       DevIo_CloseDev($hash);
-      Log 1, "Cannot init $dev, ignoring it";
+      Log3 $name, 1, "Cannot init $dev, ignoring it";
     }
   }
 
@@ -321,7 +320,7 @@ DevIo_Disconnected($)
 
   return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
-  Log 1, "$dev disconnected, waiting to reappear";
+  Log3 $name, 1, "$dev disconnected, waiting to reappear";
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";

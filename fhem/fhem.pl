@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2012
+#  (c) 2005-2013
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -24,8 +24,6 @@
 #  GNU General Public License for more details.
 #
 #  This copyright notice MUST APPEAR in all copies of the script!
-#  Thanks for Tosti's site (<http://www.tosti.com/FHZ1000PC.html>)
-#  for inspiration.
 #
 #  Homepage:  http://fhem.de
 #
@@ -50,7 +48,6 @@ sub AssignIoPort($);
 sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
-sub rejectDuplicate($$$);
 sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
@@ -60,22 +57,23 @@ sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
 sub GetTimeSpec($);
+sub GlobalAttr($$$$);
 sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
+sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
-sub IsDisabled($);
 sub LoadModule($);
 sub Log($$);
+sub Log3($$$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ReadingsVal($$$);
 sub RemoveInternalTimer($);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
-sub SecondsTillTomorrow($);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
@@ -86,17 +84,21 @@ sub addToAttrList($);
 sub createInterfaceDefinitions();
 sub devspec2array($);
 sub doGlobalDef($);
+sub evalStateFormat($);
 sub fhem($@);
 sub fhz($);
+sub getAllGets($);
 sub getAllSets($);
+sub latin1ToUtf8($);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
 sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
+sub rejectDuplicate($$$);
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
-sub evalStateFormat($);
+sub utf8ToLatin1($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -171,8 +173,10 @@ use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 use vars qw(%inform);	        # Used by telnet_ActivateInform
 
 use vars qw($reread_active);
+use vars qw($winService);       # the Windows Service object
 
-my $AttrList = "room group comment alias eventMap userReadings";
+my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
+                "eventMap userReadings";
 
 my %comments;			# Comments from the include files
 my $ipv6;			# Using IPV6
@@ -204,7 +208,7 @@ $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title userattr " .
-  "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
+  "mseclog:1,0 version nofork:1,0 logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd updatebranch uniqueID ".
@@ -230,6 +234,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
             Hlp=>"<devspec> [<attrname>],delete user defined reading for <devspec>" },
   "delete"  => { Fn=>"CommandDelete",
 	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
+  "displayattr"=> { Fn=>"CommandDisplayAttr",
+	    Hlp=>"<devspec> [attrname],display attributes" },
   "get"     => { Fn=>"CommandGet",
 	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "help"    => { Fn=>"CommandHelp",
@@ -237,6 +243,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "include" => { Fn=>"CommandInclude",
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
+            ClientFilter => "telnet",
 	    Hlp=>"{on|timer|raw|off},echo all events to this client" },
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
@@ -245,8 +252,10 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "modify"  => { Fn=>"CommandModify",
 	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
+            ClientFilter => "telnet",
 	    Hlp=>",end the client session" },
   "exit"    => { Fn=>"CommandQuit",
+            ClientFilter => "telnet",
 	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
 	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
@@ -258,6 +267,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet",
 	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
+  "setreading" => { Fn=>"CommandSetReading",
+	    Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate",
 	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
@@ -277,10 +288,14 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 
 ###################################################
 # Start the program
-if(int(@ARGV) != 1 && int(@ARGV) != 2) {
+if(int(@ARGV) < 1) {
   print "Usage:\n";
   print "as server: fhem configfile\n";
-  print "as client: fhem [host:]port cmd\n";
+  print "as client: fhem [host:]port cmd cmd cmd...\n";
+  if($^O =~ m/Win/) {
+    print "install as windows service: fhem.pl configfile -i\n";
+    print "uninstall the windows service: fhem.pl -u\n";
+  }
   CommandHelp(undef, undef);
   exit(1);
 }
@@ -315,15 +330,20 @@ if($^O !~ m/Win/ && $< == 0) {
 
 ###################################################
 # Client code
-if(int(@ARGV) == 2) {
+if(int(@ARGV) > 1 && $ARGV[$#ARGV] ne "-i") {
   my $buf;
-  my $addr = $ARGV[0];
-  $addr = "localhost:$addr" if($ARGV[0] !~ m/:/);
+  my $addr = shift @ARGV;
+  $addr = "localhost:$addr" if($addr !~ m/:/);
   my $client = IO::Socket::INET->new(PeerAddr => $addr);
   die "Can't connect to $addr\n" if(!$client);
-  syswrite($client, "$ARGV[1] ; quit\n");
+  for(my $i=0; $i < int(@ARGV); $i++) {
+    syswrite($client, $ARGV[$i]."\n");
+  }
   shutdown($client, 1);
   while(sysread($client, $buf, 256) > 0) {
+    $buf =~ s/\xff\xfb\x01Password: //;
+    $buf =~ s/\xff\xfc\x01\r\n//;
+    $buf =~ s/\xff\xfd\x00//;
     print($buf);
   }
   exit(0);
@@ -333,27 +353,30 @@ if(int(@ARGV) == 2) {
 
 
 ###################################################
-# for debugging
-sub
-Debug($) {
-  my $msg= shift;
-  Log 1, "DEBUG>" . $msg;
+# Windows Service Support: install/remove or start the fhem service
+if($^O =~ m/Win/) {
+  (my $dir = $0) =~ s+[/\\][^/\\]*$++; # Find the FHEM directory
+  chdir($dir);
+  $winService = eval {require FHEM::WinService; FHEM::WinService->new(\@ARGV);};
+  if((!$winService || $@) && ($ARGV[$#ARGV] eq "-i" || $ARGV[$#ARGV] eq "-u")) {
+    print "Cannot initialize FHEM::WinService: $@, exiting.\n";
+    exit 0;
+  }
 }
-###################################################
-
+$winService ||= {};
 
 ###################################################
 # Server initialization
 doGlobalDef($ARGV[0]);
 
 # As newer Linux versions reset serial parameters after fork, we parse the
-# config file after the fork. Since need some global attr parameters before, we
+# config file after the fork. But we need some global attr parameters before, so we
 # read them here.
 setGlobalAttrBeforeFork($attr{global}{configfile});
 
+Log 1, $_ for eval{@{$winService->{ServiceLog}};};
+
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
-  Log 1, "Forcing 'attr global nofork' on WINDOWS";
-  Log 1, "set it in the config file to avoid this message";
   $attr{global}{nofork}=1;
 }
 
@@ -421,8 +444,9 @@ if($motd eq "$sc_text\n\n") {
   }
 }
 
+my $osuser = "os $^O, user ".(getlogin || getpwuid($<) || "unknown");
 Log 0, "Server started with ".int(keys %defs).
-        " defined entities (version $attr{global}{version}, pid $$)";
+        " defined entities (version $attr{global}{version}, $osuser, pid $$)";
 
 ################################################
 # Main Loop
@@ -440,8 +464,10 @@ while (1) {
   }
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
+  $timeout = 5 if $winService->{AsAService} && $timeout > 5;
   my $nfound = select($rout=$rin, undef, undef, $timeout);
 
+  $winService->{serviceCheck}->() if($winService->{serviceCheck});
   CommandShutdown(undef, undef) if($sig_term);
 
   if($nfound < 0) {
@@ -562,21 +588,32 @@ GetLogLevel(@)
 
 
 ################################################
+# the new Log with integrated loglevel checking
 sub
-Log($$)
+Log3($$$)
 {
-  my ($loglevel, $text) = @_;
+  my ($dev, $loglevel, $text) = @_;
 
-  return if($loglevel > $attr{global}{verbose});
+  $dev = $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
+     
+  if(defined($dev) &&
+     defined($attr{$dev}) &&
+     defined (my $devlevel = $attr{$dev}{verbose})) {
+    return if($loglevel > $devlevel);
 
-  my @t = localtime;
+  } else {
+    return if($loglevel > $attr{global}{verbose});
+
+  }
+
+  my ($seconds, $microseconds) = gettimeofday();
+  my @t = localtime($seconds);
   my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
   OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
           $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
   if($attr{global}{mseclog}) {
-    my ($seconds, $microseconds) = gettimeofday();
     $tim .= sprintf(".%03d", $microseconds/1000);
   }
 
@@ -586,6 +623,14 @@ Log($$)
     print "$tim $loglevel: $text\n";
   }
   return undef;
+}
+
+################################################
+sub
+Log($$)
+{
+  my ($loglevel, $text) = @_;
+  Log3(undef, $loglevel, $text);
 }
 
 
@@ -690,6 +735,7 @@ AnalyzePerlCommand($$)
     $value{$d} = $defs{$d}{STATE}
   }
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
     my $h2we = $attr{global}{holiday2we};
@@ -768,9 +814,13 @@ AnalyzeCommand($$)
     map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
     $fn = LoadModule($fn);
     $fn = lc($fn) if(defined($cmds{lc($fn)}));
-    return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
+    return "Unknown command $fn, try help." if(!defined($cmds{$fn}));
   }
 
+  if($cl && $cmds{$fn}{ClientFilter} &&
+     $cl->{TYPE} !~ m/$cmds{$fn}{ClientFilter}/) {
+    return "This command ($fn) is not valid for this input channel.";
+  }
 
   $param = "" if(!defined($param));
   no strict "refs";
@@ -862,8 +912,9 @@ CommandHelp($$)
 
   for my $cmd (sort keys %cmds) {
     next if(!$cmds{$cmd}{Hlp});
+    next if($cl && $cmds{$cmd}{ClientFilter} &&
+            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
     my @a = split(",", $cmds{$cmd}{Hlp}, 2);
-
     $str .= sprintf("%-9s %-25s %s\n", $cmd, $a[0], $a[1]);
   }
   return $str;
@@ -924,9 +975,10 @@ OpenLogfile($)
   close(LOG);
   $logopened=0;
   $currlogfile = $param;
-  if($currlogfile eq "-") {
 
-    open LOG, '>&STDOUT'    or die "Can't dup stdout: $!";
+  # STDOUT is closed in windows services per default
+  if(!$winService->{AsAService} && $currlogfile eq "-") {
+    open LOG, '>&STDOUT' || die "Can't dup stdout: $!";
 
   } else {
 
@@ -1172,7 +1224,12 @@ CommandShutdown($$)
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   if($param && $param eq "restart") {
-    system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
+    if ($^O !~ m/Win/) {
+      system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
+    } elsif ($winService->{AsAService}) {
+      # use the OS SCM to stop and start the service
+      exec('cmd.exe /C net stop fhem & net start fhem');
+    }
   }
   exit(0);
 }
@@ -1255,7 +1312,7 @@ CommandGet($$)
 
     $a[0] = $sdev;
     my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, @a);
-    push @rets, $ret if($ret);
+    push @rets, $ret if(defined($ret) && $ret ne "");
   }
   return join("\n", @rets);
 }
@@ -1491,6 +1548,42 @@ CommandDeleteAttr($$)
 
 #############
 sub
+CommandDisplayAttr($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 2);
+  return "Usage: displayattr <name> [<attrname>]\n$namedef" if(@a < 1);
+
+  my @rets;
+  my @devspec = devspec2array($a[0]);
+
+  foreach my $sdev (@devspec) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+
+    my $ap = $attr{$sdev};
+    next if(!$ap);
+    my $d = (@devspec > 1 ? "$sdev " : "");
+
+    if(defined($a[1])) {
+      push @rets, "$d$ap->{$a[1]}" if(defined($ap->{$a[1]}));
+
+    } else {
+      push @rets, map { "$d$_ $ap->{$_}" } sort keys %{$ap};
+
+    }
+
+  }
+
+  return join("\n", @rets);
+}
+
+#############
+sub
 CommandDeleteReading($$)
 {
   my ($cl, $def) = @_;
@@ -1519,6 +1612,27 @@ CommandDeleteReading($$)
 
   return join("\n", @rets);
 }
+
+sub
+CommandSetReading($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 3);
+  return "Usage: setreading <name> <reading> <value>\n$namedef" if(@a != 3);
+
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+    readingsSingleUpdate($defs{$sdev}, $a[1], $a[2], 1);
+  }
+  return undef;
+}
+
 
 #############
 sub
@@ -1732,6 +1846,18 @@ getAllAttr($)
 
 #####################################
 sub
+getAllGets($)
+{
+  my $d = shift;
+  
+  my $a2 = CommandGet(undef, "$d ?");
+  return "" if($a2 !~ m/unknown.*choose one of /i);
+  $a2 =~ s/.*choose one of //;
+  return $a2;
+}
+
+#####################################
+sub
 getAllSets($)
 {
   my $d = shift;
@@ -1752,8 +1878,8 @@ getAllSets($)
     # interpreted as the single possible value for a dropdown
     # Why is the .*= deleted?
     $em = join(" ", grep { !/ / }
-                    map { $_ =~ s/.*=//s;
-                          $_ =~ s/.*://s; $_ } 
+                    map { $_ =~ s/.*?=//s;
+                          $_ =~ s/.*?://s; $_ } 
                     EventMapAsList($em));
     $a2 = "$em $a2";
   }
@@ -1761,7 +1887,7 @@ getAllSets($)
 }
 
 sub
-GlobalAttr($$)
+GlobalAttr($$$$)
 {
   my ($type, $me, $name, $val) = @_;
 
@@ -1793,22 +1919,7 @@ GlobalAttr($$)
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     push @INC, $modpath if(!grep(/$modpath/, @INC));
-    eval { 
-      use vars qw($DISTRIB_DESCRIPTION);
-      # start of fix
-      # "Use of uninitialized value" after a fresh 5.2 installation and first
-      # time "updatefhem" release.pm does not reside in FhemUtils (what it
-      # should), so we load it from $modpath
-      if(-e "$modpath/FhemUtils/release.pm") {
-        require "FhemUtils/release.pm";
-      } elsif(-e "$modpath/release.pm") {
-        require "release.pm";
-      } else {
-        $DISTRIB_DESCRIPTION = "unknown";
-      }
-      # end of fix
-      $attr{global}{version} = "$DISTRIB_DESCRIPTION, $cvsid";
-    };
+    $attr{global}{version} = $cvsid;
     my $counter = 0;
 
     foreach my $m (sort readdir(DH)) {
@@ -2244,7 +2355,7 @@ CommandChain($$)
   my $oid = $init_done;
 
   $init_done = 0;       # Rudi: ???
-  $attr{global}{verbose} = 1;
+  $attr{global}{verbose} = 1; # ???
   foreach my $cmd (@{$list}) {
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
@@ -2602,7 +2713,7 @@ Dispatch($$$)
   my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
   my $name = $hash->{NAME};
 
-  Log 5, "$name dispatch $dmsg";
+  Log3 $hash, 5, "$name dispatch $dmsg";
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
@@ -2617,7 +2728,7 @@ Dispatch($$$)
     next if($dmsg !~ m/$modules{$m}{Match}/i);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
-      (my $isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
+      ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
       return rejectDuplicate($name,$idx,$addvals) if($isdup);
     }
 
@@ -2646,8 +2757,7 @@ Dispatch($$$)
             }
 
           } else {
-            Log GetLogLevel($name,3),
-                "$name: Unknown $mname device detected, " .
+            Log3 $name, 3, "$name: Unknown $mname device detected, " .
                         "define one to get detailed information.";
             return undef;
 
@@ -2657,7 +2767,7 @@ Dispatch($$$)
     }
     if(!int(@found)) {
       DoTrigger($name, "UNKNOWNCODE $dmsg");
-      Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
+      Log3 $name, 3, "$name: Unknown code $dmsg, help me!";
       return undef;
     }
   }
@@ -2702,7 +2812,8 @@ Dispatch($$$)
     }
   }
 
-  $duplicate{$idx}{FND} = \@found;
+  $duplicate{$idx}{FND} = \@found 
+        if(defined($idx) && defined($duplicate{$idx}));
 
   return \@found;
 }
@@ -2817,7 +2928,8 @@ ReplaceEventMap($$$)
   my $changed;
   my @emList = EventMapAsList($em);
   foreach my $rv (@emList) {
-    my ($re, $val) = split(":", $rv, 2); # Real-Event-Regexp:GivenName
+    # Real-Event-Regexp:GivenName[:modifier]
+    my ($re, $val, $modifier) = split(":", $rv, 3);
     next if(!defined($val));
     if($dir) {  # event -> GivenName
       if($str =~ m/$re/) {
@@ -3171,7 +3283,7 @@ evalStateFormat($)
     # Substitute reading names with their values, leave the rest untouched.
     $st = $sr;
     my $r = $hash->{READINGS};
-    $st =~ s/\b([A-Za-z_\.-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
+    $st =~ s/\b([A-Za-z\d_\.-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
 
   }
   $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
@@ -3224,12 +3336,12 @@ readingsEndUpdate($$)
           $result= $deltav/$deltat;
         }
       } elsif($modifier eq "offset") {
-        $oldvalue= 0 if( !defined($oldvalue) );
+        $oldvalue = $value if( !defined($oldvalue) );
         $result = ReadingsVal($name,$userReading,0);
         $result += $oldvalue if( $value < $oldvalue );
       } elsif($modifier eq "monotonic") {
-        $oldvalue= 0 if( !defined($oldvalue) );
-        $result = ReadingsVal($name,$userReading,0);
+        $oldvalue = $value if( !defined($oldvalue) );
+        $result = ReadingsVal($name,$userReading,$value);
         $result += $value - $oldvalue if( $value > $oldvalue );
       } 
       readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
@@ -3253,7 +3365,7 @@ readingsEndUpdate($$)
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 0) if(!$readingsUpdateDelayTrigger);
   } else {
-    delete($hash->{CHANGED});
+    delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
   }
   
   return undef;
@@ -3418,6 +3530,29 @@ computeClientArray($$)
 
   $hash->{".clientArray"} = \@a;
   return \@a;
+}
+
+# http://perldoc.perl.org/perluniintro.html, UNICODE IN OLDER PERLS
+sub
+latin1ToUtf8($)
+{
+  my ($s)= @_;
+  $s =~ s/([\x80-\xFF])/chr(0xC0|ord($1)>>6).chr(0x80|ord($1)&0x3F)/eg;
+  return $s;
+}
+
+sub
+utf8ToLatin1($)
+{
+  my ($s)= @_;
+  $s =~ s/([\xC2\xC3])([\x80-\xBF])/chr(ord($1)<<6&0xC0|ord($2)&0x3F)/eg;
+  return $s;
+}
+
+sub
+Debug($) {
+  my $msg= shift;
+  Log 1, "DEBUG>" . $msg;
 }
 
 1;

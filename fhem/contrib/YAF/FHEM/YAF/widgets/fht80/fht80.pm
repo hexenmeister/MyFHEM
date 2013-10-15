@@ -37,7 +37,7 @@ use vars qw(%defs);
 #######################################################################################
 #
 # fht80_get_widgetcss - Create the CSS code for this widget
-# 
+#
 # no parameter
 #
 ########################################################################################
@@ -54,7 +54,7 @@ sub fht80_get_widgetcss() {
 			text-align: center;
 		}
 		.widget_fht80_alias {
-			font-size: 12px;
+			font-size: 0.7em;
 		}
 	";
 	return $output;
@@ -63,14 +63,16 @@ sub fht80_get_widgetcss() {
 ########################################################################################
 #
 # fht80_get_widgetjs - Create the javascript code for this widget
-# 
+#
 # no parameter
 #
 ########################################################################################
 
 sub fht80_get_widgetjs() {
-	
+
 	my $output = '
+		function fht80_on_click(view_id, widget_id) {
+		}
 		function fht80_update_widget(view_id, widget_id) {
             $.ajax({
 		 		type: "GET",
@@ -78,10 +80,14 @@ sub fht80_get_widgetjs() {
 				url: "../../ajax/widget/fht80/get_temp",
 				data: "view_id="+view_id+"&widget_id="+widget_id,
 				context: document.body,
-				success: function(get_temp) {
+				success: function(get_data) {
+					var data = jQuery.parseJSON(get_data);
+					var get_temp = data[0];
+					var sizefac = data[1];
 					var widget = $("#widget_"+view_id+"_"+widget_id);
+					widget.css("font-size", sizefac+"em");
 					widget.html(get_temp);
-				}   
+				}
 			});
 		}
 	';
@@ -91,7 +97,7 @@ sub fht80_get_widgetjs() {
 ########################################################################################
 #
 # fht80t_getwidgethtml - HTML code for this widget
-# 
+#
 # no parameter
 #
 ########################################################################################
@@ -104,7 +110,7 @@ sub fht80_get_widgethtml() {
 ########################################################################################
 #
 # fht80t_get_addwidget_setup_html - Create the selection of devices for this widget
-# 
+#
 # no parameter
 #
 ########################################################################################
@@ -113,19 +119,19 @@ sub fht80_get_addwidget_setup_html() {
 	my $output = "<script src='js/combobox.js'></script>
 				  <select name='fht80_combobox' id='combobox'>";
 	my @list = (keys %defs);
-	
+
 	foreach my $d (sort @list) {
 	    my $type  = $defs{$d}{TYPE};
 	    my $name  = $defs{$d}{NAME};
 
 	    if( $type eq "FHT"){
-	    	
+
 	    	$output = $output."<option value='$name'>$name</option>";
-	    } 
+	    }
 	}
-	
+
 	$output = $output."</select>";
-	
+
 	$output .= "<br /><label>Label:</label>
 				<script src='js/combobox.js'></script>
 				<select name='fht80_combobox_label' id='combobox_label'>";
@@ -133,14 +139,14 @@ sub fht80_get_addwidget_setup_html() {
 	$output .= "<option value='Alias'>Alias</option>";
 	$output .= "<option value='Comment'>Comment</option>";
 	$output .= "</select>";
-	
-	return $output;	
+
+	return $output;
 }
 
 ########################################################################################
 #
-# fht80t_get_addwidget_prepare_attributes - 
-# 
+# fht80t_get_addwidget_prepare_attributes -
+#
 # no parameter
 #
 ########################################################################################
@@ -156,79 +162,85 @@ sub fht80_get_addwidget_prepare_attributes() {
 		temp_array2[1] = $("#combobox_label option:selected").val()
 		attributes_array[1] = temp_array2;
 	';
-	return $output;	
+	return $output;
 }
 
+sub fht80_get_editwidget_setup_html() {
+	my $output = "";
+	$output .= "TEST!";
+	return $output;
+}
 ########################################################################################
 #
 # fht80t_getwidget_html - HTML code for this widget. DO WE NEED THIS ? SEE ABOVE
 # DO WE NEED IT? WHO KNOWS. (It looks like this one fills the initial html of the
 #                            widget, so let's keep it for science.)
-# 
+#
 # no parameter
 #
 ########################################################################################
 
 sub fht80_getwidget_html() {
 	my $output = "###";
-	return $output;	
+	return $output;
 }
 
 ########################################################################################
 #
 # fht80t_get_lamp_status - return the state of the lamp
-# 
+#
 # no parameter
 #
 ########################################################################################
 
 sub fht80_get_temp() {
- 	my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
-	if(!($attribute)) {
-		return("Widget not found ".$_GET{"view_id"}." ".$_GET{"widget_id"});
+ 	my @ret = ();
+	my $viewid = $_GET{"view_id"};
+	my $widgetid = $_GET{"widget_id"};
+	my $fhemname = YAF_getWidgetAttribute($viewid, $widgetid, "fhemname", undef);
+
+	if(!defined $fhemname) {
+		$ret[0] = "Widget not found " . $viewid . " " . $widgetid;
+		$ret[1] = 1;
+		return(encode_json(\@ret));
 	}
-	
-	my $labeltype = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "labeltype");
-	
-    my $d = $defs{$attribute};
-    my $ret = "";
-	
-	my $temp = $defs{$attribute}{READINGS}{temperature}{VAL};
-	my $temptimestamp = $defs{$attribute}{READINGS}{temperature}{TIME};
-	my $actuator = $defs{$attribute}{READINGS}{actuator}{VAL};
+
+	# get all the needed data
+	my $temp = 			ReadingsVal($fhemname, "temperature", 0);
+	my $temptimestamp = ReadingsTimestamp($fhemname, "temperature", "big-bang");
+	my $actuator = 		ReadingsVal($fhemname, "actuator", "");
+	my $mode = 			ReadingsVal($fhemname, "mode", "none");
+	my $desi = 			ReadingsVal($fhemname, "desired-temp", "");
+	my $battery = 		ReadingsVal($fhemname, "battery", "");
+	my $nomode = 		YAF_getWidgetAttribute($viewid, $widgetid, "nomode", 0);
+	my $labeltype = 	YAF_getWidgetAttribute($viewid, $widgetid, "labeltype", "");
+	$ret[1] = 			YAF_getWidgetAttribute($viewid, $widgetid, "size", 1);		#we don't process the size, so put it in the return array right away.
+
+	#process data
 	my $label = "";
 	if($labeltype eq "Comment") {
-		$label = AttrVal($attribute,"comment",$d->{NAME});	
+		$label = AttrVal($fhemname,"comment",$fhemname);
 	} elsif ($labeltype eq "Alias") {
-		$label = AttrVal($attribute,"alias",$d->{NAME});		
+		$label = AttrVal($fhemname,"alias",$fhemname);
 	} else {
-		$label = $d->{NAME}
+		$label = $fhemname;
 	}
 	$label =~ s/(_)/&nbsp;/g;
-	my $mode = $defs{$attribute}{READINGS}{mode}{VAL};
-	my $desi = $defs{$attribute}{READINGS}{"desired-temp"}{VAL};	
-	my $battery = $defs{$attribute}{READINGS}{battery}{VAL};	
-	
-	if($mode eq "manual") {
-		$mode = " <span title='manual'>&oplus;</span> ";
-	} else {
-		$mode = " <span title='$mode'>&otimes;</span> ";
+
+	$mode = ($mode eq "manual") ? " <span title='manual'>&oplus;</span>" : " <span title='$mode'>&otimes;</span>";
+	$desi .= ($desi ne "off") ? " &deg;C" : "";
+	$battery = ($battery ne "ok") ? "Check Battery: " . $battery . "<br />" : "";
+
+	#create returnstring
+	$ret[0] = "<span class='widget_fht80_alias'>" . $label . "</span><br />" . $battery;
+	$ret[0] .= "<span title='$temptimestamp'>" . $temp . "</span>" . " &deg;C";
+	if($nomode == 0) {
+		$ret[0] .= $mode;
 	}
-	
 	if($desi ne "off") {
-		$desi .= " &deg;C";
+		$ret[0] .= " <span title='Actuator: $actuator'>" . $desi . "</span>";
 	}
-	
-	if($battery ne "ok") {
-		$battery = "Check Battery: " . $battery . "<br />";
-	} else {
-		$battery = "";
-	}
-	
-	$ret = "<span class='widget_fht80_alias'>" . $label . "</span><br />" . $battery;
-	$ret .= "<span title='$temptimestamp'>" . $temp . "</span>" . " &deg;C" . $mode;
-	$ret .= "<span title='Actuator: $actuator'>" . $desi . "</span>";
-	 
-    return $ret;
+
+	return encode_json(\@ret);
 }
 1;

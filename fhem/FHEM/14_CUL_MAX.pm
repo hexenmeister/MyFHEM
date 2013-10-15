@@ -173,13 +173,16 @@ CUL_MAX_Set($@)
   } elsif($setting ~~ ["fakeSC", "fakeWT"]) {
     return "Invalid number of arguments" if(@args == 0);
     my $dest = $args[0];
+    my $destname;
     #$dest may be either a name or an address
     if(exists($defs{$dest})) {
       return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
+      $destname = $dest;
       $dest = $defs{$dest}{addr};
     } else {
       $dest = lc($dest); #address to lower-case
       return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
+      $destname = $modules{MAX}{defptr}{$dest}{NAME};
     }
 
     if($setting eq "fakeSC") {
@@ -187,25 +190,31 @@ CUL_MAX_Set($@)
       return "Invalid fakeSCaddr attribute set (must not be 000000)" if(CUL_MAX_fakeSCaddr($hash) eq "000000");
 
       my $state = $args[1] ? "12" : "10";
-      my $groupid = ReadingsVal($hash,"groupid",0);
-      return CUL_MAX_Send($hash, "ShutterContactState",$dest,$state, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "06" ), src => CUL_MAX_fakeSCaddr($hash));
+      my $groupid = ReadingsVal($destname,"groupid",0);
+      return CUL_MAX_Send($hash, "ShutterContactState",$dest,$state,
+                          groupId => sprintf("%02x",$groupid),
+                          flags => ( $groupid ? "04" : "06" ),
+                          src => CUL_MAX_fakeSCaddr($hash));
 
     } elsif($setting eq "fakeWT") {
       return "Invalid number of arguments" if(@args != 3);
-      return "desiredTemperature is invalid" if($args[1] < 4.5 || $args[2] > 30.5);
+      return "desiredTemperature is invalid" if(!validTemperature($args[1]));
       return "Invalid fakeWTaddr attribute set (must not be 000000)" if(CUL_MAX_fakeWTaddr($hash) eq "000000");
 
+      #Valid range for measured temperature is 0 - 51.1 degree
       $args[2] = 0 if($args[2] < 0); #Clamp temperature to minimum of 0 degree
 
       #Encode into binary form
       my $arg2 = int(10*$args[2]);
       #First bit is 9th bit of temperature, rest is desiredTemperature
-      my $arg1 = (($arg2&0x100)>>1) | (int(2*$args[1])&0x7F);
+      my $arg1 = (($arg2&0x100)>>1) | (int(2*MAX_ParseTemperature($args[1]))&0x7F);
       $arg2 &= 0xFF; #only take the lower 8 bits
-      my $groupid = ReadingsVal($hash,"groupid",0);
+      my $groupid = ReadingsVal($destname,"groupid",0);
 
       return CUL_MAX_Send($hash,"WallThermostatControl",$dest,
-        sprintf("%02x%02x",$arg1,$arg2), groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ), src => CUL_MAX_fakeWTaddr($hash));
+        sprintf("%02x%02x",$arg1,$arg2), groupId => sprintf("%02x",$groupid),
+                flags => ( $groupid ? "04" : "00" ),
+                src => CUL_MAX_fakeWTaddr($hash));
     }
 
   } else {
@@ -244,6 +253,12 @@ CUL_MAX_Parse($$)
   my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
   Log $ll5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
   my $isToMe = ($dst eq $shash->{addr}) ? 1 : 0; # $isToMe is true if that packet was directed at us
+
+  #Set RSSI on MAX device
+  if(exists($modules{MAX}{defptr}{$src}) && exists($hash->{RSSI})) {
+    Log 5, "CUL_MAX_Parse: rssi: $hash->{RSSI}";
+    $modules{MAX}{defptr}{$src}{RSSI} = $hash->{RSSI};
+  }
 
   if(exists($msgId2Cmd{$msgTypeRaw})) {
 

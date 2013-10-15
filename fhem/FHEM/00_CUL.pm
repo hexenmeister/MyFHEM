@@ -47,7 +47,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $clientsSlowRF = ":FS20:FHT.*:KS300:USF1000:BS:HMS: " .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
-                    ":ESA2000:CUL_IR:CUL_TX:";
+                    ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:";
 
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
 
@@ -68,6 +68,8 @@ my %matchListSlowRF = (
     "C:ESA2000"   => "^S................................\$",
     "D:CUL_IR"    => "^I............",
     "E:CUL_TX"    => "^TX[A-F0-9]{10}",
+    "F:Revolt"    => "^r......................\$",
+    "G:IT"        => "^i......\$",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
@@ -101,10 +103,9 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "sendpool addvaltrigger " .
-					 "rfmode:SlowRF,HomeMatic,MAX hmId ".
-					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+                     "showtime:1,0 model:CUL,CUN,CUR " . 
+                     "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX hmId ".
+		     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
@@ -131,7 +132,7 @@ CUL_Define($$)
   if(@a < 4 || @a > 5) {
     my $msg = "wrong syntax: define <name> CUL {none | devicename[\@baudrate] ".
                         "| devicename\@directio | hostname:port} <FHTID>";
-    Log 2, $msg;
+    Log3 undef, 2, $msg;
     return $msg;
   }
 
@@ -150,7 +151,7 @@ CUL_Define($$)
         if(uc($defs{$d}{FHTID}) =~ m/^$x/) {
           my $m = "$name: Cannot define multiple CULs with identical ".
                         "first two digits ($x)";
-          Log 1, $m;
+          Log3 $name, 1, $m;
           return $m;
         }
       }
@@ -163,7 +164,7 @@ CUL_Define($$)
   $hash->{MatchList} = \%matchListSlowRF;
 
   if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+    Log3 $name, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -187,7 +188,7 @@ CUL_Undef($$)
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $name, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -233,7 +234,6 @@ CUL_Set($@)
   my $name = shift @a;
   my $type = shift @a;
   my $arg = join("", @a);
-  my $ll = GetLogLevel($name,3);
 
   return "This command is not valid in the current rfmode"
       if($sets{$type} && $sets{$type} ne AttrVal($name, "rfmode", "SlowRF"));
@@ -262,7 +262,7 @@ CUL_Set($@)
     my $f1 = sprintf("%02x", int($f % 65536) / 256);
     my $f0 = sprintf("%02x", $f % 256);
     $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-    Log $ll, "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
+    Log3 $name, 3, "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
     CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
@@ -289,7 +289,7 @@ CUL_Set($@)
 
 GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
-    Log $ll, "Setting MDMCFG4 (10) to $ob = $bw KHz";
+    Log3 $name, 3, "Setting MDMCFG4 (10) to $ob = $bw KHz";
     CUL_SimpleWrite($hash, "W12$ob");
     CUL_SimpleWrite($hash, $hash->{initString});
 
@@ -303,7 +303,7 @@ GOTBW:
     }
     $v = sprintf("%02d", $v-1);
     $w = $ampllist[$v];
-    Log $ll, "Setting AGCCTRL2 (1B) to $v / $w dB";
+    Log3 $name, 3, "Setting AGCCTRL2 (1B) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1D$v");
     CUL_SimpleWrite($hash, $hash->{initString});
 
@@ -313,7 +313,7 @@ GOTBW:
         if($arg !~ m/^\d+$/ || $arg < 4 || $arg > 16);
     my $w = int($arg/4)*4;
     my $v = sprintf("9%d",$arg/4-1);
-    Log $ll, "Setting AGCCTRL0 (1D) to $v / $w dB";
+    Log3 $name, 3, "Setting AGCCTRL0 (1D) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1F$v");
     CUL_SimpleWrite($hash, $hash->{initString});
 
@@ -362,7 +362,7 @@ WRITEEND:
 
     return "Expecting a 0-padded hex number"
         if((length($arg)&1) == 1 && $type ne "raw");
-    Log $ll, "set $name $type $arg";
+    Log3 $name, 3, "set $name $type $arg";
     $arg = "l$arg" if($type eq "led");
     $arg = "x$arg" if($type eq "patable");
     CUL_SimpleWrite($hash, $arg);
@@ -379,8 +379,10 @@ CUL_Get($@)
   my $type = $hash->{TYPE};
 
   return "\"get $type\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
-  	if(!defined($gets{$a[1]}));
+  if(!defined($gets{$a[1]})) {
+    my @cList = map { $_ =~ m/^(file|raw)$/ ? $_ : "$_:noArg" } sort keys %gets;
+    return "Unknown argument $a[1], choose one of " . join(" ", @cList);
+  }
 
   my $arg = ($a[2] ? $a[2] : "");
   my ($msg, $err);
@@ -532,7 +534,7 @@ CUL_DoInit($)
   if($ver !~ m/^V/) {
     $attr{$name}{dummy} = 1;
     $msg = "Not an CUL device, got for V:  $ver";
-    Log 1, $msg;
+    Log3 $name, 1, $msg;
     return $msg;
   }
   $ver =~ s/[\r\n]//g;
@@ -551,7 +553,7 @@ CUL_DoInit($)
   $cmds =~ s/$name cmds =>//g;
   $cmds =~ s/ //g;
   $hash->{CMDS} = $cmds;
-  Log 3, "$name: Possible commands: " . $hash->{CMDS};
+  Log3 $name, 3, "$name: Possible commands: " . $hash->{CMDS};
 
   CUL_SimpleWrite($hash, $hash->{initString});
 
@@ -561,9 +563,9 @@ CUL_DoInit($)
   ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0, undef);
   return "$name: $err" if($err);
   $fhtid =~ s/[\r\n]//g;
-  Log 5, "GOT CUL fhtid: $fhtid";
+  Log3 $name, 5, "GOT CUL fhtid: $fhtid";
   if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
-    Log 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
+    Log3 $name, 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
     CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
   }
 
@@ -624,7 +626,7 @@ CUL_ReadAnswer($$$$)
     }
 
     if($buf) {
-      Log 5, "CUL/RAW (ReadAnswer): $buf";
+      Log3 $hash->{NAME}, 5, "CUL/RAW (ReadAnswer): $buf";
       $mculdata .= $buf;
     }
     $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
@@ -661,7 +663,7 @@ CUL_XmitLimitCheck($$)
   if(@b > 163) {          # Maximum nr of transmissions per hour (unconfirmed).
 
     my $name = $hash->{NAME};
-    Log GetLogLevel($name,2), "CUL TRANSMIT LIMIT EXCEEDED";
+    Log3 $name, 2, "CUL TRANSMIT LIMIT EXCEEDED";
     DoTrigger($name, "TRANSMIT LIMIT EXCEEDED");
 
   } else {
@@ -716,7 +718,7 @@ CUL_WriteTranslate($$$)
     $msg = substr($msg,6,4) . substr($msg,10);
 
   } else {
-    Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
+    Log3 $name, 2, "CUL cannot translate $fn $msg";
     return (undef, undef);
   }
   return ($fn, $msg);
@@ -730,8 +732,9 @@ CUL_Write($$$)
 
   ($fn, $msg) = CUL_WriteTranslate($hash, $fn, $msg);
   return if(!defined($fn));
+  my $name = $hash->{NAME};
 
-  Log 5, "$hash->{NAME} sending $fn$msg";
+  Log3 $name, 5, "$hash->{NAME} sending $fn$msg";
   my $bstring = "$fn$msg";
 
   if($fn eq "F" ||                      # FS20 message
@@ -832,7 +835,7 @@ CUL_Read($)
   my $name = $hash->{NAME};
 
   my $culdata = $hash->{PARTIAL};
-  Log 5, "CUL/RAW: $culdata/$buf"; 
+  Log3 $name, 5, "CUL/RAW: $culdata/$buf"; 
   $culdata .= $buf;
 
   while($culdata =~ m/\n/) {
@@ -852,14 +855,14 @@ CUL_Parse($$$$$)
   my $rssi;
 
   my $dmsg = $rmsg;
-  if($dmsg =~ m/^[AFTKEHRStZ]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHRStZri]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
     $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-    Log GetLogLevel($name,5), "$name: $dmsg $rssi";
+    Log3 $name, 5, "$name: $dmsg $rssi";
   } else {
-    Log GetLogLevel($name,5), "$name: $dmsg";
+    Log3 $name, 5, "$name: $dmsg";
   }
 
   ###########################################
@@ -918,7 +921,10 @@ CUL_Parse($$$$$)
       $dmsg = lc($dmsg);
     }
     # Other K... Messages ar sent to CUL_WS
-
+  } elsif($fn eq "r" && $len >= 23) {              # Revolt
+    $dmsg = lc($dmsg);
+  } elsif($fn eq "i" && $len >= 7) {              # IT
+    $dmsg = lc($dmsg);
   } elsif($fn eq "S" && $len >= 33) {              # CUL_ESA / ESA2000 / Native
     ;
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
@@ -937,7 +943,7 @@ CUL_Parse($$$$$)
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } else {
     DoTrigger($name, "UNKNOWNCODE $dmsg");
-    Log GetLogLevel($name,2), "$name: unknown message $dmsg";
+    Log3 $name, 2, "$name: unknown message $dmsg";
     return;
   }
 
@@ -984,8 +990,7 @@ CUL_SimpleWrite(@)
   }
 
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "SW: $msg";
+  Log3 $name, 5, "SW: $msg";
 
   $msg .= "\n" unless($nonl);
 
@@ -1019,7 +1024,7 @@ CUL_Attr(@)
         $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
         CUL_SimpleWrite($hash, $hash->{initString});
       } else {
-	Log 2, $msg;
+	Log3 $name, 2, $msg;
         return $msg;
       }
 
@@ -1032,7 +1037,7 @@ CUL_Attr(@)
         $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
         CUL_SimpleWrite($hash, $hash->{initString});
       } else {
-        Log 2, $msg;
+        Log3 $name, 2, $msg;
         return $msg;
       }
 
@@ -1047,7 +1052,7 @@ CUL_Attr(@)
 
     }
 
-    Log 2, "Switched $name rfmode to $a[3]";
+    Log3 $name, 2, "Switched $name rfmode to $a[3]";
     delete $hash->{".clientArray"};
 
   }
@@ -1237,7 +1242,6 @@ CUL_Attr(@)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
     <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL/CUN for covering a large area, sending

@@ -74,6 +74,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
+# Due to RFXCOM SDK requirements this code may only be used with a RFXCOM device.
+#
 # Some code was derived and modified from xpl-perl 
 # from the following two files:
 #	xpl-perl/lib/xPL/Utils.pm:
@@ -91,7 +93,7 @@
 ##################################
 #
 # values for "set global verbose"
-# 4: log unknown protocols
+# 4: log unknown prologtocols
 # 5: log decoding hexlines for debugging
 #
 package main;
@@ -115,7 +117,6 @@ TRX_WEATHER_Initialize($)
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
   $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 
 }
@@ -357,7 +358,6 @@ sub TRX_WEATHER_common_anemometer {
     	my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -373,13 +373,10 @@ sub TRX_WEATHER_common_anemometer {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_anemometer error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_anemometer error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
-
-  #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
@@ -400,8 +397,8 @@ sub TRX_WEATHER_common_anemometer {
   my $dir = $bytes->[5]*256 + $bytes->[6];
   my $dirname = $TRX_WEATHER_winddir_name[$dir/22.5];
 
-  my $avspeed = $bytes->[7]*256 + $bytes->[8];
-  my $speed = $bytes->[9]*256 + $bytes->[10];
+  my $avspeed = ($bytes->[7]*256 + $bytes->[8]) / 10;
+  my $speed = ($bytes->[9]*256 + $bytes->[10]) / 10;
 
   if ($dev_type eq "TFA_WIND") {
   	TRX_WEATHER_temperature($bytes, $dev_str, \@res, 11); 
@@ -435,7 +432,6 @@ sub TRX_WEATHER_common_temp {
   my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -455,13 +451,12 @@ sub TRX_WEATHER_common_temp {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_temp error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_temp error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
 
   #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
@@ -470,7 +465,6 @@ sub TRX_WEATHER_common_temp {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -492,7 +486,6 @@ sub TRX_WEATHER_common_hydro {
   my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -504,7 +497,7 @@ sub TRX_WEATHER_common_hydro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_hydro error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_hydro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -516,7 +509,6 @@ sub TRX_WEATHER_common_hydro {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -538,7 +530,6 @@ sub TRX_WEATHER_common_temphydro {
   my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -557,7 +548,7 @@ sub TRX_WEATHER_common_temphydro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_temphydro error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_temphydro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -565,8 +556,29 @@ sub TRX_WEATHER_common_temphydro {
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
+  } elsif ($dev_type eq "TFATS34C") {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA";
+	if ($bytes->[3] > 0x20 && $bytes->[3] <= 0x3F) {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 1";
+		$dev_str .= $DOT."1"; 
+	} elsif ($bytes->[3] >= 0x40 && $bytes->[3] <= 0x5F) {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 2";
+		$dev_str .= $DOT."2"; 
+	} elsif ($bytes->[3] >= 0x60 && $bytes->[3] <= 0x7F) {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 3";
+		$dev_str .= $DOT."3"; 
+	} elsif ($bytes->[3] >= 0xA0 && $bytes->[3] <= 0xBF) {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 4";
+		$dev_str .= $DOT."4"; 
+	} elsif ($bytes->[3] >= 0xC0 && $bytes->[3] <= 0xDF) {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 5";
+		$dev_str .= $DOT."5"; 
+	} else {
+  	#Log3 undef, 1,"TRX_WEATHER: TFA 9";
+		$dev_str .= $DOT."9"; 
+	}
   }
-  if ($bytes->[4] > 0) {
+  if ($dev_type ne "TFATS34C" && $bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
 
@@ -580,7 +592,11 @@ sub TRX_WEATHER_common_temphydro {
 
   TRX_WEATHER_temperature($bytes, $dev_str, \@res, 5);
   TRX_WEATHER_humidity($bytes, $dev_str, \@res, 7); 
-  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 9);
+  if ($dev_type eq "THGR918") {
+  	TRX_WEATHER_battery($bytes, $dev_str, \@res, 9);
+  } else {
+  	TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 9);
+  }
   return @res;
 }
 
@@ -591,7 +607,6 @@ sub TRX_WEATHER_common_temphydrobaro {
   my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -603,7 +618,7 @@ sub TRX_WEATHER_common_temphydrobaro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_temphydrobaro error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_temphydrobaro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -615,7 +630,6 @@ sub TRX_WEATHER_common_temphydrobaro {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -640,7 +654,6 @@ sub TRX_WEATHER_common_rain {
 
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -655,7 +668,7 @@ sub TRX_WEATHER_common_rain {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_rain error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_rain error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -725,7 +738,6 @@ sub TRX_WEATHER_common_uv {
   my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -738,13 +750,12 @@ sub TRX_WEATHER_common_uv {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_uv error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_uv error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
 
   #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
@@ -753,7 +764,6 @@ sub TRX_WEATHER_common_uv {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -790,7 +800,6 @@ sub TRX_WEATHER_common_datetime {
     	my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -801,7 +810,7 @@ sub TRX_WEATHER_common_datetime {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_datetime error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_datetime error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -849,7 +858,6 @@ sub TRX_WEATHER_common_energy {
     	my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -861,13 +869,12 @@ sub TRX_WEATHER_common_energy {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_energy error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_energy error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
 
   #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   $dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
@@ -928,7 +935,6 @@ sub TRX_WEATHER_common_energy2 {
     	my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -939,13 +945,12 @@ sub TRX_WEATHER_common_energy2 {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_energy2 error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_energy2 error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
 
   #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   $dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
@@ -1019,7 +1024,6 @@ sub TRX_WEATHER_common_weight {
     	my $bytes = shift;
 
   my $subtype = sprintf "%02x", $bytes->[1];
-  #Log 1,"subtype=$subtype";
   my $dev_type;
 
   my %devname =
@@ -1031,13 +1035,12 @@ sub TRX_WEATHER_common_weight {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: common_weight error undefined subtype=$subtype";
+  	Log3 undef, 3, "TRX_WEATHER: common_weight error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
 
   #my $seqnbr = sprintf "%02x", $bytes->[2];
-  #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
   if (TRX_WEATHER_use_longid($longids,$dev_type)) {
@@ -1078,28 +1081,28 @@ TRX_WEATHER_Parse($$)
 
   #my $hashname = $iohash->{NAME};
   #my $longid = AttrVal($hashname,"longids","");
-  #Log 1,"2: name=$hashname, attr longids = $longid";
+  #Log3 $iohash, $iohash, 5 ,"2: name=$hashname, attr longids = $longid";
 
   my $longids = 0;
   if (defined($attr{$iohash->{NAME}}{longids})) {
   	$longids = $attr{$iohash->{NAME}}{longids};
-  	#Log 1,"0: attr longids = $longids";
+  	#Log3 $iohash, 5,"0: attr longids = $longids";
   }
 
   $trx_rssi = 0;
   if (defined($attr{$iohash->{NAME}}{rssi})) {
   	$trx_rssi = $attr{$iohash->{NAME}}{rssi};
-  	#Log 1,"0: attr rssi = $trx_rssi";
+  	#Log3 $iohash, 5, "0: attr rssi = $trx_rssi";
   }
 
   my $time = time();
   # convert to binary
   my $msg = pack('H*', $hexline);
   if ($time_old ==0) {
-  	Log 5, "TRX_WEATHER: decoding delay=0 hex=$hexline";
+  	Log3 $iohash, 5, "TRX_WEATHER: decoding delay=0 hex=$hexline";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "TRX_WEATHER: decoding delay=$time_diff hex=$hexline";
+  	Log3 $iohash, 5, "TRX_WEATHER: decoding delay=$time_diff hex=$hexline";
   }
   $time_old = $time;
 
@@ -1124,41 +1127,40 @@ TRX_WEATHER_Parse($$)
   my $rec = $types{$key};
 
   unless ($rec) {
-    Log 4, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
-    Log 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
+    Log3 $iohash, 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
     return "";
   }
   
   my $method = $rec->{method};
   unless ($method) {
-    Log 4, "TRX_WEATHER: Possible message from Oregon part '$rec->{part}'";
-    Log 4, "TRX_WEATHER: sensor_id=$sensor_id";
+    Log3 $iohash, 4, "TRX_WEATHER: Possible message from Oregon part '$rec->{part}'";
+    Log3 $iohash, 4, "TRX_WEATHER: sensor_id=$sensor_id";
     return;
   }
 
   my @res;
 
   if (! defined(&$method)) {
-    Log 4, "TRX_WEATHER: Error: Unknown function=$method. Please define it in file $0";
-    Log 4, "TRX_WEATHER: sensor_id=$sensor_id\n";
+    Log3 $iohash, 4, "TRX_WEATHER: Error: Unknown function=$method. Please define it in file $0";
+    Log3 $iohash, 4, "TRX_WEATHER: sensor_id=$sensor_id\n";
     return "";
   } else {
-    #Log 1, "TRX_WEATHER: parsing sensor_id=$sensor_id message='$hexline'";
+    Log3 $iohash, 5, "TRX_WEATHER: parsing sensor_id=$sensor_id message='$hexline'";
     @res = $method->($rec->{part}, $longids, \@rfxcom_data_array);
   }
 
   # get device name from first entry
   my $device_name = $res[0]->{device};
-  #Log 1, "device_name=$device_name";
+  #Log3 $iohash, 5, "device_name=$device_name";
 
   if (! defined($device_name)) {
-    Log 4, "TRX_WEATHER: error device_name undefined\n";
+    Log3 $iohash, 4, "TRX_WEATHER: error device_name undefined\n";
     return "";
   }
 
   my $def = $modules{TRX_WEATHER}{defptr}{"$device_name"};
   if(!$def) {
-	Log 3, "TRX_WEATHER: Unknown device $device_name, please define it";
+	Log3 $iohash, 3, "TRX_WEATHER: Unknown device $device_name, please define it";
     	return "UNDEFINED $device_name TRX_WEATHER $device_name";
   }
   # Use $def->{NAME}, because the device may be renamed:
@@ -1177,28 +1179,28 @@ TRX_WEATHER_Parse($$)
  	#print "!> i=".$i."\n";
 	#printf "%s\t",$i->{device};
 	if ($i->{type} eq "temp") { 
-			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Temperatur ".$i->{current}." ".$i->{units};
 			$val .= "T: ".$i->{current}." ";
 
 			$sensor = "temperature";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "chilltemp") { 
-			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name windchill ".$i->{current}." ".$i->{units};
 			$val .= "CT: ".$i->{current}." ";
 
 			$sensor = "windchill";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "humidity") { 
-			#printf "Luftfeuchtigkeit %d%s, %s ;",$i->{current},$i->{units},$i->{string};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Luftfeuchtigkeit ".$i->{current}.$i->{units};
 			$val .= "H: ".$i->{current}." ";
 
 			$sensor = "humidity";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "battery") { 
-			#printf "Batterie %d%s; ",$i->{current},$i->{units};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Batterie ".$i->{current};
 			my $tmp_battery = $i->{current};
 			my @words = split(/\s+/,$i->{current});
 			$val .= "BAT: ".$words[0]." "; #use only first word
@@ -1207,7 +1209,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
-			#printf "Luftdruck %d %s, Vorhersage=%s ; ",$i->{current},$i->{units},$i->{forecast};
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name Luftdruck ".$i->{current}." ".$i->{units}." Vorhersage=".$i->{forecast};
 			# do not add it due to problems with hms.gplot
 			$val .= "P: ".$i->{current}." ";
 
@@ -1218,6 +1220,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{forecast});
 	}
 	elsif ($i->{type} eq "speed") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name wind_speed ".$i->{current}." wind_avspeed ".$i->{average};
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
 
@@ -1228,6 +1231,7 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{average});
 	}
 	elsif ($i->{type} eq "direction") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name wind_dir ".$i->{current}." ".$i->{string};
 			$val .= "WD: ".$i->{current}." ";
 			$val .= "WDN: ".$i->{string}." ";
 
@@ -1235,24 +1239,28 @@ TRX_WEATHER_Parse($$)
 			readingsBulkUpdate($def, $sensor, $i->{current} . " " . $i->{string});
 	}
 	elsif ($i->{type} eq "rain") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name rain ".$i->{current};
 			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "train") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name train ".$i->{current};
 			$val .= "TR: ".$i->{current}." ";
 
 			$sensor = "rain_total";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "flip") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name flip ".$i->{current};
 			$val .= "F: ".$i->{current}." ";
 
 			$sensor = "rain_flip";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "uv") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name uv_val ".$i->{current}." uv_risk ".$i->{risk};
 			$val .= "UV: ".$i->{current}." ";
 			$val .= "UVR: ".$i->{risk}." ";
 
@@ -1266,8 +1274,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				#Log 1,"scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name scale_current=".$def->{scale_current};			
 			}
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_current=".$energy_current;			
 			$val .= "ECUR: ".$energy_current." ";
 
 			$sensor = "energy_current";
@@ -1277,8 +1286,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				#Log 1,"scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch1 scale_current=".$def->{scale_current};			
 			}
+			Log3 $name, 5, "TRX_WEATHER: device=$device_name CH1 energy_current=$energy_current";			
 			$val .= "CH1: ".$energy_current." ";
 
 			$sensor = "energy_ch1";
@@ -1288,8 +1298,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				#Log 1,"scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch2 scale_current=".$def->{scale_current};			
 			}
+			Log3 $device_name, 5, "TRX_WEATHER: name=$name device=$device_name CH2 energy_current=$energy_current";			
 			$val .= "CH2: ".$energy_current." ";
 
 			$sensor = "energy_ch2";
@@ -1299,8 +1310,9 @@ TRX_WEATHER_Parse($$)
 			my $energy_current = $i->{current};
 			if (defined($def->{scale_current})) {
 				$energy_current = $energy_current * $def->{scale_current};
-				#Log 1,"scale_current=".$def->{scale_current};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_ch3 scale_current=".$def->{scale_current};			
 			}
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name CH3 energy_current=".$energy_current;			
 			$val .= "CH3: ".$energy_current." ";
 
 			$sensor = "energy_ch3";
@@ -1310,42 +1322,45 @@ TRX_WEATHER_Parse($$)
 			my $energy_total = $i->{current};
 			if (defined($def->{scale_total}) && defined($def->{add_total})) {
 				$energy_total = sprintf("%.4f",$energy_total * $def->{scale_total} + $def->{add_total});
-				#Log 1,"scale_total=".$def->{scale_total};			
+				Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name energy_total scale_total=".$def->{scale_total};			
 			}
-			#Log 1,"energy_total=".$energy_total;			
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_total=$energy_total";			
 			$val .= "ESUM: ".$energy_total." ";
 
 			$sensor = "energy_total";
 			readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
 	}
 	elsif ($i->{type} eq "weight") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name weight ".$i->{current};
 			$val .= "W: ".$i->{current}." ";
 
 			$sensor = "weight";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "hexline") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name hexline ".$i->{current};
 			$sensor = "hexline";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "rssi") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name rssi ".$i->{current};
 			$sensor = "rssi";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "date") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name date ".$i->{current};
 			$val .= $i->{current}." ";
 			$sensor = "date";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "time") { 
+			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name time ".$i->{current};
 			$val .= $i->{current}." ";
 			$sensor = "time";			
 			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	else { 
-			print "\nTRX_WEATHER: Unknown: "; 
-			print "Type: ".$i->{type}.", ";
-			print "Value: ".$i->{current}."\n";
+		Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name UNKNOWN Type: ".$i->{type}." Value: ".$i->{current} 
 	}
   }
 

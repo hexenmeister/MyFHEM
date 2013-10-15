@@ -31,11 +31,6 @@ use HttpUtils;
 
 package main;
 
-sub debug($) {
-  my ($msg)= @_;
-  Log 1, "DEBUG: " . $msg;
-}
-
 
 #####################################
 #
@@ -53,18 +48,18 @@ sub new {
   bless $self, $class;
   $self->{type}= $type;
   $self->{entries}= [];
-  #main::debug "NEW: $type";
+  #main::Debug "NEW: $type";
   return($self);
 }
 
 sub addproperty {
   my ($self,$line)= @_;
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
-  #main::debug "line= $line";
+  #main::Debug "line= $line";
   my ($property,$parameter)= split(":", $line,2); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
-  #main::debug "property= $property parameter= $parameter";
+  #main::Debug "property= $property parameter= $parameter";
   my ($key,$parts)= split(";", $property,2);
-  #main::debug "key= $key parts= $parts";
+  #main::Debug "key= $key parts= $parts";
   $parts= "" unless(defined($parts));
   $parameter= "" unless(defined($parameter));
   if($key eq "EXDATE") {
@@ -74,8 +69,8 @@ sub addproperty {
       PARTS => "$parts",
       VALUE => "$parameter"
   };
-  #main::debug "ADDPROPERTY: ". $self ." key= $key, parts= $parts, value= $parameter";
-  #main::debug "WE ARE " .  $self->{properties}{$key}{VALUE};
+  #main::Debug "ADDPROPERTY: ". $self ." key= $key, parts= $parts, value= $parameter";
+  #main::Debug "WE ARE " .  $self->{properties}{$key}{VALUE};
 }
 
 sub value {
@@ -95,12 +90,12 @@ sub parse {
 
 sub parseSub {
   my ($self,$ln,@ical)= @_;
-  #main::debug "ENTER @ $ln";
+  #main::Debug "ENTER @ $ln";
   while($ln<$#ical) {
     my $line= $ical[$ln];
     chomp $line;
     $line =~ s/[\x0D]//; # chomp will not remove the CR
-    #main::debug "$ln: $line";
+    #main::Debug "$ln: $line";
     $ln++;
     last if($line =~ m/^END:.*$/);
     if($line =~ m/^BEGIN:(.*)$/) {
@@ -111,7 +106,7 @@ sub parseSub {
       $self->addproperty($line);
     }
   }
-  #main::debug "BACK";
+  #main::Debug "BACK";
   return $ln;
 }
 
@@ -165,10 +160,10 @@ sub start {
 
 sub setState {
   my ($self,$state)= @_;
-  #main::debug "Before setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
+  #main::Debug "Before setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
   $self->{_previousState}= $self->{_state};
   $self->{_state}= $state;
-  #main::debug "After setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
+  #main::Debug "After setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
   return $state;
 }
 
@@ -176,7 +171,7 @@ sub setMode {
   my ($self,$mode)= @_;
   $self->{_previousMode}= $self->{_mode};
   $self->{_mode}= $mode;
-  #main::debug "After setMode $mode: Modes(" . $self->uid() . ") " . $self->{_previousMode} . " -> " . $self->{_mode};
+  #main::Debug "After setMode $mode: Modes(" . $self->uid() . ") " . $self->{_previousMode} . " -> " . $self->{_mode};
   return $mode;
 }
 
@@ -234,7 +229,7 @@ sub isDeleted {
 
 sub stateChanged {
   my ($self)= @_;
-  #main::debug "States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
+  #main::Debug "States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
   return $self->{_state} ne $self->{_previousState} ? 1 : 0;
 }
 
@@ -250,20 +245,20 @@ sub modeChanged {
 sub tm {
   my ($t)= @_;
   return undef if(!$t);
-  #main::debug "convert >$t<";
+  #main::Debug "convert >$t<";
   my ($year,$month,$day)= (substr($t,0,4), substr($t,4,2),substr($t,6,2));
   if(length($t)>8) {
       my ($hour,$minute,$second)= (substr($t,9,2), substr($t,11,2),substr($t,13,2));
       my $z;
       $z= substr($t,15,1) if(length($t) == 16);
-      #main::debug "$day.$month.$year $hour:$minute:$second $z";
+      #main::Debug "$day.$month.$year $hour:$minute:$second $z";
       if($z) {
         return main::fhemTimeGm($second,$minute,$hour,$day,$month-1,$year-1900);
       } else {
         return main::fhemTimeLocal($second,$minute,$hour,$day,$month-1,$year-1900);
       }
   } else {
-      #main::debug "$day.$month.$year";
+      #main::Debug "$day.$month.$year";
       return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
   }
 }
@@ -283,7 +278,7 @@ sub tm {
 sub d {
   my ($d)= @_;
 
-  #main::debug "Duration $d";
+  #main::Debug "Duration $d";
   
   my $sign= 1;
   my $t= 0;
@@ -301,13 +296,13 @@ sub d {
     $t+= $1*3600+$2*60+$3;
   }
   $t*= $sign;
-  #main::debug "sign: $sign  dw: $dw  dt: $dt   t= $t";
+  #main::Debug "sign: $sign  dw: $dw  dt: $dt   t= $t";
   return $t;
 }
 
 sub dt {
   my ($t0,$value,$parts)= @_;
-  #main::debug "t0= $t0  parts= $parts  value= $value";
+  #main::Debug "t0= $t0  parts= $parts  value= $value";
   if(defined($parts) && $parts =~ m/VALUE=DATE/) {
     return tm($value);
   } else {
@@ -332,11 +327,11 @@ sub ts0 {
 sub plusNMonths($$) {
   my ($tm, $n)= @_;
   my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  #main::debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
+  #main::Debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
   $month+= $n;
   $year+= int($month / 12);
   $month %= 12;
-  #main::debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
+  #main::Debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
   return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
 }
 
@@ -380,7 +375,7 @@ sub fromVEvent {
     my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH);
     foreach my $k (keys %r) {
       if(not($k ~~ @keywords)) {
-        main::Log 2, "Calendar: RRULE $rrule is not supported";
+        main::Log3 undef, 2, "Calendar: RRULE $rrule is not supported";
       }
     }
 
@@ -514,7 +509,7 @@ sub advanceToNextOccurance {
     } elsif($self->{freq} eq "YEARLY") {
       $nextstart= plusNMonths($nextstart, 12*$self->{interval});
     } else {
-      main::Log 1, "Calendar: event frequency '" . $self->{freq} . "' not implemented";
+      main::Log3 undef, 1, "Calendar: event frequency '" . $self->{freq} . "' not implemented";
       return;
     }
 
@@ -527,7 +522,7 @@ sub advanceToNextOccurance {
   my $duration = $self->{end} - $self->{start};
   $self->{start} = $nextstart;
   $self->{end} = $self->{start} + $duration;
-  main::Log 5, "Next time of $self->{summary} is: start " . ts($self->{"start"}) . ", end " . ts($self->{"end"});
+  main::Log3 undef, 5, "Next time of $self->{summary} is: start " . ts($self->{"start"}) . ", end " . ts($self->{"end"});
   return 1;
 }
 
@@ -570,13 +565,13 @@ sub nextTime {
   unshift @times, $self->{alarm} if($self->{alarm});
   @times= sort grep { $_ > $t } @times;
 
-#   main::debug "Calendar: " . $self->asFull();
-#   main::debug "Calendar: Start " . main::FmtDateTime($self->{start});
-#   main::debug "Calendar: End   " . main::FmtDateTime($self->{end});
-#   main::debug "Calendar: Alarm " . main::FmtDateTime($self->{alarm}) if($self->{alarm});
-#   main::debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
-#   main::debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
-#   main::debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
+#   main::Debug "Calendar: " . $self->asFull();
+#   main::Debug "Calendar: Start " . main::FmtDateTime($self->{start});
+#   main::Debug "Calendar: End   " . main::FmtDateTime($self->{end});
+#   main::Debug "Calendar: Alarm " . main::FmtDateTime($self->{alarm}) if($self->{alarm});
+#   main::Debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
+#   main::Debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
+#   main::Debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
   
   if(@times) {
     return $times[0];
@@ -652,20 +647,20 @@ sub updateFromCalendar {
     $event->fromVEvent($vevent);
 
     $uid= $event->uid();
-    #main::debug "Processing event $uid.";
+    #main::Debug "Processing event $uid.";
     #foreach my $ee ($self->events()) {
-    #  main::debug $ee->asFull();
+    #  main::Debug $ee->asFull();
     #}
     if(defined($self->event($uid))) {
       # the event already exists
-      #main::debug "Event $uid already exists.";
+      #main::Debug "Event $uid already exists.";
       $event->setState($self->event($uid)->state()); # copy the state from the existing event
       $event->setMode($self->event($uid)->mode()); # copy the mode from the existing event
-      #main::debug "Our lastModified: " . ts($self->event($uid)->lastModified());
-      #main::debug "New lastModified: " . ts($event->lastModified());
+      #main::Debug "Our lastModified: " . ts($self->event($uid)->lastModified());
+      #main::Debug "New lastModified: " . ts($event->lastModified());
       if($self->event($uid)->lastModified() != $event->lastModified()) {
          $event->setState("updated");
-         #main::debug "We set it to updated.";
+         #main::Debug "We set it to updated.";
       } else {
          $event->setState("known")
       }   
@@ -699,8 +694,7 @@ sub Calendar_Initialize($) {
   $hash->{UndefFn} = "Calendar_Undef";
   $hash->{GetFn}   = "Calendar_Get";
   $hash->{SetFn}   = "Calendar_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 ".
-                     $readingFnAttributes;
+  $hash->{AttrList}=  $readingFnAttributes;
 }
 
 ###################################
@@ -709,7 +703,7 @@ sub Calendar_Wakeup($) {
   my ($hash) = @_;
 
   my $t= time();
-  Log 4, "Calendar " . $hash->{NAME} . ": Wakeup";
+  Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Wakeup";
 
   Calendar_GetUpdate($hash) if($t>= $hash->{fhem}{nxtUpdtTs});
 
@@ -740,7 +734,7 @@ sub Calendar_CheckTimes($) {
 
   my $eventsObj= $hash->{fhem}{events};
   my $t= time();
-  Log 4, "Calendar " . $hash->{NAME} . ": Checking times...";
+  Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Checking times...";
 
   # we now run over all events and update the readings 
   my @allevents= $eventsObj->events();
@@ -752,7 +746,7 @@ sub Calendar_CheckTimes($) {
   my @startedevents= grep { $_->isStarted($t) } @allevents;
 
   my $event;
-  #main::debug "Updating modes...";
+  #main::Debug "Updating modes...";
   foreach $event (@upcomingevents) { $event->setMode("upcoming"); }
   foreach $event (@alarmedevents) { $event->setMode("alarm"); }
   foreach $event (@startedevents) { $event->setMode("start"); }
@@ -797,25 +791,44 @@ sub Calendar_GetUpdate($) {
   $hash->{fhem}{lstUpdtTs}= $t;
   $hash->{fhem}{lastUpdate}= FmtDateTime($t);
   
-  Log 4, "Calendar " . $hash->{NAME} . ": Updating...";
+  Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Updating...";
+  my $type = $hash->{fhem}{type};
   my $url= $hash->{fhem}{url};
   
-  my $ics= GetFileFromURLQuiet($url);
-  #my $ics= CustomGetFileFromURL(0, $url, undef, undef, 1);
+  my $ics;
+  
+  if($type eq "url"){ 
+    $ics= GetFileFromURLQuiet($url) if($type eq "url");
+  } elsif($type eq "file") {
+    if(open(ICSFILE, $url)) {
+      while(<ICSFILE>) { 
+        $ics .= $_; 
+      }
+      close(ICSFILE);
+    } else {
+      Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not open file $url"; 
+      return 0;
+    }
+  } else {
+    # this case never happens by virtue of _Define, so just
+    die "Software Error";
+  }
+    
+  
   if(!defined($ics)) {
-    Log 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
+    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
     return 0;
   }
   
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse(split("\n",$ics));
-  #main::debug "*** Result:\n";
-  #main::debug $ical->asString();
+  #main::Debug "*** Result:\n";
+  #main::Debug $ical->asString();
 
   my @entries= @{$ical->{entries}};
   if($#entries<0) {
-    Log 1, "Calendar " . $hash->{NAME} . ": Not an ical file at URL";
+    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Not an ical file at URL";
     $hash->{STATE}= "Not an ical file at URL";
     return 0;
   };
@@ -823,7 +836,7 @@ sub Calendar_GetUpdate($) {
   my $root= @{$ical->{entries}}[0];
   my $calname= "?";
   if($root->{type} ne "VCALENDAR") {
-    Log 1, "Calendar " . $hash->{NAME} . ": Root element is not a VCALENDAR";
+    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Root element is not a VCALENDAR";
     $hash->{STATE}= "Root element is not a VCALENDAR";
     return 0;
   } else {
@@ -834,7 +847,7 @@ sub Calendar_GetUpdate($) {
   $hash->{STATE}= "Active";
   
   # we now create the events from it
-  #main::debug "Creating events...";
+  #main::Debug "Creating events...";
   my $eventsObj= $hash->{fhem}{events};
   $eventsObj->updateFromCalendar($root);
   $hash->{fhem}{events}= $eventsObj;
@@ -878,7 +891,7 @@ sub Calendar_Set($@) {
      Calendar_Wakeup($hash);
      return undef;
   } else {
-    return "Unknown argument $cmd, choose one of update";
+    return "Unknown argument $cmd, choose one of update:noArg";
   }
 }
 
@@ -894,7 +907,7 @@ sub Calendar_Get($@) {
   my $cmd= $a[1];
   if(grep(/^$cmd$/, ("text","full","summary","location","alarm","start","end"))) {
 
-    return "argument is missing" if($#a != 2);
+    return "argument is missing" if($#a < 2);
     my $reading= $a[2];
     
     # $reading is alarmed, all, changed, deleted, new, started, updated
@@ -918,7 +931,12 @@ sub Calendar_Get($@) {
         push @texts, $event->startTime() if $cmd eq "start";
         push @texts, $event->endTime() if $cmd eq "end";
       }
-    }  
+    }
+    if(defined($a[3])) {
+      my $keep= $a[3];
+      return "Argument $keep is not a number." unless($keep =~ /\d+/);
+      splice @texts, $keep if($#texts>= 0);  
+    }
     return join("\n", @texts);
     
   } elsif($cmd eq "find") {
@@ -946,22 +964,25 @@ sub Calendar_Define($$) {
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> Calendar ical url <URL> [interval]"
-    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || ($a[3] ne 'url'));
+  return "syntax: define <name> Calendar ical url <URL> [interval]\n".\
+         "        define <name> Calendar ical file <FILENAME> [interval]"
+    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || (($a[3] ne 'url') && ($a[3] ne 'file')));
 
   $hash->{STATE} = "Initialized";
 
   my $name      = $a[0];
+  my $type      = $a[3];
   my $url       = $a[4];
   my $interval  = 3600;
   
   $interval= $a[5] if($#a==5);
    
+  $hash->{fhem}{type}= $type;
   $hash->{fhem}{url}= $url;
   $hash->{fhem}{interval}= $interval;
   $hash->{fhem}{events}= Calendar::Events->new();
 
-  #main::debug "Interval: ${interval}s";
+  #main::Debug "Interval: ${interval}s";
   $hash->{fhem}{nxtUpdtTs}= 0;
   Calendar_Wakeup($hash);
 
@@ -997,21 +1018,24 @@ sub Calendar_Undef($$) {
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Calendar ical file &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
     <br>
     Defines a calendar device.<br><br>
 
-    A calendar device periodically gathers calendar events from the source calendar at the given URL. The file at the given URL
-    must be in ICal format.<br><br>
+    A calendar device periodically gathers calendar events from the source calendar at the given URL or from a file. 
+    The file must be in ICal format.<br><br>
 
     If the URL
     starts with <code>https://</code>, the perl module IO::Socket::SSL must be installed
     (use <code>cpan -i IO::Socket::SSL</code>).<br><br>
 
     Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar.
-    Google App accounts do not work since requests to the URL
-    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. If your Google Calendar
+    <!--Google App accounts do not work since requests to the URL
+    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. -->
+    If your Google Calendar
     URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
-    replace it by <code>http://</code>.<br><br>
+    replace it by <code>http://</code> if and only if there is no redirection to the <code>https://</code> URL. 
+    Check with your browser first if unsure.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
@@ -1020,6 +1044,7 @@ sub Calendar_Undef($$) {
     <pre>
       define MyCalendar Calendar ical url https://www.google.com&shy;/calendar/ical/john.doe%40example.com&shy;/private-foo4711/basic.ics
       define YourCalendar Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
+      define SomeCalendar Calendar ical file /home/johndoe/calendar.ics
       </pre>
   </ul>
   <br>
@@ -1038,12 +1063,13 @@ sub Calendar_Undef($$) {
   <a name="Calendarget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt;</code><br><br>
+    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt; [max]</code><br><br>
 
     Returns, line by line, the full state or a textual representation or the summary (subject, title) or the
     location or the alarm time or the start time or the end time
     of the calendar event(s) listed in the
-    reading &lt;reading&gt or identified by the UID &lt;uid&gt.<br><br>
+    reading &lt;reading&gt or identified by the UID &lt;uid&gt. The optional parameter <code>max</code> limits
+    the number of returned lines.<br><br>
 
     <code>get &lt;name&gt; find &lt;regexp&gt;</code><br><br>
 
@@ -1158,7 +1184,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 %NAME, 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
     </code><br><br>
     </ul>
 
@@ -1186,7 +1212,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 1, "Actor: $actor, Reading $reading" }
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 %NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 

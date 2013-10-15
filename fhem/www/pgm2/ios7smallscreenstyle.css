@@ -8,13 +8,13 @@ input    { font-family:Helvetica; font-weight:300; font-size:16px;}
 select   { font-family:Helvetica; font-weight:300; font-size:16px;}
 #back    { position:absolute; top: 2px; left:18px; }
 #logo    { position:absolute; top: 2px; left: 2px; 
-           width:64px;  height:67px; background-image:url(../images/smallscreen/fhem_smallscreen.png); }
+           width:64px;  height:67px; background-image:url(../images/default/fhemicon_smallscreen.png); }
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
 #connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
-.devType { padding-top:10px; font-size:12px;}
+.devType { padding-top:10px; font-size:16px;}
 a {  color: #151515; }
 img {  border-style: none; }
 .col2 { text-align:center; }
@@ -59,9 +59,13 @@ div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 div.dist { padding-top:0.3em; }
 button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
 
-.set,.attr { margin-bottom:5px; float:left;}
+.makeTable { display:inline; float:left; clear:left;
+             margin-top:10px; margin-bottom:20px;}
+.makeSelect { display:inline; float:left; clear:left; }
+
+.get,.set,.attr { margin-bottom:5px; float:left;}
 .slider { float:right; width:320px; height:26px; }
-.set .slider { background:#F0F0D8; }
+.get .slider,.set .slider,.attr .slider { background:#F0F0D8; }
 .handle { position:relative; cursor:pointer; width:50px;
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;

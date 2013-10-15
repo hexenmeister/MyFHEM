@@ -10,6 +10,8 @@ package main;
 use strict;
 use warnings;
 
+use Color;
+
 use POSIX;
 use JSON;
 use SetExtensions;
@@ -20,6 +22,7 @@ my %hueModels = (
   LLC005 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LST001 => {name => 'LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
@@ -63,8 +66,7 @@ sub HUEDevice_Initialize($)
 
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
 
-  $data{webCmdFn}{colorpicker} = "HUEDevice_colorpickerFn";
-  $data{FWEXT}{"/"}{SCRIPT} = "/jscolor/jscolor.js";
+  FHEM_colorpickerInit();
 }
 
 sub
@@ -76,6 +78,8 @@ HUEDevice_devStateIcon($)
   return undef if( !$hash );
 
   my $name = $hash->{NAME};
+
+  return ".*:light_question" if( !$hash->{fhem}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
 
   return undef
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
@@ -103,47 +107,11 @@ HUEDevice_devStateIcon($)
 sub
 HUEDevice_summaryFn($$$$)
 {
-Log 3, "HUEDevice_summaryFn";
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   my $name = $hash->{NAME};
 
   return HUEDevice_devStateIcon($hash);
-}
-
-sub
-HUEDevice_colorpickerFn($$$)
-{
-  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
-
-  my @args = split("[ \t]+", $cmd);
-
-  return undef if($values !~ m/^colorpicker,(.*)$/);
-  my ($mode) = ($1);
-  $mode = "RGB" if( !defined($mode) );
-  my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = CommandGet("","$d $cmd");
-  $cmd = "" if($cmd eq "state");
-  if( $args[1] ) {
-    my $c = "cmd=set $d $cmd$srf";
-
-    return '<td align="center">'.
-             "<div onClick=\"FW_cmd('$FW_ME?XHR=1&$c')\" style=\"width:32px;height:19px;".
-             'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
-           '</td>' if( AttrVal($FW_wname, "longpoll", 1));
-
-    return '<td align="center">'.
-             "<a href=\"$FW_ME?$c\">".
-               '<div style="width:32px;height:19px;'.
-               'border:1px solid #fff;border-radius:8px;background-color:#'. $args[1] .';"></div>'.
-             '</a>'.
-           '</td>';
-  } else {
-    my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
-    return '<td align="center">'.
-             "<input id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
-           '</td>';
-  }
 }
 
 sub HUEDevice_Define($$)
@@ -169,12 +137,15 @@ sub HUEDevice_Define($$)
   $hash->{INTERVAL} = $interval;
 
   $hash->{fhem}{on} = -1;
+  $hash->{fhem}{reachable} = '';
   $hash->{fhem}{colormode} = '';
   $hash->{fhem}{bri} = -1;
   $hash->{fhem}{ct} = -1;
   $hash->{fhem}{hue} = -1;
   $hash->{fhem}{sat} = -1;
   $hash->{fhem}{xy} = '';
+  $hash->{fhem}{alert} = '';
+  $hash->{fhem}{effect} = '';
 
   $hash->{fhem}{percent} = -1;
 
@@ -183,9 +154,9 @@ sub HUEDevice_Define($$)
 
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
-    Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+    Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
   } else {
-    Log 1, "$name: no I/O device";
+    Log3 $name, 1, "$name: no I/O device";
   }
 
   #HUEDevice_GetUpdate($hash);
@@ -261,19 +232,19 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+#Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
 
     my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
     my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
     my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
-#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+#Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
 
     if( $X != 0
         || $Y != 0
         || $Z != 0 ) {
       my $x = $X / ($X + $Y + $Z);
       my $y = $Y / ($X + $Y + $Z);
-#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+#Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
 
       #$x = 0 if( $x < 0 );
       #$x = 1 if( $x > 1 );
@@ -298,6 +269,8 @@ HUEDevice_SetParam($$@)
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
     $obj->{'bri'}  = 0+$v;
+  } elsif( $cmd eq "alert" ) {
+    $obj->{'alert'}  = $value;
   } elsif( $cmd eq "effect" ) {
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
@@ -348,8 +321,8 @@ HUEDevice_Set($@)
     return undef;
   }
 
-  my $list = "off on toggle statusRequest";
-  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
+  my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
+  $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
@@ -485,7 +458,7 @@ HUEDevice_Get($@)
     return HUEDevice_devStateIcon($hash);
   }
 
-  return "Unknown argument $cmd, choose one of rgb RGB devStateIcon";
+  return "Unknown argument $cmd, choose one of rgb:noArg RGB:noArg devStateIcon:noArg";
 }
 
 
@@ -498,26 +471,26 @@ HUEDevice_ReadFromServer($@)
 {
   my ($hash,@a) = @_;
 
-  my $dev = $hash->{NAME};
+  my $name = $hash->{NAME};
   no strict "refs";
   my $ret;
-  unshift(@a,$dev);
+  unshift(@a,$name);
   $ret = IOWrite($hash, @a);
   use strict "refs";
   return $ret;
-  return if(IsDummy($dev) || IsIgnored($dev));
+  return if(IsDummy($name) || IsIgnored($name));
   my $iohash = $hash->{IODev};
   if(!$iohash ||
      !$iohash->{TYPE} ||
      !$modules{$iohash->{TYPE}} ||
      !$modules{$iohash->{TYPE}}{ReadFn}) {
-    Log 5, "No I/O device or ReadFn found for $dev";
+    Log3 $name, 5, "No I/O device or ReadFn found for $name";
     return;
   }
 
   no strict "refs";
   #my $ret;
-  unshift(@a,$dev);
+  unshift(@a,$name);
   $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
   use strict "refs";
   return $ret;
@@ -555,9 +528,9 @@ HUEDevice_GetUpdate($)
 
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
-  if( !defined( $attr{$name}{webCmd} ) ) {
+  if( !defined($attr{$name}{webCmd}) && defined($attr{$name}{subType}) ) {
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb C8FF12:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
     $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
   }
@@ -567,6 +540,7 @@ HUEDevice_GetUpdate($)
   my $state = $result->{'state'};
 
   my $on        = $state->{on};
+  my $reachable = $state->{reachable};
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
   my $ct        = $state->{'ct'};
@@ -574,6 +548,8 @@ HUEDevice_GetUpdate($)
   my $sat       = $state->{'sat'};
   my $xy        = undef;
      $xy        = $state->{'xy'}->[0] .",". $state->{'xy'}->[1] if( defined($state->{'xy'}) );
+  my $alert = $state->{alert};
+  my $effect = $state->{effect};
 
   if( defined($colormode) && $colormode ne $hash->{fhem}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -588,6 +564,9 @@ HUEDevice_GetUpdate($)
   if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( defined($xy) && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
+  if( defined($reachable) && $reachable ne $hash->{fhem}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
+  if( defined($alert) && $alert ne $hash->{fhem}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
+  if( defined($effect) && $effect ne $hash->{fhem}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
   my $s = '';
   my $percent;
@@ -613,18 +592,23 @@ HUEDevice_GetUpdate($)
   if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
   if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
 
+  $s = 'off' if( !$reachable );
+
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
   CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") ); 
 
   $hash->{fhem}{on} = $on;
+  $hash->{fhem}{reachable} = $reachable;
   $hash->{fhem}{colormode} = $colormode;
   $hash->{fhem}{bri} = $bri;
   $hash->{fhem}{ct} = $ct;
   $hash->{fhem}{hue} = $hue;
   $hash->{fhem}{sat} = $sat;
   $hash->{fhem}{xy} = $xy;
+  $hash->{fhem}{alert} = $alert;
+  $hash->{fhem}{effect} = $effect;
 
   $hash->{fhem}{percent} = $percent;
 }
@@ -710,10 +694,12 @@ HUEDevice_GetUpdate($)
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>xy &lt;x&gt;,&lt;y&gt;<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
+      <li>alert [none|select|lselect]</li>
       <li>effect [none|colorloop]</li>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
       <li>rgb &lt;rrggbb&gt;</li>
+      <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
       Note:
         <ul>
@@ -737,13 +723,13 @@ HUEDevice_GetUpdate($)
   <b>Attributes</b>
   <ul>
     <li>color-icon<br>
-    1 -> use lamp color as icon color and 100% shape as icon shape<br>
-    2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
+      1 -> use lamp color as icon color and 100% shape as icon shape<br>
+      2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
       colordimmer, dimmer or switch, default is initialized according to device model.</li>
-      <li>devStateIcon<br>
+    <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
-      <li>webCmd<br>
+    <li>webCmd<br>
       will be initialized to <code>rgb:rgb FF0000:rgb C8FF12:rgb 0000FF:toggle:on:off</code> to show colorpicker and 3 color preset buttons in room overview.</li>
   </ul>
 

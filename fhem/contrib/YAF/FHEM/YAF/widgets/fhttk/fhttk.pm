@@ -70,9 +70,11 @@ sub fhttk_get_widgetcss() {
 
 sub fhttk_get_widgetjs() {
 		my $output = '
-				function endsWith(str, suffix) {
+				function fhttk_endsWith(str, suffix) {
 					return str.indexOf(suffix, str.length - suffix.length) !== -1;
 				}
+						function fhttk_on_click(view_id, widget_id) {
+		}
 				function fhttk_update_widget(view_id, widget_id) {
 			$.ajax({
 								type: "GET",
@@ -82,25 +84,27 @@ sub fhttk_get_widgetjs() {
 								context: document.body,
 								success: function(get_state) {
 										var widget = $("#widget_"+view_id+"_"+widget_id);
-										 $("#widget_"+view_id+"_"+widget_id).attr("title",get_state);
-										if (endsWith(get_state,"Open")) {
+										$("#widget_"+view_id+"_"+widget_id).attr("title",get_state);
+										if (fhttk_endsWith(get_state,"Open")) {
 												if (widget.hasClass("widget_fhttk_closed")) {
 														widget.removeClass("widget_fhttk_closed");
 												}
 												if (!widget.hasClass("widget_fhttk_open")) {
 														widget.addClass("widget_fhttk_open");
 												}
+												widget.html("<span />");
 										}
-										else if (endsWith(get_state,"Closed")) {
+										else if (fhttk_endsWith(get_state,"Closed")) {
 												if (!widget.hasClass("widget_fhttk_closed")) {
 														widget.addClass("widget_fhttk_closed");
 												}
 												if (widget.hasClass("widget_fhttk_open")) {
 														widget.removeClass("widget_fhttk_open");
 												}
+												widget.html("<span />");
 										}
 										else {
-											widget.html("Error:"+get_state);
+												widget.html("Error:"+get_state);
 										}
 								}
 						});
@@ -193,14 +197,17 @@ sub fhttk_getwidget_html() {
 ########################################################################################
 
 sub fhttk_get_state() {
-		my $attribute = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");
-		my $d = $defs{$attribute};
+		my $fhemname = YAF_getWidgetAttribute($_GET{"view_id"}, $_GET{"widget_id"}, "fhemname");	#get name of device
+		my $d = $defs{$fhemname};																	#get device
+		my $name = AttrVal($fhemname,"alias",undef);												#get alias
+		if(!defined $name) {																		#if alias is defined, use it as name
+			$name = $fhemname;
+		}
 		if(defined $d) {
-			my $ret = $attribute.": ".trim($d->{STATE});
+			my $ret = $name.": ".$d->{STATE};													#return "name: state"
 			return $ret;
 		} else {
-			return "Widget not found. Maybe reload this page?";
+			return "<span onClick=document.location.reload(true)>Widget not found. Maybe reload this page?</span>";
 		}
 }
 1;
-

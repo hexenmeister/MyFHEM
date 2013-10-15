@@ -62,35 +62,77 @@ my %zwave_class = (
   SWITCH_ALL               => { id => '27', },
   SWITCH_TOGGLE_BINARY     => { id => '28', },
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
-  CHIMNEY_FAN              => { id => '2A', },
-  SCENE_ACTUATOR_CONF      => { id => '2C', },
-  SCENE_CONTROLLER_CONF    => { id => '2D', },
-  ZIP_ADV_SERVICES         => { id => '2F', },
+  CHIMNEY_FAN              => { id => '2a', },
   SCENE_ACTIVATION         => { id => '2b', },
+  SCENE_ACTUATOR_CONF      => { id => '2c', },
+  SCENE_CONTROLLER_CONF    => { id => '2d', },
   ZIP_CLIENT               => { id => '2e', },
+  ZIP_ADV_SERVICES         => { id => '2f', },
   SENSOR_BINARY            => { id => '30', 
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",  },},
-  SENSOR_MULTILEVEL        => { id => '31', },
+  SENSOR_MULTILEVEL        => { id => '31', 
+    get   => { smStatus    => "04" },
+    parse => { "06310501(..)(....)" => 'sprintf("temperature:%0.1f %s",'.
+                      'hex($2)/(10**int(hex($1)/32)), '.
+                      'hex($1)&8 ? "F":"C")',
+               "05310505(..)(..)" => 'sprintf("humidity:%0.1f %%", '.
+                      'hex($2)/(10**int(hex($1)/32)))'},},
   METER                    => { id => '32',
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
   ZIP_ADV_CLIENT           => { id => '34', },
   METER_PULSE              => { id => '35', },
-  HRV_STATUS               => { id => '37', },
+  HRV_STATUS               => { id => '37', 
+    get   => { hrvStatus    => "01%02x",
+               hrvStatusSupported => "03",},
+    parse => { "0637020042(....)" =>
+                   'sprintf("outdoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020142(....)" =>
+                   'sprintf("supplyAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020242(....)" =>
+                   'sprintf("exhaustAirTemperature: %0.1f C", s2Hex($1)/100)',
+               "0637020342(....)" =>
+                   'sprintf("dischargeAirTemperature: %0.1f C",s2Hex($1)/100)',
+               "0637020442(....)" =>
+                   'sprintf("indoorTemperature: %0.1f C", s2Hex($1)/100)',
+               "0537020501(..)" =>
+                   'sprintf("indoorHumidity: %s %%", hex($1))',
+               "0537020601(..)" =>
+                   'sprintf("remainingFilterLife: %s %%", hex($1))',
+               "033704(..)" =>
+                   'sprintf("supportedStatus: %b", hex($1))', },},
   THERMOSTAT_HEATING       => { id => '38', },
   HRV_CONTROL              => { id => '39', },
-  THERMOSTAT_MODE          => { id => '40', },
-  THERMOSTAT_OPERATING_STATE => { id => '42', },
-  THERMOSTAT_SETPOINT      => { id => '43', },
+  METER_TBL_CONFIG         => { id => '3c', },
+  METER_TBL_MONITOR        => { id => '3d', },
+  METER_TBL_PUSH           => { id => '3e', },
+  THERMOSTAT_MODE          => { id => '40',
+    set   => { tmOff       => "0100",
+               tmHeating   => "0101",
+               tmCooling   => "010b",
+               tmManual    => "011f", },
+    get   => { thermostatMode => "02", },
+    parse => { "03400300"  => "state:off",
+               "0340030b"  => "state:cooling",
+               "03400301"  => "state:heating",
+               "0340031f"  => "state:manual",  }, } ,
+  THERMOSTAT_OPERATING_STATE=>{ id => '42', },
+  THERMOSTAT_SETPOINT      => { id => '43',
+    get   => { setpoint => "02" },
+    parse => { "064303(..)(..)(....)" => 'sprintf("temperature:%0.1f %s %s", '.
+                 'hex($3)/(10**int(hex($2)/32)), '.
+                 'hex($2)&8 ? "F":"C", $1==1 ? "heating":"cooling")' }, },
   THERMOSTAT_FAN_MODE      => { id => '44', },
   THERMOSTAT_FAN_STATE     => { id => '45', },
   CLIMATE_CONTROL_SCHEDULE => { id => '46', },
   THERMOSTAT_SETBACK       => { id => '47', },
+  DOOR_LOCK_LOGGING        => { id => '4c', },
+  SCHEDULE_ENTRY_LOCK      => { id => '4e', },
   BASIC_WINDOW_COVERING    => { id => '50', },
   MTP_WINDOW_COVERING      => { id => '51', },
-  MULTI_CHANNEL            => { id => '60',     # Version 2!
+  MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
     get   => { mcEndpoints => "07",     # Endpoints
                mcCapability=> "09%02x"},
     parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
@@ -114,17 +156,19 @@ my %zwave_class = (
   PROTECTION               => { id => '75', },
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
-  GROUPING_NAME            => { id => '7B', },
   FIRMWARE_UPDATE_MD       => { id => '7a', },
-  REMOTE_ASSOCIATION_ACTIVATE => { id => '7c', },
+  GROUPING_NAME            => { id => '7b', },
+  REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c', },
   REMOTE_ASSOCIATION       => { id => '7d', },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
     parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
-  CLOCK                    => { id => '81', },
+  CLOCK                    => { id => '81',
+    parse => { "028105"=> "clock:get" }, },
   HAIL                     => { id => '82', },
   WAKE_UP                  => { id => '84', 
-    set   => { wakeupInterval => "04%06x%02x" },
+    set   => { wakeupInterval => "04%06x%02x",
+               wakeupNoMoreInformation => "08", },
     get   => { wakeupInterval => "05" },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
@@ -142,12 +186,12 @@ my %zwave_class = (
   INDICATOR                => { id => '87', },
   PROPRIETARY              => { id => '88', },
   LANGUAGE                 => { id => '89', },
-  TIME_PARAMETERS          => { id => '8B', },
-  GEOGRAPHIC_LOCATION      => { id => '8C', },
-  COMPOSITE                => { id => '8D', },
-  MULTI_CMD                => { id => '8F', },
   TIME                     => { id => '8a', },
-  MULTI_CHANNEL_ASSOCIATION=> { id => '8E', },
+  TIME_PARAMETERS          => { id => '8b', },
+  GEOGRAPHIC_LOCATION      => { id => '8c', },
+  COMPOSITE                => { id => '8d', },
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
+  MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', },
   SCREEN_MD                => { id => '92', },
@@ -158,11 +202,12 @@ my %zwave_class = (
   AV_CONTENT_SEARCH_MD     => { id => '97', },
   SECURITY                 => { id => '98', },
   AV_TAGGING_MD            => { id => '99', },
-  IP_CONFIGURATION         => { id => '9A', },
-  ASSOCIATION_COMMAND_CONFIGURATION => { id => '9B', },
-  SENSOR_ALARM             => { id => '9C', },
-  SENSOR_CONFIGURATION     => { id => '9E', },
+  IP_CONFIGURATION         => { id => '9a', },
+  ASSOCIATION_COMMAND_CONFIGURATION
+                           => { id => '9b', },
+  SENSOR_ALARM             => { id => '9c', },
   SILENCE_ALARM            => { id => '9d', },
+  SENSOR_CONFIGURATION     => { id => '9e', },
   MARK                     => { id => 'ef', },
   NON_INTEROPERABLE        => { id => 'f0', },
   );
@@ -183,9 +228,9 @@ ZWave_Initialize($)
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
-    "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
+    "$readingFnAttributes " .
     "model:".join(",", sort @zwave_models);
-  map { $zwave_id2class{$zwave_class{$_}{id}} = $_ } keys %zwave_class;
+  map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 }
 
 
@@ -225,11 +270,11 @@ ZWave_Define($$)
       my $ctrlId = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
 
       if($ctrlId) {
-        Log 1, "Adding the controller $ctrlId to association group 1";
+        Log3 $name, 1, "Adding the controller $ctrlId to association group 1";
         IOWrite($hash, "00", "130a04850101${ctrlId}05");
 
       } else {
-        Log 1, "Cannot associate $name, missing controller id";
+        Log3 $name, 1, "Cannot associate $name, missing controller id";
       }
     }
   }
@@ -276,7 +321,7 @@ ZWave_Cmd($$@)
 
   }
 
-  Log GetLogLevel($name,2), "ZWave $type $name $cmd";
+  Log3 $name, 2, "ZWave $type $name $cmd";
 
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
@@ -375,6 +420,7 @@ ZWave_ParseMeter($)
   return "$txt:$v3 $unit";
 }
 
+
 sub
 ZWave_SetClasses($$$$)
 {
@@ -389,7 +435,8 @@ ZWave_SetClasses($$$$)
 
   my @classes;
   for my $classId (grep /../, split(/(..)/, lc($classes))) {
-    push @classes, $zwave_id2class{$classId} if($zwave_id2class{$classId});
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".lc($classId);
   }
   my $name = $def->{NAME};
   $attr{$name}{classes} = join(" ", @classes) if(@classes);
@@ -413,7 +460,8 @@ ZWave_mcCapability($$)
 
   my @classes;
   for my $classId (@l) {
-    push @classes, $zwave_id2class{$classId} if($zwave_id2class{$classId});
+    push @classes, $zwave_id2class{lc($classId)} ? 
+        $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
   }
   return "mcCapability_$chid:no classes" if(!@classes);
 
@@ -438,11 +486,11 @@ ZWave_Parse($$@)
   my $homeId = $iodev->{homeId};
   my $ioName = $iodev->{NAME};
   if(!$homeId) {
-    Log 1, "ERROR: $ioName homeId is not set!" if(!$iodev->{errReported});
+    Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
+        if(!$iodev->{errReported});
     $iodev->{errReported} = 1;
     return;
   }
-  my $ll4 = AttrVal($ioName, "loglevel", 4);
 
   return "" if($msg !~ m/00(..)(..)(..)(..*)/); # Ignore unknown commands 
   my ($cmd, $callbackid, $id, $arg) = ($1, $2, $3, $4);
@@ -473,11 +521,11 @@ ZWave_Parse($$@)
   if($evt) {
     return "$cmd $evt" if($local);
     DoTrigger($ioName, "$cmd $evt");
-    Log $ll4, "$ioName $cmd $evt";
+    Log3 $ioName, 4, "$ioName $cmd $evt";
     return "";
 
   } else {
-    Log $ll4, "$ioName $cmd $id ($arg)";
+    Log3 $ioName, 4, "$ioName $cmd $id ($arg)";
 
   }
 
@@ -490,30 +538,47 @@ ZWave_Parse($$@)
     $id = "$id$1";
     $arg = sprintf("%02x$3", length($3)/2);
   }
-
-  return if($arg !~ m/^..(..)/);
-  my $class = $1;
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
   if(!$hash) {
     $id = hex($id);
-    Log 3, "Unknown ZWave device $homeId $id, please define it";
-    return "";
-  }
-
-
-  my $className = $zwave_id2class{$class} ? $zwave_id2class{$class} : "UNKNOWN";
-  my $ptr = $zwave_class{$className}{parse} if($zwave_class{$className}{parse});
-  if(!$ptr) {
-    Log $ll4, "$hash->{NAME}: Unknown message ($className $arg)";
+    Log3 $ioName, 3, "Unknown ZWave device $homeId $id, please define it";
     return "";
   }
 
   my @event;
-  foreach my $k (keys %{$ptr}) {
-    if($arg =~ m/$k/) {
-      my $val = $ptr->{$k};
-      $val = eval $val if(index($val, '$') >= 0);
-      push @event, $val;
+  my @args = ($arg); # MULTI_CMD handling
+
+  while(@args) {
+    $arg = shift(@args);
+
+    return if($arg !~ m/^..(..)/);
+    my $class = $1;
+
+    my $className = $zwave_id2class{lc($class)} ?
+                  $zwave_id2class{lc($class)} : "UNKNOWN_".uc($class);
+    if($className eq "MULTI_CMD") {
+       my ($ncmd, $off) = (0, 4);
+       while(length($arg) > $off*2) {
+         my $l = hex(substr($arg, $off*2, 2))+1;
+         push @args, substr($arg, $off*2, $l*2);
+         $off += $l;
+       }
+       next;
+    }
+
+    my $ptr = $zwave_class{$className}{parse}
+                        if($zwave_class{$className}{parse});
+    if(!$ptr) {
+      Log3 $hash, 4, "$hash->{NAME}: Unknown message ($className $arg)";
+      next;
+    }
+
+    foreach my $k (keys %{$ptr}) {
+      if($arg =~ m/$k/) {
+        my $val = $ptr->{$k};
+        $val = eval $val if(index($val, '$') >= 0);
+        push @event, $val;
+      }
     }
   }
 
@@ -546,6 +611,17 @@ ZWave_Undef($$)
   my $id = $hash->{id};
   delete $modules{ZWave}{defptr}{"$homeId $id"};
   return undef;
+}
+
+
+#####################################
+# 2-byte signed hex
+sub
+s2Hex($)
+{
+  my ($p) = @_;
+  $p = hex($p);
+  return ($p > 32767 ? -(65536-$p) : $p);
 }
 
 1;
@@ -597,10 +673,31 @@ ZWave_Undef($$)
   <b>Note</b>: devices with on/off functionality support the <a
       href="#setExtensions"> set extensions</a>.
 
+  <br><br><b>Class ASSOCIATION</b>
+  <li>associationAdd groupId nodeId ...<br>
+  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
+  upon creating a fhem-device for the first time fhem will automatically add
+  the controller to the first association group of the node corresponding to
+  the fhem device, i.e it issues a "set name associationAdd 1
+  controllerNodeId"</li>
+
+  <li>associationDel groupId nodeId ...<br>
+  Remove the specified list of nodeIds from the assotion group groupId.</li>
+
   <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>configByte cfgAddress 8bitValue<br>
+      configWord cfgAddress 16bitValue<br>
+      configLong cfgAddress 32bitValue<br>
+    Send a configuration value for the parameter cfgAddress. cfgAddress and
+    value is node specific.</li>
+  <li>configDefault cfgAddress<br>
+    Reset the configuration parameter for the cfgAddress parameter to its
+    default value.  See the device documentation to determine this value.</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>on<br>
@@ -617,31 +714,21 @@ ZWave_Undef($$)
   <li>dim value<br>
     dim to the requested value (0..100)</li>
 
-  <br><br><b>Class CONFIGURATION</b>
-  <li>configByte cfgAddress 8bitValue<br>
-      configWord cfgAddress 16bitValue<br>
-      configLong cfgAddress 32bitValue<br>
-    Send a configuration value for the parameter cfgAddress. cfgAddress and
-    value is node specific.</li>
-  <li>configDefault cfgAddress<br>
-    Reset the configuration parameter for the cfgAddress parameter to its
-    default value.  See the device documentation to determine this value.</li>
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>tmOff</li>
+  <li>tmCooling</li>
+  <li>tmHeating</li>
+  <li>tmManual<br>
+    set the thermostat mode to off, cooling, heating or manual.
+    </li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
-  Set the wakeup interval of battery operated devices to the given value in
-  seconds. Upon wakeup the device sends a wakeup notification.</li>
+    Set the wakeup interval of battery operated devices to the given value in
+    seconds. Upon wakeup the device sends a wakeup notification.</li>
+  <li>wakeupNoMoreInformation<br>
+    put a battery driven device into sleep mode. </li>
 
-  <br><br><b>Class ASSOCIATION</b>
-  <li>associationAdd groupId nodeId ...<br>
-  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
-  upon creating a fhem-device for the first time fhem will automatically add
-  the controller to the first association group of the node corresponding to
-  the fhem device, i.e it issues a "set name associationAdd 1
-  controllerNodeId"</li>
-
-  <li>associationDel groupId nodeId ...<br>
-  Remove the specified list of nodeIds from the assotion group groupId.</li>
   </ul>
   <br>
 
@@ -649,48 +736,9 @@ ZWave_Undef($$)
   <b>Get</b>
   <ul>
 
-  <br><b>Class BASIC</b>
-  <li>basicStatus<br>
-    return the status of the node as basicReport:XY. The value (XY) depends on
-    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
-    </li>
-
-  <br><br><b>Class SWITCH_BINARY</b>
-  <li>swbStatus<br>
-    return the status of the node, as state:on or state:off.
-    </li>
-
-  <br><br><b>Class SWITCH_MULTILEVEL</b>
-  <li>swmStatus<br>
-    return the status of the node, as state:on, state:off or state:dim value.
-    </li>
-
-
-  <br><br><b>Class SENSOR_BINARY</b>
-  <li>sbStatus<br>
-    return the status of the node, as state:open or state:closed.
-    </li>
-
-  <br><br><b>Class CONFIGURATION</b>
-  <li>config cfgAddress<br>
-    return the value of the configuration parameter cfgAddress. The value is
-    device specific.
-    </li>
-
   <br><br><b>Class ALARM</b>
   <li>alarm alarmId<br>
     return the value for alarmId. The value is device specific.
-    </li>
-
-  <br><br><b>Class BATTERY</b>
-  <li>battery<br>
-    return the charge of the battery in %, as battery:value %
-    </li>
-
-  <br><br><b>Class WAKE_UP</b>
-  <li>wakeupInterval<br>
-    return the wakeup interval in seconds, in the form<br>
-    wakeupReport:interval seconds target id
     </li>
 
   <br><br><b>Class ASSOCIATION</b>
@@ -699,10 +747,29 @@ ZWave_Undef($$)
     assocGroup_X:Max Y, Nodes id,id...
     </li>
 
-  <br><br><b>Class VERSION</b>
-  <li>version<br>
-    return the version information of this node in the form:<br>
-    Lib A Prot x.y App a.b
+  <br><b>Class BASIC</b>
+  <li>basicStatus<br>
+    return the status of the node as basicReport:XY. The value (XY) depends on
+    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+    </li>
+
+  <br><br><b>Class BATTERY</b>
+  <li>battery<br>
+    return the charge of the battery in %, as battery:value %
+    </li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config cfgAddress<br>
+    return the value of the configuration parameter cfgAddress. The value is
+    device specific.
+    </li>
+
+  <br><br><b>HRV_STATUS</b>
+  <li>hrvStatus<br>
+    report the current status (temperature, etc)
+    </li>
+  <li>hrvStatusSupported<br>
+    report the supported status fields as a bitfield.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -718,6 +785,48 @@ ZWave_Undef($$)
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
     </li>
 
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>sbStatus<br>
+    return the status of the node, as state:open or state:closed.
+    </li>
+
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>smStatus<br>
+    request data from the node (temperature/humidity/etc)
+    </li>
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>swbStatus<br>
+    return the status of the node, as state:on or state:off.
+    </li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>swmStatus<br>
+    return the status of the node, as state:on, state:off or state:dim value.
+    </li>
+
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>thermostatMode<br>
+    request the mode
+    </li>
+
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>setpoint<br>
+    request the setpoint
+    </li>
+
+  <br><br><b>Class VERSION</b>
+  <li>version<br>
+    return the version information of this node in the form:<br>
+    Lib A Prot x.y App a.b
+    </li>
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval<br>
+    return the wakeup interval in seconds, in the form<br>
+    wakeupReport:interval seconds target id
+    </li>
+
   </ul>
   <br>
 
@@ -729,7 +838,6 @@ ZWave_Undef($$)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#classes">classes</a>
@@ -744,8 +852,50 @@ ZWave_Undef($$)
   <b>Generated events:</b>
   <ul>
 
+  <br><br><b>Class ALARM</b>
+  <li>alarm_type_X:level Y</li>
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>assocGroup_X:Max Y Nodes A,B,...</li>
+
   <br><b>Class BASIC</b>
   <li>basicReport:XY</li>
+
+  <br><br><b>Class BATTERY</b>
+  <li>battery:chargelevel %</li>
+
+  <br><br><b>Class CLOCK</b>
+  <li>clock:get</li>
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config_X:Y</li>
+
+  <br><br><b>Class HRV_STATUS</b>
+  <li>outdoorTemperature: %0.1f C</li>
+  <li>supplyAirTemperature: %0.1f C</li>
+  <li>exhaustAirTemperature: %0.1f C</li>
+  <li>dischargeAirTemperature: %0.1f C</li>
+  <li>indoorTemperature: %0.1f C</li>
+  <li>indoorHumidity: %s %</li>
+  <li>remainingFilterLife: %s %</li>
+  <li>supportedStatus: %b</li>
+
+  <br><br><b>Class METER</b>
+  <li>power:val [kWh|kVAh|W|pulseCount]</li>
+  <li>gas:val [m3|feet3|pulseCount]</li>
+  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>endpoints:total X $dynamic $identical</li>
+  <li>mcCapability_X:class1 class2 ...</li>
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>state:open</li>
+  <li>state:closed</li>
+
+  <br><br><b>Class SENSOR_MULTILEVEL</b>
+  <li>temperature:$temp [C|F]</li>
+  <li>humidity:$hum %</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
@@ -756,37 +906,21 @@ ZWave_Undef($$)
   <li>state:off</li>
   <li>state:dim value</li>
 
-  <br><br><b>Class SENSOR_BINARY</b>
-  <li>state:open</li>
-  <li>state:closed</li>
+  <br><br><b>Class THERMOSTAT_MODE</b>
+  <li>off</li>
+  <li>cooling</li>
+  <li>heating</li>
+  <li>manual</li>
 
-  <br><br><b>Class METER</b>
-  <li>power:val [kWh|kVAh|W|pulseCount]</li>
-  <li>gas:val [m3|feet3|pulseCount]</li>
-  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
-
-  <br><br><b>Class CONFIGURATION</b>
-  <li>config_X:Y</li>
-
-  <br><br><b>Class ALARM</b>
-  <li>alarm_type_X:level Y</li>
-
-  <br><br><b>Class BATTERY</b>
-  <li>battery:chargelevel %</li>
-
-  <br><br><b>Class WAKE_UP</b>
-  <li>wakeup:notification</li>
-  <li>wakeupReport:interval:X target:Y</li>
-
-  <br><br><b>Class ASSOCIATION</b>
-  <li>assocGroup_X:Max Y Nodes A,B,...</li>
+  <br><br><b>Class THERMOSTAT_SETPOINT</b>
+  <li>temperature:$temp [C|F] [heating|cooling]</li>
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
 
-  <br><br><b>Class MULTI_CHANNEL</b>
-  <li>endpoints:total X $dynamic $identical</li>
-  <li>mcCapability_X:class1 class2 ...</li>
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeup:notification</li>
+  <li>wakeupReport:interval:X target:Y</li>
 
   </ul>
 </ul>

@@ -5,11 +5,23 @@ package main;
 use strict;
 use warnings;
 use IO::File;
-#use Devel::Size qw(size total_size);
-use vars qw($FW_ss);      # is smallscreen
-use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
 
-sub seekTo($$$$);
+# This block is only needed when FileLog is loaded bevore FHEMWEB
+sub FW_pO(@);
+sub FW_pH(@);
+use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_RET);     # Returned data (html)
+use vars qw($FW_RETTYPE); 
+use vars qw($FW_cmdret);  # error msg forwarding from toSVG
+use vars qw($FW_detail);  # for redirect after toSVG
+use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by weblink
+use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by weblink
+use vars qw($FW_ss);      # is smallscreen
+use vars qw($FW_wname);   # Web instance
+use vars qw(%FW_pos);     # scroll position
+use vars qw(%FW_webArgs); # all arguments specified in the GET
+
+sub FileLog_seekTo($$$$);
 
 #####################################
 sub
@@ -25,11 +37,13 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd ".
-                      "loglevel";
+  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
 
-  $hash->{FW_summaryFn} = "FileLog_fhemwebFn";
-  $hash->{FW_detailFn}  = "FileLog_fhemwebFn";
+  $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
+  $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
+  $hash->{SVG_sampleDataFn} = "FileLog_sampleDataFn";
+  $data{FWEXT}{"/FileLog_toSVG"}{CONTENTFUNC} = "FileLog_toSVG";
+  $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
 }
 
 
@@ -93,7 +107,7 @@ FileLog_Switch($)
     HandleArchiving($log);
     $fh = new IO::File ">>$cn";
     if(!defined($fh)) {
-      Log(0, "Can't open $cn");
+      Log3 $log, 0, "Can't open $cn";
       return;
     }
     $log->{currentlogfile} = $cn;
@@ -254,17 +268,27 @@ FileLog_Set($@)
   return undef;
 }
 
+sub
+FileLog_loadSVG()
+{
+  if(!$modules{SVG}{LOADED} && -f "$attr{global}{modpath}/FHEM/98_SVG.pm") {
+    my $ret = CommandReload(undef, "98_SVG");
+    Log3 undef, 1, $ret if($ret);
+  }
+}
+
 #########################
 sub
 FileLog_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  return "<div id=\"$d\" align=\"center\" class=\"col2\">$defs{$d}{STATE}</div>"
-        if($FW_ss && $pageHash);
+  return "<div id=\"$d\" align=\"center\" class=\"FileLog col2\">".
+                "$defs{$d}{STATE}</div>" if($FW_ss && $pageHash);
 
   my $row = 0;
-  my $ret = sprintf("<table class=\"%swide\">", $pageHash ? "" : "block ");
+  my $ret = sprintf("<table class=\"FileLog %swide\">",
+                        $pageHash ? "" : "block ");
   foreach my $f (FW_fileList($defs{$d}{logfile})) {
     my $class = (!$pageHash ? (($row++&1)?"odd":"even") : "");
     $ret .= "<tr class=\"$class\">";
@@ -276,7 +300,7 @@ FileLog_fhemwebFn($$$$)
       }
       my ($lt, $name) = split(":", $ln);
       $name = $lt if(!$name);
-      $ret .= FW_pH("cmd=logwrapper $d $lt $f",
+      $ret .= FW_pH("$FW_ME/FileLog_logWrapper&dev=$d&type=$lt&file=$f",
                     "<div class=\"dval\">$name</div>", 1, "dval", 1);
     }
     $ret .= "</tr>";
@@ -336,15 +360,116 @@ FileLog_fhemwebFn($$$$)
   $ret .= "</table>";
 
   my $newIdx=1;
-  while($defs{"wl_${d}_$newIdx"}) {
+  while($defs{"SVG_${d}_$newIdx"}) {
     $newIdx++;
   }
-  my $name = "wl_${d}_$newIdx";
-  $ret .= FW_pH("cmd=define $name weblink fileplot $d:template:CURRENT;".
+  my $name = "SVG_${d}_$newIdx";
+  $ret .= FW_pH("cmd=define $name SVG $d:template:CURRENT;".
                      "set $name copyGplotFile&detail=$name",
-                "<div class=\"dval\">Create new SVG plot</div>", 0, "dval", 1);
+                "<div class=\"dval\">Create SVG plot</div>", 0, "dval", 1);
 
   return $ret;
+}
+
+###################################
+sub
+FileLog_toSVG($)
+{
+  my ($arg) = @_;
+  FW_digestCgi($arg);
+  return("text/html;", "bad url: cannot create SVG def")
+    if(!defined($FW_webArgs{arg}));
+
+  my @aa = split(":", $FW_webArgs{arg});
+  my $max = 0;
+  for my $d (keys %defs) {
+    $max = ($1+1) if($d =~ m/^SVG_(\d+)$/ && $1 >= $max);
+  }
+  $defs{$aa[0]}{currentlogfile} =~ m,([^/]*)$,;
+  $aa[2] = "CURRENT" if($1 eq $aa[2]);
+  $FW_cmdret = FW_fC("define SVG_$max SVG $aa[0]:$aa[1]:$aa[2]");
+  $FW_detail = "SVG_$max" if(!$FW_cmdret);
+  return;
+}
+
+######################
+# Show the content of the log (plain text), or an image and offer a link
+# to convert it to an SVG instance
+# If text and no reverse required, try to return the data as a stream;
+sub
+FileLog_logWrapper($)
+{
+  my ($cmd) = @_;
+
+  my $d    = $FW_webArgs{dev};
+  my $type = $FW_webArgs{type};
+  my $file = $FW_webArgs{file};
+  my $ret = "";
+
+  if(!$d || !$type || !$file) {
+    FW_pO '<div id="content">FileLog_logWrapper: bad arguments</div>';
+    return 0;
+  }
+
+  if(defined($type) && $type eq "text") {
+    $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
+    my $path = "$1/$file";
+    $path =~ s/%L/$attr{global}{logdir}/g
+        if($path =~ m/%/ && $attr{global}{logdir});
+    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
+
+    FW_pO "<div id=\"content\">";
+    FW_pO "<div class=\"tiny\">" if($FW_ss);
+    FW_pO "<pre class=\"log\">";
+    my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
+
+    my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
+    if(!$reverseLogs) {
+      $suffix .= "</body></html>";
+      return FW_returnFileAsStream($path, $suffix, "text/html", 1, 0);
+    }
+
+    if(!open(FH, $path)) {
+      FW_pO "<div id=\"content\">$path: $!</div></body></html>";
+      return 0;
+    }
+    my $cnt = join("", reverse <FH>);
+    close(FH);
+    $cnt = FW_htmlEscape($cnt);
+    FW_pO $cnt;
+    FW_pO $suffix;
+
+  } else {
+    FileLog_loadSVG();
+    FW_pO "<div id=\"content\">";
+    FW_pO "<br>";
+    FW_pO SVG_zoomLink("$cmd;zoom=-1", "Zoom-in", "zoom in");
+    FW_pO SVG_zoomLink("$cmd;zoom=1",  "Zoom-out","zoom out");
+    FW_pO SVG_zoomLink("$cmd;off=-1",  "Prev",    "prev");
+    FW_pO SVG_zoomLink("$cmd;off=1",   "Next",    "next");
+    FW_pO "<table><tr><td>";
+    FW_pO "<td>";
+    my $logtype = $defs{$d}{TYPE};
+    my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+    my $arg = "$FW_ME/SVG_showLog&dev=$logtype&logdev=$d".
+                "&gplotfile=$type&logfile=$file$wl";
+    if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+      my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
+      FW_pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
+                    "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
+    } else {
+      FW_pO "<img src=\"$arg\"/>";
+    }
+
+    FW_pO "<br>";
+    FW_pH "$FW_ME/FileLog_toSVG&arg=$d:$type:$file", "Create SVG instance";
+    FW_pO "</td>";
+    FW_pO "</td></tr></table>";
+    FW_pO "</div>";
+
+  }
+  return 0;
 }
 
 
@@ -366,12 +491,12 @@ FileLog_Get($@)
 {
   my ($hash, @a) = @_;
   
-  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec>...\n".
+  return "Usage: get $a[0] <infile> <outfile> <from> <to> [<column_spec>...]\n".
          "  where column_spec is <col>:<regexp>:<default>:<fn>\n" .
          "  see the FileLogGrep entries in he .gplot files\n" .
          "  <infile> is without direcory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
-        if(int(@a) < 5);
+        if(int(@a) < 4);
   shift @a;
   my $inf  = shift @a;
   my $outf = shift @a;
@@ -380,7 +505,6 @@ FileLog_Get($@)
   my $internal;
 
   my $name = $hash->{NAME};
-  my $ll = GetLogLevel($name,4);
 
   if($outf eq "INT") {
     $outf = "-";
@@ -422,10 +546,22 @@ FileLog_Get($@)
     }
     $inf = $linf;
   }
-  Log $ll, "$name get: Input file $inf, from:$from  to:$to";
+  Log3 $name, 4, "$name get: Input file $inf, from:$from  to:$to";
 
   my $ifh = new IO::File $inf if($inf);
-  seekTo($inf, $ifh, $hash, $from) if($ifh);
+  FileLog_seekTo($inf, $ifh, $hash, $from) if($ifh);
+
+  # Return the the plain file data, $outf is ignored
+  if(!@a) {
+    return "" if(!$ifh);
+    my $out = "";
+    while(my $l = <$ifh>) {
+      next if($l lt $from);
+      last if($l gt $to);
+      $out .= $l;
+    }
+    return $out;
+  }
 
   #############
   # Digest the input.
@@ -639,8 +775,9 @@ RESCAN:
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
 
-    Log $ll, "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
-                ", output lines:".$data{"cnt$j"};
+    Log3 $name, 4,
+        "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
+        ", output lines:".$data{"cnt$j"};
 
   }
   if($internal) {
@@ -672,7 +809,7 @@ seekBackOneLine($$)
 
 ###################################
 sub
-seekTo($$$$)
+FileLog_seekTo($$$$)
 {
   my ($fname, $fh, $hash, $ts) = @_;
 
@@ -686,7 +823,6 @@ seekTo($$$$)
   my $upper = $fh->tell;
 
   my ($lower, $next, $last) = (0, $upper/2, 0);
-  my $div = 2;
   while() {                                             # Binary search
     $fh->seek($next, 0);
     my $data = <$fh>;
@@ -704,9 +840,9 @@ seekTo($$$$)
 
       # If the second line is longer then the first,
       # binary search will never get it: 
-      if($next eq $last && $data ge $ts && $div < 8192) {
-        $last = 0;
-        $div *= 2;
+      if($next eq $last && $data ge $ts) {
+        $last = seekBackOneLine($fh, $next);
+        last;
       }
     }
     if($next eq $last) {
@@ -716,13 +852,77 @@ seekTo($$$$)
 
     $last = $next;
     if(!$data || $data lt $ts) {
-      ($lower, $next) = ($next, int(($next+$upper)/$div));
+      ($lower, $next) = ($next, int(($next+$upper)/2));
     } else {
-      ($upper, $next) = ($next, int(($lower+$next)/$div));
+      ($upper, $next) = ($next, int(($lower+$next)/2));
     }
   }
   $hash->{pos}{"$fname:$ts"} = $last;
 
+}
+
+sub
+FileLog_addTics($$)
+{
+  my ($in, $p) = @_;
+  return if(!$in || $in !~ m/^\((.*)\)$/);
+  map { $p->{"\"$2\""}=1 if(m/^ *([^ ]+) ([^ ]+) */); } split(",",$1);
+}
+
+sub
+FileLog_sampleDataFn($$$$$)
+{
+  my ($flName, $flog, $max, $conf, $wName) = @_;
+  my $desc = "Input:Column,Regexp,DefaultValue,Function";
+
+  my $fName = $defs{$flName}{currentlogfile};
+  my $fh = new IO::File $fName;
+  if(!$fh) {
+    $fName = "<undefined>" if(!defined($fName));
+    Log3 $wName, 1, "FileLog get sample data: $fName: $!";
+    return ($desc, undef, "");
+  }
+  $fh->seek(0, 2); # Go to the end
+  my $sz = $fh->tell;
+  $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
+  my $data;
+  $data = <$fh> if($sz > 65536); # discard the first/partial line
+  my $maxcols = 0;
+  my %h;
+  while($data = <$fh>) {
+    my @cols = split(" ", $data);
+    next if(@cols < 3);
+    $maxcols = @cols if(@cols > $maxcols);
+    $cols[2] = "*" if($cols[2] =~ m/^[-\.\d]+$/);
+    $h{"$cols[1].$cols[2]"} = $data;
+    $h{"$cols[1].*"} = "" if($cols[2] ne "*");
+  }
+  $fh->close();
+
+  my $colnums = $maxcols+1;
+  my $colregs = join(",", sort keys %h);
+  my $example = join("<br>", grep /.+/,map { $h{$_} } sort keys %h);
+
+  $colnums = join(",", 3..$colnums);
+
+  my %tickh;
+  FileLog_addTics($conf->{ytics}, \%tickh);
+  FileLog_addTics($conf->{y2tics}, \%tickh);
+  $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
+
+  $max = 8 if($max > 8);
+  my @htmlArr;
+  for(my $r=0; $r < $max; $r++) {
+    my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
+    my $ret = "";
+    $ret .= SVG_sel("par_${r}_0", $colnums, $f[0]);
+    $ret .= SVG_sel("par_${r}_1", $colregs, $f[1]);
+    $ret .= SVG_txt("par_${r}_2", "", $f[2], 1);
+    $ret .= SVG_txt("par_${r}_3", "", $f[3], 6);
+    push @htmlArr, $ret;
+  }
+
+  return ($desc, \@htmlArr, $example);
 }
 
 1;
@@ -912,7 +1112,6 @@ seekTo($$$$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>

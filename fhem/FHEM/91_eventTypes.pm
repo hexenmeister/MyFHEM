@@ -1,6 +1,7 @@
 ##############################################
 # $Id: 91_eventTypes.pm 2982 2013-03-24 17:47:28Z rudolfkoenig $
 package main;
+use IO::File;
 
 use strict;
 use warnings;
@@ -17,7 +18,7 @@ eventTypes_Initialize($)
   $hash->{GetFn}    = "eventTypes_Get";
   $hash->{SetFn}    = "eventTypes_Set";
   $hash->{AttrFn}   = "eventTypes_Attr";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1";
 }
 
 
@@ -30,18 +31,28 @@ eventTypes_Define($$)
 
   return "wrong syntax: define <name> eventTypes filename" if(int(@a) != 3);
 
+  my $cnt = 0;
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   my $fh = new IO::File "$f";
-  
+
   if($fh) {
     while(my $l = <$fh>) {
       chomp($l);
+      next if($l =~ m/ CULHM (SND|RCV) /);
+      next if($l =~ m/ UNKNOWNCODE /);
+      next if($l =~ m/^\d+ global /);
       my @a = split(" ", $l, 3);
+      if(@a != 3) {
+        Log3 undef, 2, "eventTypes: $f: bogus line $l";
+        next;
+      }
       $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
+      $cnt++;
     }
     close($fh);
   }
+  Log3 undef, 2, "eventTypes: loaded $cnt events from $f";
 
   $hash->{STATE} = "active";
   return undef;
@@ -59,15 +70,19 @@ eventTypes_Notify($$)
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
-  my $ll4 = GetLogLevel($ln, 4);
+  return if(!defined($n) || !defined($t) || $n eq "global");
 
   my $ret = "";
   foreach my $oe (@{$eventSrc->{CHANGED}}) {
     $oe = "" if(!defined($oe));
+    next if($oe =~ m/ CULHM (SND|RCV) /);
+    next if($oe =~ m/ UNKNOWNCODE /);
+
     my $ne = $oe;
     $ne =~ s/\b-?\d*\.?\d+\b/.*/g;
     $ne =~ s/set_\d+/set_.*/;   # HM special :/
-    Log $ll4, "$ln: $t $n $oe -> $ne";
+    next if(!defined($ne) || $ne eq "");
+    Log3 $ln, 4, "$ln: $t $n $oe -> $ne";
     $modules{eventTypes}{ldata}{$n}{$ne}++;
   }
   return undef;
@@ -181,7 +196,6 @@ eventTypes_Get($@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
 

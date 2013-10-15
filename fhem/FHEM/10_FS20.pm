@@ -129,7 +129,7 @@ FS20_Initialize($)
   $hash->{ParseFn}   = "FS20_Parse";
   $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 follow-on-timer ".
                        "do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
+                       "$readingFnAttributes " .
                        "model:".join(",", sort keys %models);
 }
 
@@ -147,7 +147,8 @@ Do_On_Till($@)
   my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
   my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
   if($hms_now ge $hms_till) {
-    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+    Log3 $hash->{NAME}, 4,
+        "on-till: won't switch as now ($hms_now) is later than $hms_till";
     return "";
   }
 
@@ -199,7 +200,7 @@ FS20_Set($@)
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
   my $v = join(" ", @a);
-  Log GetLogLevel($name,3), "FS20 set $v";
+  Log3 $name, 3, "FS20 set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
@@ -214,8 +215,7 @@ FS20_Set($@)
         $val = (2**$i)*$j*0.25;
         if($val >= $a[2]) {
           if($val != $a[2]) {
-            Log GetLogLevel($name,2), 
-               "$name: changing timeout to $val from $a[2]";
+            Log3 $name, 2, "$name: changing timeout to $val from $a[2]";
           }
           $c .= sprintf("%x%x", $i, $j);
           last LOOP;
@@ -252,9 +252,9 @@ FS20_Set($@)
   if($newState) {
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
     $modules{FS20}{ldata}{$name} = $to;
-    Log 4, "Follow: +$to setstate $name $newState";
+    Log3 $name, 4, "Follow: +$to setstate $name $newState";
     CommandDefine(undef, $name."_timer at +$to ".
-        "setstate $name $newState; trigger $name $newState");
+      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1); undef}");
   }
 
   ##########################
@@ -389,7 +389,7 @@ FS20_Parse($$)
       return "" if(IsIgnored($n));   # Little strange.
 
       readingsSingleUpdate($lh, "state", $v, 1);
-      Log GetLogLevel($n,4), "FS20 $n $v";
+      Log3 $n, 4, "FS20 $n $v";
 
       if($modules{FS20}{ldata}{$n}) {
         CommandDelete(undef, $n . "_timer");
@@ -408,9 +408,9 @@ FS20_Parse($$)
       }
       if($newState) {
         my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
-        Log 4, "Follow: +$to setstate $n $newState";
+        Log3 $n, 4, "Follow: +$to setstate $n $newState";
         CommandDefine(undef, $n."_timer at +$to ".
-            "setstate $n $newState; trigger $n $newState");
+          "{readingsSingleUpdate(\$defs{'$n'},'state','$newState', 1); undef}");
         $modules{FS20}{ldata}{$n} = $to;
       }
 
@@ -425,7 +425,7 @@ FS20_Parse($$)
 
     my $dev_four = hex2four($dev);
     my $btn_four = hex2four($btn);
-    Log 3, "FS20 Unknown device $dev ($dev_four), " .
+    Log3 $hash, 3, "FS20 Unknown device $dev ($dev_four), " .
                 "Button $btn ($btn_four) Code $cde ($v), please define it";
     return "UNDEFINED FS20_$dev$btn FS20 $dev $btn";
   }
@@ -673,7 +673,6 @@ four2hex($$)
         </li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 

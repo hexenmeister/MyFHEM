@@ -31,6 +31,8 @@ my $yaf_version=0.41;
 
 my %fhemwidgets;
 my %fhemviews;
+my %fhemviewbgs;
+my $isInit = 0;
 
 #######################################################################################
 #
@@ -44,11 +46,17 @@ my %fhemviews;
 sub YAF_FHEMConfig { #this is called via ajax when the page is loaded.
 		#get the views
 		my $views = AttrVal("yaf","views",undef);
-		if(defined $views) {
+		my $backgrounds = AttrVal("yaf", "backgrounds", undef);
+		if(defined $views and $isInit == 0) {
 			foreach my $view (split (/;/,$views)) {
 				my @aview = split(/,/,$view);
 				$fhemviews{$aview[0]} = $aview[1];
 			}
+			
+			foreach my $bg (split (/;/,$backgrounds)) {
+				my @abg = split(/,/,$bg);
+				$fhemviewbgs{$abg[0]} = $abg[3];
+			}			
 
 			my $retAttr = "";
 			foreach my $viewId (keys %fhemviews) {
@@ -67,6 +75,9 @@ sub YAF_FHEMConfig { #this is called via ajax when the page is loaded.
 		} else {
 			return 0;
 		}
+		Log 3, "YAF initialized";
+		$isInit = 1;
+		return 1;
 }
 
 #######################################################################################
@@ -85,6 +96,7 @@ sub YAF_getViews{
 		foreach my $view (keys %fhemviews){
 				$viewsArray[$index][0] = $view;
 				$viewsArray[$index][1] = $fhemviews{$view};
+				$viewsArray[$index][2] = $fhemviewbgs{$view};
 				$index++;
 		}
 
@@ -155,27 +167,40 @@ sub YAF_getView{
 sub YAF_editView{
 		my $viewId = $_[0];
 		my $viewName = $_[1];
+		my $viewImage = $_[2];
 
 		my %viewhash = ();
+		my %viewbghash = ();
 
 		#load current config
 		foreach my $views (split(/;/,AttrVal("yaf","views",undef))) {
 			my @view = split(/,/,$views);
 			$viewhash{$view[0]} = $view[1];
 		}
+		
+		foreach my $bgs (split(/;/,AttrVal("yaf","backgrounds",undef))) {
+			my @bg = split(/,/,$bgs);
+			$viewbghash{$bg[0]} = $bg[3];
+		}
 
 		#set new config value
 		$viewhash{$viewId} = $viewName;
+		$viewbghash{$viewId} = $viewImage;
 
 		#create new config
 		my $newview = "";
 		foreach my $key (keys %viewhash) {
 			$newview .= $key . "," . $viewhash{$key} . ";;";
 		}
+		
+		my $newbg = "";
+		foreach my $key (keys %viewbghash) {
+			$newbg .= $key . ",1,1," . $viewbghash{$key} . ";;";
+		}		
 
 		#save new config
 		fhem ("attr yaf views $newview");
-		#fhem("save");
+		fhem ("attr yaf backgrounds $newbg");
 
 		return 1;
 }
@@ -248,8 +273,6 @@ sub YAF_deleteView{
 			fhem ("attr global userattr $newuserattr");
 		}
 
-		#fhem("save");
-
 		return 1;
 }
 
@@ -294,7 +317,6 @@ sub YAF_addView{
 		fhem ("attr yaf views $newview");
 		fhem ("attr yaf backgrounds $newbackground");
 		fhem ("attr global userattr $newuserattr");
-		#fhem("save");
 		return 1;
 }
 
@@ -350,7 +372,6 @@ sub YAF_addWidget{
 				$newId = 0;
 			} else {
 				fhem("attr $fhemname yaf_$viewId $widgetString");
-				#fhem("save");
 			}
 
 			return $newId;
@@ -379,7 +400,6 @@ sub YAF_deleteWidget{
 		delete $fhemwidgets{$viewId}{$widgetId};
 
 		fhem("deleteattr $widgetname yaf_$viewId");
-		#fhem("save");
 
 		return 1;
 }
@@ -442,7 +462,6 @@ sub YAF_setWidgetPosition{
 		}
 
 		fhem("attr $widgetname yaf_$viewId $newattr");
-		#fhem("save");
 }
 
 #######################################################################################
@@ -453,6 +472,7 @@ sub YAF_setWidgetPosition{
 # viewId - The view id to search
 # widgetId - The widget id
 # attributeName - name of the attribute properties to search for
+# default - Value to return on undefined
 #
 # @return The value property if successful, otherwise 0
 #
@@ -462,7 +482,13 @@ sub YAF_getWidgetAttribute{
 		my $viewId = $_[0];
 		my $widgetId = $_[1];
 		my $attributeName = $_[2];
+		my $default = (defined $_[3]) ? $_[3] : 0;
+		my $regex = (defined $_[4]) ? $_[4] : 0;
 
+		if($isInit == 0) {						#after a restart of fhem the config hashes might be empty, because they are filled while
+			YAF_FHEMConfig();					#loading the "yaf.htm" page. However, when restarting FHEM without reloading the page, there
+		}										#will be lots of errors. Since this method is called by any update method, we check if YAF
+												#is initialized and load the config, if not.
 		my $retAttr = "";
 		my $widgetName = "";
 
@@ -470,7 +496,7 @@ sub YAF_getWidgetAttribute{
 			$widgetName = $fhemwidgets{$viewId}{$widgetId};
 		}
 
-		if("fhemname" eq $attributeName) {					#special case: get the fhemname
+		if("fhemname" eq $attributeName) {						#special case: get the fhemname
 			$retAttr = $widgetName;								#the key is the name of the device
 		} else {
 			my $attrString = AttrVal($widgetName,"yaf_$viewId",undef);
@@ -478,17 +504,22 @@ sub YAF_getWidgetAttribute{
 				my @tokens = split(/,/,$attrString);
 				foreach my $akey (@tokens) {					#cycle through the other values
 					my @skey = split(/=/, $akey);				#split them for =
-					if($skey[0] eq $attributeName) {			#the first value is the key, if it is the wanted attribute
-						$retAttr = $skey[1];					#return it.
+					if($regex == 0) {
+						if($skey[0] eq $attributeName) {			#the first value is the key, if it is the wanted attribute
+							$retAttr = $skey[1];					#return it.
+						}
+					} else {
+						if($attributeName =~ $skey[0]) {
+							$retAttr = $skey[1];
+						}
 					}
 				}
 			}
 		}
-
 		if(length $retAttr > 0) {
 			return $retAttr;											#return the found config
 		} else {
-			return 0;
+			return $default;
 		}
 }
 
@@ -505,9 +536,8 @@ sub YAF_getRefreshTime{
 		if (defined $ret) {
 			return $ret;
 		} else {
-			Log 1,"YAF_getRefreshTime: refresh_interval attribute was not found (so it was created with a default value)";
+			Log 1,"YAF_getRefreshTime: refresh_interval attribute was not found (so it will be created with a default value)";
 			fhem("attr yaf refresh_interval 60");
-			fhem("save");
 			return 60;
 		}
 }
@@ -524,12 +554,36 @@ sub YAF_setRefreshTime{
 
 		if($newRefreshInterval =~ /^\d+$/) {
 			fhem("attr yaf refresh_interval $newRefreshInterval");
-			#fhem("save");
 			return 1;
 		} else {
-			Log 1,"YAF_setRefreshTime: no valid refresh value or refresh node was not found";
+			Log 1,"YAF_setRefreshTime: no valid refresh value or refresh attribute was not found";
 			return 0;
 		}
 }
 
+sub YAF_setWidgetAttribute{
+		my $viewId = $_[0];
+		my $widgetId = $_[1];
+		my $key = $_[2];
+		my $val = $_[3];
+
+		my $widgetname = $fhemwidgets{$viewId}{$widgetId};
+		my %attrhash = ();
+
+		foreach my $attrs (split (/,/,AttrVal($widgetname, "yaf_".$viewId, undef))) {
+			my @attr = split(/=/,$attrs);
+			$attrhash{$attr[0]} = $attr[1];
+		}
+
+		$attrhash{$key} = $val;
+
+		my $newattr = "id=" . $widgetId . ",";
+		foreach my $ckey (keys %attrhash) {
+			if ($ckey ne "id" and defined $attrhash{$ckey}) {
+				$newattr .= $ckey."=".$attrhash{$ckey}.",";
+			}
+		}
+
+		fhem("attr $widgetname yaf_$viewId $newattr");
+}
 1;

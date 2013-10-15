@@ -3,8 +3,11 @@
 <html>
 
 <head>
-  <title>fhem reference</title>
-  <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  <title>FHEM reference</title>
+  <script type="text/javascript" src="fhemdoc.js"></script>
+  <noscript>
+    <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  </noscript>
   <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
   <link rel="shortcut icon" href="/fhem/icons/favicon.ico"/>
 </head>
@@ -38,6 +41,7 @@
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
       <a href="#deletereading">deletereading</a> &nbsp;
+      <a href="#displayattr">displayattr</a> &nbsp;
       <a href="#fheminfo">fheminfo</a> &nbsp;
       <a href="#get">get</a> &nbsp;
       <a href="#getstate">getstate</a> &nbsp;
@@ -55,6 +59,7 @@
       <a href="#save">save</a> &nbsp;
       <a href="#set">set</a> &nbsp;
       <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
+      <a href="#setreading">setreading</a> &nbsp;
       <a href="#setstate">setstate</a> &nbsp;
       <a href="#shutdown">shutdown</a> &nbsp;
       <a href="#sleep">sleep</a> &nbsp;
@@ -94,17 +99,21 @@
     <a href="#holiday">holiday</a> &nbsp;
     <a href="#LightScene">LightScene</a> &nbsp;
     <a href="#notify">notify</a> &nbsp;
+    <a href="#openweathermap">openweathermap</a> &nbsp;
     <a href="#PID">PID</a> &nbsp;
     <a href="#PRESENCE">PRESENCE</a> &nbsp;
     <a href="#PachLog">PachLog</a> &nbsp;
-	<a href="#remotecontrol">remotecontrol</a> &nbsp;
+    <a href="#readingsGroup">readingsGroup</a> &nbsp;
+    <a href="#remotecontrol">remotecontrol</a> &nbsp;
     <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
     <a href="#sequence">sequence</a> &nbsp;
     <a href="#speedtest">speedtest</a> &nbsp;
     <a href="#structure">structure</a> &nbsp;
+    <a href="#SVG">SVG</a> &nbsp;
     <a href="#telnet">telnet</a> &nbsp;
     <a href="#Twilight">Twilight</a> &nbsp;
     <a href="#THRESHOLD">THRESHOLD</a> &nbsp;
+    <a href="#Utils">Utils</a> &nbsp;
     <a href="#watchdog">watchdog</a> &nbsp;
     <a href="#weblink">weblink</a> &nbsp;
     <a href="#WOL">WOL</a> &nbsp;
@@ -174,7 +183,7 @@ telnet) or single client command (via fhem.pl). Example:
 </ul>
     or
 <ul>
-    <code>fhem.pl &lt;fhemhost&gt;:7072 "&lt;command&gt;..."</code>
+    <code>fhem.pl &lt;fhemhost&gt;:7072 "&lt;fhem-command&gt" "..."</code>
 </ul>
 </ul>
 
@@ -248,10 +257,12 @@ A line ending with \ will be concatenated with the next one, so long lines
   The commands
     <a href="#attr">attr</a>,
     <a href="#deleteattr">deleteattr</a>,
+    <a href="#displayattr">displayattr</a>,
     <a href="#delete">delete</a>,
     <a href="#get">get</a>,
     <a href="#list">list</a>,
     <a href="#set">set</a>,
+    <a href="#setreading">setreading</a>,
     <a href="#setstate">setstate</a>,
     <a href="#trigger">trigger</a>
   can take a more complex device specification as argument, which will be
@@ -316,6 +327,21 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   Attributes used by all devices:
   <ul>
+    <a name="verbose"></a>
+    <li>verbose<br>
+        Set the verbosity level. Possible values:
+        <ul>
+          <li>0 - server start/stop
+          <li>1 - error messages or unknown packets
+          <li>2 - major events/alarms.
+          <li>3 - commands sent out will be logged.
+          <li>4 - you'll see whats received by the different devices.
+          <li>5 - debugging.</li>
+        </ul>
+        The value for the <a href="#global">global</a> device is a default for
+        other devices without own verbose attribute set.
+    </li>
+
     <a name="comment"></a>
     <li>comment<br>
         Add an arbitrary comment.
@@ -351,12 +377,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         devices.
     </li>
 
-    <br>
     <a name="readingFnAttributes"></a>
-    <b>readingFnAttributes</b><br>
+    <h4>readingFnAttributes</h4>
     The following attributes are honored by the modules that make use
     of the standardized readings updating mechanism in fhem.pl. Check the
     modules attribute list if you want to know if it is supporting it.
+    <br>
+    <br>
 
     <a name="stateFormat"></a>
     <li>stateFormat<br>
@@ -383,17 +410,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     expressions in that list. If set, only changes of the listed readings
     create events. In other words, if a reading listed here is updated with the
     new value identical to the old value, no event is created.
-    </li><br>
-
-    <a name="event-min-interval"></a>
-    <li>event-min-interval<br>
-    This attribute takes a comma-separated list of reading:minInterval pairs.
-    You may use regular expressions for reading. Events will only be
-    generated, if at least minInterval seconds elapsed since the last reading
-    of the matched type.
-    </li><br>
-
-
+    </li>
     The precedence of event-on-update-reading and event-on-change-reading is as
     follows:
     <ol>
@@ -404,7 +421,15 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>If a reading is listed in event-on-update-reading, an update of the
         reading creates an event no matter whether the reading is also listed
         in event-on-change-reading.</li>
-    </ol><br>
+    </ol>
+
+    <a name="event-min-interval"></a>
+    <li>event-min-interval<br>
+    This attribute takes a comma-separated list of reading:minInterval pairs.
+    You may use regular expressions for reading. Events will only be
+    generated, if at least minInterval seconds elapsed since the last reading
+    of the matched type.
+    </li>
 
     <a name="userReadings"></a>
     <li>userReadings<br>
@@ -567,6 +592,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
 </ul>
 
+
 <a name="deletereading"></a>
 <h3>deletereading</h3>
 <ul>
@@ -583,6 +609,33 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>deletereading mySensor temp1</code><br>
     <code>deletereading mySensor temp\d+</code><br>
+  </ul>
+  <br>
+</ul>
+
+
+<a name="displayattr"></a>
+<h3>displayattr</h3>
+<ul>
+  <code>displayattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <br>
+  Display either the value of a single attribute (see the <a href="#attr">attr</a> command)
+  or all attributes for a device (if no &lt;attrname&gt; is defined).
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  If more then one device is specified, then the device name will also included
+  in the output.
+  <br>
+
+  Examples:
+  <ul>
+    <code>
+    fhem&gt; di WEB<br>
+    menuEntries AlarmOn,/fhem?cmd=set%20alarm%20on<br>
+    room Misc.<br>
+    fhem&gt di WEB room<br>
+    Misc.<br>
+    </code>
   </ul>
   <br>
 </ul>
@@ -888,26 +941,37 @@ A line ending with \ will be concatenated with the next one, so long lines
 </ul>
 
 
+<a name="setreading"></a>
+<h3>setreading</h3>
+<ul>
+  <code>setreading &lt;devspec&gt; &lt;reading&gt; &lt;value&gt;</code>
+  <br><br>
+  Set the reading &lt;reading&gt; for the device <code>&lt;name&gt;</code> to
+  &lt;value&gt; without sending out commands to the device, but triggering
+  events and eventMap/stateFormat transformations as usual.
+  <br><br>
+  Examples:
+  <ul>
+    setreading lamp state on
+  </ul>
+</ul>
+
 <a name="setstate"></a>
 <h3>setstate</h3>
 <ul>
   <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
-  Set the "STATE" for <code>&lt;name&gt;</code> as shown in paranthesis in the
-  <a href="#list">list</a> command
-  to <code>&lt;value&gt;</code> without sending any signals to the device
-  itself. This command is also used in the <a href="#statefile">statefile</a>.
+  Set the STATE entry for the device specified by <code>&lt;devspec&gt;</code>,
+  which is used for displaying the device state in different frontends.
+  No signals will be sent to the device, no events will be generated, and no
+  eventMap or stateFormat translation will be done either.
+  This command is also used in the <a href="#statefile">statefile</a>.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
   <br><br>
   Examples:
   <ul>
     setstate lamp on
-  </ul>
-  Note:
-  <ul>
-    <li>The statefile uses another version of this command, don't be surprised.
-    </li>
   </ul>
 </ul>
 
@@ -1157,8 +1221,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="nofork"></a>
     <li>nofork<br>
-        If set and the logfile is not "-", do not try to background. Needed
-        on some Fritzbox installations.
+        If set and the logfile is not "-", do not try to background. Needed on
+        some Fritzbox installations, and it will be set automatically for
+        Windows.
     </li><br>
 
     <a name="pidfilename="></a>
@@ -1209,20 +1274,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         A space separated list which contains the names of additional
         attributes. Without specifying them you will not be able to set them
         (in order to prevent typos).
-    </li><br>
-
-    <a name="verbose"></a>
-    <li>verbose<br>
-        Set the verbosity level. Possible values:
-        <ul>
-          <li>0 - server start/stop
-          <li>1 - error messages or unknown packets
-          <li>2 - major events/alarms.
-          <li>3 - commands sent out will be logged.
-          <li>4 - you'll see whats received by the different devices.
-          <li>5 - debugging.</li>
-        </ul>
-        Recommended level is 3 for normal use.
     </li><br>
 
     <a name="dupTimeout"></a>
@@ -1296,7 +1347,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>To make date and time handling easier, the variables $sec, $min, $hour,
     $mday, $month, $year, $wday, $yday, $isdst are available in the perl
     oneliners (see also perldoc -f localtime). Exceptions: $month is in the
-    range of 1 to 12, and $year is corrected by 1900 (as I would expect).<br>
+    range of 1 to 12, and $year is corrected by 1900 (as I would expect).
+    Additionally the variable $hms contains the time in the HH:MM:SS format.
+    <br>
     Additionally the variabe $we is 1 if it is weekend (i.e $wday == 0 or
     $wday == 6), and 0 otherwise. If the <a href="#holiday2we">holida2we</a>
     global attribute is set, $we is 1 for holidays too.<br>

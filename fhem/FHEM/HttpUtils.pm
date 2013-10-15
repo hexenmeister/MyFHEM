@@ -63,10 +63,15 @@ CustomGetFileFromURL($$@)
   my ($quiet, $url, $timeout, $data, $noshutdown, $loglevel) = @_;
   $timeout = 4.0 if(!defined($timeout));
   $loglevel = 1 if(!$loglevel);
+  
+  my $redirects= 0;
+  
+  RETRY:
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log $loglevel, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
+    Log3 undef, $loglevel, 
+        "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
@@ -85,18 +90,21 @@ CustomGetFileFromURL($$@)
   }
 
   my $conn;
+  my $errstr= "";
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log $loglevel, $@;
+      Log3 undef, $loglevel, $@;
     } else {
       $conn = IO::Socket::SSL->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
     }
   } else {
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
+  $errstr= $@ if(!$conn);
   if(!$conn) {
-    Log $loglevel, "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log3 undef, $loglevel,
+        "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port, $errstr"; 
     undef $conn;
     return undef;
   }
@@ -122,7 +130,7 @@ CustomGetFileFromURL($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log $loglevel, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
+      Log3 undef, $loglevel, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
@@ -134,21 +142,40 @@ CustomGetFileFromURL($$@)
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   my @header= split("\r\n", $1);
+  my @header0= split(" ", $header[0]);
+  my $code= $header0[1];
+  Log3 undef, 4, "CustomGetFileFromURL $displayurl: Code $code ($header[0])";
+  if($code==301) {
+    # redirect
+    my @header1= split(" ", $header[1]);
+    my $location= $header1[1];
+    Log3 undef, 4, "CustomGetFileFromURL $displayurl: Redirect";
+    
+    $redirects++;
+    if($redirects> 5) {
+      Log3 undef, 2, "CustomGetFileFromURL $displayurl: Too many redirects";
+    } else {
+      $url= $location;
+      goto RETRY;
+    }
+  }
+  
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
-  Log 4, "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
+  Log3 undef, 4,
+        "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
   if(!length($ret)) {
-    Log 4, "CustomGetFileFromURL $displayurl: Zero length data, header follows...";
+    Log3 undef, 4, "CustomGetFileFromURL $displayurl: Zero length data, header follows...";
     for (@header) {
-        Log 4, "CustomGetFileFromURL $displayurl: $_";
+      Log3 undef, 4, "CustomGetFileFromURL $displayurl: $_";
     }
   }
   undef $conn;
   return $ret;
 }
 
+
 ##################
 # Compatibility mode
-
 sub
 GetFileFromURL($@)
 {

@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
   $hash->{AttrFn}  = "PRESENCE_Attr";
-  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 loglevel:1,2,3,4,5 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
+  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
   
 }
 
@@ -419,20 +419,20 @@ PRESENCE_Read($)
     }
     elsif($buf =~ /socket_closed;(.+?)$/)
     {
-	Log GetLogLevel($hash->{NAME}, 3), "PRESENCE: collectord lost connection to room $1 for device ".$hash->{NAME};
+	Log3 $hash->{NAME}, 3, "PRESENCE: collectord lost connection to room $1 for device ".$hash->{NAME};
     }
     elsif($buf =~ /socket_reconnected;(.+?)$/)
     {
-	Log GetLogLevel($hash->{NAME}, 3), "PRESENCE: collectord reconnected to room $1 for device ".$hash->{NAME};
+	Log3 $hash->{NAME}, 3, "PRESENCE: collectord reconnected to room $1 for device ".$hash->{NAME};
     
     }
     elsif($buf =~ /error;(.+?)$/)
     {
-	Log GetLogLevel($hash->{NAME}, 3), "PRESENCE: room $1 cannot execute hcitool to check device ".$hash->{NAME};
+	Log3 $hash->{NAME}, 3, "PRESENCE: room $1 cannot execute hcitool to check device ".$hash->{NAME};
     }
     elsif($buf =~ /error$/)
     {
-	Log GetLogLevel($hash->{NAME}, 3), "PRESENCE: presenced cannot execute hcitool to check device ".$hash->{NAME};
+	Log3 $hash->{NAME}, 3, "PRESENCE: presenced cannot execute hcitool to check device ".$hash->{NAME};
     }
     readingsEndUpdate($hash, 1);
   
@@ -506,7 +506,7 @@ PRESENCE_DoLocalPingScan($)
     my ($string) = @_;
     my ($name, $device, $local, $count) = split("\\|", $string);
 
-    Log GetLogLevel($defs{$name}{NAME}, 5), "PRESENCE_DoLocalPingScan: $string";
+    Log3 $name, 5, "PRESENCE_DoLocalPingScan: $string";
    
     my $retcode;
     my $return;
@@ -514,29 +514,36 @@ PRESENCE_DoLocalPingScan($)
 
     if($^O =~ m/(Win|cygwin)/)
     {
-	eval "require Net::Ping;";
-	my $pingtool = Net::Ping->new("syn");
+	
 
-	if($pingtool)
-	{
-	    $retcode = $pingtool->ping($device, 5);
-	    
-	    Log GetLogLevel($name, 5), "PRESENCE ($name) - pingtool returned $retcode";
-	    
-	    $return = "$name|$local|".($retcode ? "present" : "absent"); 
-	}
-	else
-	{
-	    $return = "$name|$local|error|Could not create a Net::Ping object.";
-	}
+		$temp = qx(ping -n $count -4 $device);
+		
+		chomp $temp;
+		if($temp ne "")
+		{
+			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+			$return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
+		}
+		else
+		{	
+			$return = "$name|$local|error|Could not execute ping command: \"ping -n $count $device\"";
+		}
 
     }
     else
     {
-	$temp = qx(ping -c $count $device);
-	
-	Log GetLogLevel($name, 5), "PRESENCE ($name) - ping command returned with output:\n$temp";
-	$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+		$temp = qx(ping -c $count $device);
+		
+		chomp $temp;
+		if($temp ne "")
+		{
+			Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+			$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
+		}
+		else
+		{	
+			$return = "$name|$local|error|Could not execute ping command: \"ping -c $count $device\"";
+		}
     }
 
     return $return;
@@ -554,7 +561,7 @@ PRESENCE_ExecuteFritzBoxCMD($$)
 	while(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp" and (stat("/var/tmp/fhem-PRESENCE-cmd-lock.tmp"))[9] > (gettimeofday() - 2))
 	{	 
 		$wait = int(rand(4))+2;
-		Log GetLogLevel($name, 5), "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
+		Log3 $name, 5, "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
 		sleep $wait;
 	}
 
@@ -575,7 +582,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     my ($string) = @_;
     my ($name, $device, $local, $repeater) = split("\\|", $string);
     
-    Log GetLogLevel($defs{$name}{NAME}, 5), "PRESENCE_DoLocalFritzBoxScan: $string";
+    Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: $string";
     my $number=0;
     
     my $check_command = ($repeater ? "active" : "speed");
@@ -587,7 +594,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     {
         $number = $defs{$name}{helper}{cachednr};
        
-        Log GetLogLevel($name, 5), "PRESENCE_DoLocalFritzBoxScan: try checking $name as device $device with cached number $number";
+        Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: try checking $name as device $device with cached number $number";
        
         my $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");    
         chomp $cached_name;
@@ -595,12 +602,12 @@ PRESENCE_DoLocalFritzBoxScan($)
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
-            Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
+            Log3 $name, 5, "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
     	    $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
     	    
     	    chomp $status;
     	    
-    	    Log GetLogLevel($name, 5), "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
+    	    Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
     	    
     	    if(not $status =~ /^\s*\d+\s*$/)
     	    {
@@ -610,7 +617,7 @@ PRESENCE_DoLocalFritzBoxScan($)
 	}
 	else
 	{
-	    Log GetLogLevel($name, 5), "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
+	    Log3 $name, 5, "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
 	}
     }
 
@@ -618,7 +625,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     chomp $max;
     
-    Log GetLogLevel($name, 5), "PRESENCE ($name) - ctlmgr_ctl (getting device count) returned: $max";
+    Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (getting device count) returned: $max";
     
     if(not $max =~ /^\s*\d+\s*$/)
     {
@@ -637,14 +644,14 @@ PRESENCE_DoLocalFritzBoxScan($)
         
         chomp $net_device;
         
-        Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
+        Log3 $name, 5, "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
 	if($net_device eq $device)
 	{
   	    $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command"); 
   	    
   	    chomp $status;
   	    
-  	    Log GetLogLevel($name, 5), "PRESENCE ($name) - $check_command for device number $net_device is $status";
+  	    Log3 $name, 5, "PRESENCE ($name) - $check_command for device number $net_device is $status";
   	    last;
 	}
 	
@@ -667,7 +674,7 @@ PRESENCE_DoLocalBluetoothScan($)
     my $wait = 1;
     my $ps;
     
-    Log GetLogLevel($name, 4), "PRESENCE ($name): 'which hcitool' returns: $hcitool";
+    Log3 $name, 4, "PRESENCE ($name): 'which hcitool' returns: $hcitool";
     chomp $hcitool;
     
     
@@ -679,7 +686,7 @@ PRESENCE_DoLocalBluetoothScan($)
     	   if(not $ps =~ /^\s*$/)
     	   {
     	     # sleep between 1 and 5 seconds and try again
-    	     Log GetLogLevel($name, 5), "PRESENCE ($name) - another hcitool command is running. waiting...";
+    	     Log3 $name, 5, "PRESENCE ($name) - another hcitool command is running. waiting...";
     	     sleep(rand(4)+1);
     	   }
     	   else
@@ -691,7 +698,7 @@ PRESENCE_DoLocalBluetoothScan($)
 	$devname = qx(hcitool name $device);
 
 	chomp($devname);
-	Log GetLogLevel($name, 4), "PRESENCE ($name) - hcitool returned: $devname";
+	Log3 $name, 4, "PRESENCE ($name) - hcitool returned: $devname";
 
 	if(not $devname =~ /^\s*$/)
 	{
@@ -720,7 +727,7 @@ PRESENCE_DoLocalShellScriptScan($)
     my $ret;
     my $return;
     
-    Log GetLogLevel($name, 5), "PRESENCE_DoLocalShellScriptScan: $string";
+    Log3 $name, 5, "PRESENCE_DoLocalShellScriptScan: $string";
 
     $ret = qx($call);
     
@@ -762,7 +769,7 @@ PRESENCE_DoLocalFunctionScan($)
     my $ret;
     my $return;
     
-    Log GetLogLevel($name, 5), "PRESENCE_DoLocalFunctionScan: $string";
+    Log3 $name, 5, "PRESENCE_DoLocalFunctionScan: $string";
 
     $ret = AnalyzeCommandChain(undef, $call);
     
@@ -808,12 +815,12 @@ PRESENCE_ProcessLocalScan($)
  
  my $local = $a[1];
 
- Log GetLogLevel($hash->{NAME}, 5), "PRESENCE_ProcessLocalScan: $string";
+ Log3 $hash->{NAME}, 5, "PRESENCE_ProcessLocalScan: $string";
 
   
  if(defined($hash->{helper}{RETRY_COUNT}))
  {
-    Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
+    Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
     delete($hash->{helper}{RETRY_COUNT});
  }
 
@@ -842,7 +849,7 @@ PRESENCE_ProcessLocalScan($)
  {
     $a[3] =~ s/<<line-break>>/\n/g;
     
-    Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
+    Log3 $hash->{NAME}, 2, "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
  }
 
  readingsEndUpdate($hash, 1);
@@ -871,13 +878,13 @@ PRESENCE_ProcessAbortedScan($)
    {
     if($hash->{helper}{RETRY_COUNT} >= 3)
     {
-	Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
+	Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry"). " (resuming normal operation)" if($hash->{helper}{RETRY_COUNT} == 3);
 	InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
 	$hash->{helper}{RETRY_COUNT}++;
     }
     else
     {
-	Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
+	Log3 $hash->{NAME}, 2, "PRESENCE: ".$hash->{NAME}." could not be checked after ".$hash->{helper}{RETRY_COUNT}." ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry")." (retrying in 10 seconds)";
 	InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
         $hash->{helper}{RETRY_COUNT}++;
     }
@@ -959,12 +966,12 @@ PRESENCE_ProcessAbortedScan($)
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
      The given device will be checked for presence status.<br>
     <br>
-    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;bluetooth-address&gt; &lt;ip-address&gt;[:port]  [ &lt;check-interval&gt; ]</code><br>
     <br>
     The default port is 5111 (presenced). Alternatly you can use port 5222 (collectord)<br>
     <br>
     <u>Example</u><br><br>
-    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:89</code><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
     <ul>The presence is a perl network daemon, which provides presence checks of multiple bluetooth devices over network. 
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
@@ -996,8 +1003,8 @@ Options:
     The presenced is available as:<br><br>
     <ul>
     <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.1.deb" target="_new">presenced-1.1.deb</a></li>
-    <li>.deb package for Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.1.deb" target="_new">presenced-rpi-1.1.deb</a></li>
+    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.3.deb" target="_new">presenced-1.3.deb</a></li>
+    <li>.deb package for Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.3.deb" target="_new">presenced-rpi-1.3.deb</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1052,7 +1059,7 @@ Options:
     
     <ul>
     <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
+    <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.3.deb" target="_new">collectord-1.3.deb</a></li>
     </ul>
     </ul><br><br>
 
@@ -1075,7 +1082,6 @@ Options:
   <a name="PRESENCEattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a>disable</a></li>
@@ -1180,11 +1186,11 @@ Options:
     welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
     <br>
     <br>
-    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;IP-Adresse&gt;[:Port] &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-bluetooth &lt;Bluetooth-Adresse&gt; &lt;IP-Adresse&gt;[:Port] [ &lt;Interval&gt; ]</code><br>
     <br>
     Der Standardport ist 5111 (presenced). Alternativ kann man den Port 5222 (collectord) nutzen. Generell ist der Port aber frei w&auml;hlbar.<br><br>
     <u>Beispiel</u><br><br>
-    <code>define iPhone PRESENCE lan-bluetooth 127.0.0.1:5222 0a:4f:36:d8:f9:8</code><br><br>
+    <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
     <ul>Der presenced ist ein Perl Netzwerk Dienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
     Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
@@ -1217,8 +1223,8 @@ Options:
     Der presenced ist zum Download verf&uuml;gbar als:<br><br>
     <ul>
     <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.1.deb" target="_new">presenced-1.1.deb</a></li>
-    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.1.deb" target="_new">presenced-rpi-1.1.deb</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.3.deb" target="_new">presenced-1.3.deb</a></li>
+    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.3.deb" target="_new">presenced-rpi-1.3.deb</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1273,7 +1279,7 @@ Options:
     
     <ul>
     <li>Perl Skript:  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
-    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.1.deb" target="_new">collectord-1.1.deb</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/collectord-1.3.deb" target="_new">collectord-1.3.deb</a></li>
     </ul>
     </ul>
 
@@ -1297,7 +1303,6 @@ Options:
   <a name="PRESENCEattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a>disable</a></li>

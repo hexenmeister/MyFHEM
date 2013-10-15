@@ -1,11 +1,88 @@
-# Add changes at the top of the list. Keep it in ASCII
-- SVN
+# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+
+- 2013-xx-xx (SVN)
+  - feature: readingsGroup: allow devStateIcon to be displayed
+  - feature: readingsGroup: allow multiple device readings in one line
+  - feature: YAMAHA_AVR - new remoteControl commands for Tuner Preset 
+             selection
+  - feature: RSS amended (read image from pipe, scaling options, line width)
+
+- 2013-09-29 (5.5)
+  - feature: new module 55_PIFACE.pm added (betateilchen)
+  - feature: Calendar can read from file and limit number of calendar events
+             retrieved in get command
+  - feature: new module 70_ENIGMA2.pm added (by loredo)
+  - change:  CustomGetFileFromURL() in HttpUtils.pm now reacts to 
+             "301 Moved Permanently" return code
+  - change:  changed exit to POSIX::_exit in 10_OWServer.pm
+  - feature: new module 32_mailcheck.pm (by justme1968)
+  - feature: TCM: new commands added
+  - bugfix:  TCM: TCM_ReadAnswer(): response error corrected 
+  - feature: readingsGroup: new attribute nolinks
+  - feature: readingsGroup: new attribute nameIcon
+  - feature: readingsGroup: allow device selecton by TYPE=xxx
+  - feature: new module Revolt for Revolt NC-5462 power metering devices.
+             (by mehf)
+  - feature: HUEDevice: added alert command
+  - change:  The DBLOG propagated Attribute DbLogExclude will work as 
+             regexp to exclude defined readings to log. 
+             If a MinInterval is set, the logentry is dropped if the 
+             defined interval is not reached and value vs. lastvalue is eqal
+  - change:  readingsGroup added valueFormat
+  - feature: new modules JeeLink and PCA301 and for the ELV PCA 301 power
+             meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
+             sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
+             (by justme1968)
+  - change:  PRESENCE: using ping command line utility to check presence on Windows
+             based machines.
+  - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
+  - feature: new module 33_readingsGroup to display a collection of readings
+             from one or more devices. this will replace weblink readings.
+             (by justme1968)
+  - feature: setreading command added
+  - feature: DbLog: by using DbLog a new Attribute DbLogExclude will be
+             propagated to all Devices. DbLogExclue will work as regexp to
+             exclude defined readings to log
+  - change:  loglevel attribute deprecated/replaced by the verbose attribute
+  - change:  VIERA: changed several readings/commands according to
+             DevelopmentGuidelinesAV. See FHEM Wiki and commandref for more
+             details.
+  - change:  YAMAHA_AVR: changed several readings/commands and introduced new 
+             volume handling. please see the commandref for more details
+  - change:  weblink fileplot/dbplot converted to SVG device (+FHEMWEB cleanup)
+  - change:  VIERA: Added support for get dropdown
+  - change:  EnOcean: Manufacturer Specific Applications (EEP A5-3F-7F),
+             Shutter: readings position and anglePos are updated automatically,
+             if command position is sent and the reading state was changed
+             manually to open or closed
+  - bugfix:  EnOcean: profile MD15 now sends current temperature values
+  - feature: EnOcean: subtype roomSensorControl.05 (Room Sensor and Control
+             Unit): actor commands added
+  - feature: EnOcean: new sensor device Heating/Cooling Relay
+  - feature: EnOcean: new attr sensorMode, temperatureRefDev, humidityRefDev
+  - feature: EnOcean: EEP: MSC basic functions implemented (no teach-in)
+  - feature: EnOcean: 4BS teach-in with EEP number and Manufacturer ID
+  - bugfix:  EnOcean: subtypes tempSensor.??: calculations corrected
+  - feature: new module 55_GDS.pm added (betateilchen)
+  - feature: HUEDevice: special svg icon for unreachable (hard switched off)
+             devices
+  - feature: FHEMWEB detail screen with get dropdown
+  - feature: displayattr command added
+  - feature: SYSSTAT: allow (remote) monitoring system uptime
+  - feature: new module 98_openweathermap.pm added (betateilchen)
+  - feature: WeatherAsHtmlH(), WeatherAsHtmlD() added to 59_Weather.pm (Boris)
+  - feature: new module I2C_BMP180 for reading I2C digital pressure sensor
+             BMP180 or BMP085 connected to Raspberry Pi (Dirk)
+  - feature: new module 35_SWAP_0000002200000003 for panstamp rgb led driver
+             board with ir and dmx support
+  - feature: 95_remotecontrol does not require a weblink anymore (UliM)
   - feature: optional sleep parameter quiet
   - feature: additional buttons for use with 95_remotecontrol
-  - feature: new module 71_LISTENLIVE.pm for use with media players (betateilchen)
+  - feature: new module 71_LISTENLIVE.pm for use with media players
+             (betateilchen)
   - feature: use xhr for colorupdates by colorpicker and rgb presets
   - feature: new module 34_SWAP for generic SWAP protocoll support using
-             a panStick and 34_panStamp as IODevice(by justme1968)
+             a panStick and 34_panStamp as IODevice (by justme1968)
   - feature: new module 34_panStamp to use a panStick as a RF modem
              for panStamps using the SWAP protocoll (by justme1968)
   - feature: EGPM2LAN module added for Gembird (R) Energenie LAN Support

@@ -13,7 +13,7 @@ FHT8V_Initialize($)
   $hash->{DefFn}     = "FHT8V_Define";
   $hash->{SetFn}     = "FHT8V_Set";
   $hash->{GetFn}     = "FHT8V_Get";
-  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 ".
                          $readingFnAttributes;
 }
 
@@ -25,20 +25,27 @@ FHT8V_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $n = $a[0];
 
-  return "wrong syntax: define <name> FHT8V housecode [IODev]" if(@a < 3);
+  return "wrong syntax: define <name> FHT8V housecode [IODev|FHTID]" if(@a < 3);
   return "wrong housecode format: specify a 4 digit hex value "
   		if(($a[2] !~ m/^[a-f0-9]{4}$/i));
-  if(@a > 3) {
+
+  my $fhtid;
+  if(@a > 3 && $defs{$a[3]}) {
     $hash->{IODev} = $defs{$a[3]};
+
   } else {
     AssignIoPort($hash);
+    $fhtid = $a[3] if($a[3]);
   }
+
   return "$n: No IODev found" if(!$hash->{IODev});
-  return "$n: Wrong IODev, has no FHTID" if(!$hash->{IODev}->{FHTID});
+  $fhtid = $hash->{IODev}->{FHTID} if(!$fhtid);
+
+  return "$n: Wrong IODev $hash->{IODev}{NAME}, has no FHTID" if(!$fhtid);
 
   #####################
   # Check if the address corresponds to the CUL
-  my $ioaddr = hex($hash->{IODev}->{FHTID});
+  my $ioaddr = hex($fhtid);
   my $myaddr = hex($a[2]);
   my ($io1, $io0) = (int($ioaddr/255), $ioaddr % 256);
   my ($my1, $my0) = (int($myaddr/255), $myaddr % 256);
@@ -69,16 +76,16 @@ FHT8V_Set($@)
   if($arg eq "valve" ) {
     return "Set valve needs a numeric parameter between 0 and 100"
         if(@a != 3 || $a[2] !~ m/^\d+$/ || $a[2] < 0 || $a[2] > 100);
-    Log GetLogLevel($n,3), "FHT8V set $n $arg $a[2]";
+    Log3 $n, 3, "FHT8V set $n $arg $a[2]";
     $hash->{STATE} = sprintf("%d %%", $a[2]);
     IOWrite($hash, "", sprintf("T%s0026%02X", $hash->{addr}, $a[2]*2.55));
 
   } elsif ($arg eq "pair" ) {
-    Log GetLogLevel($n,3), "FHT8V set $n $arg";
+    Log3 $n, 3, "FHT8V set $n $arg";
     IOWrite($hash, "", sprintf("T%s002f00", $hash->{addr}));
 
   } elsif ($arg eq "decalc" ) {
-    Log GetLogLevel($n,3), "FHT8V set $n $arg";
+    Log3 $n, 3, "FHT8V set $n $arg";
     $hash->{STATE} = "lime-protection";
     IOWrite($hash, "", sprintf("T%s000A00", $hash->{addr}));
 
@@ -128,7 +135,7 @@ FHT8V_Get($@)
   <a name="FHT8Vdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev]</code>
+    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev|FHTID]</code>
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
@@ -144,7 +151,11 @@ FHT8V_Get($@)
     <code>&lt;IODev&gt;</code> must be specified if the last defined CUL device
     is not the one to use. Usually this is done voa the <a
     href="#IODev">IODev</a> attribute, but as the address checked is performed
-    at the definition, we must use an exception here.
+    at the definition, we must use an exception here.<br>
+
+    As an alternative you can specify the FHTID of the assigned IODev device
+    (instead of the IODev itself), this method is needed if you are using FHT8V
+    through FHEM2FHEM.
     <br>
 
     Examples:
@@ -184,7 +195,6 @@ FHT8V_Get($@)
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

@@ -39,7 +39,7 @@ RSS_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}   = "RSS_Define";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList}= "loglevel:0,1,2,3,4,5 size bg tmin";
+    $hash->{AttrList}= "size bg tmin";
     $hash->{SetFn}   = "RSS_Set";
 
 
@@ -98,7 +98,7 @@ RSS_Set() {
   my $name = $a[0];
 
   # usage check
-  my $usage= "Usage: set $name rereadcfg";
+  my $usage= "Unknown argument, choose one of rereadcfg:noArg";
   if((@a == 2) && ($a[1] eq "rereadcfg")) {
      RSS_readLayout($hash);
      return undef;
@@ -201,8 +201,8 @@ RSS_returnRSS($) {
 sub
 RSS_xy($$$) {
   my ($S,$x,$y)= @_;
-  if($x<1) { $x*= $S->width; }
-  if($y<1) { $y*= $S->height; }
+  if($x<=1) { $x*= $S->width; }
+  if($y<=1) { $y*= $S->height; }
   return($x,$y);
 }
 
@@ -274,17 +274,42 @@ RSS_itemImg {
     } else {
       return;
     }
+  } elsif($srctype eq "data") {
+    if($imgtype eq "gif") {
+      $I= GD::Image->newFromGifData($arg);
+    } elsif($imgtype eq "png") {
+      $I= GD::Image->newFromPngData($arg);
+    } elsif($imgtype eq "jpeg") {
+      $I= GD::Image->newFromJpegData($arg);
+    } else {
+      return;
+    }
   } else {
     return;
   }
   ($x,$y)= RSS_xy($S,$x,$y);
   my ($width,$height)= $I->getBounds();
+  if ($scale =~ s/([wh])([\d]*)/$2/) { # get the digit from width/hight to pixel entry
+    #Debug "RSS scale $scale (1: $1 / 2: $2)contais px after Digit - width: $width / height: $height";
+    if ($1 eq "w") {
+	$scale=$scale/$width;
+    } else {
+	$scale=$scale/$height;
+    }
+  }
   my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
   #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
-  Log 5, "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
   $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
 }  
 
+sub
+RSS_itemLine {
+  my ($S,$x1,$y1,$x2,$y2,$th,%params)= @_;
+  ($x1,$y1)= RSS_xy($S,$x1,$y1);
+  ($x2,$y2)= RSS_xy($S,$x2,$y2);
+  $S->setThickness($th);
+  $S->line($x1,$y1,$x2,$y2,RSS_color($S,$params{rgb}));  
+}
 
 ##################
 sub
@@ -298,7 +323,7 @@ RSS_evalLayout($$@) {
   $params{pt}= 12;
   $params{rgb}= "ffffff";
 
-  my ($x,$y,$scale,$text,$imgtype,$srctype,$arg,$format);
+  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -311,12 +336,13 @@ RSS_evalLayout($$@) {
           if($line=~ s/\\$//) { $cont= $line; undef $line; }
           next unless($line);
           $cont= "";
-          #Log 5, "$name: evaluating >$line<";
+          #Debug "$name: evaluating >$line<";
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
-          #Log 5, "CMD= \"$cmd\", DEF= \"$def\"";
+          ##Debug, "CMD= \"$cmd\", DEF= \"$def\"";
           if($cmd eq "rgb") {
-            $params{rgb}= $def;
+            $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
+            $params{rgb}= AnalyzePerlCommand(undef, $def);
           } elsif($cmd eq "font") {
             $params{font}= $def;
           } elsif($cmd eq "pt") {
@@ -324,8 +350,12 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "text") {
             ($x,$y,$text)= split("[ \t]+", $def, 3);
             my $txt= AnalyzePerlCommand(undef, $text);
-            #Log 5, "$name: ($x,$y) $txt";
+            #Debug "$name: ($x,$y) $txt";
             RSS_itemText($S,$x,$y,$txt,%params);
+          } elsif($cmd eq "line") {
+            ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+            $format //= 1; # set format to 1 as default thickness for the line
+            RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemTime($S,$x,$y,%params);
@@ -340,7 +370,7 @@ RSS_evalLayout($$@) {
             my $arg= AnalyzePerlCommand(undef, $arg);
             RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
           } else {
-            Log 1, "$name: Illegal command $cmd in layout definition.";
+            Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
           }  
             
   }
@@ -369,8 +399,9 @@ RSS_returnJPEG($) {
   # create the image
   #
   my $S;
-#  my $S= GD::Image->newTrueColor($width,$height);
-#  $S->colorAllocate(0,0,0); # black is the background
+  # let's create a blank image, we will need it in most cases. 
+  $S= GD::Image->newTrueColor($width,$height);
+  $S->colorAllocate(0,0,0); # black is the background
 
   # wrap to make problems with GD non-lethal
 
@@ -380,63 +411,57 @@ RSS_returnJPEG($) {
     # set the background
     #
     # check if background directory is set
-    my $bgdir= AttrVal($name,"bg","");
-    goto SKIPBG unless($bgdir ne "");
-
-    my $bgnr; # item number
-    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
-        $bgnr= $defs{$name}{fhem}{bgnr};
-    } else {
-        $bgnr= 0;
-    }
-    # check if at least tmin seconds have passed
-    my $t0= 0;
-    my $tmin= AttrVal($name,"tmin",0);
-    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
-      $t0= $defs{$name}{fhem}{t};
-    }
-    my $t1= time();
-    if($t1-$t0>= $tmin) {
-      $defs{$name}{fhem}{t}= $t1;
-      $bgnr++;
-    }
-    # detect pictures
-    goto SKIPBG unless(opendir(BGDIR, $bgdir));
-    my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
-    closedir(BGDIR);
-    # get item number
-    if($#bgfiles>=0) {
-      if($bgnr > $#bgfiles) { $bgnr= 0; }
-      $defs{$name}{fhem}{bgnr}= $bgnr;
-      my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
-      my $bg= newFromJpeg GD::Image($bgfile);
-      my ($bgwidth,$bgheight)= $bg->getBounds();
-      if($bgwidth != $width or $bgheight != $height) {
-        # we need to resize
-        my ($w,$h);
-        my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-        if($u>$v) {
-            $w= $width;
-            $h= $bgheight/$u;
-        } else {
-            $h= $height;
-            $w= $bgwidth/$v;
-        }
-        # create empty image
-        $S= GD::Image->newTrueColor($width,$height);
-        $S->colorAllocate(0,0,0); # black is the background
-        $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
-      } else {
-        # size is as required, we take the original
-        $S= $bg;
-      }
-    } else {
-      # no background, we create an empty background
-      $S= GD::Image->newTrueColor($width,$height);
-      $S->colorAllocate(0,0,0); # black is the background
-    }
-    SKIPBG:
-
+    my $bgdir= AttrVal($name,"bg","undef");
+	if(defined($bgdir)){
+		my $bgnr; # item number
+		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
+			$bgnr= $defs{$name}{fhem}{bgnr};
+		} else {
+			$bgnr= 0;
+		}
+		# check if at least tmin seconds have passed
+		my $t0= 0;
+		my $tmin= AttrVal($name,"tmin",0);
+		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
+			$t0= $defs{$name}{fhem}{t};
+		}
+		my $t1= time();
+		if($t1-$t0>= $tmin) {
+			$defs{$name}{fhem}{t}= $t1;
+			$bgnr++;
+		}
+		# detect pictures
+		if(opendir(BGDIR, $bgdir)){
+			my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
+			closedir(BGDIR);
+			# get item number
+			if($#bgfiles>=0) {
+				if($bgnr > $#bgfiles) { $bgnr= 0; }
+				$defs{$name}{fhem}{bgnr}= $bgnr;
+				my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
+				my $bg= newFromJpeg GD::Image($bgfile);
+				my ($bgwidth,$bgheight)= $bg->getBounds();
+				if($bgwidth != $width or $bgheight != $height) {
+					# we need to resize
+					my ($w,$h);
+					my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+					if($u>$v) {
+						$w= $width;
+						$h= $bgheight/$u;
+					} else {
+						$h= $height;
+						$w= $bgwidth/$v;
+					}
+					$S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+				} else {
+					# size is as required
+					# kill the predefined image and take the original
+					$S = undef;
+					$S= $bg;
+				}
+			}
+		}
+	}
     #
     # evaluate layout
     #
@@ -599,7 +624,7 @@ RSS_CGI(){
     Everything after a # is treated as a comment and ignored. You can fold long lines by
     putting a \ at the end.<p>
 
-    <i>Layout control commands</i>
+    <i>Layout control commands</i><p>
     <ul>
     <li>font &lt;font&gt;<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
     <code>Arial</code>) or the full path to a TrueType font
@@ -608,12 +633,13 @@ RSS_CGI(){
 
     <li>rgb &lt;color&gt;<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
     determining the red, green and blue color components as in HTML color codes (e.g.
-    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
+    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray). You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
     <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
     </ul>
 
-    <i>Item placement commands</i>
+    <i>Item placement commands</i><p>
     <ul>
     <li>text &lt;x&gt; &lt;y&gt; &lt;text&gt;<br>Renders the text &lt;text&gt; at the
     position (&lt;x&gt;, &lt;y&gt;) using the current font, font size and color.
@@ -626,11 +652,13 @@ RSS_CGI(){
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
-    <li>img &lt;x&gt; &lt;y&gt; &lt;s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
+    <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
+    <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
-    The picture is scaled by the factor &lt;s&gt; (a decimal value). If &lt;srctype&gt; is <code>file</code>, the picture
+    The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
     is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code>, the picture
-    is loaded from the URL &lt;arg&gt;. You can use
+    is loaded from the URL &lt;arg&gt;, if &lt;srctype&gt; is <code>data</code>, the picture
+    is loaded from Data &lt;arg&gt;. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
     Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
     <br>

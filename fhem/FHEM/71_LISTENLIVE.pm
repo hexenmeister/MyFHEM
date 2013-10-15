@@ -1,29 +1,30 @@
 # $Id$
 ##############################################################################
 #
-#     71_LISTENLIVE.pm
-#     An FHEM Perl module for controlling ListenLive-enabled Mediaplayers
-#     via network connection.
+#	71_LISTENLIVE.pm
+#	An FHEM Perl module for controlling ListenLive-enabled Mediaplayers
+#	via network connection.
 #
-#     Copyright: betateilchen ®
-#     e-mail   : fhem.development@betateilchen.de
+#	Copyright: betateilchen ®
+#	e-mail: fhem.development@betateilchen.de
 #
-#     This file is part of fhem.
+#	This file is part of fhem.
 #
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
+#	Fhem is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 2 of the License, or
+#	(at your option) any later version.
 #
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
+#	Fhem is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
 #
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#	You should have received a copy of the GNU General Public License
+#	along with fhem. If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+#
 #	Changelog:
 #
 #	2013-07-21
@@ -43,11 +44,14 @@
 #					neues Parsing für cursor erstellt
 #					neues Parsing für audio erstellt
 #
+#	2013-08-03
+#				Fixed: Fehlermeldungen wegen ReplaceEventMap
+#
 ##############################################################################
 
 package main;
 
-#use strict;
+use strict;
 use warnings;
 use POSIX;
 use CGI qw(:standard);
@@ -68,29 +72,37 @@ sub LISTENLIVE_Undefine($$);
 sub HMT350_RCLayout();
 sub HMT350_RCmakenotify($$);
 
-%HMT350_RCtranslate = (
-power	=>	"POWER",
-mute	=>	"MUTE",
-home	=>	"HOME",
-volplus	=>	"VOLp",
-tvout	=>	"OK",
-up		=>	"UP",
-rewind	=>	"REWIND",
-left	=>	"LEFT",
-ok		=>	"OK",
-right	=>	"RIGHT",
-down	=>	"DOWN",
-ret		=>	"RETURN",
-volmin	=>	"VOLm",
-stop	=>	"STOP",
-pageup	=>	"PAGEUP",
-pause	=>	"PAUSE",
-itv		=> 	"ITV",
-pagedn	=>	"PAGEDOWN",
-menu	=>	"MENU",
-fav		=>	"OK",
-fmradio	=>	"FMRADIO",
+my %HMT350_RCtranslate = (
+home		=>	"HOME",
+volplus		=>	"VOLp",
+volmin		=>	"VOLm",
+pageup		=>	"PAGEUP",
+pagedn		=>	"PAGEDOWN",
 );
+
+# %HMT350_RCtranslate = (
+# power		=>	"POWER",
+# mute		=>	"MUTE",
+# home		=>	"HOME",
+# volplus		=>	"VOLp",
+# tvout		=>	"OK",
+# up			=>	"UP",
+# rewind		=>	"REWIND",
+# left		=>	"LEFT",
+# ok			=>	"OK",
+# right		=>	"RIGHT",
+# down		=>	"DOWN",
+# "return"	=>	"RETURN",
+# volmin		=>	"VOLm",
+# stop		=>	"STOP",
+# pageup		=>	"PAGEUP",
+# pause		=>	"PAUSE",
+# itv			=> 	"ITV",
+# pagedn		=>	"PAGEDOWN",
+# menu		=>	"MENU",
+# fav			=>	"OK",
+# fmradio		=>	"FMRADIO",
+# );
 
 ###################################
 sub
@@ -101,7 +113,7 @@ LISTENLIVE_Initialize($)
 	$hash->{SetFn}		=	"LISTENLIVE_Set";
 	$hash->{DefFn}		=	"LISTENLIVE_Define";
 	$hash->{UndefFn}	=	"LISTENLIVE_Undefine";
-	$hash->{AttrList}	=	"do_not_notify:0,1 loglevel:0,1,2,3,4,5 ".
+	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							$readingFnAttributes;
 	$data{RC_layout}{HMT350}		=	"HMT350_RClayout";
 	$data{RC_makenotify}{LISTENLIVE}=	"HMT350_RCmakenotify";
@@ -122,8 +134,7 @@ LISTENLIVE_Set($@)
 
 	my %powerGroup	=	(on => "POWER", off => "POWER");
 	my %muteGroup	=	(on => "MUTE", off => "MUTE");
-	my %cursorGroup	=	(left => "LEFT", right => "RIGHT", up => "UP", down => "DOWN",
-							home => "HOME", enter => "OK", ok => "OK", "exit" => "RETURN");
+	my %cursorGroup	=	(left => "LEFT", right => "RIGHT", up => "UP", down => "DOWN", home => "HOME", enter => "OK", ok => "OK", "exit" => "RETURN");
 	my %audioGroup	=	(mute => "MUTE", unmute => "MUTE", volp => "VOLp", volm => "VOLm");
 
 	my $pstat = $hash->{READINGS}{power}{VAL};
@@ -137,7 +148,9 @@ LISTENLIVE_Set($@)
 	my $cmdGroup = $a[1];
 	my $cmd = $a[2];
 
-	my $usage = "Unknown argument, choose one of help statusRequest power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok reset:power,mute,menupos app:weather raw user";
+	my $usage =	"Unknown argument, choose one of help:noArg statusRequest:noArg ".
+				"power:on,off audio:volp,volm,mute,unmute cursor:up,down,left,right,enter,exit,home,ok ".
+				"reset:power,mute,menupos app:weather raw user";
 
 	given ($cmdGroup){
 
@@ -148,9 +161,16 @@ LISTENLIVE_Set($@)
 
 		when("rc"){
 
+			my ($c, $g); 
 			$g = "raw";
-			$c = $HMT350_RCtranslate{$cmd};
-			Log $loglevel, "LISTENLIVE $name rc_translate: >$cmdGroup $cmd< translated to: >$g $c<";
+			# prüfen ob Befehl in Kleinbuchstaben,
+			# wenn ja => übersetzen!
+			if($cmd eq lc($cmd)){
+				$c = $HMT350_RCtranslate{$cmd};
+				Log $loglevel, "LISTENLIVE $name rc_translate: >$cmdGroup $cmd< translated to: >$g $c<";
+			} else {
+				$c = $cmd;
+			}
 			fhem("set $name $g $c");
 			break;
 		}
@@ -164,6 +184,7 @@ LISTENLIVE_Set($@)
 
 			if(defined($cmd)){
 				Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+				no strict 'refs';
 				$result = &{$cmd};
 				readingsBeginUpdate($hash);
 				readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
@@ -223,6 +244,7 @@ LISTENLIVE_Set($@)
 
 		when("power"){
 
+			my $xCmd;
 			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
 			if($pstat ne $cmd) {
 				$xCmd = $powerGroup{$cmd};
@@ -232,6 +254,9 @@ LISTENLIVE_Set($@)
 					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
 					readingsBulkUpdate($hash, "lastResult",$result);
 					readingsBulkUpdate($hash, "power",$cmd);
+					if($cmd eq "on"){
+					readingsBulkUpdate($hash, "mute", "off");
+					}
 					readingsEndUpdate($hash, 1);
 				} else {
 					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
@@ -250,15 +275,17 @@ LISTENLIVE_Set($@)
 
 			Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
 			if($mute ne $cmd) {
-				$xCmd = $audioGroup{$cmd};
+				my $xCmd = $audioGroup{$cmd};
 				$result = LISTENLIVE_SendCommand($hash, $xCmd);
 				if($result =~  m/OK/){
 					readingsBeginUpdate($hash);
 					readingsBulkUpdate($hash, "lastCmd","$cmdGroup $cmd");
 					readingsBulkUpdate($hash, "lastResult",$result);
-#
-# ToDo: set mute state
-#
+					if($cmd eq "mute"){
+					readingsBulkUpdate($hash, "mute", "on");
+					} else {
+					readingsBulkUpdate($hash, "mute", "off");
+					}
 					readingsEndUpdate($hash, 1);
 				} else {
 					LISTENLIVE_rbuError($hash, $cmdGroup, $cmd);
@@ -274,9 +301,9 @@ LISTENLIVE_Set($@)
 #
 
 		when("cursor"){
-
+		
 			Log $loglevel, "LISTENLIVE: $name input: $cmdGroup $cmd";
-			$xCmd = $cursorGroup{$cmd};
+			my $xCmd = $cursorGroup{$cmd};
 			$result = LISTENLIVE_SendCommand($hash, $xCmd);
 			if($result =~  m/OK/){
 				readingsBeginUpdate($hash);
@@ -299,6 +326,8 @@ LISTENLIVE_Set($@)
 
 				when("weather"){
 					Log $loglevel, "LISTENLIVE $name input: $cmdGroup $cmd";
+					$result = LISTENLIVE_SendCommand($hash, "POWER");
+					select(undef, undef, undef, 1.0);
 					$result = LISTENLIVE_SendCommand($hash, "HOME");
 					select(undef, undef, undef, 0.2);
 					$result = LISTENLIVE_SendCommand($hash, "DOWN");
@@ -342,7 +371,7 @@ LISTENLIVE_Get($@){
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
 	my $address = $hash->{helper}{ADDRESS};
-	my $response;
+	my ($response, $usage);
 
 	return "No Argument given" if(!defined($a[1]));
 
@@ -367,22 +396,21 @@ LISTENLIVE_GetStatus($;$){
 	$local = 0 unless(defined($local));
 
 	if($hash->{helper}{ADDRESS} ne "none")
-	{
-		$presence = ReadingsVal("pres_".$name,"state","noPresence");
-	}
+	{ $presence = ReadingsVal("pres_".$name,"state","absent"); }
 	else
-	{
-		$presence = "present";
-	}
+	{ $presence = "present"; }
 
-	$presence = ReplaceEventMap($name, $presence, 1);
-	
+	if($presence eq "absent") { $presence = "offline";}
+	else { $presence = "online"; }
+
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $presence);
 	readingsEndUpdate($hash, 1);
 
+	$hash->{STATE} = $presence;
+
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0) unless($local == 1);
-	return $hash->{STATE};
+	return 1;
 }
 
 #############################
@@ -391,15 +419,13 @@ LISTENLIVE_Define($$){
 	my ($hash, $def) = @_;
 	my @a = split("[ \t][ \t]*", $def);
 	my $name = $hash->{NAME};
+	my ($cmd, $presence, $ret);
 
 	if(! @a >= 4){
 		my $msg = "wrong syntax: define <name> LISTENLIVE <ip-or-hostname>[:<port>] [<interval>]";
 		Log 2, $msg;
 		return $msg;
 	}
-
-# Attribut eventMap festlegen (schönere Optik im Frontend)  
-	$attr{$name}{"eventMap"} = "absent:offline present:online";
 
 # Adresse in IP und Port zerlegen
 	my @address = split(":", $a[2]);
@@ -416,7 +442,7 @@ LISTENLIVE_Define($$){
 
 	if($address[0] ne "none"){
 		# PRESENCE aus device pres_+NAME lesen
-		my $presence = ReadingsVal("pres_".$name,"state","noPresence");
+		$presence = ReadingsVal("pres_".$name,"state","noPresence");
 	
 		if($presence eq "noPresence"){
 			$cmd = "pres_$name PRESENCE lan-ping $address[0]";
@@ -429,27 +455,30 @@ LISTENLIVE_Define($$){
 		} else {
 			Log 3, "LISTENLIVE $name PRESENCE pres_$name found.";
 		}	
+		$presence = "absent";
 	} else {
 	# Gerät ist als dummy definiert
 		$presence = "present";	# dummy immer als online melden
 	}
 	
-	$presence = ReplaceEventMap($name, $presence, 1);
+
+	if($presence eq "absent") {
+		$presence = "offline";
+	} else {
+		$presence = "online";
+	}
 
 # Readings anlegen und füllen
 	readingsBeginUpdate($hash);
-#	readingsBulkUpdate($hash, "currentMedia","");
 	readingsBulkUpdate($hash, "lastCmd","");
 	readingsBulkUpdate($hash, "lastResult","");
-#	readingsBulkUpdate($hash, "menuPos","11");
 	readingsBulkUpdate($hash, "mute","???");
-#	readingsBulkUpdate($hash, "playStatus","");
 	readingsBulkUpdate($hash, "power","???");
-#	readingsBulkUpdate($hash, "presence",$presence);
 	readingsBulkUpdate($hash, "state",$presence);
 	readingsEndUpdate($hash, 1);
 
 	$hash->{helper}{AVAILABLE} = 1;
+	$hash->{STATE} = $presence;
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "LISTENLIVE_GetStatus", $hash, 0);
 
 	return;
@@ -474,17 +503,19 @@ LISTENLIVE_SendCommand($$;$){
 
 	given($modus) {
 		when("online") {
-			$socket = new IO::Socket::INET (
-				PeerHost => $address,
-				PeerPort => $port,
-				Proto => 'tcp',
-			) or die "ERROR in Socket Creation : $!\n";
-			$socket->send($command);
-			usleep(30000);
-			$socket->recv($response, 2);
-			if($response !~  m/OK/)	{ Log 2,			"LISTENLIVE $name error: $response"; }
-			else 					{ Log $loglevel,	"LISTENLIVE $name response: $response"; }
-			$socket->close();
+			eval {
+				$socket = new IO::Socket::INET (
+					PeerHost => $address,
+					PeerPort => $port,
+						Proto => 'tcp',
+				) or die "ERROR in Socket Creation : $!\n";
+				$socket->send($command);
+				usleep(30000);
+				$socket->recv($response, 2);
+				if($response !~  m/OK/)	{ Log 2,			"LISTENLIVE $name error: $response"; }
+				else 					{ Log $loglevel,	"LISTENLIVE $name response: $response"; }
+				$socket->close();
+			}; warn $@ if $@;
 			$hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
 		}
 
@@ -589,13 +620,13 @@ LISTENLIVE_Undefine($$){
 
 #####################################
 sub HMT350_RCmakenotify($$) {
-	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
+#	my $loglevel = GetLogLevel($name, 3) unless(defined($loglevel));
 	my ($nam, $ndev) = @_;
 	my $nname="notify_$nam";
 	my $cmd = "$nname notify $nam set $ndev rc \$EVENT";
 	my $ret = CommandDefine(undef, $cmd);
-	if($ret)	{ Log 2,			"remotecontrol ERROR $ret"; }
-	else		{ Log $loglevel,	"remotecontrol HMT350: $nname created as notify"; }
+	if($ret)	{ Log 2,	"remotecontrol ERROR $ret"; }
+	else		{ Log 3,	"remotecontrol HMT350: $nname created as notify"; }
 	return "Notify created: $nname";
 }
 
@@ -604,16 +635,16 @@ sub HMT350_RClayout() {
 	my @row;
 	my $rownum = 0;
 
-	$row[$rownum]="power:POWEROFF,:blank,:blank,:blank,mute:MUTE"; $rownum++;
+	$row[$rownum]="power:POWEROFF,:blank,:blank,:blank,MUTE"; $rownum++;
 	$row[$rownum]="home:HOMEsym,:blank,volplus:VOLUP,:blank,:TVout"; $rownum++;
-	$row[$rownum]=":blank,:blank,up:UP,:blank,:blank"; $rownum++;
-	$row[$rownum]="rewind:REWIND,left:LEFT,ok:OK,right:RIGHT,forward:FF"; $rownum++;
-	$row[$rownum]=":blank,:blank,down:DOWN,:blank,:blank"; $rownum++;
-	$row[$rownum]="ret:RETURN,:blank,volmin:VOLDOWN,:blank,stop:STOP"; $rownum++;
+	$row[$rownum]=":blank,:blank,UP,:blank,:blank"; $rownum++;
+	$row[$rownum]="REWIND,LEFT,OK,RIGHT,forward:FF"; $rownum++;
+	$row[$rownum]=":blank,:blank,DOWN,:blank,:blank"; $rownum++;
+	$row[$rownum]="RETURN,:blank,volmin:VOLDOWN,:blank,STOP"; $rownum++;
 	$row[$rownum]=":blank,:blank,:blank,:blank,:blank"; $rownum++;
-	$row[$rownum]="raw+PGUP:PAGEUP,:blank,raw+PAUSE:PAUSE,:blank,raw+ITV:ITV"; $rownum++;
-	$row[$rownum]="raw+PGDN:PAGEDOWN,:blank,raw+MENU:MENU,:blank,raw+IRADIO:IRADIO"; $rownum++;
-	$row[$rownum]=":FAV,:blank,raw+REPEAT:REPEAT,:blank,raw+FMRADIO:FMRADIO"; $rownum++;
+	$row[$rownum]="PAGEUP,:blank,PAUSE,:blank,ITV"; $rownum++;
+	$row[$rownum]="PAGEDOWN,:blank,MENU,:blank,IRADIO"; $rownum++;
+	$row[$rownum]=":FAV,:blank,REPEAT,:blank,FMRADIO"; $rownum++;
 
 	$row[19]="attr rc_iconpath icons/remotecontrol";
 	$row[20]="attr rc_iconprefix black_btn_";
@@ -721,14 +752,11 @@ statusRequest
   </ul>
   <br>
 <br><br>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="LISTENLIVEattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#eventMap">eventMap</a>
-	The attribute eventMap <code>absent:offline present:online</code> is created automagically.</li>
   </ul>
   <br><br>
   <b>Generated Readings/Events:</b><br>
@@ -845,14 +873,12 @@ statusRequest
   </ul>
   <br>
 <br><br>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="LISTENLIVEattr"></a>
   <b>Attribute</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#eventMap">eventMap</a>
-	Die eventMap <code>absent:offline present:online</code> wird bei der Definition des Ger&auml;tes automatisch angelegt.</li>
   </ul>
   <br><br>
   <b>Generierte Readings/Events:</b><br>

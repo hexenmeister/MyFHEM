@@ -55,9 +55,9 @@ my @YahooCodes_en = (
        'scattered snow showers', 'heavy snow', 'partly cloudy', 'thundershowers', 'snow showers', 'isolated thundershowers');
 
 my @YahooCodes_de = (
-       'Tornado', 'schwerer Sturm', 'Sturm', 'schwere Gewitter', 'Gewitter', 'Regen und Schnee',
+       'Tornado', 'schwerer Sturm', 'Orkan', 'schwere Gewitter', 'Gewitter', 'Regen und Schnee',
        'Regen und Graupel', 'Schnee und Graupel', 'Eisregen', 'Nieselregen', 'gefrierender Regen' ,'Schauer',
-       'Schauer', 'Schneetreiben', 'leichter Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
+       'Schauer', 'Schneetreiben', 'leichte Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
        'Graupel', 'Staub', 'Nebel', 'Dunst', 'Smog', 'Sturm',
        'windig', 'kalt', 'wolkig',
        'überwiegend wolkig', # night
@@ -66,8 +66,8 @@ my @YahooCodes_de = (
        'teilweise wolkig', # day
        'klar', # night
        'sonnig',
-       'bewölkt', # night
-       'bewölkt', # day
+       'heiter', # night
+       'heiter', # day
        'Regen und Hagel',
        'heiß', 'einzelne Gewitter', 'vereinzelt Gewitter', 'vereinzelt Gewitter', 'vereinzelt Schauer', 'starker Schneefall',
        'vereinzelt Schneeschauer', 'starker Schneefall', 'teilweise wolkig', 'Gewitterregen', 'Schneeschauer', 'vereinzelt Gewitter');
@@ -76,7 +76,7 @@ my @YahooCodes_nl = (
        'tornado', 'zware storm', 'orkaan', 'hevig onweer', 'onweer',
        'regen en sneeuw',
        'regen en ijzel', 'sneeuw en ijzel', 'aanvriezende motregen',
-       'motregen', 'aanvriezende regen' ,'regenbuien',
+       'motregen', 'aanvriezende regen' ,'buien',
        'buien', 'sneeuw windstoten', 'lichte sneeuwbuien',
        'stuifsneeuw', 'sneeuw', 'hagel',
        'ijzel', 'stof', 'mist', 'waas', 'smog', 'heftig',
@@ -87,8 +87,8 @@ my @YahooCodes_nl = (
        'gedeeltelijk bewolkt', # day
        'helder', #night
        'zonnig',
-       'bewolkt', #night
-       'bewolkt', #day
+       'mooi', #night
+       'mooi', #day
        'regen en hagel',
        'heet', 'plaatselijk onweer', 'af en toe onweer', 'af en toe onweer', 'af en toe regenbuien', 'hevige sneeuwval',
        'af en toe sneeuwbuien', 'hevige sneeuwval', 'deels bewolkt',
@@ -112,12 +112,23 @@ my %wdays_txt_nl = ('Mon' => 'Maa', 'Tue' => 'Din', 'Wed'=> 'Woe', 'Thu' => 'Don
 my @iconlist = (
        'storm', 'storm', 'storm', 'thunderstorm', 'thunderstorm', 'rainsnow',
        'sleet', 'snow', 'drizzle', 'drizzle', 'icy' ,'chance_of_rain',
-       'chance_of_rain', 'snowflurries', 'chance_of_snow', 'heavysnow', 'snow', 'heavyrain',
+       'chance_of_rain', 'snowflurries', 'chance_of_snow', 'heavysnow', 'snow', 'sleet',
        'sleet', 'dust', 'fog', 'haze', 'smoke', 'flurries',
        'windy', 'icy', 'cloudy', 'mostlycloudy_night', 'mostlycloudy', 'partly_cloudy_night',
-       'partly_cloudy', 'clear', 'sunny', 'mostly_clear_night', 'overcast', 'heavyrain',
+       'partly_cloudy', 'clear', 'sunny', 'mostly_clear_night', 'clear', 'heavyrain',
        'clear', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredshowers', 'heavysnow',
        'chance_of_snow', 'heavysnow', 'partly_cloudy', 'heavyrain', 'chance_of_snow', 'scatteredshowers');
+
+###################################
+sub Weather_DebugCodes() {
+
+  Debug "Weather Code List, see http://developer.yahoo.com/weather/#codes";
+  for(my $c= 0; $c<= 47; $c++) {
+    Debug sprintf("%2d %30s %30s %30s %30s", $c, $iconlist[$c], $YahooCodes_en[$c], $YahooCodes_de[$c], $YahooCodes_nl[$c]);
+  }
+
+}
+
 
 #####################################
 sub Weather_Initialize($) {
@@ -128,9 +139,10 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons ".
+  $hash->{AttrList}= "localicons ".
                       $readingFnAttributes;
 
+  #Weather_DebugCodes();                    
 }
 
 ###################################
@@ -165,7 +177,7 @@ sub Weather_UpdateReading($$$$) {
 
   my ($hash,$prefix,$key,$value)= @_;
 
-  #Log 1, "DEBUG WEATHER: $prefix $key $value";
+  #Debug "DEBUG WEATHER: $prefix $key $value";
 
   my $unitsystem= $hash->{READINGS}{unit_system}{VAL};
   
@@ -232,7 +244,7 @@ sub Weather_RetrieveData($)
 
 
   foreach my $l (split("<",$xml)) {
-          #Log 1, "DEBUG WEATHER: line=\"$l\"";
+          #Debug "DEBUG WEATHER: line=\"$l\"";
           next if($l eq "");                   # skip empty lines
           $l =~ s/(\/|\?)?>$//;                # strip off /> and >
           my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
@@ -344,7 +356,7 @@ sub Weather_GetUpdate($)
   my $humidity= $hash->{READINGS}{humidity}{VAL};
   my $wind= $hash->{READINGS}{wind}{VAL};
   my $val= "T: $temperature  H: $humidity  W: $wind";
-  Log GetLogLevel($hash->{NAME},4), "Weather ". $hash->{NAME} . ": $val";
+  Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
   readingsBulkUpdate($hash, "state", $val);
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
       
@@ -466,7 +478,7 @@ WeatherIconIMGTag($) {
 
 #####################################
 sub
-WeatherAsHtml($)
+WeatherAsHtmlV($)
 {
 
   my ($d) = @_;
@@ -476,8 +488,8 @@ WeatherAsHtml($)
 
   my $width= int(ICONSCALE*ICONWIDTH);
       
-  my $ret = sprintf("<table><tr><th width=%d></th><th></th></tr>", $width);
-  $ret .= sprintf('<tr><td width=%d>%s</td><td>%s<br>%s°C  %s%%<br>%s</td></tr>',
+  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th></tr>', $width);
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
         ReadingsVal($d, "condition", ""),
@@ -485,20 +497,85 @@ WeatherAsHtml($)
         ReadingsVal($d, "wind_condition", ""));
 
   for(my $i=1; $i<=5; $i++) {
-    #  Yahoo provides 5 days since June 2013 (previouly 2 days)
-    #next if (ReadingsVal($d, "fc${i}_code", "") eq ""); # MH skip non existent entries
-
-    $ret .= sprintf('<tr><td width=%d>%s</td><td>%s: %s<br>min %s°C max %s°C</td></tr>',
+    $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span></td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")),
         ReadingsVal($d, "fc${i}_day_of_week", ""),
         ReadingsVal($d, "fc${i}_condition", ""),
         ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
   }
-
+      
   $ret .= "</table>";
   return $ret;
 }
+
+sub
+WeatherAsHtml($)
+{
+  my ($d) = @_;
+  WeatherAsHtmlV($d);
+}
+
+sub
+WeatherAsHtmlH($)
+{
+
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a Weather instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+
+  my $width= int(ICONSCALE*ICONWIDTH);
+  
+  
+  
+  my $format= '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
+      
+  my $ret = '<table class="weather">';
+  
+  # icons
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "icon", "")));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherIcon" width=%d>%s</td>', $width, WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", "")));
+  }
+  $ret .= '</tr>';
+  
+  # condition
+  $ret .= sprintf('<tr><td class="weatherDay">%s</td>', ReadingsVal($d, "condition", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherDay">%s: %s</td>', ReadingsVal($d, "fc${i}_day_of_week", ""),
+        ReadingsVal($d, "fc${i}_condition", ""));
+  }
+  $ret .= '</tr>';
+  
+  # temp/hum | min
+  $ret .= sprintf('<tr><td class="weatherMin">%s°C %s%%</td>', ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc${i}_low_c", ""));
+  }
+  $ret .= '</tr>';
+  
+  # wind | max
+  $ret .= sprintf('<tr><td class="weatherMax">%s</td>', ReadingsVal($d, "wind_condition", ""));
+  for(my $i=1; $i<=5; $i++) {
+    $ret .= sprintf('<td class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc${i}_high_c", ""));
+  }
+  $ret .= "</tr></table>";
+
+  return $ret;
+}
+
+sub
+WeatherAsHtmlD($)
+{
+  my ($d) = @_;
+  if($FW_ss) {
+    WeatherAsHtmlV($d);
+  } else {
+    WeatherAsHtmlH($d);
+  }
+}
+
 
 #####################################
 
@@ -542,6 +619,17 @@ WeatherAsHtml($)
       define MyWeather Weather 673513
       define Forecast Weather 673513 1800
      </pre>
+     
+    The module provides four additional functions <code>WeatherAsHtml</code>, <code>WeatherAsHtmlV</code>, <code>WeatherAsHtmlH</code> and
+    <code>WeatherAsHtmlD</code>. The former two functions are identical: they return the HTML code for a
+    vertically arranged weather forecast. The third function returns the HTML code for a horizontally arranged weather forecast. The 
+    latter function dynamically picks the orientation depending on wether a smallscreen style is set (vertical layout) or not (horizontal layout).<br><br>
+    Example:
+    <pre>
+      define MyWeatherWeblink weblink htmlCode { WeatherAsHtmlH("MyWeather") }
+    </pre>
+
+     
   </ul>
   <br>
 
@@ -560,8 +648,8 @@ WeatherAsHtml($)
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
-    Valid readings and their meaning (? can be one of 1, 2 and stands
-    for today, tomorrow):<br>
+    Valid readings and their meaning (? can be one of 1, 2, 3, 4, 5 and stands
+    for today, tomorrow, etc.):<br>
     <table>
     <tr><td>city</td><td>name of town returned for location</td></tr>
     <tr><td>code</td><td>current condition code</td></tr>
