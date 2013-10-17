@@ -34,9 +34,14 @@ my %sets = ( "hmPairForSec" => "HomeMatic"
 my %HMcond = ( 0  =>'ok'
               ,2  =>'Warning-HighLoad'
 			  ,4  =>'ERROR-Overload'
+			  ,252=>'timeout'
 			  ,253=>'disconnected'
 			  ,254=>'Overload-released'
 			  ,255=>'init');
+			  
+#my %HM STATE= (  =>'opened'
+#                 =>'disconnected'
+#			      =>'overload');
 			  
 my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
 
@@ -50,6 +55,7 @@ sub HMLAN_Initialize($) {
   $hash->{WriteFn} = "HMLAN_Write";
   $hash->{ReadyFn} = "HMLAN_Ready";
   $hash->{SetFn}   = "HMLAN_Set";
+  $hash->{NotifyFn}= "HMLAN_Notify";
   $hash->{AttrFn}  = "HMLAN_Attr";
   $hash->{Clients} = ":CUL_HM:";
   my %mc = (
@@ -92,8 +98,6 @@ sub HMLAN_Define($$) {#########################################################
   }
   $attr{$name}{wdTimer} = 25;
   $attr{$name}{hmLanQlen} = "1_min"; #max message queue length in HMLan
-  $attr{$name}{hmMsgLowLimit} = 550; #max msgs to be send per h - 
-                                     #then block low prio messages
 
   no warnings 'numeric';
   $hash->{helper}{q}{hmLanQlen} = int($attr{$name}{hmLanQlen})+0; 
@@ -104,7 +108,7 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
   
-  $hash->{helper}{q}{cap}{$_} = 0 for (0..9);
+  $hash->{helper}{q}{cap}{$_}   = 0 for (0..9);
   $hash->{helper}{q}{cap}{last} = 0;
   $hash->{helper}{q}{cap}{sum}  = 0;  
   HMLAN_UpdtMsgCnt("UpdtMsg:".$name);
@@ -138,7 +142,17 @@ sub HMLAN_RemoveHMPair($) {####################################################
   my $hash = $defs{$name};
   delete($hash->{hmPair});
 }
-sub HMLAN_Attr(@) {#################################
+sub HMLAN_Notify(@) {##########################################################
+  my ($hash,$dev) = @_;
+  return if ($dev->{NAME} ne $hash->{NAME}); # looking for our own connect/disconnect
+  
+  foreach (grep (m/CONNECTED$/,@{$dev->{CHANGED}})) { # connect/disconnect
+    if    ($_ eq "DISCONNECTED") {HMLAN_condUpdate($hash,253);}
+#    elsif ($_ eq "CONNECTED")    {covered by init;}
+  }
+  return;
+}
+sub HMLAN_Attr(@) {############################################################
   my ($cmd,$name, $attrName,$aVal) = @_;
   if   ($attrName eq "wdTimer"){#allow between 5 and 25 second
     return "select wdTimer between 5 and 25 seconds" if ($aVal>25 || $aVal<5);
@@ -188,21 +202,18 @@ sub HMLAN_Attr(@) {#################################
 	return $retVal;
   }
   elsif($attrName eq "hmMsgLowLimit"){
-    if ($cmd eq "del"){
-	  $attr{$name}{hmMsgLowLimit} = 500;# return to default
-	}
-	else{
-	  return "please add plain integer between 100 and 600" 
+    if ($cmd eq "set"){
+	  return "hmMsgLowLimit:please add integer between 10 and 120" 
 	      if (  $aVal !~ m/^(\d+)$/
-		      ||$aVal<100
-			  ||$aVal >300 );
+		      ||$aVal<10
+			  ||$aVal >120 );
       $attr{$name}{hmMsgLowLimit} =$aVal;
 	}
   }
   return;
 }
 
-sub HMLAN_UpdtMsgCnt($) {#################################
+sub HMLAN_UpdtMsgCnt($) {######################################################
   # update HMLAN capacity counter
   # HMLAN will raise high-load after ~610 msgs per hour
   #                  overload with send-stop after 670 msgs
@@ -215,7 +226,7 @@ sub HMLAN_UpdtMsgCnt($) {#################################
   InternalTimer(gettimeofday()+100, "HMLAN_UpdtMsgCnt", "UpdtMsg:".$name, 0);
   return;
 }
-sub HMLAN_UpdtMsgLoad($$) {#################################
+sub HMLAN_UpdtMsgLoad($$) {####################################################
   my($name,$incr) = @_;
   my $hash = $defs{$name};
   my $hCap = $hash->{helper}{q}{cap};
@@ -232,16 +243,16 @@ sub HMLAN_UpdtMsgLoad($$) {#################################
 						 ."000001")
       if (ReadingsVal($name,"cond","") eq 'Warning-HighLoad');
   }
-  $hCap->{$hCap->{last}}++  if ($incr);
-
+  $hCap->{$hCap->{last}}+=$incr  if ($incr);
   my @tl;
   $hCap->{sum} = 0;
   for (($t-5)..$t){# we have 6 slices
-    push @tl,$hCap->{$_%6};
+    push @tl,int($hCap->{$_%6}/16.8);
 	$hCap->{sum} += $hCap->{$_%6}; # need to recalc incase a slice was removed
   }
 	  
-  $hash->{msgLoad} = " total 1h:".$hCap->{sum}." recentSteps: ".join("/",reverse @tl);
+  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/16.8)."% 10min steps: ".join("/",reverse @tl);
+#testing only           ." :".$hCap->{sum}
   return;
 }
 
@@ -438,7 +449,7 @@ sub HMLAN_Parse($$) {##########################################################
                                    .' '.$p;
 								  
     # handle status. 
-	#HMcond stat
+	#HMcnd stat
 	#    00 00= msg without relation
 	#    00 01= ack that HMLAN waited for
 	#    00 02= msg send, no ack requested
@@ -458,7 +469,8 @@ sub HMLAN_Parse($$) {##########################################################
 	#  Cond text
 	#     0 ok
 	#     2 Warning-HighLoad
-	# 
+	#     4 Overload condition - no send anymore
+	#
     my $stat = hex($mFld[1]);
     my $HMcnd =$stat >>8; #high = HMLAN cond
 	$stat &= 0xff;        # low byte related to message format
@@ -473,6 +485,20 @@ sub HMLAN_Parse($$) {##########################################################
 	  if    ($stat & 0x03 && $dst eq $attr{$name}{hmId}){HMLAN_qResp($hash,$src,0);}
 	  elsif ($stat & 0x08 && $src eq $attr{$name}{hmId}){HMLAN_qResp($hash,$dst,0);}
 	  
+#	  HMLAN_UpdtMsgLoad($name,(($stat & 0x09)?(($stat & 0x08)?2 #2 repetitions
+#	                                                         :1)#one ack
+#	                                         :0)                #no ack
+#							  *((hex($flg)&0x10)?17             #burst=17units
+#							                    :1));           #ACK=1 unit
+#	  HMLAN_UpdtMsgLoad($name,(($stat & 0x08)?2       #2 repetitions
+#	                                         :0)      #one ack
+#							  *((hex($flg)&0x10)?17   #burst=17units
+#							                    :1)); #ACK=1 unit
+	  HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?34   #burst=17units *2
+							                   :2))  #ACK=1 unit *2
+		  if (($stat & 0x48) == 8);# reject - but not from repeater
+
+	  
 	  $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
       if ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
 	    Log $ll5, "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
@@ -484,6 +510,12 @@ sub HMLAN_Parse($$) {##########################################################
 	  }elsif (($stat & 0x70) == 0x40){;#$CULinfo = "???";
 	  }	  
     }
+	else{
+	  HMLAN_UpdtMsgLoad($name,1)
+	        if (   $letter eq "E" 
+	            && (hex($flg)&0x60) == 0x20 # ack but not from repeater
+	            && $dst eq $attr{$name}{hmId});
+	}
 
     my $rssi = hex($mFld[4])-65536;
      #update some User information ------
@@ -514,7 +546,7 @@ sub HMLAN_Parse($$) {##########################################################
 
 	# HMLAN sends ACK for flag 'A0' but not for 'A4'(config mode)- 
 	# we ack ourself an long as logic is uncertain - also possible is 'A6' for RHS
-	if (hex($flg)&0x4){#not sure: 4 oder 2 ? 
+	if (hex($flg)&0x2){#not sure: 4 oder 2 ? 02 works for VD!
 	  my $wait = 0.100 - $dly/1000;
 	  $hash->{helper}{$src}{nextSend} = gettimeofday() + $wait if ($wait > 0);
 	}
@@ -572,7 +604,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
 
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
-  HMLAN_condUpdate($hash,253) if ($hash->{STATE} eq "disconnected");#closed?
   
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
@@ -586,7 +617,10 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  return if ($HMcnd == 4 || $HMcnd == 253);# no send if overload or disconnect
     }
 
-    my ($src,$dst) = (substr($msg,40,6),substr($msg,46,6));
+    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(..)(..)(.{6})(.{6})(.*)/;
+	my ($s,$stat,$t,$d,$r,$no,$flg,$typ,$src,$dst,$p) = 
+	   ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+
 	my $hmId = $attr{$name}{hmId};
 	my $hDst = $hash->{helper}{$dst};# shortcut
 	my $tn = gettimeofday();
@@ -604,7 +638,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	    return;
 	  }
 	  if ($src eq $hmId){
-	    $hDst->{flg} = (hex(substr($msg,36,2))&0x20)?1:0;# answer expected?
+	    $hDst->{flg} = (hex($flg)&0x20)?1:0;# answer expected?
         $hDst->{to} = $tn + 2;# flag timeout after 2 sec
 	    $hDst->{msg} = "";
 		HMLAN_qResp($hash,$dst,1) if ($hDst->{flg} == 1);
@@ -619,19 +653,18 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 	  }
 	  $hDst->{chn} = $chn;
 	} 
-    $msg =~ m/(.{9}).(..).(.{8}).(..).(.{8}).(..)(....)(.{6})(.{6})(.*)/;
-	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$1
-                             .' stat:  ' .$2
-                             .' t:'      .$3
-                             .' d:'      .$4
-                             .' r:'      .$5 
-                             .' m:'      .$6
-                             .' '        .$7 
-                             .' '        .$8
-                             .' '        .$9
-                             .' '        .$10;
+	Log $ll5, 'HMLAN_Send:  '.$name.' S:'.$s
+                             .' stat:  ' .$stat
+                             .' t:'      .$t
+                             .' d:'      .$d
+                             .' r:'      .$r 
+                             .' m:'      .$no
+                             .' '        .$flg.$typ
+                             .' '        .$src
+                             .' '        .$dst
+                             .' '        .$p;
 
-    HMLAN_UpdtMsgLoad($name,1);
+    HMLAN_UpdtMsgLoad($name,(hex($flg)&0x10)?17:1);#burst counts 
   }
   else{
     Log $ll5, 'HMLAN_Send:  '.$name.' I:'.$msg; 
@@ -700,8 +733,8 @@ sub HMLAN_KeepAliveCheck($) {##################################################
   my $hash = $defs{$name};
   if ($hash->{helper}{q}{keepAliveRec} != 1){# no answer
     if ($hash->{helper}{q}{keepAliveRpt} >2){# give up here
+	  HMLAN_condUpdate($hash,252);# trigger timeout event
       DevIo_Disconnected($hash);
-	  HMLAN_condUpdate($hash,253);
     }
     else{
       $hash->{helper}{q}{keepAliveRpt}++;
@@ -847,13 +880,14 @@ sub HMLAN_condUpdate($$) {#####################################################
 		<li><a href="#loglevel">loglevel</a></li><br>
 		<li><a href="#addvaltrigger">addvaltrigger</a></li><br>
 		<li><a href="#hmMsgLowLimit">hmMsgLowLimit</a><br>
-		    max number of messages allowed per hour before low-level message queue
-			will be postponed. <br>
-			HMLAN will allow a max of about 670 msgs per hour, then it will block sending.
-			After 610 messages the low-priority queue (currently only CUL_HM autoReadReg)
-			will be postponed anyway until the condition is cleared. <br>
-			The counting of messages can be observed in msgLoad of HMLAN. It is updated every 10 min.
-			Besides the hourly sum the six 10min counter are displayed. 		
+		    max messages level of HMLAN allowed for low-level message queue
+			to be executed. Above this level processing will be postponed.<br>
+			HMLAN will allow a max of messages per hour, it will block sending otherwise.
+			After about 90% messages the low-priority queue (currently only CUL_HM autoReadReg)
+			will be delayed until the condition is cleared. <br>
+			hmMsgLowLimit allowes to reduce this level further.<br>
+			Note that HMLAN transmitt-level calculation is based on some estimations and 
+            has some tolerance. <br>
 		    </li><br>
 		<li><a href="#hmId">hmId</a></li><br>
 		<li><a href="#hmKey">hmKey</a></li><br>

@@ -80,7 +80,7 @@ my %culHmModel=(
   "001C" => {name=>"HM-RC-SEC3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",},
   "001D" => {name=>"HM-RC-KEY3"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",},
   "001E" => {name=>"HM-RC-KEY3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",},
-  "001F" => {name=>"KS888"                   ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
+  "001F" => {name=>"KS888"                   ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
   "0022" => {name=>"WS888"                   ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0026" => {name=>"HM-SEC-KEY-S"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
   "0027" => {name=>"HM-SEC-KEY-O"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
@@ -95,7 +95,7 @@ my %culHmModel=(
   "0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
   "0031" => {name=>"HM-WS550LCB"             ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",},
   "0032" => {name=>"HM-WS550LCW"             ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",},
-  "0033" => {name=>"KS550LC"                 ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
+  "0033" => {name=>"KS550LC"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
   "0034" => {name=>"HM-PBI-4-FM"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}, # HM Push Button Interface
   "0035" => {name=>"HM-PB-4-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0036" => {name=>"HM-PB-2-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",},
@@ -112,8 +112,8 @@ my %culHmModel=(
   "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",},
   "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
-  "0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"",},
-  "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'      ,lst=>'p'            ,chn=>"",},
+  "0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,4'          ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'28:00' ,rxt=>'b'      ,lst=>'p'            ,chn=>"",},
   "0043" => {name=>"HM-SEC-TIS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
   "0044" => {name=>"HM-SEN-EP"               ,st=>'sensor'            ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
   "0045" => {name=>"HM-SEC-WDS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
@@ -121,7 +121,7 @@ my %culHmModel=(
   "0047" => {name=>"KFM-Sensor"              ,st=>'KFM100'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "0049" => {name=>"KFM-Display"             ,st=>'KFM100'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
-  "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
+  "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "004B" => {name=>"HM-Sec-Cen"              ,st=>'AlarmControl'      ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "004C" => {name=>"HM-RC-12-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "004D" => {name=>"HM-RC-19-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
@@ -388,11 +388,11 @@ my %culHmRegDefine = (
 #un-identified List0
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
-# CC-RT 02:01 16:00
+# CC-RT    02:01 16:00
 # SEC-WDS  02:01 16:01(sabotage) ?
 # HM-SEC-MDIR  02:01 ?
 # SEC-SC   02:00 ?
-# Blind     9:00 10:00 20:00
+# Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
 #Keymatic 3.3 unknown, seen 1 here
@@ -696,7 +696,7 @@ my %culHmRegModel = (
 		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1	
                       },
 
-  "HM-CC-VD"        =>{burstRx         =>1,valveOffset     =>1,valveErrorPos   =>1},
+  "HM-CC-VD"        =>{valveOffset     =>1,valveErrorPos   =>1},
   "HM-CC-TC"        =>{burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"     =>{btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1,
                        cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,
@@ -897,7 +897,7 @@ my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
-  regSet        => "<regName> <value> ... [<peerChannel>]",
+  regSet        => "<regName> [prep|exec] <value> ... [<peerChannel>]",
   clear         => "[readings|register|rssi|msgEvents]",
 );
 my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1005,23 +1005,24 @@ $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 my %culHmModelSets = (# channels of this subtype-------------
-  "HM-CC-VD"       =>{ valvePos     => "position"},
-  "HM-RC-19"       =>{ service      => "<count>"
-		              ,alarm        => "<count>"
-		              ,display      => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"  =>{ text         => "<txt1> <txt2>..."
-                        #text       => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
-				     },
-  "HM-OU-LED16"    =>{ led          => "[off|red|green|orange]"
-		              ,ilum         => "[0-15] [0-127]"},
-  "HM-OU-CFM-PL"   =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-		              ,on            =>""
-					  ,off           =>""
-					  ,toggle        =>""
-					  ,press         =>"[long|short] [on|off] ..."
-					  ,inhibit       =>"[on|off]"},
-  "HM-CC-TC"       =>{ statusRequest =>""},
+  "HM-CC-VD"       =>{ valvePos       => "position"},
+  "HM-RC-19"       =>{ service        => "<count>"
+		              ,alarm          => "<count>"
+		              ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"  =>{ text           => "<txt1> <txt2>..."
+                        #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
+				     },               
+  "HM-OU-LED16"    =>{ led            => "[off|red|green|orange]"
+		              ,ilum           => "[0-15] [0-127]"},
+  "HM-OU-CFM-PL"   =>{ "on-for-timer" =>"<sec>"
+                      ,"on-till"      =>"<time>"
+		              ,on             =>""
+					  ,off            =>""
+					  ,toggle         =>""
+					  ,press          =>"[long|short] [on|off] ..."
+					  ,inhibit        =>"[on|off]"},
+  "HM-CC-TC"       =>{ burstXmit      =>""},
+  "HM-CC-RT-DN"    =>{ burstXmit      =>""},
 );
 # clones- - - - - - - - - - - - - - - - - 
 $culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
@@ -1031,22 +1032,24 @@ $culHmModelSets{"HM-OU-CM-PCB"} = $culHmModelSets{"HM-OU-CFM-PL"};
 
 my %culHmChanSets = (
   "HM-CC-TC00"     =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                      ,statusRequest  =>""
                       ,sysTime        =>""	  
 					  ,getSerial      => ""},
   "HM-CC-TC02"     =>{ peerChan       =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"
                       ,"desired-temp" =>"[on|off|6.0..30.0]" 
-                      ,tempListSat    =>"HH:MM temp ..."
-                      ,tempListSun    =>"HH:MM temp ..."
-                      ,tempListMon    =>"HH:MM temp ..."
-                      ,tempListTue    =>"HH:MM temp ..."
-                      ,tempListThu    =>"HH:MM temp ..."
-                      ,tempListWed    =>"HH:MM temp ..."
-                      ,tempListFri    =>"HH:MM temp ..."
-                      ,partyMode      =>"HH:MM durationDays"
+                      ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                      ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                      ,partyMode      =>"[prep|exec] HH:MM durationDays"
                       ,displayMode    =>"[temp-only|temp-hum]"
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
                       ,controlMode    =>"[auto|manual|central|party]"
+                      ,statusRequest  =>""
                       ,sysTime        =>""	  },
   "HM-SEC-WIN01"   =>{ stop           =>"",
                        level          =>"<level> <relockDly> <speed>..."},
