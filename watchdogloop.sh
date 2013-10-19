@@ -27,7 +27,7 @@ logName=watchdog
 activeLogName=NN_TE_DMST01.Server_Heartbeat
 
 # Grenzwert (Sekunden der Inaktivitaet)
-maxTime=270;
+maxTime=300;
 
 # Pruefintervall
 pollTime=60;
