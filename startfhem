@@ -14,7 +14,7 @@ cd $home
 #  fi
 #fi
 
-sudo -u fhem ./runwatchdog.sh
+sudo -u fhem ./runwatchdog.sh 2>>log/watchdog_err.log
 
 
 #cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
@@ -28,6 +28,6 @@ sudo -u fhem ./runwatchdog.sh
 #  RETVAL=0
 #fi
 
-sudo -u fhem ./runfhem.sh
+sudo -u fhem ./runfhem.sh 2>>log/watchdog_err.log
 
 return $RETVAL
