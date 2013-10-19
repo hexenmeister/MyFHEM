@@ -378,6 +378,21 @@ refreshMyAtCmds() {
   }
 }
 
+sub
+sendRLStatusRequest() {
+	Log 5, "Zustandsanfrage an alle Rollos";
+	# Alle FHEM-Devices durchgehen
+	foreach my $d (keys %defs) {
+	  my $name = $defs{$d}{NAME};
+    my $type = $defs{$d}{TYPE};
+    # Nur Geraete aussuchen, die ein  Attribut 'model' mit dem Wert 'HM-LC-Bl1PBU-FM' haben und vom Typ 'CUL_HM' sind.
+    if(AttrVal($name, 'model', '-') eq 'HM-LC-Bl1PBU-FM' && $type eq 'CUL_HM') {      
+      Log 5, "Zustandsanfrage an: $name";
+      fhem("set $name statusRequest");
+    }
+	}
+}
+
 #sub
 #myTest() {
 #	Log 3, "---: Test";
@@ -464,7 +479,10 @@ notGreaterThen($$;@)
   my $wndOpen = 0; # wird auf 1 gesetzt, wenn min 1 Fensterkontakt 'offen' meldet
   my $desiredValueWhenOpened = 90; # wenn offen, wird dieser Wert statt den gewünschten verwendet (bei 100 wäre keine Änderung duchgeführt)
   
+  fhem "set $device statusRequest"; # TEST!
+  
   foreach my $wndDevice (@wndDeviceList) {
+  	fhem "set $wndDevice statusRequest"; # TEST!
   	my $wdValue = Value($wndDevice);
   	$wdValue = lc($wdValue);
     if($wdValue ne 'closed') { $wndOpen=1; }
@@ -501,7 +519,10 @@ notLesserThen($$;@)
   my $wndOpen = 0; # wird auf 1 gesetzt, wenn min 1 Fensterkontakt 'offen' meldet
   my $desiredValueWhenOpened = 20; # wenn offen, wird dieser Wert statt den gewünschten verwendet (bei 0 wäre keine Änderung duchgeführt)
   
+  fhem "set $device statusRequest"; # TEST!
+  
   foreach my $wndDevice (@wndDeviceList) {
+  	fhem "set $wndDevice statusRequest"; # TEST!
   	my $wdValue = Value($wndDevice);
   	$wdValue = lc($wdValue);
     if($wdValue ne 'closed') { $wndOpen=1; }
