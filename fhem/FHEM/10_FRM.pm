@@ -372,6 +372,16 @@ FRM_Init_Pin_Client($$$) {
 	my $u = "wrong syntax: define <name> FRM_XXX pin";
   	return $u unless defined $args and int(@$args) > 0;
  	my $pin = @$args[0];
+ 	
+    foreach my $d ( sort keys %main::defs ) {
+      if ( defined( $main::defs{$d} )
+        && defined( $main::defs{$d}{IODev} )
+        && defined( $main::defs{$d}{PIN} )
+        && $main::defs{$d}{IODev} == $hash->{IODev}
+        && $main::defs{$d}{PIN} == $pin ) {
+      	die "Device $main::defs{$d}{NAME} allready defined for pin $pin";
+      }
+    }
   	$hash->{PIN} = $pin;
   eval {
     FRM_Client_FirmataDevice($hash)->pin_mode($pin,$mode);
@@ -393,15 +403,29 @@ FRM_Client_Define($$)
   $hash->{STATE}="defined";
   
   AssignIoPort($hash);
-  FRM_Init_Client($hash,[@a[2..scalar(@a)-1]]);
-    
-  return undef;
+  eval {
+    FRM_Init_Client($hash,[@a[2..scalar(@a)-1]]);
+  };
+  return $@;
 }
 
 sub
 FRM_Client_Undef($$)
 {
   my ($hash, $name) = @_;
+  my $pin = $hash->{PIN};
+  eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    $firmata->pin_mode($pin,PIN_ANALOG);
+  };
+  if ($@) {
+    eval {
+      my $firmata = FRM_Client_FirmataDevice($hash);
+      $firmata->pin_mode($pin,PIN_INPUT);
+      $firmata->digital_write($pin,0);
+    };
+  }
+  return undef;
 }
 
 sub
