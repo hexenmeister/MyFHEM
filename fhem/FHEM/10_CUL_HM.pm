@@ -249,6 +249,10 @@ sub CUL_HM_updateConfig($){
 	  $hash->{helper}{role}{vrt} = 1;
 	}
 
+    if ( $hash->{helper}{role}{dev} && CUL_HM_getRxType($hash)&0x02){#burst dev
+	  #burst devices must restrict retries!
+	  $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
+	}
 	# -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
@@ -500,7 +504,6 @@ sub CUL_HM_Parse($$) {##############################
 
   return "" if(  ($msgStat && $msgStat eq 'NACK')# lowlevel error
                ||($src eq $id));                 # mirrored messages
-  
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
@@ -987,6 +990,7 @@ sub CUL_HM_Parse($$) {##############################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($mTp eq "10" && $p =~ m/^06/))	{ #    or Info_Status message here
 
+	  my $rSUpdt = 0;# require status update
       my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4)) 
  	                     if($p =~ m/^(..)(..)(..)(..)/);
 	  $chn = sprintf("%02X",$chn&0x3f);
@@ -1014,8 +1018,9 @@ sub CUL_HM_Parse($$) {##############################
 			push @event,"phyLevel:$pl %";      #phys level 
 			$physLvl = $pl." %";
 		  }
-		  else{                                #invalid PhysLevel   
-		    CUL_HM_stateUpdatDly($name,3);     # update for device!
+		  else{                                #invalid PhysLevel
+            $rSUpdt = 1;		  
+		    CUL_HM_stateUpdatDly($shash->{NAME},3);     # update to get level
 		  }
 		}
 	  }
@@ -1038,7 +1043,11 @@ sub CUL_HM_Parse($$) {##############################
         push @event, "$eventName:up:$vs"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$vs" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$vs" if(($err&0x30) == 0x00);
-		CUL_HM_stateUpdatDly($name,120)    if(($err&0x30) != 0x00);
+		if (!$rSUpdt){#dont touch if necessary for dimmer
+		  if(($err&0x30) != 0x00) {CUL_HM_stateUpdatDly($shash->{NAME},120);}
+		  else                    {CUL_HM_unQEntity($shash->{NAME},
+		                                  $modules{CUL_HM}{helper}{qReqStat});}
+		}
 	  }
 	  if ($st eq "dimmer"){
         push @event,"overload:".(($err&0x02)?"on":"off");
@@ -1589,6 +1598,15 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  $reply = "ACK"; 
 	}
 
+    if (     $shash->{helper}{prt}{mmcA} 
+	    && @{$shash->{helper}{prt}{mmcA}}
+		&&   $shash->{helper}{prt}{mmcS} == 3){
+	  if ($success eq 'yes'){
+		delete $shash->{helper}{prt}{mmcA};
+		delete $shash->{helper}{prt}{mmcS};
+	  }
+	};
+	
 	if($success){#do we have a final ack?
       #mark timing on the channel, not the device
       my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
@@ -1647,12 +1665,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my $chn = $shash->{helper}{prt}{rspWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
 		$chnhash = $shash if (!$chnhash);
-	    my $chnNname = $chnhash->{NAME};
+	    my $chnName = $chnhash->{NAME};
 	    my (undef,@peers) = unpack 'A2(A8)*',$p;
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
 	    $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
-		
-    	CUL_HM_ID2PeerList ($chnNname,$_,1) foreach (@peers);
+
+    	CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
 		if (grep /00000000/,@peers) {# last entry, peerList is complete
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
@@ -1660,8 +1678,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 		    my $flag = CUL_HM_getFlag($shash);
 		    my $id = CUL_HM_IOid($shash);
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
-		    my @peerID = split(",",($attr{$chnNname}{peerIDs}?
-			                        $attr{$chnNname}{peerIDs}:""));
+		    my @peerID = split(",",($attr{$chnName}{peerIDs}?
+			                        $attr{$chnName}{peerIDs}:""));
 		    foreach my $peer (grep (!/00000000/,@peerID)){
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
@@ -1673,6 +1691,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_respPendRm($shash);	  
 		  delete $chnhash->{helper}{getCfgList};
 		  delete $chnhash->{helper}{getCfgListNo};
+          CUL_HM_rmOldRegs($chnName);	  
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
@@ -1931,11 +1950,11 @@ sub CUL_HM_Get($@) {
 		}
 	  }
 	  my $addInfo = "";
-	  $addInfo = CUL_HM_TCtempReadings($hash)
-	        if ($md eq "HM-CC-TC" && $chn eq "02");
-		
-      $addInfo = CUL_HM_repReadings($hash) if ($md eq "HM-Sys-sRP-Pl");
-	
+	  if    ($md eq "HM-CC-TC"     && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
+      elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_RTtempReadings($hash)}
+      elsif ($md eq "HM-PB-4DIS-WM")               {$addInfo = CUL_HM_4DisText($hash)}
+	  elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
+
 	  return $name." type:".$st." - \n".
 	         $regHeader.join("",sort(@regValList)).
 			 $addInfo;
@@ -2222,6 +2241,8 @@ sub CUL_HM_Set($@) {
 	  delete $hash->{EVENTS};
 	  delete $hash->{helper}{prt}{rspWait};
 	  delete $hash->{helper}{prt}{rspWaitSec};
+	  delete $hash->{helper}{prt}{mmcA};
+	  delete $hash->{helper}{prt}{mmcS};
 	  #rescue "protLastRcv" for action detector. 
 	  my $protLastRcv = $hash->{protLastRcv} if ($hash->{protLastRcv});
       delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
@@ -2353,7 +2374,7 @@ sub CUL_HM_Set($@) {
 	}
   } 
   elsif($cmd eq "regSet") { ############################################### reg
-    #set <name> regSet <regName> [prep] <value> [<peerChn>] 
+    #set <name> regSet [prep] <regName>  <value> [<peerChn>] 
 	#prep is internal use only. It allowes to prepare shadowReg only but supress
 	#writing. Application necessarily needs to execute writing subsequent.
 	my $prep = "";
@@ -3086,6 +3107,8 @@ sub CUL_HM_Set($@) {
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
+		CUL_HM_pushConfig($peerHash,$id,$peerDst,0,0,0,0,"0101")#set burstRx
+				   if(CUL_HM_getRxType($peerHash) & 0x80);      #if conBurst
 		CUL_HM_qAutoRead($peerHash->{NAME},3);
 	  }
 	}
@@ -3459,6 +3482,33 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 	}
   }
 
+  my $mmcS = $hash->{helper}{prt}{mmcS}?$hash->{helper}{prt}{mmcS}:0;
+  if ($mTp eq '01'){
+    my ($chn,$sTp) = unpack 'A2A2',$p;
+	my $oCmd = "++".substr($cmd,6);
+	if    ($sTp eq "05"){
+	  my @arr = ($oCmd);
+	  $hash->{helper}{prt}{mmcA}=\@arr;
+	  $hash->{helper}{prt}{mmcS} = 1;
+	}
+	elsif ($sTp =~ m/(07|08)/ && ($mmcS == 1||$mmcS == 2)){
+	  push @{$hash->{helper}{prt}{mmcA}},$oCmd;
+	  $hash->{helper}{prt}{mmcS} = 2;
+	}
+	elsif ($sTp eq "06" && ($mmcS == 2)){
+	  push @{$hash->{helper}{prt}{mmcA}},$oCmd;
+	  $hash->{helper}{prt}{mmcS} = 3;
+	}
+    elsif ($mmcS){ #
+	  delete $hash->{helper}{prt}{mmcA};
+	  delete $hash->{helper}{prt}{mmcS};
+    }
+  }
+  elsif($mmcS){
+    delete $hash->{helper}{prt}{mmcA};
+	delete $hash->{helper}{prt}{mmcS};
+  }
+  
   if($hash->{cmdStack} && scalar @{$hash->{cmdStack}}){
     $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
   }
@@ -3579,7 +3629,7 @@ sub CUL_HM_respPendTout($) {
   (undef,$HMid) = split(":",$HMid,2); 
   my $hash = $modules{CUL_HM}{defptr}{$HMid}; 
   my $pHash = $hash->{helper}{prt};#shortcut
-  if ($hash && $hash->{DEF} ne '000000'){
+  if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
@@ -3593,7 +3643,14 @@ sub CUL_HM_respPendTout($) {
 	}
 	elsif ($pHash->{rspWait}{reSent} > AttrVal($hash->{NAME},"msgRepeat",3) # too much
 	     ||((CUL_HM_getRxType($hash) & 0x83) == 0)){                        #to slow
-	  if ($hash->{IODev}->{STATE} ne "opened"){
+	  if ($pHash->{mmcA}){
+	    #shall we re-insert commands?
+		#unshift  @{$hash->{cmdStack}},@{$pHash->{mmcA}};
+		delete $pHash->{mmcA};
+		delete $pHash->{mmcS};
+	  }
+
+	  if ($hash->{IODev}->{STATE} ne "opened"){#IO errors
         CUL_HM_eventP($hash,"IOerr");
 		readingsSingleUpdate($hash,"state","IOerr",1);
 	  }
@@ -3606,7 +3663,7 @@ sub CUL_HM_respPendTout($) {
 	  }	  
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands if any
 	}
-	else{
+	else{# manage retries
 	  if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
 		#timeout while conditional burst was active. try re-wakeup
         $pHash->{rspWait}{reSent}++;
@@ -3649,7 +3706,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
   if ($evntType =~ m/(Nack|ResndFail|IOerr)/){# unrecoverable Error
     $hash->{helper}{prt}{bErr}++;
     $nAttr->{protCmdDel}++;
-    if (  (CUL_HM_getRxType($hash) & 0x03) == 0 #to slow for wakeup and config
+    if (  (CUL_HM_getRxType($hash) & 0x01) == 0 #to slow for wakeup and config
+	                                            #no retry for burst either
 	    || $evntType eq "IOerr"){               #IO problem
       $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
       $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} 
@@ -4024,10 +4082,10 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
                       substr($hash->{DEF},6,2) eq "02");
   }
-  if ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
+  elsif ($md =~ m/HM-CC-RT-DN/){#handle temperature readings
     CUL_HM_RTtempReadings($hash)  if ($list == 7);
   }
-  if ($md eq "HM-PB-4DIS-WM"){#add text
+  elsif ($md eq "HM-PB-4DIS-WM"){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
@@ -4035,6 +4093,24 @@ sub CUL_HM_updtRegDisp($$$) {
   }
 #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 }
+sub CUL_HM_rmOldRegs($){ # remove register i outdated
+  #will remove register for deleted peers
+  my $name = shift;
+  my $hash = $defs{$name};
+  return if (!$hash->{peerList});# so far only peer-regs are removed
+  my @pList = split",",$hash->{peerList};
+  my @rpList;
+  foreach(grep /^R-(.*)-/,keys %{$hash->{READINGS}}){
+    push @rpList,$1 if ($_ =~m /^R-(.*)-/);
+  }
+  @rpList = CUL_HM_noDup(@rpList);
+  return if (!@rpList);
+  foreach my $peer(@rpList){
+	next if($hash->{peerList} =~ m /\b$peer\b/);
+	delete $hash->{READINGS}{$_} foreach (grep /^R-$peer-/,keys %{$hash->{READINGS}})
+  }
+}
+
 #############################
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
@@ -4207,7 +4283,7 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
-sub CUL_HM_4DisText($) {# convert text for 4dis
+sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text1: start at 54 (0x36) length 12 (0x0c)
   #text2: start at 70 (0x46) length 12 (0x0c)
   my ($hash)=@_;
@@ -4363,7 +4439,7 @@ sub CUL_HM_RTtempReadings($) {# parse RT temperature readings
 		"R-winOpnDetFall:".ReadingsVal($name,"R-winOpnDetFall"  ,"unknown"),);
   return $setting;
 }
-sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
+sub CUL_HM_repReadings($) {   # parse repeater 
   my ($hash)=@_;
   my %pCnt;
   my $cnt = 0;
@@ -4682,7 +4758,7 @@ sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
 sub CUL_HM_stateUpdat($){#delay timeout - now queue statusRequest
   my $name = shift;
   (undef,$name)=split":",$name,2;
-  CUL_HM_qStateUpdatIfEnab($name,1) if ($name);
+  CUL_HM_qStateUpdatIfEnab($name) if ($name);
 }
 sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request after 12 s
    my ($name,$force) = @_;
@@ -5168,7 +5244,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
 	 set myblind regBulk 01 0C:00<br>
 	 </code></ul>
 	 myblind will set the max drive time up for a blind actor to 25,6sec</li>
-     <li><B>regSet &lt;regName&gt; [prep|exec] &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
+     <li><B>regSet [prep|exec] &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
         For some major register a readable version is implemented supporting
         register names &lt;regName&gt; and value conversionsing. Only a subset
         of register can be supproted.<br>

@@ -742,7 +742,14 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
       readingsBulkUpdate($shash, ".weekProfile", $args[13]);
     } else {
-      readingsBulkUpdate($shash, ".weekProfile", $args[4]);
+      #With firmware 18 (opposed to firmware 16), the WallThermostat sends 3 more bytes (6 more hex)
+      my ($weekProfile, $unknownBytes) = $args[4] =~ m/^(.{364})(.*)$/;
+      readingsBulkUpdate($shash, ".weekProfile", $weekProfile);
+      #We still have to find out what $unknownBytes mean, so hopefully
+      #we can observe some other values
+      if($unknownBytes ne "071830" and $unknownBytes ne "") {
+        Log GetLogLevel($shash->{NAME}, 2), "While parsing weekProfile of WallThermostat: Additional bytes $unknownBytes differ from 071830. Please report to http://forum.fhem.de/index.php?topic=15567";
+      }
     }
 
    MAX_ParseWeekProfile($shash);
@@ -878,7 +885,7 @@ MAX_Parse($$)
     <li>comfortTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given comfort temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>measurementOffset &lt;value&gt;<br>
-      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. The thermostat tries to match desiredTemperature to (temperature = measured temperature at sensor + measurementOffset). Usually, the measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree celsius.</li>
+      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. If the internal temperature sensor is not well calibrated, it may produce a systematic error. Using measurementOffset, this error can be compensated. The reading temperature is equal to the measured temperature at sensor + measurementOffset. Usually, the internally measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree celsius.</li>
     <li>minimumTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given minimum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
     <li>maximumTemperature &lt;value&gt;<br>
@@ -904,6 +911,7 @@ MAX_Parse($$)
     <li>associate &lt;value&gt;<br>
         Associated one device to another. &lt;value&gt; can be the name of MAX device or its 6-digit hex address.<br>
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened. The thermostat must be associated to the ShutterContact, too, to accept those messages.
+        <b>!Attention: After sending this associate command to the ShutterContact, you have to press the button on the ShutterContact to wake it up and accept the command. See the log for a message regarding this!</b>
         Associating HeatingThermostat and WallMountedThermostat makes them sync their desiredTemperature and uses the measured temperature of the
  WallMountedThermostat for control.</li>
     <li>deassociate &lt;value&gt;<br>

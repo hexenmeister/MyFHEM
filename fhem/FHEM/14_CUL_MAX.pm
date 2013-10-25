@@ -15,7 +15,7 @@ sub CUL_MAX_Set($@);
 sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_GetTimeInformationPayload();
 sub CUL_MAX_Send(@);
-sub CUL_MAX_SendQueueHandler($);
+sub CUL_MAX_SendQueueHandler($$);
 
 my $pairmodeDuration = 60; #seconds
 
@@ -40,6 +40,8 @@ CUL_MAX_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                         "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                         $readingFnAttributes;
+
+  $hash->{sendQueue} = [];
 }
 
 #############################
@@ -274,13 +276,18 @@ CUL_MAX_Parse($$)
 
       return $shash->{NAME} if(!@{$shash->{sendQueue}}); #we are not waiting for any Ack
 
-      my $packet = $shash->{sendQueue}[0];
-      if($packet->{src} eq $dst and $packet->{dst} eq $src and $packet->{cnt} == hex($msgcnt)) {
-        Log $ll5, "Got matching ack";
-        my $isnak = unpack("C",pack("H*",$payload)) & 0x80;
-        $packet->{sent} = $isnak ? 3 : 2;
-        return $shash->{NAME};
+      for my $i (0 .. $#{$shash->{sendQueue}}) {
+        my $packet = $shash->{sendQueue}[$i];
+        if($packet->{src} eq $dst and $packet->{dst} eq $src and $packet->{cnt} == hex($msgcnt)) {
+          Log $ll5, "Got matching ack";
+          my $isnak = unpack("C",pack("H*",$payload)) & 0x80;
+          $packet->{sent} = $isnak ? 3 : 2;
+        }
       }
+      #Handle outgoing messages to that ShutterContact. It is only awake shortly
+      #after sending an Ack to a PairPong
+      CUL_MAX_SendQueueHandler($shash, $src) if($modules{MAX}{defptr}{$src}{type} eq "ShutterContact");
+      return $shash->{NAME};
 
     } elsif($msgType eq "TimeInformation") {
       if($isToMe) {
@@ -314,11 +321,14 @@ CUL_MAX_Parse($$)
         return $shash->{NAME};
       }
 
-      if($shash->{pairmode}) {
-        Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
+      #If $isToMe is true, this device is already paired and just wants to be reacknowledged
+      if($shash->{pairmode} || $isToMe) {
+        Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         #Send after dispatch the define, otherwise Send will create an invalid device
         CUL_MAX_Send($shash, "PairPong", $src, "00");
+
+        return $shash->{NAME} if($isToMe); #Skip default values if just rePairing
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
@@ -326,7 +336,6 @@ CUL_MAX_Parse($$)
         } elsif($device_types{$type} eq "WallMountedThermostat") {
           Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
         }
-        #Todo: CUL_MAX_SendTimeInformation($shash, $src); on Ack for our PairPong
       }
     } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"])  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
@@ -382,7 +391,7 @@ CUL_MAX_Send(@)
 
   #Call CUL_MAX_SendQueueHandler if we just enqueued the only packet
   #otherwise it is already in the InternalTimer list
-  CUL_MAX_SendQueueHandler($hash) if(@{$hash->{sendQueue}} == 1);
+  CUL_MAX_SendQueueHandler($hash,undef) if(@{$hash->{sendQueue}} == 1);
   return undef;
 }
 
@@ -395,12 +404,17 @@ CUL_MAX_DeviceHash($)
 
 #This can be called for two reasons:
 #1. @sendQueue was empty, CUL_MAX_Send added a packet and then called us
-#2. We sent a packet from @sendQueue and know the ackTimeout is over.
+#2. We sent a packet from @sendQueue and now the ackTimeout is over.
 #   The packet my still be in @sendQueue (timed out) or removed when the Ack was received.
+# Arguments are hash and responseToShutterContact.
+# If SendQueueHandler was called after receiving a message from a shutter contact, responseToShutterContact
+# holds the address of the respective shutter contact. Otherwise, it is empty.
 sub
-CUL_MAX_SendQueueHandler($)
+CUL_MAX_SendQueueHandler($$)
 {
   my $hash = shift;
+  my $responseToShutterContact = shift;
+
   Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_SendQueueHandler: " . @{$hash->{sendQueue}} . " items in queue";
   return if(!@{$hash->{sendQueue}}); #nothing to do
 
@@ -419,44 +433,70 @@ CUL_MAX_SendQueueHandler($)
       return undef;
   }
 
-  my $packet = $hash->{sendQueue}[0];
+  my ($packet, $pktIdx, $packetForShutterContactInQueue);
+  for($pktIdx = 0; $pktIdx < @{$hash->{sendQueue}}; $pktIdx += 1) {
+    $packet = $hash->{sendQueue}[$pktIdx];
+
+    if(defined($responseToShutterContact)) {
+      #Find a packet to the ShutterContact in $responseToShutterContact
+      last if($packet->{dst} eq $responseToShutterContact);
+    } else {
+      #We cannot sent packets to a ShutterContact directly, everything else is possible
+      last if($packet->{cmd} eq "PairPong"
+           || $packet->{sent} != 0
+           || $modules{MAX}{defptr}{$packet->{dst}}{type} ne "ShutterContact");
+      $packetForShutterContactInQueue = $modules{MAX}{defptr}{$packet->{dst}}{NAME};
+    }
+  }
+  if($pktIdx == @{$hash->{sendQueue}} && !defined($responseToShutterContact)) {
+    Log 2, "There is a packet for ShutterContact $packetForShutterContactInQueue in queue. Please push the button on the respective ShutterContact so the packet can be send.";
+    $timeout += 3;
+    InternalTimer($timeout, "CUL_MAX_SendQueueHandler", $hash, 0);
+    return undef;
+  }
 
   if( $packet->{sent} == 0 ) { #Need to send it first
     #We can use fast sending without preamble on culfw 1.53 and higher when the devices has been woken up
     my $needPreamble = ((CUL_MAX_Check($hash) < 153)
-      || !defined($modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil})
-      || $modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil} < gettimeofday()) ? 1 : 0;
+      || (!defined($responseToShutterContact) &&
+         (!defined($modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil})
+          || $modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil} < gettimeofday()))) ? 1 : 0;
 
     #Send to CUL
     my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
-    # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
-    # keep this in sync with culfw's code in clib/rf_moritz.c!
-    my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
-    Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
-    if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
-      my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
-      $timeout += $waitTime;
-      Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+    if($credit10ms eq "No answer") {
+      Log 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
+      $timeout += 5;
     } else {
-      #Update TimeInformation payload. It should reflect the current time when sending,
-      #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
-      #minutes
-      if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
-        Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
-        substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
-      }
-      IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
+      # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
+      # keep this in sync with culfw's code in clib/rf_moritz.c!
+      my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
+      Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
+      if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
+        my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
+        $timeout += $waitTime;
+        Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+      } else {
+        #Update TimeInformation payload. It should reflect the current time when sending,
+        #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
+        #minutes
+        if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
+          Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
+          substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
+        }
+        IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
 
-      $packet->{sent} = 1;
-      $packet->{sentTime} = gettimeofday();
-      $timeout += 0.5; #recheck for Ack
-    }
+        $packet->{sent} = 1;
+        $packet->{sentTime} = gettimeofday();
+        $timeout += 0.5; #recheck for Ack
+      }
+    } # $credit10ms ne "No answer"
 
   } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
       # ackTimeout exceeded
       Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
-      splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
+      splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
       readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
     } else {
       # Recheck for Ack
@@ -467,13 +507,14 @@ CUL_MAX_SendQueueHandler($)
     if(defined($packet->{callbackParam})) {
       Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {RAWMSG => ""});
     }
-    splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
+    splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
 
   } elsif( $packet->{sent} == 3 ) { #Got nack
-    splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
+    splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
   }
 
   return if(!@{$hash->{sendQueue}}); #everything done
+  return if(defined($responseToShutterContact)); #this was not called from InternalTimer
   InternalTimer($timeout, "CUL_MAX_SendQueueHandler", $hash, 0);
 }
 
