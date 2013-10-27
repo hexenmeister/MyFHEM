@@ -185,7 +185,7 @@ sub search($) {
 		};
 	};
 	if ($@) {
-		main::Log(1,$@);
+      main::Log(5,$@);
 	  $self->exit($hash);
 	};
 	return $success;
@@ -291,7 +291,6 @@ sub exit($) {
 sub poll($) {
   my ($self,$hash) = @_;
 	if (my $frm = $hash->{IODev} ) {
-		main::Log(1,"poll $frm->{NAME}");
     main::FRM_poll($frm);
     my $delayed = $self->{delayed};
     foreach my $address (keys %$delayed) {

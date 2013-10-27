@@ -651,7 +651,6 @@ sub OWX_AwaitSearchResponse($) {
 	if (defined $async) {
 		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
 		for (my $i=0;$i<$times;$i++) {
-			main::Log(1,"AwaitSearchResponse $hash->{NAME}, $async->{pin}");
 			if(! defined $hash->{DEVS} ) {
 				select (undef,undef,undef,0.05);
 				$async->poll($hash);
