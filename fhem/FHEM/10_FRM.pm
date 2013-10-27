@@ -550,15 +550,19 @@ sub FRM_poll
 {
 	my ($hash) = @_;
 	if (defined $hash->{FD}) {
+		main::Log(1,"FRM_poll $hash->{NAME}: found FD");
+		main::Log(1,"no FirmataDevice") unless defined ($hash->{FirmataDevice});
 		my ($rout, $rin) = ('', '');
     	vec($rin, $hash->{FD}, 1) = 1;
     	my $nfound = select($rout=$rin, undef, undef, 0.1);
     	my $mfound = vec($rout, $hash->{FD}, 1); 
+    	Log(1,"mfound: $mfound");
 		if($mfound && defined $hash->{FirmataDevice}) {
 			$hash->{FirmataDevice}->poll();
 		}
 		return $mfound;
 	} else {
+		main::Log(1,"FRM_poll $hash->{NAME}: no FD found");
 		# This is relevant for windows/USB only
   		my $po = $hash->{USBDev};
   		my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);

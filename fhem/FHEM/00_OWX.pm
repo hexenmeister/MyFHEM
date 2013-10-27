@@ -651,6 +651,7 @@ sub OWX_AwaitSearchResponse($) {
 	if (defined $async) {
 		my $times = AttrVal($hash,"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
 		for (my $i=0;$i<$times;$i++) {
+			main::Log(1,"AwaitSearchResponse $hash->{NAME}, $async->{pin}");
 			if(! defined $hash->{DEVS} ) {
 				select (undef,undef,undef,0.05);
 				$async->poll($hash);
@@ -894,7 +895,7 @@ sub OWX_Init ($) {
   	  #-- Third step: see, if a bus interface is detected
   	if (my $ret = $owx->Init($hash)) {
       $hash->{PRESENT} = 0;
-      $hash->{STATE} = "Init Failed";
+      $hash->{STATE} = "Init Failed: $ret";
       #readingsSingleUpdate($hash,"state","failed",1);
       #$main::init_done = 1; 
       return "OWX_Init failed: $ret";

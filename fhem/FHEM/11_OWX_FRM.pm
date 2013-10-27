@@ -26,6 +26,15 @@ package OWX_FRM;
 use strict;
 use warnings;
 
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants qw/ :all /;
 use Time::HiRes qw(gettimeofday tv_interval);
 
@@ -44,19 +53,12 @@ sub Define($$) {
 	$self->{name} = $hash->{NAME};
 	$self->{hash} = $hash;
 
- 	if (defined $main::modules{FRM}) {
-  	main::AssignIoPort($hash);
   	my @a = split("[ \t][ \t]*", $def);
   	my $u = "wrong syntax: define <name> FRM_XXX pin";
-		return $u unless int(@a) > 0;
-		$self->{pin} = $a[2];
-		$self->{id} = 0;
-		return undef;
-	} else {
-	  my $ret = "module FRM not yet loaded, please define an FRM device first."; 
-	  main::Log(1,$ret);
-	  return $ret;
-	}
+	return $u unless int(@a) > 0;
+	$self->{pin} = $a[2];
+	$self->{id} = 0;
+	return undef;
 }
 
 ########################################################################################
@@ -74,16 +76,23 @@ sub Init($)
 {
 	my ($self,$hash) = @_;
 	
+	main::LoadModule("FRM");
 	my $pin = $self->{pin};
 	my $ret = main::FRM_Init_Pin_Client($hash,[$pin],PIN_ONEWIRE);
 	return $ret if (defined $ret);
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	$firmata->observe_onewire($pin,\&FRM_OWX_observer,$self);
-	$self->{devs} = [];
-	if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-		$firmata->onewire_config($pin,1);
+	eval {
+		my $firmata = main::FRM_Client_FirmataDevice($hash);
+		$firmata->observe_onewire($pin,\&FRM_OWX_observer,$self);
+		$self->{devs} = [];
+		if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+			$firmata->onewire_config($pin,1);
+		}
+		$firmata->onewire_search($pin);
+	};
+	if ($@) {
+		$@ =~ /^(.*)( at.*FHEM.*)$/;
+		return $1;
 	}
-	$firmata->onewire_search($pin);
 	return undef;
 }
 
@@ -176,6 +185,7 @@ sub search($) {
 		};
 	};
 	if ($@) {
+		main::Log(1,$@);
 	  $self->exit($hash);
 	};
 	return $success;
@@ -281,6 +291,7 @@ sub exit($) {
 sub poll($) {
   my ($self,$hash) = @_;
 	if (my $frm = $hash->{IODev} ) {
+		main::Log(1,"poll $frm->{NAME}");
     main::FRM_poll($frm);
     my $delayed = $self->{delayed};
     foreach my $address (keys %$delayed) {
