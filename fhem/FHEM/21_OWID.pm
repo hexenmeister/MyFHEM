@@ -173,11 +173,8 @@ sub OWID_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
     return "OWID: Warning, no 1-Wire I/O device found for $name.";
-  }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWID: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWID}{defptr}{$id} = $hash;
   #--
@@ -194,8 +191,8 @@ sub OWID_Define ($$) {
   readingsSingleUpdate($hash,"state","Initialized",1);
   
   if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
-		$main::attr{$hash->{NAME}}{"stateFormat"} = "{\$hash->{READINGS}{present} ? \"present\" : \"not present\"}";
-	}
+    $main::attr{$hash->{NAME}}{"stateFormat"} = "{ReadingsVal(\$name,\"present\",0) ? \"present\" : \"not present\"}";
+  }
    
   return undef; 
 }
