@@ -956,7 +956,7 @@ sub OWXTHERM_SetValues($$) {
   OWX_Reset($master);
   
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-  #   followed by the write EEPROM command \x48
+  #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
   #
   #   so far writing the EEPROM does not work properly.
   #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
