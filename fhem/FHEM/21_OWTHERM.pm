@@ -67,20 +67,13 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes};
 use strict;
 use warnings;
 sub Log($$);
+sub AttrVal($$$);
 
-my $owx_version="3.23";
-#-- temperature globals - always the raw values from/for the device
-my $owg_temp     = "";
-my $owg_th       = "";
-my $owg_tl       = "";
-
-#-- variables for display strings
-my $stateal;
-my $stateah;
+my $owx_version="3.24";
 
 my %gets = (
   "id"          => "",
@@ -216,15 +209,17 @@ sub OWTHERM_Define ($$) {
   $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+
+#-- temperature globals - always the raw values from/for the device
+  $hash->{owg_temp}   = "";
+  $hash->{owg_th}     = "";
+  $hash->{owg_tl}     = "";
   
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
   }
-  #if( $hash->{IODev}->{PRESENT} != 1 ){
-  #  return "OWTHERM: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  #}
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -280,14 +275,14 @@ sub OWTHERM_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my $interface = $hash->{IODev}->{TYPE};
-  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
+  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef,$stateal,$stateah);
   my $svalue = "";
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $stateal = AttrVal($name,"stateAL","&#x25BE;");
+  $stateah = AttrVal($name,"stateAH","&#x25B4;");
+  $unit    = AttrVal($name,"tempUnit","Celsius");
+  $offset  = AttrVal($name,"tempOffset",0.0);
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
@@ -310,12 +305,12 @@ sub OWTHERM_FormatValues($) {
   $hash->{tempf}{factor}                     = $factor;
   
   #-- no change in any value if invalid reading
-  return if( $owg_temp eq "");
+  return if( $hash->{owg_temp} eq "");
   
   #-- correct values for proper offset, factor 
-  $vval  = ($owg_temp + $offset)*$factor;
-  $vlow   = floor(($owg_tl + $offset)*$factor+0.5);
-  $vhigh  = floor(($owg_th + $offset)*$factor+0.5);
+  $vval  = ($hash->{owg_temp} + $offset)*$factor;
+  $vlow   = floor(($hash->{owg_tl} + $offset)*$factor+0.5);
+  $vhigh  = floor(($hash->{owg_th} + $offset)*$factor+0.5);
   
   $main::attr{$name}{"tempLow"} = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
@@ -513,10 +508,8 @@ sub OWTHERM_InitializeDevice($) {
   my ($unit,$offset,$factor,$abbr,$value,$ret);
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
-  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $unit    = AttrVal($name,"tempUnit","Celsius");
+  $offset  = AttrVal($name,"tempOffset",0.0);
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
@@ -649,8 +642,8 @@ sub OWTHERM_Set($@) {
     $value = floor($value+0.5);
     
     #-- First we have to read the current data, because alarms may not be set independently
-    $owg_tl = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
-    $owg_th = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
+    $hash->{owg_tl} = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
+    $hash->{owg_th} = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
     
     #-- find upper and lower boundaries for given offset/factor
     my $mmin = floor((-55+$offset)*$factor+0.5);
@@ -737,19 +730,19 @@ sub OWFSTHERM_GetValues($) {
   my $name   = $hash->{NAME};
   
   #-- get values - or should we rather get the uncached ones ?
-  $owg_temp = OWServer_Read($master,"/$owx_add/temperature");
+  $hash->{owg_temp} = OWServer_Read($master,"/$owx_add/temperature");
  
   my $ow_thn   = OWServer_Read($master,"/$owx_add/temphigh");
   my $ow_tln   = OWServer_Read($master,"/$owx_add/templow");
   
   return "no return from OWServer"
-    if( (!defined($owg_temp)) || (!defined($ow_thn)) || (!defined($ow_tln)) );
+    if( (!defined($hash->{owg_temp})) || (!defined($ow_thn)) || (!defined($ow_tln)) );
   return "empty return from OWServer"
-    if( ($owg_temp eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
+    if( ($hash->{owg_temp} eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
         
   #-- process alarm settings
-  $owg_tl = $ow_tln;
-  $owg_th = $ow_thn;
+  $hash->{owg_tl} = $ow_tln;
+  $hash->{owg_th} = $ow_thn;
   
   return undef
 }
@@ -781,8 +774,8 @@ sub OWFSTHERM_SetValues($@) {
     if( $value eq "");
     
   #-- $owg_tl and $owg_th are preset and may be changed here
-  $owg_tl = $value if( lc($key) eq "templow" );
-  $owg_th = $value if( lc($key) eq "temphigh");
+  $hash->{owg_tl} = $value if( lc($key) eq "templow" );
+  $hash->{owg_th} = $value if( lc($key) eq "temphigh");
   
   OWServer_Write($master, "/$owx_add/".lc($key),$value );
   
@@ -874,9 +867,9 @@ sub OWXTHERM_GetValues($) {
     #$delta = 0;
       
     #-- 2's complement form = signed bytes
-    $owg_temp = int($lsb/2) + $delta;
+    $hash->{owg_temp} = int($lsb/2) + $delta;
     if( $sign !=0 ){
-      $owg_temp = -128+$owg_temp;
+      $hash->{owg_temp} = -128+$hash->{owg_temp};
     }
 
     $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
@@ -894,9 +887,9 @@ sub OWXTHERM_GetValues($) {
     #$msb   = 7;
       
     #-- 2's complement form = signed bytes
-    $owg_temp = $msb*16+ $lsb/16;   
+    $hash->{owg_temp} = $msb*16+ $lsb/16;   
     if( $sign !=0 ){
-      $owg_temp = -128+$owg_temp;
+      $hash->{owg_temp} = -128+$hash->{owg_temp};
     }
     $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
@@ -906,9 +899,9 @@ sub OWXTHERM_GetValues($) {
   }
   
   #-- process alarm settings
-  $owg_tl = $ow_tln;
-  $owg_th = $ow_thn;
-  
+  $hash->{owg_tl} = $ow_tln;
+  $hash->{owg_th} = $ow_thn;
+
   return undef;
 }
 
@@ -942,12 +935,12 @@ sub OWXTHERM_SetValues($@) {
     if( $value eq "");
     
   #-- $owg_tl and $owg_th are preset and may be changed here
-  $owg_tl = $value if( lc($key) eq "templow" );
-  $owg_th = $value if( lc($key) eq "temphigh");
+  $hash->{owg_tl} = $value if( lc($key) eq "templow" );
+  $hash->{owg_th} = $value if( lc($key) eq "temphigh");
 
   #-- put into 2's complement formed (signed byte)
-  my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
-  my $thp = $owg_th < 0 ? 128 - $owg_th : $owg_th; 
+  my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
+  my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th}; 
 
   OWX_Reset($master);
   
