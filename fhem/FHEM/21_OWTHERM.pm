@@ -67,7 +67,7 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs %modules $readingFnAttributes};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
@@ -262,8 +262,10 @@ sub OWTHERM_Attr(@) {
         return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
         # update timer
         $hash->{INTERVAL} = $value;
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+        }
   	    last;
   	  };
   	  $key eq "resolution" and do {
