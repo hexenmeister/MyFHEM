@@ -277,7 +277,7 @@ sub OWTHERM_Attr(@) {
       return undef
         if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
   
-      $ret = OWTHERM_Set($hash,($do,$name,$key,$value));
+      $ret = OWTHERM_Set($hash,($name,$key,$value));
     }
   }
   return $ret;
