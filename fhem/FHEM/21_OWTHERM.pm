@@ -67,12 +67,13 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
+sub AttrVal($$$);
 
-my $owx_version="3.23";
+my $owx_version="3.24";
 #-- temperature globals - always the raw values from/for the device
 my $owg_temp     = "";
 my $owg_th       = "";
@@ -129,6 +130,7 @@ sub OWTHERM_Initialize ($) {
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
+                     "interval ".
                      $readingFnAttributes;                
   }
   
@@ -206,14 +208,14 @@ sub OWTHERM_Define ($$) {
   }
   
   #-- determine CRC Code
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
+  $crc = sprintf("%02X",OWX_CRC($fam.".".$id."00"));
   
   #-- define device internals
   $hash->{ALARM}      = 0;
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
   
@@ -222,9 +224,6 @@ sub OWTHERM_Define ($$) {
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
   }
-  #if( $hash->{IODev}->{PRESENT} != 1 ){
-  #  return "OWTHERM: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  #}
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -246,23 +245,33 @@ sub OWTHERM_Define ($$) {
 ########################################################################################
 
 sub OWTHERM_Attr(@) {
-  my ($do,@a) = @_;
+  my ($do,$name,$key,$value) = @_;
   
-  my $name    = $a[0];
-  my $key     = $a[1];
+  my $hash = $defs{$name};
   my $ret;
   
-  #-- only alarm settings may be modified at runtime for now
-  return undef
-    if( $key !~ m/(.*)(Low|High)/ );
-  #-- safeguard against uninitialized devices
-  return undef
-    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+  	  $key eq "interval" and do {
+        # check value
+        return "OWTHERM: Set with short interval, must be > 1" if(int($value) < 1);
+        # update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+        }
+  	    last;
+  	  };
+      #-- only alarm settings may be modified at runtime for now
+      $key =~ m/(.*)(Low|High)/  and do {
+        #-- safeguard against uninitialized devices
+        return undef
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
   
-  if( $do eq "set")
-  {
-    $ret = OWTHERM_Set($main::defs{$name},@a);
-  } elsif( $do eq "del"){
+        $ret = OWTHERM_Set($hash,($name,$key,$value));
+      };
+  	};
   }
   return $ret;
 }
@@ -628,14 +637,7 @@ sub OWTHERM_Set($@) {
 
   #-- set new timer interval
   if($key eq "interval") {
-    # check value
-    return "OWTHERM: Set with short interval, must be > 1"
-      if(int($value) < 1);
-    # update timer
-    $hash->{INTERVAL} = $value;
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
-    return undef;
+  	return OWTHERM_Attr("set",@a);
   }
 
   #-- set tempLow or tempHigh
@@ -952,14 +954,15 @@ sub OWXTHERM_SetValues($@) {
   OWX_Reset($master);
   
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-  #   followed by the write EEPROM command \x48
+  #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
+  #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
   #
   #   so far writing the EEPROM does not work properly.
   #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
   #   2. \x48 appended to match ROM => command not ok. 
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
-  my $select=sprintf("\x4E%c%c\x48",$thp,$tlp); 
+  my $select=sprintf("\x4E%c%c\x7F",$thp,$tlp); 
   my $res=OWX_Complex($master,$owx_dev,$select,3);
 
   if( $res eq 0 ){
