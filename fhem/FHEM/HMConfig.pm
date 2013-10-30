@@ -168,7 +168,7 @@ my %culHmModel=(
   "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,st=>''                  ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,3'          ,chn=>"",}, #
   "007A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, #
   "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
-  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>'remote'            ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel				
+  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel				
   "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
   "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,st=>'remote'            ,cyc=>'00:10' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons Roto
   "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
@@ -188,7 +188,7 @@ my %culHmModel=(
   "008E" => {name=>"Schueco_263-155"         ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons
   "008F" => {name=>"Schueco_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
   "0090" => {name=>"Schueco_263-162"         ,st=>'motionDetector'    ,cyc=>'00:30' ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector
-  "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
+  "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
   "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:4'
@@ -347,7 +347,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 
   CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"   ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
-  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature reöated to CtrlRc reg"},
+  TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature repated to CtrlRc reg"},
 );
 
 my %culHmRegDefine = (
@@ -1138,7 +1138,7 @@ my %culHmChanSets = (
                       ,tempListThu    =>"[prep|exec] HH:MM temp ..."
                       ,tempListWed    =>"[prep|exec] HH:MM temp ..."
                       ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                      ,partyMode      =>"[prep|exec] HH:MM durationDays"
+                      ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
                       ,displayMode    =>"[temp-only|temp-hum]"
                       ,displayTemp    =>"[actual|setpoint]"
                       ,displayTempUnit=>"[celsius|fahrenheit]"
