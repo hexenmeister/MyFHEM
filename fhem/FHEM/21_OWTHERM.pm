@@ -273,14 +273,14 @@ sub OWTHERM_Attr(@) {
         last;
   	  };
       #-- only alarm settings may be modified at runtime for now
-      return undef
-        if( $key !~ m/(.*)(Low|High)/ );
-      #-- safeguard against uninitialized devices
-      return undef
-        if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
+      $key =~ m/(.*)(Low|High)/  and do {
+        #-- safeguard against uninitialized devices
+        return undef
+          if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
   
-      $ret = OWTHERM_Set($hash,($name,$key,$value));
-    }
+        $ret = OWTHERM_Set($hash,($name,$key,$value));
+      };
+  	};
   }
   return $ret;
 }
@@ -961,6 +961,7 @@ sub OWXTHERM_SetValues($$) {
 
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
   #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
+  #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
   #
   #   so far writing the EEPROM does not work properly.
   #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM

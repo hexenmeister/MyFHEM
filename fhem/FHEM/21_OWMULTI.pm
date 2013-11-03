@@ -64,12 +64,12 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="4.00";
+my $owx_version="4.01";
 
 my %gets = (
   "id"          => "",
@@ -114,13 +114,15 @@ sub OWMULTI_Initialize ($) {
   $hash->{GetFn}   = "OWMULTI_Get";
   $hash->{SetFn}   = "OWMULTI_Set";
   $hash->{AfterExecuteFn} = "OWXMULTI_AfterExecute";
-  
+  $hash->{AttrFn}  = "OWMULTI_Attr";
+
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 loglevel:0,1,2,3,4,5 ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "VName VUnit VFunction ".
-                     $main::readingFnAttributes;
+                     "interval ".
+                     $readingFnAttributes;
                      
   #-- temperature and voltage globals - always the raw values from the device
   $hash->{owg_temp} = undef;
@@ -128,6 +130,39 @@ sub OWMULTI_Initialize ($) {
   $hash->{owg_vdd} = undef;
   $hash->{owg_channel} = undef;
                      
+}
+
+#######################################################################################
+#
+# OWMULTI_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWMULTI_Attr(@) {
+  my ($do,$name,$key,$value) = @_;
+  
+  my $hash = $defs{$name};
+  my $ret;
+  
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+  	  $key eq "interval" and do {
+        # check value
+        return "OWMULTI: Set with short interval, must be > 1" if(int($value) < 1);
+        # update timer
+        $hash->{INTERVAL} = $value;
+        if ($init_done) {
+          RemoveInternalTimer($hash);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
+        }
+  	    last;
+  	  };
+    }
+  }
+  return $ret;
 }
   
 ########################################################################################
@@ -195,13 +230,13 @@ sub OWMULTI_Define ($$) {
   
  
   #-- determine CRC Code - only if this is a direct interface
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
+  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
   
   #-- define device internals
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{ROM_ID}     = "$fam.$id.$crc";
   $hash->{INTERVAL}   = $interval;
 
   #-- Couple to I/O device
