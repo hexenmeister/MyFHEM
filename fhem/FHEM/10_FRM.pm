@@ -603,7 +603,7 @@ FRM_OWX_Init($$)
 		$firmata->onewire_config($pin,1);
 	}
 	$hash->{STATE}="Initialized";
-	$firmata->onewire_search($pin);
+	InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
 	return undef;
 }
 
@@ -673,7 +673,7 @@ sub FRM_OWX_firmata_to_device
 
 sub FRM_OWX_Verify {
 	my ($hash,$dev) = @_;
-	foreach my $found ($hash->{DEVS}) {
+	foreach my $found (@{$hash->{DEVS}}) {
 		if ($dev eq $found) {
 			return 1;
 		}
