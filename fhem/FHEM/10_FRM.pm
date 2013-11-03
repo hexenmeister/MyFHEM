@@ -673,7 +673,7 @@ sub FRM_OWX_firmata_to_device
 
 sub FRM_OWX_Verify {
 	my ($hash,$dev) = @_;
-	foreach my $found ($hash->{DEVS}) {
+	foreach my $found (@{$hash->{DEVS}}) {
 		if ($dev eq $found) {
 			return 1;
 		}
