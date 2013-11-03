@@ -325,8 +325,8 @@ SYSMON_getCPUTemp($$)
 	my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{"cpu_temp"}="$val_txt";
-  my $geometric_ovg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu_temp_avg",$val_txt) + $val_txt ) / 4 );
-  $map->{"cpu_temp_avg"}="$geometric_ovg";
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu_temp_avg",$val_txt) + $val_txt ) / 4 );
+  $map->{"cpu_temp_avg"}="$t_avg";
 	
 	return $map; 
 }
