@@ -131,7 +131,10 @@ sub OWTHERM_Initialize ($) {
                      "tempConv:onkick,onread tempLow tempHigh ".
                      "resolution:9,10,11,12 interval ".
                      $readingFnAttributes;                
-  }
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
+}
   
 ########################################################################################
 #
