@@ -21,7 +21,7 @@ SYSMON_Initialize($)
   $hash->{GetFn}    = "SYSMON_Get";
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "disable:0,1 raspberrytemperature:0,1,2 uptime:1,2 ".
+  $hash->{AttrList} = "filesystems disable:0,1 raspberrytemperature:0,1,2 uptime:1,2 ".
                        $readingFnAttributes;
 }
 
@@ -181,30 +181,33 @@ SYSMON_Attr($$$)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   
-  log 5, "SYSMON Attr: $cmd $name $attrName $attrVal";
+  Log 5, "SYSMON Attr: $cmd $name $attrName $attrVal";
 
   $attrVal= "" unless defined($attrVal);
   #my $orig = $attrVal;
   my $orig = AttrVal($name, $attrName, "");
 
-  if( $cmd eq "set" ) {
+  if( $cmd eq "set" ) {# set, del
     if( $orig ne $attrVal ) {
     	
-    	#if($attrName eq "disable")
-      #{
-      #	if($attrVal ne "0")
-      #	{
-      #		RemoveInternalTimer($hash);
-      #	} else {
-      #		InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 0);
-      #	}
-      #}
+    	if($attrName eq "disable")
+      {
+        my $hash = $main::defs{$name};
+        RemoveInternalTimer($hash);
+      	if($attrVal ne "0")
+      	{
+      		InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 0);
+      	}
+       	$hash->{LOCAL} = 1;
+  	    SYSMON_Update($hash);
+  	    delete $hash->{LOCAL};
+      }
     	
       $attr{$name}{$attrName} = $attrVal;
-      return $attrName ." set to ". $attrVal;
+      #return $attrName ." set to ". $attrVal;
+      return undef;
     }
   }
-
   return;
 }
 
@@ -218,30 +221,31 @@ SYSMON_Update($)
   
   my $name = $hash->{NAME};
 
-  if( AttrVal($name, "disable", "") eq "1" ) 
-  {
-  	logF($hash, "Update", "disabled");
-  	$hash->{STATE} = "Inactive";
-  	return undef;
-  }
-
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 1);
   }
 
   readingsBeginUpdate($hash);
+
+  if( AttrVal($name, "disable", "") eq "1" ) 
+  {
+  	logF($hash, "Update", "disabled");
+  	$hash->{STATE} = "Inactive";
+  } else {
   
-  my $map = SYSMON_obtainParameters($hash);
+    my $map = SYSMON_obtainParameters($hash);
  
-  $hash->{STATE} = "Active";
-  #my $state = $map->{"loadavg"};
-  #readingsBulkUpdate($hash,"state",$state);
+    $hash->{STATE} = "Active";
+    #my $state = $map->{"loadavg"};
+    #readingsBulkUpdate($hash,"state",$state);
   
-  foreach my $name (keys %{$map}) {
-  	my $value = $map->{$name};
-  	Log 3, "SYSMON DEBUG: ---> ".$name."=".$value;
-  	readingsBulkUpdate($hash,$name,$value);
+    foreach my $name (keys %{$map}) {
+  	  my $value = $map->{$name};
+  	  Log 3, "SYSMON DEBUG: ---> ".$name."=".$value;
+  	  readingsBulkUpdate($hash,$name,$value);
+    }
+  
   }
 
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
@@ -252,6 +256,7 @@ sub
 SYSMON_obtainParameters($)
 {
 	my ($hash) = @_;
+	my $name = $hash->{NAME};
 	
 	my $map;
   
@@ -261,6 +266,18 @@ SYSMON_obtainParameters($)
   $map = SYSMON_getRamAndSwap($hash, $map);
   $map = SYSMON_getCPUTemp($hash, $map);
   $map = SYSMON_getCPUFreq($hash, $map);
+  
+  my $filesystems = AttrVal($name, "filesystems", undef);
+  if(defined $filesystems) 
+  {
+    my @filesystem_list = split(/,\s*/, trim($filesystems));
+    foreach (@filesystem_list)
+    {
+    	$map = SYSMON_getFileSystemInfo($hash, $map, "$_");
+    }
+  } else {
+    $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+  }
   
   return $map;
 }
@@ -317,6 +334,9 @@ SYSMON_getLoadAvg($$)
 	return $map; 
 }
 
+#------------------------------------------------------------------------------
+# leifert Raspberry Pi CPU Temperature
+#------------------------------------------------------------------------------
 sub
 SYSMON_getCPUTemp($$)
 {
@@ -343,6 +363,9 @@ SYSMON_getCPUFreq($$)
 	return $map; 
 }
 
+#------------------------------------------------------------------------------
+# Liefert Werte für RAM und SWAP (Gesamt, Verwendet, Frei).
+#------------------------------------------------------------------------------
 sub SYSMON_getRamAndSwap($$)
 {
   my ($hash, $map) = @_;
@@ -386,6 +409,36 @@ sub SYSMON_getRamAndSwap($$)
   return $map; 
 }
 
+#------------------------------------------------------------------------------
+# Liefert Füllstand für das angegebene Dateisystem (z.B. '/dev/root', '/dev/sda1' (USB stick)).
+# Eingabeparameter: HASH; MAP; FS-Bezeichnung
+#------------------------------------------------------------------------------
+sub SYSMON_getFileSystemInfo ($$$)
+{
+	my ($hash, $map, $fs) = @_;
+  
+  # my @filesystems = qx(df /dev/root);
+  my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
+
+  my @filesystems = qx($disk);
+
+  # if filesystem is not present, output goes to stderr, i.e. @filesystems is empty
+  shift @filesystems;
+  #Log 3, "SYSMON DEBUG: ---> filesystems:=".$filesystems[0];
+  if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
+  {
+    my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
+    #my $out_txt = $fs_desc." at ".$mnt_point." => Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
+    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
+    $map->{"fs[$mnt_point]"} = $out_txt; 
+  }
+
+  return $map;
+}
+
+#------------------------------------------------------------------------------
+# Übersetzt Sekunden (Dauer) in Tage/Stunden/Minuten/Sekunden
+#------------------------------------------------------------------------------
 sub SYSMON_decode_time_diff($)
 {
   my $s = shift;
@@ -410,13 +463,6 @@ sub logF($$$)
   #Log 5, "SYSMON $fname (".$hash->{NAME}."): $msg";
   Log 5, "SYSMON $fname $msg";
 }
-
-# --- AS -------------------------------------------------------------
-#------------------------------------------------------------------------------
-# gets the RAM and SWAP values
-#------------------------------------------------------------------------------
-
-# --- AS -------------------------------------------------------------
 
 
 1;
