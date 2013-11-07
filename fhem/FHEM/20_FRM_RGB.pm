@@ -21,6 +21,10 @@ use SetExtensions qw/ :all /;
 #####################################
 
 my %gets = (
+  "rgb"           => 0,
+  "RGB"           => 0,
+  "pct"           => 0,
+  "devStateIcon"  => 0,
 );
 
 my %sets = (
@@ -28,31 +32,10 @@ my %sets = (
   "off"                 => 0,
   "toggle"              => 0,
   "rgb:colorpicker,RGB" => 1,
+  "pct:slider,0,1,100"  => 1,
   "fadeTo"              => 2,
   "dimUp"               => 0,
   "dimDown"             => 0,
-  "getFade"             => 1,
-  "setFade"             => 3,
-  "startFade"           => 2,
-  "reset"               => 0,
-);
-
-my %dim_values = (
-   0 => "dim06%",
-   1 => "dim12%",
-   2 => "dim18%",
-   3 => "dim25%",
-   4 => "dim31%",
-   5 => "dim37%",
-   6 => "dim43%",
-   7 => "dim50%",
-   8 => "dim56%",
-   9 => "dim62%",
-  10 => "dim68%",
-  11 => "dim75%",
-  12 => "dim81%",
-  13 => "dim87%",
-  14 => "dim93%",
 );
 
 sub
@@ -61,7 +44,8 @@ FRM_RGB_Initialize($)
   my ($hash) = @_;
 
   $hash->{SetFn}     = "FRM_RGB_Set";
-  $hash->{DefFn}     = "FRM_Client_Define";
+  $hash->{GetFn}     = "FRM_RGB_Get";
+  $hash->{DefFn}     = "FRM_RGB_Define";
   $hash->{InitFn}    = "FRM_RGB_Init";
   $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_RGB_Attr";
@@ -74,25 +58,33 @@ FRM_RGB_Initialize($)
 }
 
 sub
+FRM_RGB_Define($$)
+{
+  my ($hash, $def) = @_;
+  $attr{$hash->{NAME}}{webCmd} = "rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off";
+  return FRM_Client_Define($hash,$def);
+}
+
+sub
 FRM_RGB_Init($$)
 {
   my ($hash,$args) = @_;
   my $name = $hash->{NAME};
   my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
   return $ret if (defined $ret);
-  delete $hash->{PIN};
-  $hash->{PIN1} = @$args[0];
-  $hash->{PIN2} = @$args[1];
-  $hash->{PIN3} = @$args[2];
+  my @pins = ();
   eval {
     my $firmata = FRM_Client_FirmataDevice($hash);
-    $firmata->pin_mode($hash->{PIN2},PIN_PWM);
-    $firmata->pin_mode($hash->{PIN3},PIN_PWM);
-  
-    $hash->{".shift1"} = defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$hash->{PIN1}}-8 : 0;
-    $hash->{".shift2"} = defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$hash->{PIN2}}-8 : 0;
-    $hash->{".shift3"} = defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$hash->{PIN3}}-8 : 0;
-  
+    $hash->{PIN} = "";
+    foreach my $pin (@{$args}) {
+      $firmata->pin_mode($pin,PIN_PWM);
+      push @pins,{
+        pin     => $pin,
+        "shift" => defined $firmata->{metadata}{pwm_resolutions} ? $firmata->{metadata}{pwm_resolutions}{$pin}-8 : 0,
+      };
+      $hash->{PIN} .= $hash->{PIN} eq "" ? $pin : " $pin";
+    }
+    $hash->{PINS} = \@pins;
     if (! (defined AttrVal($name,"stateFormat",undef))) {
       $attr{$name}{"stateFormat"} = "value";
     }
@@ -102,6 +94,11 @@ FRM_RGB_Init($$)
     }
   };
   return $@ if $@;
+  $hash->{toggle} = "off";
+  $hash->{dim} = {
+    bri => 50,
+    channels => [(255) x @{$hash->{PINS}}],    
+  };
   readingsSingleUpdate($hash,"state","Initialized",1);
   return undef;  
 }
@@ -118,12 +115,12 @@ FRM_RGB_Set($@)
 
   SETHANDLER: {
     $cmd eq "on" and do {
-      FRM_RGB_SetRGB($hash,"FFFFFF");
+      FRM_RGB_SetChannels($hash,(0xFF) x scalar(@{$hash->{PINS}}));
       $hash->{toggle} = "on";
       last;
     };
     $cmd eq "off" and do {
-      FRM_RGB_SetRGB($hash,"000000");
+      FRM_RGB_SetChannels($hash,(0x00) x scalar(@{$hash->{PINS}}));
       $hash->{toggle} = "off";
       last;
     };
@@ -132,117 +129,108 @@ FRM_RGB_Set($@)
       TOGGLEHANDLER: {
         $toggle eq "off" and do {
           $hash->{toggle} = "up";
-          FRM_RGB_SetRGB($hash,$hash->{dim} ? $hash->{dim} : "7F7F7F");
+          FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
           last;    
         };
         $toggle eq "up" and do {
-          FRM_RGB_SetRGB($hash,"FFFFFF");
+          FRM_RGB_SetChannels($hash,(0xFF) x @{$hash->{PINS}});
           $hash->{toggle} = "on";
           last;
         };
         $toggle eq "on" and do {
           $hash->{toggle} = "down";
-          FRM_RGB_SetRGB($hash,$hash->{dim} ? $hash->{dim} : "7F7F7F");
+          FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
           last;    
         };
         $toggle eq "down" and do {
-          FRM_RGB_SetRGB($hash,"000000");
+          FRM_RGB_SetChannels($hash,(0x0) x @{$hash->{PINS}});
           $hash->{toggle} = "off";
           last;
         };
       };
       last;
     };
-  $cmd eq "rgb" and do {
-    my $arg = $a[0];
-    FRM_RGB_SetRGB($hash,$arg);
-    RGBHANDLER: {
-      $arg eq "000000" and do {
-        $hash->{toggle} = "off";
-        last;
+    $cmd eq "rgb" and do {
+      my $arg = $a[0];
+      my $numPins = scalar(@{$hash->{PINS}});
+      my $nybles = $numPins << 1;
+      my @channels = RgbToChannels($arg,$numPins);
+      FRM_RGB_SetChannels($hash,@channels);
+      RGBHANDLER: {
+        $arg =~ /^0{$nybles}$/ and do {
+          $hash->{toggle} = "off";
+          last;
+        };
+        $arg =~ /^f{$nybles}$/i and do {
+          $hash->{toggle} = "on";
+          last;
+        };
+        $hash->{toggle} = "up";
       };
-      $arg eq "FFFFFF" and do {
-        $hash->{toggle} = "on";
-        last;
-      };
-      $hash->{toggle} = "up";
-      $hash->{dim} = $arg;
+      $hash->{dim} = ChannelsToBrightness(@channels);
+      last;
     };
-  };
-#  $cmd eq "fadeTo" and do {
-#    return (undef, "$arg2 not a valid time" ) if( $arg2 !~ /^\d{1,2}$/ );
-#    return( "regSet", CMD_REG, CMD_On.$arg.sprintf( "%02X",$arg2 )."00" ) if( $arg =~ /^[\da-f]{6}$/i );
-#    return (undef, "$arg is not a valid rgb color" );
-#  };
-#  $cmd eq "dimUp" and do {
-#    return( "regSet", CMD_REG, CMD_DimUp."0000000000" );
-#  };
-#  $cmd eq "dimDown" and do {
-#    return( "regSet", CMD_REG, CMD_DimDown."0000000000" );
-#  };
-#  $cmd eq "getFade" and do {
-#    if( $arg eq "all" ) {
-#      for( my $reg = 0; $reg <= 0xF; ++$reg) {
-#        SWAP_Send($hash, $hash->{addr}, "02", CMD_REG, CMD_GetFade."0".sprintf("%1X",$reg)."00000000" );
-#      }
-#      return undef;
-#    }
-#    return( "regSet", CMD_REG, CMD_GetFade."0".sprintf("%1X",$arg)."00000000" ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
-#    return (undef, "$arg is not a valid fade register number" );
-#  };
-#  $cmd eq "setFade" and do {
-#    return (undef, "$arg2 not a valid rgb value" ) if( $arg2 !~ /^[\da-f]{6}$/i );
-#    return (undef, "$arg3 not a valid time value" ) if( $arg3 !~ /^[\da-f]{1,3}$/i );
-#    return( "regSet", CMD_REG, CMD_SetFade."0".sprintf("%1X",$arg).$arg2.sprintf( "%02X",$arg3 ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
-#    return (undef, "$arg not a valid fade register" );
-#  };
-#  $cmd eq "startFade" and do {
-#    return (undef, "$arg is not a valid fade register number" ) if( $arg !~ /^(\d|0\d|1[0-5])$/ );
-#    return( "regSet", CMD_REG, CMD_StartFade."0".sprintf("%1X",$arg)."0".sprintf( "%1X",$arg2 )."000000" ) if( $arg2 =~ /^(\d|0\d|1[0-5])$/ );
-#    return (undef, "$arg2 not a valid fade register number" );
-#  };
-#  $cmd eq "reset" and do {
-#    return( "regSet", CMD_REG, CMD_RESET."0000000000" );
-#  };
-}
-
+    $cmd eq "pct" and do {
+      $hash->{dim}->{bri} = $a[0];
+      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+      last;
+    };
+    $cmd eq "dimUp" and do {
+      $hash->{dim}->{bri} = $hash->{dim}->{bri} > 90 ? 100 : $hash->{dim}->{bri}+10;
+      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim})); 
+      last; 
+    };
+    $cmd eq "dimDown" and do {
+      $hash->{dim}->{bri} = $hash->{dim}->{bri} < 10 ? 0 : $hash->{dim}->{bri}-10;
+      FRM_RGB_SetChannels($hash,BrightnessToChannels($hash->{dim}));
+      last;
+    };
+  }
   return undef;
 }
 
 sub
-FRM_RGB_SetRGB($$)
+FRM_RGB_Get($@)
 {
-  my ($hash,$rgb) = @_;
+  my ($hash, $name, $cmd, @a) = @_;
+  
+  return "FRM_RGB: Get with unknown argument $cmd, choose one of ".join(" ", sort keys %gets)
+    unless defined($gets{$cmd});
+    
+  GETHANDLER: {
+    $cmd eq 'rgb' and do {
+      return ReadingsVal($name,"rgb",undef);
+    };
+    $cmd eq 'RGB' and do {
+      return ChannelsToRgb(@{$hash->{dim}->{channels}});
+    };
+    $cmd eq 'pct' and do {
+      return $hash->{dim}->{bri};
+      return undef;
+    };
+  }
+}
 
-  die "$rgb is not the right format" unless( $rgb =~ /^[\da-f]{6}$/i );
-
-  my ($r,$g,$b) = unpack("A2A2A2",$rgb);
-  
-  if ($hash->{".shift1"} > 0) {
-    $r = hex($r) << $hash->{".shift1"};
-  } else {
-    $r = hex ($r) >> -$hash->{".shift1"};
-  }
-  
-  if ($hash->{".shift2"} > 0) {
-    $g = hex($g) << $hash->{".shift2"};
-  } else {
-    $g = hex($g) >> -$hash->{".shift2"};
-  }
-  
-  if ($hash->{".shift3"} > 0) {
-    $b = hex($b) << $hash->{".shift3"};
-  } else {
-    $b = hex($b) >> -$hash->{".shift3"};
-  }
+sub
+FRM_RGB_SetChannels($$)
+{
+  my ($hash,@channels) = @_;
 
   my $firmata = FRM_Client_FirmataDevice($hash);
-
-  $firmata->analog_write($hash->{PIN1},$r);
-  $firmata->analog_write($hash->{PIN2},$g);
-  $firmata->analog_write($hash->{PIN3},$b);
+  my @pins = @{$hash->{PINS}};
+  my @values = @channels;
   
-  main::readingsSingleUpdate($hash,"rgb",$rgb, 1);
+  while(@values) {
+    my $pin = shift @pins;
+    my $value = shift @values;
+    if ($pin->{"shift"} < 0) {
+      $value >>= -$pin->{"shift"};
+    } else {
+      $value <<= $pin->{"shift"};
+    }
+    $firmata->analog_write($pin->{pin},$value);
+  };
+  readingsSingleUpdate($hash,"rgb",ChannelsToRgb(@channels),1);
 }
 
 sub FRM_RGB_State($$$$)
@@ -252,7 +240,7 @@ sub FRM_RGB_State($$$$)
 STATEHANDLER: {
 		$sname eq "value" and do {
 			if (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") { 
-				FRM_PWM_Set($hash,$hash->{NAME},$sval);
+				FRM_RGB_Set($hash,$hash->{NAME},$sval);
 			}
 			last;
 		}
