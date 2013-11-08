@@ -236,6 +236,12 @@ SYSMON_Update($)
   
     my $map = SYSMON_obtainParameters($hash);
  
+    foreach my $aName (keys %{$defs{$name}{READINGS}}) {
+    	if(index($aName, "fs[") == 0) {
+    		delete $defs{$name}{READINGS}{$aName};
+		  }
+    }
+ 
     $hash->{STATE} = "Active";
     #my $state = $map->{"loadavg"};
     #readingsBulkUpdate($hash,"state",$state);
