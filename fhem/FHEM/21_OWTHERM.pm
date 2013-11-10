@@ -132,7 +132,10 @@ sub OWTHERM_Initialize ($) {
                      "resolution:9,10,11,12 interval ".
                      $readingFnAttributes;                
   $hash->{AfterExecuteFn} = "OWTHERM_AfterExecute";
-  }
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
+}
   
 ########################################################################################
 #

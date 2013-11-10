@@ -173,6 +173,8 @@ sub OWAD_Initialize ($) {
   $hash->{owg_vlow} = [];
   $hash->{owg_vhigh} = [];
   
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #########################################################################################

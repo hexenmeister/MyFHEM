@@ -151,6 +151,9 @@ sub OWCOUNT_Initialize ($) {
     $attlist .= " ".$owg_fixed[$i]."Period:hour,minute,second";
   }
   $hash->{AttrList} = $attlist; 
+
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #########################################################################################
@@ -1115,7 +1118,7 @@ sub OWFSCOUNT_GetPage($$) {
     # $owg_str =~ /([\d\.]+)/;
     #   a la truchsess
     $owg_str =~ s/[^\d\.]+//g;
-    $owg_str = 0.0 unless ($owg_str);
+    $owg_str = 0.0 if(!defined($owg_str) or $owg_str !~ /^\d+\.?\d*$/);
     $owg_str = int($owg_str*100)/100;
     $owg_midnight[0] = $owg_str;
     
@@ -1132,7 +1135,7 @@ sub OWFSCOUNT_GetPage($$) {
     $owg_val[1]      = $vval;
     #-- parse float from midnight
     $owg_str =~ s/[^\d\.]+//g;
-    $owg_str = 0.0 unless ($owg_str);
+    $owg_str = 0.0 if(!defined($owg_str) or $owg_str !~ /^\d+\.\d*$/);
     $owg_str = int($owg_str*100)/100;
     $owg_midnight[1] = $owg_str;
   }else {
@@ -1245,7 +1248,7 @@ sub OWXCOUNT_AfterGetPage($$$$$) {
       # $owg_str =~ /([\d\.]+)/;
       #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = 0.0 unless ($owg_str);
+      $owg_str = 0.0 if(!defined($owg_str) or $owg_str !~ /^\d+\.\d*$/);
       $owg_str = int($owg_str*100)/100;
       $owg_midnight[0] = $owg_str;
     }elsif( $page == 15) {
@@ -1254,7 +1257,7 @@ sub OWXCOUNT_AfterGetPage($$$$$) {
       # $owg_str =~ /([\d\.]+)/;
       #   a la truchsess
       $owg_str =~ s/[^\d\.]+//g;
-      $owg_str = 0.0 unless ($owg_str);
+      $owg_str = 0.0 if(!defined($owg_str) or $owg_str !~ /^\d+\.\d*$/);
       $owg_str = int($owg_str*100)/100;
       $owg_midnight[1] = $owg_str;
     }

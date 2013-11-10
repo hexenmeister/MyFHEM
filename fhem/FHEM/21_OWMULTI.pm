@@ -130,6 +130,8 @@ sub OWMULTI_Initialize ($) {
   $hash->{owg_vdd} = undef;
   $hash->{owg_channel} = undef;
                      
+  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  main::LoadModule("OWX");	
 }
 
 #######################################################################################
