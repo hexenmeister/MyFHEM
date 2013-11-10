@@ -236,22 +236,33 @@ SYSMON_Update($)
   
     my $map = SYSMON_obtainParameters($hash);
  
-    foreach my $aName (keys %{$defs{$name}{READINGS}}) {
-    	if(index($aName, "fs[") == 0) {
-    		delete $defs{$name}{READINGS}{$aName};
-		  }
-    }
+    #foreach my $aName (keys %{$defs{$name}{READINGS}}) {
+    #	if(index($aName, "fs[") == 0) {
+    #		delete $defs{$name}{READINGS}{$aName};
+		#  }
+    #}
+ 
+    # Kopie der Readings
+    my %copy = %{$defs{$name}{READINGS}}; #$defs{$name}{READINGS};
  
     $hash->{STATE} = "Active";
     #my $state = $map->{"loadavg"};
     #readingsBulkUpdate($hash,"state",$state);
   
-    foreach my $name (keys %{$map}) {
-  	  my $value = $map->{$name};
-  	  Log 3, "SYSMON DEBUG: ---> ".$name."=".$value;
-  	  readingsBulkUpdate($hash,$name,$value);
+    foreach my $aName (keys %{$map}) {
+  	  my $value = $map->{$aName};
+  	  Log 3, "SYSMON DEBUG: ---> ".$aName."=".$value;
+  	  readingsBulkUpdate($hash,$aName,$value);
+  	  
+  	  # Vorhandene Keys löschen
+  	  delete %copy->{$aName};
     }
-  
+    
+    # Überflüssige Readings löschen
+    foreach my $aName (keys %copy) {
+      delete $defs{$name}{READINGS}{$aName};
+      Log 5, "SYSMON DEBUG: delete obsolete READING---> ".$aName;
+    }
   }
 
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
@@ -437,6 +448,9 @@ sub SYSMON_getFileSystemInfo ($$$)
     #my $out_txt = $fs_desc." at ".$mnt_point." => Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
     $map->{"fs[$mnt_point]"} = $out_txt; 
+    #$map->{"fs:[$mnt_point]"} = $out_txt; 
+  } else {
+  	$map->{"fs[$fs]"} = "not available"; 
   }
 
   return $map;
