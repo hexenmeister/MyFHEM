@@ -296,6 +296,9 @@ SYSMON_obtainParameters($)
     $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
   }
   
+  $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
+  $map = SYSMON_getNetworkInfo($hash, $map, "wlan0");
+  
   return $map;
 }
 
@@ -451,6 +454,52 @@ sub SYSMON_getFileSystemInfo ($$$)
     #$map->{"fs:[$mnt_point]"} = $out_txt; 
   } else {
   	$map->{"fs[$fs]"} = "not available"; 
+  }
+
+  return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Netztwerkinformationen
+# Parameter: HASH; MAP; DEVICE (eth0 or wlan0)
+#------------------------------------------------------------------------------
+sub SYSMON_getNetworkInfo ($$$)
+{
+	my ($hash, $map, $device) = @_;
+  
+  # in case of network not present get failure from stderr (2>&1)  
+  my $cmd="ifconfig ".$device." 2>&1";
+
+  my @dataThroughput = qx($cmd);
+  
+  Log 3, "SYSMON DEBUG: ---> network: cmd:".$cmd." : ".@dataThroughput[0]." :- ".grep(/error/, @dataThroughput[0]);
+  
+  # check if network available
+  if (not grep(/error/, @dataThroughput[0]))
+  {
+    # perform grep from above
+    @dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
+
+    # change array into scalar variable
+    my $dataThroughput = $dataThroughput[0];
+
+    # remove RX bytes or TX bytes from string
+    $dataThroughput =~ s/RX bytes://;
+    $dataThroughput =~ s/TX bytes://;
+    $dataThroughput = trim($dataThroughput);
+
+    @dataThroughput = split(/ /, $dataThroughput); # return of split is array
+
+    my $rxRaw = $dataThroughput[0] / 1024 / 1024;
+    my $txRaw = $dataThroughput[4] / 1024 / 1024;
+    my $rx = sprintf ("%.2f", $rxRaw, 2);
+    my $tx = sprintf ("%.2f", $txRaw, 2);
+    my $totalRxTx = $rx + $tx;
+
+    my $out_txt = "Received: ".$rx." MB, Sent: ".$tx." MB, Total: ".$totalRxTx." MB";
+    $map->{$device} = $out_txt; 
+  } else {
+  	$map->{$device} = "not available"; 
   }
 
   return $map;
