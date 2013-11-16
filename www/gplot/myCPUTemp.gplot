@@ -1,0 +1,29 @@
+#
+# Anzeige der gemessenen CPU Temperatur und des errechneten Durchschnitts
+#
+# Beispiel aus dem Logfile:
+# 2013-11-16_23:06:05 sysmon cpu_temp_avg: 49.6
+# 2013-11-16_23:06:05 sysmon cpu_temp: 49.77
+#
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+
+#FileLog 4:T\x3a|cpu_temp_avg\x3a:0:
+#FileLog 4:T\x3a|cpu_temp\x3a:0:
+
+
+plot \
+  "< egrep 'T:|cpu_temp_avg:' <IN>"\
+     using 1:4 axes x1y2 title 'CPU average' ls l4 lw 3 with lines \
+   "< egrep 'T:|cpu_temp:' <IN>"\
+     using 1:4 axes x1y2 title 'CPU temperature' ls l0 lw 1 with lines
