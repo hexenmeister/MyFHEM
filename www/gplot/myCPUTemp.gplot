@@ -31,4 +31,4 @@ plot \
    "< egrep 'T:|cpu_temp:' <IN>"\
      using 1:4 axes x1y2 title 'CPU temperature' ls l0 lw 1 with lines \
    "< egrep 'T:|cpu_freq:' <IN>"\
-     using 1:4 axes x1y1 title 'CPU Frequenz' ls l4fill lw 1 with steps
+     using 1:4 axes x1y1 title 'CPU Frequenz' ls l1fill lw 1 with steps
