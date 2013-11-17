@@ -416,7 +416,7 @@ sub SYSMON_getRamAndSwap($$)
   # if no swap present, total2 is zero -> prevent division by zero
   if($total2 > 0)
   {
-    $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100), 0);
+    $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
     $swap = "Total: ".$total2." MB, Used: ".$used2." MB  (".$percentage_swap." %), Free: ".$free2." MB";
   }
   else
@@ -492,14 +492,20 @@ sub SYSMON_getNetworkInfo ($$$)
 
     my $rxRaw = $dataThroughput[0] / 1024 / 1024;
     my $txRaw = $dataThroughput[4] / 1024 / 1024;
-    my $rx = sprintf ("%.2f", $rxRaw, 2);
-    my $tx = sprintf ("%.2f", $txRaw, 2);
+    my $rx = sprintf ("%.2f", $rxRaw);
+    my $tx = sprintf ("%.2f", $txRaw);
     my $totalRxTx = $rx + $tx;
 
-    my $out_txt = "Received: ".$rx." MB, Sent: ".$tx." MB, Total: ".$totalRxTx." MB";
+    my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
     $map->{$device} = $out_txt; 
+    
+    my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
+    my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
+    my $out_txt_diff = "RX: ".sprintf ("%.2f", ($rx-$o_rx))." MB, TX: ".sprintf ("%.2f", ($tx-$o_tx))." MB, Total: ".sprintf ("%.2f", ($totalRxTx-$o_tt))." MB";
+    $map->{$device."_diff"} = $out_txt_diff; 
   } else {
   	$map->{$device} = "not available"; 
+  	$map->{$device."_diff"} = "not available"; 
   }
 
   return $map;
