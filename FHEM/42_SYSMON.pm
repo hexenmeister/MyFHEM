@@ -309,17 +309,18 @@ SYSMON_getUptime($$)
 	
 	my $uptime_str = qx(cat /proc/uptime );
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
+  my $idle_percent = $idle/$uptime*100;  
 	
 	$map->{"uptime"}=sprintf("%d",$uptime);
 	#$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
 	$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
-  $map->{"idletime"}=sprintf("%d",$idle);
+  #$map->{"idletime"}=sprintf("%d",$idle);
+  $map->{"idletime"}=sprintf("%d %.2f %",$idle, $idle_percent);
 	#$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($idle));
 	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle));
 
-  my $idle_percent = $idle/$uptime*100;  
-	$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
+	#$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
 	
 	return $map; 
 }
@@ -347,9 +348,9 @@ SYSMON_getLoadAvg($$)
   my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
 	
 	$map->{"loadavg"}="$la1 $la5 $la15";
-  $map->{"load"}="$la1";
-	$map->{"load5"}="$la5";
-	$map->{"load15"}="$la15";
+  #$map->{"load"}="$la1";
+	#$map->{"load5"}="$la5";
+	#$map->{"load15"}="$la15";
 	
 	return $map; 
 }
@@ -409,7 +410,7 @@ sub SYSMON_getRamAndSwap($$)
   my $percentage_swap;
   
   $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
-  $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB (".$percentage_ram." %), Free: ".($free + $buffers + $cached)." MB";
+  $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram."%, Free: ".($free + $buffers + $cached)." MB";
   
   $map->{"ram"} = $ram;
   
@@ -417,7 +418,7 @@ sub SYSMON_getRamAndSwap($$)
   if($total2 > 0)
   {
     $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
-    $swap = "Total: ".$total2." MB, Used: ".$used2." MB  (".$percentage_swap." %), Free: ".$free2." MB";
+    $swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap."%, Free: ".$free2." MB";
   }
   else
   {
@@ -449,7 +450,7 @@ sub SYSMON_getFileSystemInfo ($$$)
   {
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     #my $out_txt = $fs_desc." at ".$mnt_point." => Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
-    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
+    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used.", Available: ".$available." MB";
     $map->{"fs[$mnt_point]"} = $out_txt; 
     #$map->{"fs:[$mnt_point]"} = $out_txt; 
   } else {
@@ -475,7 +476,7 @@ sub SYSMON_getNetworkInfo ($$$)
   Log 3, "SYSMON DEBUG: ---> network: cmd:".$cmd." : ".@dataThroughput[0]." :- ".grep(/error/, @dataThroughput[0]);
   
   # check if network available
-  if (not grep(/error/, @dataThroughput[0]))
+  if (not grep(/Fehler/, @dataThroughput[0]) && not grep(/error/, @dataThroughput[0]))
   {
     # perform grep from above
     @dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
