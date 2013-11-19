@@ -18,8 +18,8 @@ set y2tics
 set title '<L1>'
 set grid xtics y2tics
 
-set ylabel "CPU Frequenz"
-set y2label "CPU Temperatur in C"
+set ylabel "Frequenz"
+set y2label "Temperatur in C"
 
 #FileLog 4:T\x3a|cpu_temp_avg\x3a:0:
 #FileLog 4:T\x3a|cpu_temp\x3a:0:
@@ -27,8 +27,8 @@ set y2label "CPU Temperatur in C"
 
 plot \
   "< egrep 'T:|cpu_temp_avg:' <IN>"\
-     using 1:4 axes x1y2 title 'CPU average' ls l4 lw 3 with lines \
+     using 1:4 axes x1y2 title 'Durchschnitt' ls l4 lw 3 with lines \
    "< egrep 'T:|cpu_temp:' <IN>"\
-     using 1:4 axes x1y2 title 'CPU temperature' ls l0 lw 1 with lines \
+     using 1:4 axes x1y2 title 'Temperatur' ls l0 lw 1 with lines \
    "< egrep 'T:|cpu_freq:' <IN>"\
-     using 1:4 axes x1y1 title 'CPU Frequenz' ls l1fill lw 1 with steps
+     using 1:4 axes x1y1 title 'Frequenz' ls l1fill lw 1 with steps

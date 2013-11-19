@@ -18,7 +18,7 @@ set ytics
 set title '<L1>'
 set grid xtics y2tics
 
-set ylabel "Load"
+set y2label "Load average"
 
 
 #FileLog 4:load:0:
@@ -27,8 +27,8 @@ set ylabel "Load"
 
 plot \
   "< awk '/load avg:/ {print $1, $4}' <IN>" \
-   using 1:2 ls l8fill axes x1y1 title 'Load 1m' lw 0 with lines \
+   using 1:2 ls l8fill axes x1y1 title '1 min' lw 0 with lines \
   "< awk '/load avg5:/ {print $1, $4}' <IN>" \
-   using 1:2 ls l0 axes x1y1 title 'Load 5m' lw 2 with lines
+   using 1:2 ls l0 axes x1y1 title '5 min' lw 2 with lines \
   "< awk '/load avg15:/ {print $1, $4}' <IN>" \
-   using 1:2 ls l4 axes x1y1 title 'Load 15m' lw 3 with lines
+   using 1:2 ls l4 axes x1y1 title '15 min' lw 3 with lines

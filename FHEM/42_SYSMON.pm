@@ -316,9 +316,9 @@ SYSMON_getUptime($$)
 	$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
   #$map->{"idletime"}=sprintf("%d",$idle);
-  $map->{"idletime"}=sprintf("%d %.2f %",$idle, $idle_percent);
+  $map->{"idletime"}=sprintf("%d %.2f%",$idle, $idle_percent);
 	#$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($idle));
-	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle));
+	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f%)",$idle_percent);
 
 	#$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
 	
