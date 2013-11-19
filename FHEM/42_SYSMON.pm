@@ -513,6 +513,66 @@ sub SYSMON_getNetworkInfo ($$$)
 }
 
 #------------------------------------------------------------------------------
+# Systemparameter als HTML-Tabelle ausgeben
+# Parameter: Name des SYSMON-Gerätes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+#------------------------------------------------------------------------------
+sub SYSMON_ShowValuesHTML ($)
+{
+	my ($name) = @_;
+	my $hash = $main::defs{$name};
+	
+	# Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
+	my @dataDescription =
+  (
+    ["Date", undef, ""],
+    ["CPU temperature", "cpu_temp", " &deg;C"],
+    ["CPU frequency", "cpu_freq", " MHz"],
+    ["System up time", "uptime_text", ""],
+    ["FHEM up time", "fhemuptime_text", ""],
+    ["RAM", "ram", ""], 
+    ["Swap", "swap", ""],
+    #["File system", ?, ""],
+    #["USB stick", ?, ""],
+    ["Ethernet", "eth0", ""],
+    ["WLAN", "wlan0", ""],
+  );
+
+  my $map = SYSMON_obtainParameters($hash);
+
+  my $div_class="";
+
+  my $htmlcode = "<div  class='".$div_class."'><table>";
+
+  # Datum anzeigen
+  $htmlcode .= "<tr><td valign='top'>Date:&nbsp;</td><td>".strftime("%d.%m.%Y %H:%M:%S", localtime())."</td></tr>";
+
+  # oben definierte Werte anzeigen
+  my $ref_zeile;
+  foreach $ref_zeile (@dataDescription) {
+    #foreach my $spalte (@$ref_zeile) { 
+    #	print "$spalte " 
+    #}
+    my $tName = @$ref_zeile[1];
+    if(defined $tName) {
+      $htmlcode .= "<tr><td valign='top'>".@$ref_zeile[0].":&nbsp;</td><td>".$map->{$tName}.@$ref_zeile[2]."</td></tr>";
+    }
+  }
+  
+  # File systems
+  foreach my $aName (sort keys %{$map}) {
+  	if(index($aName, "fs[") == 0) {
+      $aName =~ /fs\[(.+)\]/;
+      #my $dName=$1;
+  	  $htmlcode .= "<tr><td valign='top'>File System: ".$1."&nbsp;</td><td>".$map->{$aName}."</td></tr>";
+    }
+  }
+
+  $htmlcode .= "</table></div><br>";
+
+  return $htmlcode;
+}
+
+#------------------------------------------------------------------------------
 # Übersetzt Sekunden (Dauer) in Tage/Stunden/Minuten/Sekunden
 #------------------------------------------------------------------------------
 sub SYSMON_decode_time_diff($)
@@ -554,6 +614,6 @@ TODO
     <code>define &lt;name&gt; SYSMON ...</code><br>
     <br>
 
-  TODO
+  TODO FS_DIFF+PLOT, HTML-Anzeige, Aktualisierungsintervalleinstellungen, Doku
 =end html
 =cut
