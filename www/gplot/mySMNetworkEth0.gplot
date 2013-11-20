@@ -17,11 +17,11 @@ set grid xtics y2tics
 
 set y2label "Traffic in MB"
 
-#FileLog 5:T\x3a|eth0_diff\x3a:0:
-#FileLog 8:T\x3a|eth0_diff\x3a:0:
+#FileLog 5:eth0_diff\x3a:0:
+#FileLog 8:eth0_diff\x3a:0:
 
 plot \
-  "< egrep 'T:|RX:' <IN>"\
+  "< egrep 'RX:' <IN>"\
      using 1:5 axes x1y2 title 'Empfangen' ls l1 lw 2 with lines \
-   "< egrep 'T:|TX:' <IN>"\
+   "< egrep 'TX:' <IN>"\
      using 1:8 axes x1y2 title 'Gesendet' ls l0 lw 2 with lines

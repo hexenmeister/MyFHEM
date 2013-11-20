@@ -18,12 +18,12 @@ set grid xtics y2tics
 set y2label "RAM-Nutzung MB"
 set y2range [0:495]
 
-#FileLog 5:T\x3a|ram\x3a:0:
-#FileLog 8:T\x3a|ram\x3a:0:
+#FileLog 5:ram\x3a:0:
+#FileLog 8:ram\x3a:0:
 
 plot \
-  "< egrep 'T:|total:' <IN>"\
+  "< egrep 'total:' <IN>"\
      using 1:5 axes x1y2 title '' ls l0 lw 2 with lines
 plot \
-   "< egrep 'T:|used:' <IN>"\
+   "< egrep 'used:' <IN>"\
      using 1:8 axes x1y2 title 'Verwendet' ls l2fill lw 0.5 with lines
