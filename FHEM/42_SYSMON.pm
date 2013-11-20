@@ -529,6 +529,7 @@ sub SYSMON_ShowValuesHTML ($)
     ["CPU frequency", "cpu_freq", " MHz"],
     ["System up time", "uptime_text", ""],
     ["FHEM up time", "fhemuptime_text", ""],
+    ["Load average", "loadavg", ""], 
     ["RAM", "ram", ""], 
     ["Swap", "swap", ""],
     #["File system", ?, ""],
