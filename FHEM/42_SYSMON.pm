@@ -243,7 +243,10 @@ SYSMON_Update($)
     #}
  
     # Kopie der Readings
-    my %copy = %{$defs{$name}{READINGS}}; #$defs{$name}{READINGS};
+    #my %copy = %{$defs{$name}{READINGS}}; #$defs{$name}{READINGS};
+    
+    my @cKeys=keys (%{$defs{$name}{READINGS}});
+ 
  
     $hash->{STATE} = "Active";
     #my $state = $map->{"loadavg"};
@@ -251,17 +254,27 @@ SYSMON_Update($)
   
     foreach my $aName (keys %{$map}) {
   	  my $value = $map->{$aName};
-  	  Log 3, "SYSMON DEBUG: ---> ".$aName."=".$value;
+  	  #Log 3, "SYSMON DEBUG: ---> ".$aName."=".$value;
   	  readingsBulkUpdate($hash,$aName,$value);
   	  
   	  # Vorhandene Keys löschen
-  	  delete %copy->{$aName};
+  	  #delete %copy->{$aName};
+  	  my $i=0;
+  	  foreach my $bName (@cKeys) {
+  	  	if($bName eq $aName) {
+  	  		#Log 3, "SYSMON DEBUG: copy keys ---> ".$bName." / ".$aName;
+  	      delete $cKeys[$i];
+  	      last;
+  	    }
+  	    $i=$i+1;
+  	  }
     }
     
     # Überflüssige Readings löschen
-    foreach my $aName (keys %copy) {
+    #foreach my $aName (keys %copy) {
+    foreach my $aName (@cKeys) {
       delete $defs{$name}{READINGS}{$aName};
-      Log 5, "SYSMON DEBUG: delete obsolete READING---> ".$aName;
+      #Log 3, "SYSMON DEBUG: delete obsolete READING---> ".$aName;
     }
   }
 
@@ -451,10 +464,13 @@ sub SYSMON_getFileSystemInfo ($$$)
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     #my $out_txt = $fs_desc." at ".$mnt_point." => Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used.", Available: ".$available." MB";
-    $map->{"fs[$mnt_point]"} = $out_txt; 
+    #$map->{"fs[$mnt_point]"} = $out_txt; 
     #$map->{"fs:[$mnt_point]"} = $out_txt; 
+    $map->{"~ $mnt_point"} = $out_txt; 
+    
   } else {
-  	$map->{"fs[$fs]"} = "not available"; 
+  	#$map->{"fs[$fs]"} = "not available"; 
+  	$map->{"~ $fs"} = "not available"; 
   }
 
   return $map;
@@ -473,7 +489,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
   my @dataThroughput = qx($cmd);
   
-  Log 3, "SYSMON DEBUG: ---> network: cmd:".$cmd." : ".@dataThroughput[0]." :- ".grep(/error/, @dataThroughput[0]);
+  #Log 3, "SYSMON DEBUG: ---> network: cmd:".$cmd." : ".@dataThroughput[0]." :- ".grep(/error/, @dataThroughput[0]);
   
   # check if network available
   if (not grep(/Fehler/, @dataThroughput[0]) && not grep(/error/, @dataThroughput[0]))
@@ -502,7 +518,17 @@ sub SYSMON_getNetworkInfo ($$$)
     
     my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
     my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
-    my $out_txt_diff = "RX: ".sprintf ("%.2f", ($rx-$o_rx))." MB, TX: ".sprintf ("%.2f", ($tx-$o_tx))." MB, Total: ".sprintf ("%.2f", ($totalRxTx-$o_tt))." MB";
+    
+    my $d_rx = $rx-$o_rx;
+    if($d_rx<0) {$d_rx=0;}
+    my $d_tx = $tx-$o_tx;
+    if($d_tx<0) {$d_tx=0;}
+    my $d_tt = $totalRxTx-$o_tt;
+    if($d_tt<0) {$d_tt=0;}
+    my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
+    
+    #my $out_txt_diff = "---";
+    #$out_txt_diff = "RX: ".sprintf ("%.2f", ($rx-$o_rx))." MB, TX: ".sprintf ("%.2f", ($tx-$o_tx))." MB, Total: ".sprintf ("%.2f", ($totalRxTx-$o_tt))." MB";
     $map->{$device."_diff"} = $out_txt_diff; 
   } else {
   	$map->{$device} = "not available"; 
@@ -561,8 +587,10 @@ sub SYSMON_ShowValuesHTML ($)
   
   # File systems
   foreach my $aName (sort keys %{$map}) {
-  	if(index($aName, "fs[") == 0) {
-      $aName =~ /fs\[(.+)\]/;
+  	#if(index($aName, "fs[") == 0) {
+  	if(index($aName, "~ ") == 0) {
+      #$aName =~ /fs\[(.+)\]/;
+      $aName =~ /^~ (.+)/;
       #my $dName=$1;
   	  $htmlcode .= "<tr><td valign='top'>File System: ".$1."&nbsp;</td><td>".$map->{$aName}."</td></tr>";
     }
