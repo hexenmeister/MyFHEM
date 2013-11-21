@@ -329,9 +329,9 @@ SYSMON_getUptime($$)
 	$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
   #$map->{"idletime"}=sprintf("%d",$idle);
-  $map->{"idletime"}=sprintf("%d %.2f%",$idle, $idle_percent);
+  $map->{"idletime"}=sprintf("%d %.2f %",$idle, $idle_percent);
 	#$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($idle));
-	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f%)",$idle_percent);
+	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %)",$idle_percent);
 
 	#$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
 	
@@ -423,7 +423,7 @@ sub SYSMON_getRamAndSwap($$)
   my $percentage_swap;
   
   $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
-  $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram."%, Free: ".($free + $buffers + $cached)." MB";
+  $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
   
   $map->{"ram"} = $ram;
   
@@ -431,7 +431,7 @@ sub SYSMON_getRamAndSwap($$)
   if($total2 > 0)
   {
     $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
-    $swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap."%, Free: ".$free2." MB";
+    $swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap." %, Free: ".$free2." MB";
   }
   else
   {
@@ -462,8 +462,10 @@ sub SYSMON_getFileSystemInfo ($$$)
   if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
   {
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
+    $percentage_used =~ /^(.+)%$/;
+    $percentage_used = $1;
     #my $out_txt = $fs_desc." at ".$mnt_point." => Total: ".$total." MB, Used: ".$used." MB (".$percentage_used."), Available: ".$available." MB";
-    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used.", Available: ".$available." MB";
+    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB";
     #$map->{"fs[$mnt_point]"} = $out_txt; 
     #$map->{"fs:[$mnt_point]"} = $out_txt; 
     $map->{"~ $mnt_point"} = $out_txt; 

@@ -2,8 +2,8 @@
 # Visualisierung: RAM-Nutzung
 # 
 # Beispiel aus dem Logfile:
-# 2013-11-21_20:00:54 sysmon ~ /: Total: 7404 MB, Used: 3292 MB, 47%, Available: 3787 MB
-# 2013-11-21_20:00:54 sysmon ~ /media/usb1: Total: 30942 MB, Used: 6330 MB, 21%, Available: 24613 MB
+# 2013-11-21_20:00:54 sysmon ~ /: Total: 7404 MB, Used: 3292 MB, 47 %, Available: 3787 MB
+# 2013-11-21_20:00:54 sysmon ~ /media/usb1: Total: 30942 MB, Used: 6330 MB, 21 %, Available: 24613 MB
 #
 
 set terminal png transparent size <SIZE> crop
@@ -34,4 +34,4 @@ plot \
      using 1:9 axes x1y2 title 'Verwendet MB' ls l2fill lw 0.5 with lines
 plot \
    "< egrep 'percent:' <IN>"\
-     using 1:11 axes x1y1 title 'Verwendet %' ls l3 lw 1.5 with lines
+     using 1:11 axes x1y1 title 'Verwendet %' ls l1 lw 1.5 with lines
