@@ -21,7 +21,7 @@ SYSMON_Initialize($)
   $hash->{GetFn}    = "SYSMON_Get";
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "filesystems disable:0,1 raspberrytemperature:0,1,2 uptime:1,2 ".
+  $hash->{AttrList} = "filesystems disable:0,1 ".
                        $readingFnAttributes;
 }
 
@@ -113,9 +113,9 @@ SYSMON_Get($@)
 
   if($cmd eq "update")
   {
-  	$hash->{LOCAL} = 1;
+  	#$hash->{LOCAL} = 1;
   	SYSMON_Update($hash);
-  	delete $hash->{LOCAL};
+  	#delete $hash->{LOCAL};
   	return undef;
   }
   
@@ -198,9 +198,9 @@ SYSMON_Attr($$$)
       	{
       		InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 0);
       	}
-       	$hash->{LOCAL} = 1;
+       	#$hash->{LOCAL} = 1;
   	    SYSMON_Update($hash);
-  	    delete $hash->{LOCAL};
+  	    #delete $hash->{LOCAL};
       }
     	
       $attr{$name}{$attrName} = $attrVal;
@@ -645,6 +645,55 @@ TODO
     <code>define &lt;name&gt; SYSMON ...</code><br>
     <br>
 
-  TODO FS_DIFF+PLOT, HTML-Anzeige, Aktualisierungsintervalleinstellungen, Doku
+  TODO Aktualisierungsintervalleinstellungen, Doku
+  
+  SYSMON
+  Dieses Modul Liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgeführt wird.
+  Es werden ausschliessliche Linux-basierte Systemen unterstützt. Bis jetzt getestet auf Raspberry Pi (Debian Wheezy).
+  
+  Definition:
+  Die Anweisung
+  define <name> SYSMON [<interval>]
+  erstellt eine neue SYSMON-Instanz. Der Parameter <interval> legt den Aktualisierungsinterval fest.
+  
+  Readings:
+  - cpu_freq
+  - cpu_temp
+  - cpu_temp_avg
+  - eth0
+  - eth0_diff
+  - fhemuptime
+  - fhemuptime_text
+  - idletime
+  - idletime_text
+  - loadavg
+  - ram
+  - swap
+  - uptime
+  - uptime_text
+  - wlan0
+  - wlan0_diff
+  - Dateisysteminformationen (z.B. ~ /)
+  
+  Get:
+  - interval
+  - list
+  - update
+  - version
+  
+  Set:
+  - interval
+  
+  Attributes:
+  - filesystems 
+  - disable:0,1 
+  
+  
+  Beispiele:
+  
+  
+  Plots:
+  
+  
 =end html
 =cut
