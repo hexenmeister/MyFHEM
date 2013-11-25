@@ -1,5 +1,5 @@
 #
-# Display the measured temperature for Oregon sensors
+# Visualisierung: Raumtemperatur
 #
 # FileLog definition: 
 # define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
@@ -23,7 +23,8 @@ set xlabel " "
 set yrange [15:29]
 set y2range [15:29]
 set y2tics
-set title '<TL>'
+#set title '<TL>'
+set title '<L1>'
 set grid xtics y2tics
 
 set y2label "Temperature in C"
