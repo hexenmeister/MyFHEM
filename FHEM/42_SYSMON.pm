@@ -270,7 +270,7 @@ SYSMON_Update($)
   	  }
     }
     
-    # Überflüssige Readings löschen
+    # Ueberfluessige Readings löschen
     #foreach my $aName (keys %copy) {
     foreach my $aName (@cKeys) {
       delete $defs{$name}{READINGS}{$aName};
@@ -398,7 +398,7 @@ SYSMON_getCPUFreq($$)
 }
 
 #------------------------------------------------------------------------------
-# Liefert Werte für RAM und SWAP (Gesamt, Verwendet, Frei).
+# Liefert Werte fuer RAM und SWAP (Gesamt, Verwendet, Frei).
 #------------------------------------------------------------------------------
 sub SYSMON_getRamAndSwap($$)
 {
@@ -444,7 +444,7 @@ sub SYSMON_getRamAndSwap($$)
 }
 
 #------------------------------------------------------------------------------
-# Liefert Füllstand für das angegebene Dateisystem (z.B. '/dev/root', '/dev/sda1' (USB stick)).
+# Liefert Fuellstand fuer das angegebene Dateisystem (z.B. '/dev/root', '/dev/sda1' (USB stick)).
 # Eingabeparameter: HASH; MAP; FS-Bezeichnung
 #------------------------------------------------------------------------------
 sub SYSMON_getFileSystemInfo ($$$)
@@ -604,7 +604,7 @@ sub SYSMON_ShowValuesHTML ($)
 }
 
 #------------------------------------------------------------------------------
-# Übersetzt Sekunden (Dauer) in Tage/Stunden/Minuten/Sekunden
+# Uebersetzt Sekunden (Dauer) in Tage/Stunden/Minuten/Sekunden
 #------------------------------------------------------------------------------
 sub SYSMON_decode_time_diff($)
 {
@@ -670,120 +670,271 @@ sub logF($$$)
         Durchschnitt der CPU-Temperatur, gebildet &uuml;ber die letzten 4 Werte.
     </li>
     <br>
-  - eth0
-  - eth0_diff
-  - fhemuptime
-  - fhemuptime_text
-  - idletime
-  - idletime_text
-  - loadavg
-  - ram
-  - swap
-  - uptime
-  - uptime_text
-  - wlan0
-  - wlan0_diff
-  - Dateisysteminformationen (z.B. ~ /)
+    <li>eth0<br>
+    		Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle eth0.
+    </li>
+    <br>
+    <li>eth0_diff<br>
+    	 &Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufrung (f&uuml; eth0).
+    </li>
+    <br>
+    <li>fhemuptime<br>
+    		Zeit (in Sekunden) seit dem Start des FHEM-Servers.
+    </li>
+    <br>
+    <li>fhemuptime_text<br>
+    		Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
+    </li>
+    <br>
+    <li>idletime<br>
+    		Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!) 
+    		seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
+    </li>
+    <br>
+    <li>idletime_text<br>
+    		Zeit der Inaktivit&auml;t des Systems seit dem Systemstart in menschenlesbarer Form.
+    </li>
+    <br>
+    <li>loadavg<br>
+        Ausgabe der Werte f&uuml;r die Systemauslastung (load average): 1 Minute-, 5 Minuten- und 15 Minuten-Werte.
+    </li>
+    <br>
+    <li>ram<br>
+       Ausgabe der Speicherauslastung.
+    </li>
+    <br>
+    <li>swap<br>
+    		Benutzung und Auslastung der SWAP-Datei (bzw. Partition).
+    </li>
+    <br>
+    <li>uptime<br>
+    		Zeit (in Sekenden) seit dem Systemstart.
+    </li>
+    <br>
+    <li>uptime_text<br>
+    		Zeit seit dem Systemstart in menschenlesbarer Form.
+    </li>
+    <br>
+    <li>wlan0<br>
+        Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle wlan0.
+    </li>
+    <br>
+    <li>wlan0_diff<br>
+    		&Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufrung (f&uuml; wlan0).
+    </li>
+    <br>
+    <li>Dateisysteminformationen (z.B. ~ /)<br>
+    		Iformationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.
+    </li>
+    <br>
   <br>
   </ul>
-<table>
-<tr class="odd"><td><div class="dname">cpu_freq</div></td>
-<td><div informid="sysmon-cpu_freq">900</div></td>
-<td><div informid="sysmon-cpu_freq-ts">2013-11-27 00:05:36</div></td>
+ 
+  Beispiel-Ausgabe:<br> 
+  <ul>
+ 
+<table style="border: 1px solid black;">
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">cpu_freq</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>900</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">cpu_temp</div></td>
-<td><div informid="sysmon-cpu_temp">49.77</div></td>
-<td><div informid="sysmon-cpu_temp-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.77</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">cpu_temp_avg</div></td>
-<td><div informid="sysmon-cpu_temp_avg">49.7</div></td>
-<td><div informid="sysmon-cpu_temp_avg-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp_avg</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.7</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">eth0</div></td>
-<td><div informid="sysmon-eth0">RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
-<td><div informid="sysmon-eth0-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">eth0_diff</div></td>
-<td><div informid="sysmon-eth0_diff">RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
-<td><div informid="sysmon-eth0_diff-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">fhemuptime</div></td>
-<td><div informid="sysmon-fhemuptime">11231</div></td>
-<td><div informid="sysmon-fhemuptime-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>11231</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">fhemuptime_text</div></td>
-<td><div informid="sysmon-fhemuptime_text">0 days, 03 hours, 07 minutes</div></td>
-<td><div informid="sysmon-fhemuptime_text-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>0 days, 03 hours, 07 minutes</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">idletime</div></td>
-<td><div informid="sysmon-idletime">931024 88.35 %</div></td>
-<td><div informid="sysmon-idletime-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>931024 88.35 %</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">idletime_text</div></td>
-<td><div informid="sysmon-idletime_text">10 days, 18 hours, 37 minutes (88.35 %)</div></td>
-<td><div informid="sysmon-idletime_text-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime_text</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>10 days, 18 hours, 37 minutes (88.35 %)</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">loadavg</div></td>
-<td><div informid="sysmon-loadavg">0.14 0.18 0.22</div></td>
-<td><div informid="sysmon-loadavg-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">loadavg</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>0.14 0.18 0.22</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">ram</div></td>
-<td><div informid="sysmon-ram">Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
-<td><div informid="sysmon-ram-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">ram</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">swap</div></td>
-<td><div informid="sysmon-swap">n/a</div></td>
-<td><div informid="sysmon-swap-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">swap</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>n/a</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">uptime</div></td>
-<td><div informid="sysmon-uptime">1053739</div></td>
-<td><div informid="sysmon-uptime-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>1053739</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">uptime_text</div></td>
-<td><div informid="sysmon-uptime_text">12 days, 04 hours, 42 minutes</div></td>
-<td><div informid="sysmon-uptime_text-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime_text</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>12 days, 04 hours, 42 minutes</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">wlan0</div></td>
-<td><div informid="sysmon-wlan0">RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
-<td><div informid="sysmon-wlan0-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">wlan0_diff</div></td>
-<td><div informid="sysmon-wlan0_diff">RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
-<td><div informid="sysmon-wlan0_diff-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">~ /</div></td>
-<td><div informid="sysmon-~ /">Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB</div></td>
-<td><div informid="sysmon-~ /-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">~ /</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="even"><td><div class="dname">~ /boot</div></td>
-<td><div informid="sysmon-~ /boot">Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB</div></td>
-<td><div informid="sysmon-~ /boot-ts">2013-11-27 00:05:36</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">~ /boot</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr class="odd"><td><div class="dname">~ /media/usb1</div></td>
-<td><div informid="sysmon-~ /media/usb1">Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB</div></td>
-<td><div informid="sysmon-~ /media/usb1-ts">2013-11-27 00:05:36</div></td>
+<tr><td><div class="dname">~ /media/usb1</div></td>
+<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB</div></td>
+<td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
+  </ul><br>
   
-  <b>Get:</b>
-  - interval
-  - list
-  - update
-  - version
+  <b>Get:</b><br><br>
+    <ul>
+    <li>interval<br>
+    Listet die bei der Definition angegebene Polling-Intervale auf.
+    </li>
+    <br>
+    <li>list<br>
+    Gibt alle Readings aus.
+    </li>
+    <br>
+    <li>update<br>
+    Aktualisiert alle Readings. Alle Werte werden neu abgefragt.
+    </li>
+    <br>
+    <li>version<br>
+    Zeigt die Version des SYSMON-Moduls.
+    </li>
+    <br>
+    </ul><br>
+    
+  <b>Set:</b><br><br>
+    <ul>
+    <li>interval<br>
+    Definiert Polling-Intervale (wie bei der Definition des Ger&auml;tes).
+    </li>
+    <br>
+    </ul><br>
+    
+  <b>Attributes:</b><br><br>
+    <ul>
+    <li>filesystems<br>
+    Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
+    Beispiel: <code>/boot, /, /media/usb1</code>
+    </li>
+    <br>
+    <li>disable<br>
+    M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
+    </li>
+    <br>
+    </ul><br>
   
-  <b>Set:</b>
-  - interval
+  <b>Plots:</b><br><br>
+    <ul>
+    F&uuml;r dieses Modul sind bereits einige gplot-Dateien vordefiniert:<br>
+     <ul>
+      <code>
+       mySMRAM.gplot<br>
+       mySMCPUTemp.gplot<br>
+       mySMFS_Root.gplot<br>
+       mySMFS_usb1.gplot<br>
+       mySMLoad.gplot<br>
+       mySMNetworkEth0.gplot<br>
+       mySMNetworkEth0t.gplot<br>
+      </code>
+     </ul>
+    </ul><br>
+    
+  <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML</b><br><br>
+    <ul>
+    Das Modul definiert eine Funrktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
+    Als Parameter wird der Name des definierten SYSMON-Ger&auml;ten erwartet.<br><br>
+    <code>define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code>
+    </ul><br>
   
-  Attributes:
-  - filesystems 
-  - disable:0,1 
-  
-  
-  <b>Beispiele:</b>
-  
-  
-  <b>Plots:</b>
-  
+  <b>Beispiele:</b><br><br>
+    <ul>
+    <code>
+      # Modul-Definition<br>
+      define sysmon SYSMON 60<br>
+      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
+      attr sysmon filesystems /boot, /, /media/usb1<br>
+      attr sysmon group RPi<br>
+      attr sysmon room 9.03_Tech<br>
+      <br>
+      # Log<br>
+      define FileLog_sysmon FileLog ./log/sysmon-%Y-%m.log sysmon<br>
+      attr FileLog_sysmon group RPi<br>
+      attr FileLog_sysmon logtype mySMCPUTemp:Plot,text<br>
+      attr FileLog_sysmon room 9.03_Tech<br>
+      <br>
+      # Visualisierung: CPU-Temperatur<br>
+      define wl_sysmon_temp SVG FileLog_sysmon:mySMCPUTemp:CURRENT<br>
+      attr wl_sysmon_temp group RPi<br>
+      attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
+      attr wl_sysmon_temp room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
+      define wl_sysmon_eth0 SVG FileLog_sysmon:mySMNetworkEth0:CURRENT<br>
+      attr wl_sysmon_eth0 group RPi<br>
+      attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_eth0 room 9.03_Tech<br>
+      <br>
+      # Visualisierung: CPU-Auslastung (load average)<br>
+      define wl_sysmon_load SVG FileLog_sysmon:mySMLoad:CURRENT<br>
+      attr wl_sysmon_load group RPi<br>
+      attr wl_sysmon_load label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_load room 9.03_Tech<br>
+      <br>
+      # Visualisierung: RAM-Nutzung<br>
+      define wl_sysmon_ram SVG FileLog_sysmon:mySMRAM:CURRENT<br>
+      attr wl_sysmon_ram group RPi<br>
+      attr wl_sysmon_ram label "RAM-Nutzung Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_ram room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Dateisystem: Root-Partition<br>
+      define wl_sysmon_fs_root SVG FileLog_sysmon:mySMFS_Root:CURRENT<br>
+      attr wl_sysmon_fs_root group RPi<br>
+      attr wl_sysmon_fs_root label "Root Partition Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_fs_root room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Dateisystem: USB-Stick<br>
+      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:mySMFS_usb1:CURRENT<br>
+      attr wl_sysmon_fs_usb1 group RPi<br>
+      attr wl_sysmon_fs_usb1 label "USB1 Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_fs_usb1 room 9.03_Tech<br>
+      <br>
+      # Anzeige der Readings zum EInbinden in ein 'Raum'.<br>
+      define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
+      attr SysValues group RPi<br>
+      attr SysValues room 9.03_Tech<br>
+    </code>
+    </ul>
   
   </ul>
   
