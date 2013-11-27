@@ -1,5 +1,5 @@
 #
-# Eigene Definition für 3 Temperaturlinien in einem Graph (Heizung)
+# Eigene Definition für 5 Temperaturlinien in einem Graph (Heizung)
 #
 
 set terminal png transparent size <SIZE> crop
@@ -10,13 +10,15 @@ set xlabel " "
 set yrange [10:90]
 set y2range [10:90]
 
-set title 'Fernwaerme / Heizung'
+#set title 'Fernwaerme / Heizung / Warmwasser'
+set title '<L1>'
 set y2label "Temperature in C"
 
-#FileLog 4:EG_HA_OWTS21.Fernwaerme_Vorlauf_Heizung:0:
-#FileLog 4:EG_HA_OWTS22.Fernwaerme_Vorlauf_Warmwasser:0:
-#FileLog 4:EG_HA_OWTS23.Fernwaerme_Rueckflauf:0:
-
+#FileLog 4:Vorlauf_Heizung:0:
+#FileLog 4:Vorlauf_Warmwasser:0:
+#FileLog 4:Fernwaerme_Rueckflauf_Gesamt:0:
+#FileLog 4:Rueckflauf_Heizung:0:
+#FileLog 4:Rueckflauf_Warmwasser:0:
 plot \
 
   "< awk '/EG_HA_OWTS21\.Fernwaerme_Vorlauf_Heizung/ {print $1, $4}' <IN>"\
@@ -24,5 +26,9 @@ plot \
   "< awk '/EG_HA_OWTS22\.Fernwaerme_Vorlauf_Warmwasser/ {print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Vorlauf Warmwasser' with lines lw 2,\
   "< awk '/EG_HA_OWTS23\.Fernwaerme_Rueckflauf/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rueckflauf' with lines lw 2\
+     using 1:2 axes x1y2 title 'Rueckflauf Gesamt' with lines lw 2\
+  "< awk '/Rueckflauf_Heizung/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Rueckflauf Heizung' with lines lw 1\
+  "< awk '/Rueckflauf_Warmwasser/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Rueckflauf Warmwasser' with lines lw 1
  
