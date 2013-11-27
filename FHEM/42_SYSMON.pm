@@ -637,29 +637,39 @@ sub logF($$$)
 =pod
 =begin html
 
+
+
+=end html
+=begin html_DE
+
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
-TODO
+<ul>
+  Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
+  Es werden ausschliessliche Linux-basierte Systemen unterst&uuml;tzt. Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
+  <br><br>
   <b>Define</b>
-  
-    <code>define &lt;name&gt; SYSMON ...</code><br>
+  <br><br>
+    <code>define <name> SYSMON [&lt;interval&gt;]</code><br>
     <br>
-
-  TODO Aktualisierungsintervalleinstellungen, Doku
+    Diese Anweisung erstellt eine neue SYSMON-Instanz. Der Parameter &lt;interval&gt; legt den Aktualisierungsinterval fest.<br>
+  <br>
   
-  SYSMON
-  Dieses Modul Liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgeführt wird.
-  Es werden ausschliessliche Linux-basierte Systemen unterstützt. Bis jetzt getestet auf Raspberry Pi (Debian Wheezy).
-  
-  Definition:
-  Die Anweisung
-  define <name> SYSMON [<interval>]
-  erstellt eine neue SYSMON-Instanz. Der Parameter <interval> legt den Aktualisierungsinterval fest.
-  
-  Readings:
-  - cpu_freq
-  - cpu_temp
-  - cpu_temp_avg
+  <b>Readings:</b>
+  <br><br>
+  <ul>
+    <li>cpu_freq<br>
+        CPU-Frequenz
+    </li>
+    <br>
+    <li>cpu_temp<br>
+        CPU-Temperatur
+    </li>
+    <br>
+    <li>cpu_temp_avg<br>
+        Durchschnitt der CPU-Temperatur, gebildet &uuml;ber die letzten 4 Werte.
+    </li>
+    <br>
   - eth0
   - eth0_diff
   - fhemuptime
@@ -674,14 +684,94 @@ TODO
   - wlan0
   - wlan0_diff
   - Dateisysteminformationen (z.B. ~ /)
+  <br>
+  </ul>
+<table>
+<tr class="odd"><td><div class="dname">cpu_freq</div></td>
+<td><div informid="sysmon-cpu_freq">900</div></td>
+<td><div informid="sysmon-cpu_freq-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">cpu_temp</div></td>
+<td><div informid="sysmon-cpu_temp">49.77</div></td>
+<td><div informid="sysmon-cpu_temp-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">cpu_temp_avg</div></td>
+<td><div informid="sysmon-cpu_temp_avg">49.7</div></td>
+<td><div informid="sysmon-cpu_temp_avg-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">eth0</div></td>
+<td><div informid="sysmon-eth0">RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
+<td><div informid="sysmon-eth0-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">eth0_diff</div></td>
+<td><div informid="sysmon-eth0_diff">RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
+<td><div informid="sysmon-eth0_diff-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">fhemuptime</div></td>
+<td><div informid="sysmon-fhemuptime">11231</div></td>
+<td><div informid="sysmon-fhemuptime-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">fhemuptime_text</div></td>
+<td><div informid="sysmon-fhemuptime_text">0 days, 03 hours, 07 minutes</div></td>
+<td><div informid="sysmon-fhemuptime_text-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">idletime</div></td>
+<td><div informid="sysmon-idletime">931024 88.35 %</div></td>
+<td><div informid="sysmon-idletime-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">idletime_text</div></td>
+<td><div informid="sysmon-idletime_text">10 days, 18 hours, 37 minutes (88.35 %)</div></td>
+<td><div informid="sysmon-idletime_text-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">loadavg</div></td>
+<td><div informid="sysmon-loadavg">0.14 0.18 0.22</div></td>
+<td><div informid="sysmon-loadavg-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">ram</div></td>
+<td><div informid="sysmon-ram">Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
+<td><div informid="sysmon-ram-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">swap</div></td>
+<td><div informid="sysmon-swap">n/a</div></td>
+<td><div informid="sysmon-swap-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">uptime</div></td>
+<td><div informid="sysmon-uptime">1053739</div></td>
+<td><div informid="sysmon-uptime-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">uptime_text</div></td>
+<td><div informid="sysmon-uptime_text">12 days, 04 hours, 42 minutes</div></td>
+<td><div informid="sysmon-uptime_text-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">wlan0</div></td>
+<td><div informid="sysmon-wlan0">RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
+<td><div informid="sysmon-wlan0-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">wlan0_diff</div></td>
+<td><div informid="sysmon-wlan0_diff">RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
+<td><div informid="sysmon-wlan0_diff-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">~ /</div></td>
+<td><div informid="sysmon-~ /">Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB</div></td>
+<td><div informid="sysmon-~ /-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="even"><td><div class="dname">~ /boot</div></td>
+<td><div informid="sysmon-~ /boot">Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB</div></td>
+<td><div informid="sysmon-~ /boot-ts">2013-11-27 00:05:36</div></td>
+</tr>
+<tr class="odd"><td><div class="dname">~ /media/usb1</div></td>
+<td><div informid="sysmon-~ /media/usb1">Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB</div></td>
+<td><div informid="sysmon-~ /media/usb1-ts">2013-11-27 00:05:36</div></td>
+</tr>
+</table>
   
-  Get:
+  <b>Get:</b>
   - interval
   - list
   - update
   - version
   
-  Set:
+  <b>Set:</b>
   - interval
   
   Attributes:
@@ -689,11 +779,13 @@ TODO
   - disable:0,1 
   
   
-  Beispiele:
+  <b>Beispiele:</b>
   
   
-  Plots:
+  <b>Plots:</b>
   
   
-=end html
+  </ul>
+  
+=end html_DE
 =cut
