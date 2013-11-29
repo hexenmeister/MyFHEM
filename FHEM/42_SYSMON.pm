@@ -637,7 +637,33 @@ sub logF($$$)
 =pod
 =begin html
 
+TODO
+Minutlich (times):
+ fhemuptime
+ fhemuptime_text
+ idletime
+ idletime_text
+ uptime
+ uptime_text
 
+Time1 (cpu):
+ cpu_freq
+ cpu_temp
+ cpu_temp_avg
+ loadavg
+
+Time2 (ram):
+ ram
+ swap
+
+Time3 (network):
+ eth0
+ eth0_diff
+ wlan0
+ wlan0_diff
+
+Time4 (fs):
+ Filesystems
 
 =end html
 =begin html_DE
