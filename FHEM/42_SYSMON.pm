@@ -758,7 +758,7 @@ sub logF($$$)
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>11231</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text&nbsp;&nbsp;</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>0 days, 03 hours, 07 minutes</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
@@ -807,7 +807,7 @@ sub logF($$$)
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
 <tr><td><div class="dname">~ /media/usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB</div></td>
+<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
