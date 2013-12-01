@@ -6,7 +6,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "0.95";
+my $VERSION = "1.0";
 
 sub
 SYSMON_Initialize($)
