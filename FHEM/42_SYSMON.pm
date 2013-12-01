@@ -81,10 +81,10 @@ SYSMON_setInterval($@)
 	my $p3=1;
 	my $p4=10;
 	
-	if(defined($a[0])) {$p1 = $a[0];}
-	if(defined($a[1])) {$p2 = $a[1];} else {$p2 = $p1;}
-	if(defined($a[2])) {$p3 = $a[2];} else {$p3 = $p1;}
-	if(defined($a[3])) {$p4 = $a[3];} else {$p4 = $p1*10;}
+	if(defined($a[0]) && int($a[0]) eq $a[0]) {$p1 = $a[0];}
+	if(defined($a[1]) && int($a[1]) eq $a[1]) {$p2 = $a[1];} else {$p2 = $p1;}
+	if(defined($a[2]) && int($a[2]) eq $a[2]) {$p3 = $a[2];} else {$p3 = $p1;}
+	if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
 	
 	#Log 3, "SYSMON (".$hash->{NAME}.") :::::::::: ".int(@a)." : ".$a[0]." ".$a[1]." ".$a[2]." ".$a[3]." ";
 	
