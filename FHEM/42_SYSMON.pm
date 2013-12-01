@@ -7,7 +7,7 @@ use strict;
 use warnings;
 #use Data::Dumper;
 
-my $VERSION = "0.9";
+my $VERSION = "0.95";
 
 sub
 SYSMON_Initialize($)
@@ -38,13 +38,14 @@ SYSMON_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> SYSMON [interval]"  if(@a < 2);
+  return "Usage: define <name> SYSMON [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
 
   #my $interval = 60;
   #if(int(@a)>=3) { $interval = $a[2]; }
   if(int(@a)>=3) 
-  { 
-  	SYSMON_setInterval($hash, $a[2]);
+  {
+    my @na = @a[1..scalar(@a)-1];
+  	SYSMON_setInterval($hash, @na);
   } else {
     SYSMON_setInterval($hash, undef);
   }
@@ -53,13 +54,12 @@ SYSMON_Define($$)
   #delete( $hash->{INTERVAL_FS} );
   
   $hash->{STATE} = "Initialized";
-  #$hash->{INTERVAL} = $interval;
 
   #$starttime = time() unless defined($starttime);
   $hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 0);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
 
   #$hash->{LOCAL} = 1;
   #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgehängt'
@@ -69,15 +69,29 @@ SYSMON_Define($$)
 }
 
 sub
-SYSMON_setInterval($$)
+SYSMON_setInterval($@)
 {
-	my ($hash, $def) = @_;
+	my ($hash, @a) = @_;
 	
 	my $interval = 60;
-  if(defined($def)) {$interval = $def;}
-  if($interval < 60) {$interval = 60;}
-
-  $hash->{INTERVAL} = $interval;
+	$hash->{INTERVAL_BASE} = $interval;
+	
+	my $p1=1;
+	my $p2=1;
+	my $p3=1;
+	my $p4=10;
+	
+	if(defined($a[0])) {$p1 = $a[0];}
+	if(defined($a[1])) {$p2 = $a[1];} else {$p2 = $p1;}
+	if(defined($a[2])) {$p3 = $a[2];} else {$p3 = $p1;}
+	if(defined($a[3])) {$p4 = $a[3];} else {$p4 = $p1*10;}
+	
+	#Log 3, "SYSMON (".$hash->{NAME}.") :::::::::: ".int(@a)." : ".$a[0]." ".$a[1]." ".$a[2]." ".$a[3]." ";
+	
+	$hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
+	
+  #if(defined($def)) {$interval = $def;}
+  #if($interval < 60) {$interval = 60;}
 }
 
 sub
@@ -118,7 +132,7 @@ SYSMON_Get($@)
   	#delete $hash->{LOCAL};
   	return undef;
   }
-  
+
   if($cmd eq "list") {
     my $map = SYSMON_obtainParameters($hash);
     my $ret = "";
@@ -134,12 +148,17 @@ SYSMON_Get($@)
   	return $VERSION;
   }
 
-  if($cmd eq "interval")
+  if($cmd eq "interval_base")
   {
-  	return $hash->{INTERVAL};
+  	return $hash->{INTERVAL_BASE};
   }
   
-  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval:noArg version:noArg";
+  if($cmd eq "interval_multipliers")
+  {
+  	return $hash->{INTERVAL_MULTIPLIERS};
+  }
+  
+  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg";
 }
 
 sub
@@ -161,19 +180,20 @@ SYSMON_Set($@)
   logF($hash, "Set", "@a");
   #Log 5, "SYSMON (".$hash->{NAME}.") Set $name $cmd";
 
-  if($cmd eq "interval")
+  if($cmd eq "interval_multipliers")
   {
   	if(@a < 3) {
   		logF($hash, "Set", "$name: not enought parameters");
       return "$name: not enought parameters";
   	} 
   	#my $val= $a[2];
-  	SYSMON_setInterval($hash, $a[2]);
-  	#$hash->{INTERVAL} = $val;
-  	return $cmd ." set to ".($hash->{INTERVAL});
+  	my @na = @a[2..scalar(@a)-1];
+  	#Log 3, "SYSMON (".$hash->{NAME}.") :::::::::: ".int(@na)." : ".$na[0]." ".$na[1]." ".$na[2]." ".$na[3]." ";
+  	SYSMON_setInterval($hash, @na);
+  	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
   }
 
-  return "Unknown argument $cmd, choose one of interval";
+  return "Unknown argument $cmd, choose one of interval_multipliers";
 }
 
 sub
@@ -196,7 +216,7 @@ SYSMON_Attr($$$)
         RemoveInternalTimer($hash);
       	if($attrVal ne "0")
       	{
-      		InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 0);
+      		InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
       	}
        	#$hash->{LOCAL} = 1;
   	    SYSMON_Update($hash);
@@ -223,7 +243,7 @@ SYSMON_Update($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSMON_Update", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 1);
   }
 
   readingsBeginUpdate($hash);
@@ -676,9 +696,31 @@ Time4 (fs):
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define <name> SYSMON [&lt;interval&gt;]</code><br>
+    <code>define <name> SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
-    Diese Anweisung erstellt eine neue SYSMON-Instanz. Der Parameter &lt;interval&gt; legt den Aktualisierungsinterval fest.<br>
+    Diese Anweisung erstellt eine neue SYSMON-Instanz. 
+    Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
+    Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
+    Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervale in Minuten angesehen werden.<br>
+    <br>
+    Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
+    <ul>
+     <li>M1: (Default-Wert: 1)<br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     </li>
+     <li>M2: (Default-Wert: M1)<br>
+     ram, swap<br>
+     </li>
+     <li>M3: (Default-Wert: M1)<br>
+     eth0, eth0_diff, wlan0, wlan0_diff<br><br>
+     </li>
+     <li>M4: (Default-Wert: 10*M1)<br>
+     Filesystem-Informationen<br><br>
+     </li>
+     <li>folgende Parameter werden immer anhand des Basisintervalls (unabh&auml;ngig von den Mx-Parameters) aktualisiert:<br>
+     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
+     </li>
+    </ul>
   <br>
   
   <b>Readings:</b>
