@@ -109,13 +109,13 @@ SYSMON_Get($@)
   if($cmd eq "update")
   {
   	#$hash->{LOCAL} = 1;
-  	SYSMON_Update($hash);
+  	SYSMON_Update($hash, 1);
   	#delete $hash->{LOCAL};
   	return undef;
   }
 
   if($cmd eq "list") {
-    my $map = SYSMON_obtainParameters($hash);
+    my $map = SYSMON_obtainParameters($hash, 1);
     my $ret = "";
     foreach my $name (keys %{$map}) {
   	  my $value = $map->{$name};
@@ -209,9 +209,9 @@ SYSMON_Attr($$$)
 }
 
 sub
-SYSMON_Update($)
+SYSMON_Update($@)
 {
-  my ($hash) = @_;
+  my ($hash, $refresh_all) = @_;
   
   logF($hash, "Update", "");
   
@@ -230,7 +230,7 @@ SYSMON_Update($)
   	$hash->{STATE} = "Inactive";
   } else {
   
-    my $map = SYSMON_obtainParameters($hash);
+    my $map = SYSMON_obtainParameters($hash, $refresh_all);
  
     # Existierende Schlüssel merken   
     my @cKeys=keys (%{$defs{$name}{READINGS}});
@@ -265,35 +265,57 @@ SYSMON_Update($)
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
 
+#my $counter = 0;
+
 sub
-SYSMON_obtainParameters($)
+SYSMON_obtainParameters($$)
 {
-	my ($hash) = @_;
+	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
 	
 	my $map;
-  
+	
+	my $ref =  int(time()/60);
+	my ($m1, $m2, $m3, $m4) = split(/\s+/, $hash->{INTERVAL_MULTIPLIERS});
+	
+	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
-  $map = SYSMON_getLoadAvg($hash, $map);
-  $map = SYSMON_getRamAndSwap($hash, $map);
-  $map = SYSMON_getCPUTemp($hash, $map);
-  $map = SYSMON_getCPUFreq($hash, $map);
   
-  my $filesystems = AttrVal($name, "filesystems", undef);
-  if(defined $filesystems) 
-  {
-    my @filesystem_list = split(/,\s*/, trim($filesystems));
-    foreach (@filesystem_list)
-    {
-    	$map = SYSMON_getFileSystemInfo($hash, $map, "$_");
-    }
-  } else {
-    $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+  # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
+  if($refresh_all || ($ref % $m1) eq 0) {
+    $map = SYSMON_getCPUTemp($hash, $map);
+    $map = SYSMON_getCPUFreq($hash, $map);
+    $map = SYSMON_getLoadAvg($hash, $map);
   }
   
-  $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
-  $map = SYSMON_getNetworkInfo($hash, $map, "wlan0");
+  # M2: ram, swap
+  if($refresh_all || ($ref % $m2) eq 0) {
+    $map = SYSMON_getRamAndSwap($hash, $map);
+  }
+  
+  # M3: eth0, eth0_diff, wlan0, wlan0_diff
+  if($refresh_all || ($ref % $m3) eq 0) {
+    $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
+    $map = SYSMON_getNetworkInfo($hash, $map, "wlan0");
+  }
+  
+  # M4: Filesystem-Informationen
+  if($refresh_all || ($ref % $m4) eq 0) {
+    my $filesystems = AttrVal($name, "filesystems", undef);
+    if(defined $filesystems) 
+    {
+      my @filesystem_list = split(/,\s*/, trim($filesystems));
+      foreach (@filesystem_list)
+      {
+    	  $map = SYSMON_getFileSystemInfo($hash, $map, "$_");
+      }
+    } else {
+      $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+    }
+  }
+  
+  #$counter=$counter+1;
   
   return $map;
 }
@@ -549,7 +571,7 @@ sub SYSMON_ShowValuesHTML ($)
     ["WLAN", "wlan0", ""],
   );
 
-  my $map = SYSMON_obtainParameters($hash);
+  my $map = SYSMON_obtainParameters($hash, 1);
 
   my $div_class="";
 
@@ -903,7 +925,7 @@ Time4 (fs):
     
   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML</b><br><br>
     <ul>
-    Das Modul definiert eine Funrktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
+    Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
     Als Parameter wird der Name des definierten SYSMON-Ger&auml;ten erwartet.<br><br>
     <code>define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code>
     </ul><br>
