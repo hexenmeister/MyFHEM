@@ -14,7 +14,7 @@ SYSMON_Initialize($)
 {
   my ($hash) = @_;
   
-  Log 5, "SYSMON Initialize: ".$hash->{NAME};
+  Log 5, "SYSMON Initialize";
 
   $hash->{DefFn}    = "SYSMON_Define";
   $hash->{UndefFn}  = "SYSMON_Undefine";
@@ -281,10 +281,12 @@ SYSMON_Update($)
   	  #delete %copy->{$aName};
   	  my $i=0;
   	  foreach my $bName (@cKeys) {
-  	  	if($bName eq $aName) {
-  	  		#Log 3, "SYSMON DEBUG: copy keys ---> ".$bName." / ".$aName;
-  	      delete $cKeys[$i];
-  	      last;
+  	  	if(defined $bName) {
+  	  	  if($bName eq $aName) {
+  	  		  #Log 3, "SYSMON DEBUG: copy keys ---> ".$bName." / ".$aName;
+  	        delete $cKeys[$i];
+  	        last;
+  	      }
   	    }
   	    $i=$i+1;
   	  }
@@ -349,9 +351,9 @@ SYSMON_getUptime($$)
 	$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
   #$map->{"idletime"}=sprintf("%d",$idle);
-  $map->{"idletime"}=sprintf("%d %.2f %",$idle, $idle_percent);
+  $map->{"idletime"}=sprintf("%d %.2f %%",$idle, $idle_percent);
 	#$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($idle));
-	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %)",$idle_percent);
+	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
 
 	#$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
 	
@@ -522,15 +524,19 @@ sub SYSMON_getNetworkInfo ($$$)
     # change array into scalar variable
     my $dataThroughput = $dataThroughput[0];
 
-    # remove RX bytes or TX bytes from string
-    $dataThroughput =~ s/RX bytes://;
-    $dataThroughput =~ s/TX bytes://;
-    $dataThroughput = trim($dataThroughput);
+    if(defined $dataThroughput) {
+      # remove RX bytes or TX bytes from string
+      $dataThroughput =~ s/RX bytes://;
+      $dataThroughput =~ s/TX bytes://;
+      $dataThroughput = trim($dataThroughput);
 
-    @dataThroughput = split(/ /, $dataThroughput); # return of split is array
-
-    my $rxRaw = $dataThroughput[0] / 1024 / 1024;
-    my $txRaw = $dataThroughput[4] / 1024 / 1024;
+      @dataThroughput = split(/ /, $dataThroughput); # return of split is array
+    }
+    
+    my $rxRaw = 0;
+    $rxRaw = $dataThroughput[0] / 1024 / 1024 if(defined $dataThroughput[0]);
+    my $txRaw = 0;
+    $txRaw = $dataThroughput[4] / 1024 / 1024 if(defined $dataThroughput[4]);
     my $rx = sprintf ("%.2f", $rxRaw);
     my $tx = sprintf ("%.2f", $txRaw);
     my $totalRxTx = $rx + $tx;
