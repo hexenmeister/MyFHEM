@@ -44,7 +44,7 @@ SYSMON_Define($$)
   #if(int(@a)>=3) { $interval = $a[2]; }
   if(int(@a)>=3) 
   {
-    my @na = @a[1..scalar(@a)-1];
+    my @na = @a[2..scalar(@a)-1];
   	SYSMON_setInterval($hash, @na);
   } else {
     SYSMON_setInterval($hash, undef);
