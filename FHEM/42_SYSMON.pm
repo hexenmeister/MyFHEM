@@ -6,7 +6,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.0";
+my $VERSION = "1.01";
 
 sub
 SYSMON_Initialize($)
@@ -208,6 +208,9 @@ SYSMON_Attr($$$)
   return;
 }
 
+
+my $u_first_mark = undef;
+
 sub
 SYSMON_Update($@)
 {
@@ -229,7 +232,13 @@ SYSMON_Update($@)
   	logF($hash, "Update", "disabled");
   	$hash->{STATE} = "Inactive";
   } else {
-  
+	  # Beim ersten mal alles aktualisieren!
+	  if(!$u_first_mark) {
+	    $u_first_mark = 1;
+	    $refresh_all = 1;
+	  }
+	  
+	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
  
     # Existierende Schlüssel merken   
@@ -241,8 +250,11 @@ SYSMON_Update($@)
   
     foreach my $aName (keys %{$map}) {
   	  my $value = $map->{$aName};
-  	  readingsBulkUpdate($hash,$aName,$value);
-  	  
+  	  # Nur aktualisieren, wenn ein gültiges Value vorliegt
+  	  if(defined $value) {
+  	    readingsBulkUpdate($hash,$aName,$value);
+  	  }
+  	
   	  # Vorhandene Keys aus der Merkliste löschen
   	  my $i=0;
   	  foreach my $bName (@cKeys) {
@@ -275,12 +287,22 @@ SYSMON_obtainParameters($$)
 	
 	my $map;
 	
-	my $ref =  int(time()/60);
-	my ($m1, $m2, $m3, $m4) = split(/\s+/, $hash->{INTERVAL_MULTIPLIERS});
-	
+	my $base=0;
+	my $im = "1 1 1 10";
+	# Wenn wesentliche Parameter nicht definiert sind, soll ktualisierung immer vorgenommen werden
+	if((defined $hash->{INTERVAL_BASE}) && (defined $hash->{INTERVAL_MULTIPLIERS})) {
+  	$base = $hash->{INTERVAL_BASE};
+  	$im = $hash->{INTERVAL_MULTIPLIERS};
+  } 
+  
+  my $ref =  int(time()/$base);
+	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
+	  
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
+  
+  # TODO: Behandlung anderer Werte wie bei FS: Damit bei Mx>1 nicht ammer wieder Readings gelöscht werden.
   
   # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
   if($refresh_all || ($ref % $m1) eq 0) {
@@ -301,17 +323,28 @@ SYSMON_obtainParameters($$)
   }
   
   # M4: Filesystem-Informationen
-  if($refresh_all || ($ref % $m4) eq 0) {
-    my $filesystems = AttrVal($name, "filesystems", undef);
-    if(defined $filesystems) 
+  my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
+  my $filesystems = AttrVal($name, "filesystems", undef);
+  if(defined $filesystems) 
+  {
+    my @filesystem_list = split(/,\s*/, trim($filesystems));
+    foreach (@filesystem_list)
     {
-      my @filesystem_list = split(/,\s*/, trim($filesystems));
-      foreach (@filesystem_list)
-      {
-    	  $map = SYSMON_getFileSystemInfo($hash, $map, "$_");
-      }
-    } else {
+    	my $fs = $_;
+    	# Workaround: Damit die Readings zw. den Update-Punkte nicht gelöscht werden, werden die Schlüssel leer angelegt
+    	# Die Schlüssel können u.U. anders sein, als von der Methode am Ende geliefert wird!
+    	if($update_fs) {
+    	  $map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+    	} else {
+    		$map->{"~ ".$fs} = undef;
+    	}
+    }
+  } else {
+  	if($update_fs) {
       $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+    } else {
+    	# s.o.
+      $map->{"~ /"} = undef;
     }
   }
   
