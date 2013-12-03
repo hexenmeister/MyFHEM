@@ -245,7 +245,7 @@ SYSMON_Update($@)
     my @cKeys=keys (%{$defs{$name}{READINGS}});
  
     $hash->{STATE} = "Active";
-    #my $state = $map->{"loadavg"};
+    #my $state = $map->{LOADAVG};
     #readingsBulkUpdate($hash,"state",$state);
   
     foreach my $aName (keys %{$map}) {
@@ -278,6 +278,35 @@ SYSMON_Update($@)
 }
 
 #my $counter = 0;
+
+use constant {
+  UPTIME          => "uptime",
+  UPTIME_TEXT     => "uptime_text",
+  FHEMUPTIME      => "fhemuptime",
+  FHEMUPTIME_TEXT => "fhemuptime_text",
+  IDLETIME        => "idletime",
+  IDLETIME_TEXT   => "idletime_text"
+};
+
+use constant {
+  CPU_FREQ     => "cpu_freq",
+  CPU_TEMP     => "cpu_temp",
+  CPU_TEMP_AVG => "cpu_temp_avg",
+  LOADAVG      => "loadavg"
+};
+
+use constant {
+  RAM  => "ram",
+  SWAP => "swap"
+};
+
+use constant {
+  ETH0        => "eth0",
+  WLAN0       => "wlan0",
+  DIFF_SUFFIX => "_diff"
+};
+
+use constant FS_PREFIX => "~ ";
 
 sub
 SYSMON_obtainParameters($$)
@@ -318,8 +347,8 @@ SYSMON_obtainParameters($$)
   
   # M3: eth0, eth0_diff, wlan0, wlan0_diff
   if($refresh_all || ($ref % $m3) eq 0) {
-    $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
-    $map = SYSMON_getNetworkInfo($hash, $map, "wlan0");
+    $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
+    $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
   }
   
   # M4: Filesystem-Informationen
@@ -336,7 +365,7 @@ SYSMON_obtainParameters($$)
     	if($update_fs) {
     	  $map = SYSMON_getFileSystemInfo($hash, $map, $fs);
     	} else {
-    		$map->{"~ ".$fs} = undef;
+    		$map->{FS_PREFIX.$fs} = undef;
     	}
     }
   } else {
@@ -344,7 +373,7 @@ SYSMON_obtainParameters($$)
       $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
     } else {
     	# s.o.
-      $map->{"~ /"} = undef;
+      $map->{FS_PREFIX."/"} = undef;
     }
   }
   
@@ -365,13 +394,13 @@ SYSMON_getUptime($$)
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
   my $idle_percent = $idle/$uptime*100;  
 	
-	$map->{"uptime"}=sprintf("%d",$uptime);
-	#$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
-	$map->{"uptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+	$map->{UPTIME}=sprintf("%d",$uptime);
+	#$map->{UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
+	$map->{UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
-  $map->{"idletime"}=sprintf("%d %.2f %%",$idle, $idle_percent);
-	$map->{"idletime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
-	#$map->{"idletime_percent"} = sprintf ("%.2f %",$idle_percent);
+  $map->{IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
+	$map->{IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
+	#$map->{IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
 	
 	return $map; 
 }
@@ -386,8 +415,8 @@ SYSMON_getFHEMUptime($$)
 	
 	if(defined ($hash->{DEF_TIME})) {
 	  my $fhemuptime = time()-$hash->{DEF_TIME};
-	  $map->{"fhemuptime"} = sprintf("%d",$fhemuptime);
-	  $map->{"fhemuptime_text"} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
+	  $map->{FHEMUPTIME} = sprintf("%d",$fhemuptime);
+	  $map->{FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
   }
 
 	return $map;
@@ -404,7 +433,7 @@ SYSMON_getLoadAvg($$)
 	my $la_str = qx(cat /proc/loadavg );
   my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
 	
-	$map->{"loadavg"}="$la1 $la5 $la15";
+	$map->{LOADAVG}="$la1 $la5 $la15";
   #$map->{"load"}="$la1";
 	#$map->{"load5"}="$la5";
 	#$map->{"load15"}="$la15";
@@ -422,9 +451,9 @@ SYSMON_getCPUTemp($$)
 	
 	my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
   my $val_txt = sprintf("%.2f", $val/1000);
-  $map->{"cpu_temp"}="$val_txt";
-  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu_temp_avg",$val_txt) + $val_txt ) / 4 );
-  $map->{"cpu_temp_avg"}="$t_avg";
+  $map->{CPU_TEMP}="$val_txt";
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+  $map->{CPU_TEMP_AVG}="$t_avg";
 	
 	return $map; 
 }
@@ -439,7 +468,7 @@ SYSMON_getCPUFreq($$)
 	
 	my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
   my $val_txt = sprintf("%d", $val/1000);
-  $map->{"cpu_freq"}="$val_txt";
+  $map->{CPU_FREQ}="$val_txt";
 	
 	return $map; 
 }
@@ -472,7 +501,7 @@ sub SYSMON_getRamAndSwap($$)
   $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
   $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
   
-  $map->{"ram"} = $ram;
+  $map->{RAM} = $ram;
   
   # wenn kein swap definiert ist, ist die Größe (total2) gleich Null. Dies würde eine Exception (division by zero) auslösen
   if($total2 > 0)
@@ -485,7 +514,7 @@ sub SYSMON_getRamAndSwap($$)
     $swap = "n/a"
   }
   
-  $map->{"swap"} = $swap;
+  $map->{SWAP} = $swap;
 
   return $map; 
 }
@@ -509,9 +538,9 @@ sub SYSMON_getFileSystemInfo ($$$)
     $percentage_used =~ /^(.+)%$/;
     $percentage_used = $1;
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB";
-    $map->{"~ $mnt_point"} = $out_txt;
+    $map->{FS_PREFIX.$mnt_point} = $out_txt;
   } else {
-  	$map->{"~ $fs"} = "not available"; 
+  	$map->{FS_PREFIX.$fs} = "not available"; 
   }
 
   return $map;
@@ -569,10 +598,10 @@ sub SYSMON_getNetworkInfo ($$$)
     my $d_tt = $totalRxTx-$o_tt;
     if($d_tt<0) {$d_tt=0;}
     my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-    $map->{$device."_diff"} = $out_txt_diff; 
+    $map->{$device.DIFF_SUFFIX} = $out_txt_diff; 
   } else {
   	$map->{$device} = "not available"; 
-  	$map->{$device."_diff"} = "not available"; 
+  	$map->{$device.DIFF_SUFFIX} = "not available"; 
   }
 
   return $map;
@@ -591,17 +620,17 @@ sub SYSMON_ShowValuesHTML ($)
 	my @dataDescription =
   (
     ["Date", undef, ""],
-    ["CPU temperature", "cpu_temp", " &deg;C"],
-    ["CPU frequency", "cpu_freq", " MHz"],
-    ["System up time", "uptime_text", ""],
-    ["FHEM up time", "fhemuptime_text", ""],
-    ["Load average", "loadavg", ""], 
-    ["RAM", "ram", ""], 
-    ["Swap", "swap", ""],
+    ["CPU temperature", CPU_TEMP, " &deg;C"],
+    ["CPU frequency", CPU_FREQ, " MHz"],
+    ["System up time", UPTIME_TEXT, ""],
+    ["FHEM up time", FHEMUPTIME_TEXT, ""],
+    ["Load average", LOADAVG, ""], 
+    ["RAM", RAM, ""], 
+    ["Swap", SWAP, ""],
     #["File system", ?, ""],
     #["USB stick", ?, ""],
-    ["Ethernet", "eth0", ""],
-    ["WLAN", "wlan0", ""],
+    ["Ethernet", ETH0, ""],
+    ["WLAN", WLAN0, ""],
   );
 
   my $map = SYSMON_obtainParameters($hash, 1);
@@ -628,7 +657,7 @@ sub SYSMON_ShowValuesHTML ($)
   # File systems
   foreach my $aName (sort keys %{$map}) {
   	#if(index($aName, "fs[") == 0) {
-  	if(index($aName, "~ ") == 0) {
+  	if(index($aName, FS_PREFIX) == 0) {
       #$aName =~ /fs\[(.+)\]/;
       $aName =~ /^~ (.+)/;
       #my $dName=$1;
