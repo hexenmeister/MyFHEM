@@ -268,9 +268,14 @@ SYSMON_Update($@)
   	  }
     }
     
-    # Ueberfluessige Readings löschen
+    # Ueberfluessige Readings löschen 
+    # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden, 
+    # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
-      delete $defs{$name}{READINGS}{$aName};
+    	# nur Filesystem-Readings löschen. Alle anderen sind ja je immer da.
+    	if(index($aName, FS_PREFIX) == 0) {
+        delete $defs{$name}{READINGS}{$aName};
+      }
     }
   }
 
@@ -314,6 +319,8 @@ SYSMON_obtainParameters($$)
 	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
 	
+	#$refresh_all = 1;
+	
 	my $map;
 	
 	my $base=0;
@@ -354,6 +361,7 @@ SYSMON_obtainParameters($$)
   # M4: Filesystem-Informationen
   my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
   my $filesystems = AttrVal($name, "filesystems", undef);
+  if($update_fs) {
   if(defined $filesystems) 
   {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
@@ -362,18 +370,29 @@ SYSMON_obtainParameters($$)
     	my $fs = $_;
     	# Workaround: Damit die Readings zw. den Update-Punkte nicht gelöscht werden, werden die Schlüssel leer angelegt
     	# Die Schlüssel können u.U. anders sein, als von der Methode am Ende geliefert wird!
-    	if($update_fs) {
-    	  $map = SYSMON_getFileSystemInfo($hash, $map, $fs);
-    	} else {
-    		$map->{FS_PREFIX.$fs} = undef;
-    	}
+    	#if($update_fs) {
+    	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+    	#} else {
+    	#	$map->{+FS_PREFIX.$fs} = undef;
+    	#}
     }
   } else {
-  	if($update_fs) {
-      $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
-    } else {
-    	# s.o.
-      $map->{FS_PREFIX."/"} = undef;
+  	#if($update_fs) {
+    $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+    #} else {
+    #	# s.o.
+    #  $map->{+FS_PREFIX."/"} = undef;
+    #}
+    }
+  } else {
+  	# Wenn noch keine Update notwendig, dan einfach alte Schlüssel (mit undef als Wert) angeben, 
+  	# damit werden die Readings in der Update-Methode nicht gelöscht.
+  	# Die ggf. notwendige Löschung findet nur bei tatsächlichen Update statt.
+  	my @cKeys=keys (%{$defs{$name}{READINGS}});
+    foreach my $aName (@cKeys) {
+  	  if(index($aName, FS_PREFIX) == 0) {
+        $map->{$aName} = undef;
+      }
     }
   }
   
@@ -394,13 +413,13 @@ SYSMON_getUptime($$)
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
   my $idle_percent = $idle/$uptime*100;  
 	
-	$map->{UPTIME}=sprintf("%d",$uptime);
-	#$map->{UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
-	$map->{UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+	$map->{+UPTIME}=sprintf("%d",$uptime);
+	#$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
+	$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 	
-  $map->{IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
-	$map->{IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
-	#$map->{IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
+  $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
+	$map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
+	#$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
 	
 	return $map; 
 }
@@ -415,8 +434,8 @@ SYSMON_getFHEMUptime($$)
 	
 	if(defined ($hash->{DEF_TIME})) {
 	  my $fhemuptime = time()-$hash->{DEF_TIME};
-	  $map->{FHEMUPTIME} = sprintf("%d",$fhemuptime);
-	  $map->{FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
+	  $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
+	  $map->{+FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
   }
 
 	return $map;
@@ -433,7 +452,7 @@ SYSMON_getLoadAvg($$)
 	my $la_str = qx(cat /proc/loadavg );
   my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
 	
-	$map->{LOADAVG}="$la1 $la5 $la15";
+	$map->{+LOADAVG}="$la1 $la5 $la15";
   #$map->{"load"}="$la1";
 	#$map->{"load5"}="$la5";
 	#$map->{"load15"}="$la15";
@@ -451,9 +470,9 @@ SYSMON_getCPUTemp($$)
 	
 	my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
   my $val_txt = sprintf("%.2f", $val/1000);
-  $map->{CPU_TEMP}="$val_txt";
+  $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-  $map->{CPU_TEMP_AVG}="$t_avg";
+  $map->{+CPU_TEMP_AVG}="$t_avg";
 	
 	return $map; 
 }
@@ -468,7 +487,7 @@ SYSMON_getCPUFreq($$)
 	
 	my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
   my $val_txt = sprintf("%d", $val/1000);
-  $map->{CPU_FREQ}="$val_txt";
+  $map->{+CPU_FREQ}="$val_txt";
 	
 	return $map; 
 }
@@ -501,7 +520,7 @@ sub SYSMON_getRamAndSwap($$)
   $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
   $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
   
-  $map->{RAM} = $ram;
+  $map->{+RAM} = $ram;
   
   # wenn kein swap definiert ist, ist die Größe (total2) gleich Null. Dies würde eine Exception (division by zero) auslösen
   if($total2 > 0)
@@ -514,7 +533,7 @@ sub SYSMON_getRamAndSwap($$)
     $swap = "n/a"
   }
   
-  $map->{SWAP} = $swap;
+  $map->{+SWAP} = $swap;
 
   return $map; 
 }
@@ -538,9 +557,9 @@ sub SYSMON_getFileSystemInfo ($$$)
     $percentage_used =~ /^(.+)%$/;
     $percentage_used = $1;
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB";
-    $map->{FS_PREFIX.$mnt_point} = $out_txt;
+    $map->{+FS_PREFIX.$mnt_point} = $out_txt;
   } else {
-  	$map->{FS_PREFIX.$fs} = "not available"; 
+  	$map->{+FS_PREFIX.$fs} = "not available"; 
   }
 
   return $map;
