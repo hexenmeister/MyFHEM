@@ -208,6 +208,34 @@ SYSMON_Attr($$$)
   return;
 }
 
+use constant {
+  UPTIME          => "uptime",
+  UPTIME_TEXT     => "uptime_text",
+  FHEMUPTIME      => "fhemuptime",
+  FHEMUPTIME_TEXT => "fhemuptime_text",
+  IDLETIME        => "idletime",
+  IDLETIME_TEXT   => "idletime_text"
+};
+
+use constant {
+  CPU_FREQ     => "cpu_freq",
+  CPU_TEMP     => "cpu_temp",
+  CPU_TEMP_AVG => "cpu_temp_avg",
+  LOADAVG      => "loadavg"
+};
+
+use constant {
+  RAM  => "ram",
+  SWAP => "swap"
+};
+
+use constant {
+  ETH0        => "eth0",
+  WLAN0       => "wlan0",
+  DIFF_SUFFIX => "_diff"
+};
+
+use constant FS_PREFIX => "~ ";
 
 my $u_first_mark = undef;
 
@@ -281,35 +309,6 @@ SYSMON_Update($@)
 
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
-
-use constant {
-  UPTIME          => "uptime",
-  UPTIME_TEXT     => "uptime_text",
-  FHEMUPTIME      => "fhemuptime",
-  FHEMUPTIME_TEXT => "fhemuptime_text",
-  IDLETIME        => "idletime",
-  IDLETIME_TEXT   => "idletime_text"
-};
-
-use constant {
-  CPU_FREQ     => "cpu_freq",
-  CPU_TEMP     => "cpu_temp",
-  CPU_TEMP_AVG => "cpu_temp_avg",
-  LOADAVG      => "loadavg"
-};
-
-use constant {
-  RAM  => "ram",
-  SWAP => "swap"
-};
-
-use constant {
-  ETH0        => "eth0",
-  WLAN0       => "wlan0",
-  DIFF_SUFFIX => "_diff"
-};
-
-use constant FS_PREFIX => "~ ";
 
 sub
 SYSMON_obtainParameters($$)
