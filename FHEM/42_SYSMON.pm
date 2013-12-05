@@ -282,8 +282,6 @@ SYSMON_Update($@)
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 }
 
-#my $counter = 0;
-
 use constant {
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
@@ -319,8 +317,6 @@ SYSMON_obtainParameters($$)
 	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
 	
-	#$refresh_all = 1;
-	
 	my $map;
 	
 	my $base=0;
@@ -337,8 +333,6 @@ SYSMON_obtainParameters($$)
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
-  
-  # TODO: Behandlung anderer Werte wie bei FS: Damit bei Mx>1 nicht ammer wieder Readings gelöscht werden.
   
   # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
   if($refresh_all || ($ref % $m1) eq 0) {
@@ -362,27 +356,18 @@ SYSMON_obtainParameters($$)
   my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
   my $filesystems = AttrVal($name, "filesystems", undef);
   if($update_fs) {
-  if(defined $filesystems) 
-  {
-    my @filesystem_list = split(/,\s*/, trim($filesystems));
-    foreach (@filesystem_list)
+    if(defined $filesystems) 
     {
-    	my $fs = $_;
-    	# Workaround: Damit die Readings zw. den Update-Punkte nicht gelöscht werden, werden die Schlüssel leer angelegt
-    	# Die Schlüssel können u.U. anders sein, als von der Methode am Ende geliefert wird!
-    	#if($update_fs) {
-    	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
-    	#} else {
-    	#	$map->{+FS_PREFIX.$fs} = undef;
-    	#}
-    }
-  } else {
-  	#if($update_fs) {
-    $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
-    #} else {
-    #	# s.o.
-    #  $map->{+FS_PREFIX."/"} = undef;
-    #}
+      my @filesystem_list = split(/,\s*/, trim($filesystems));
+      foreach (@filesystem_list)
+      {
+      	my $fs = $_;
+      	# Workaround: Damit die Readings zw. den Update-Punkte nicht gelöscht werden, werden die Schlüssel leer angelegt
+      	# Die Schlüssel können u.U. anders sein, als von der Methode am Ende geliefert wird!
+      	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+      }
+    } else {
+      $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
     }
   } else {
   	# Wenn noch keine Update notwendig, dan einfach alte Schlüssel (mit undef als Wert) angeben, 
@@ -395,8 +380,6 @@ SYSMON_obtainParameters($$)
       }
     }
   }
-  
-  #$counter=$counter+1;
   
   return $map;
 }
