@@ -51,7 +51,7 @@ SYSMON_Define($$)
   InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
 
   #$hash->{LOCAL} = 1;
-  #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgeh‰ngt'
+  #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgehaengt'
   #delete $hash->{LOCAL};  
   
   return undef;
@@ -269,7 +269,7 @@ SYSMON_Update($@)
 	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
  
-    # Existierende Schl¸ssel merken   
+    # Existierende Schluessel merken   
     my @cKeys=keys (%{$defs{$name}{READINGS}});
  
     $hash->{STATE} = "Active";
@@ -278,12 +278,12 @@ SYSMON_Update($@)
   
     foreach my $aName (keys %{$map}) {
   	  my $value = $map->{$aName};
-  	  # Nur aktualisieren, wenn ein g¸ltiges Value vorliegt
+  	  # Nur aktualisieren, wenn ein gueltiges Value vorliegt
   	  if(defined $value) {
   	    readingsBulkUpdate($hash,$aName,$value);
   	  }
   	
-  	  # Vorhandene Keys aus der Merkliste lˆschen
+  	  # Vorhandene Keys aus der Merkliste loeschen
   	  my $i=0;
   	  foreach my $bName (@cKeys) {
   	  	if(defined $bName) {
@@ -296,11 +296,11 @@ SYSMON_Update($@)
   	  }
     }
     
-    # Ueberfluessige Readings lˆschen 
+    # Ueberfluessige Readings loeschen 
     # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden, 
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
-    	# nur Filesystem-Readings lˆschen. Alle anderen sind ja je immer da.
+    	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
     	if(index($aName, FS_PREFIX) == 0) {
         delete $defs{$name}{READINGS}{$aName};
       }
@@ -361,17 +361,17 @@ SYSMON_obtainParameters($$)
       foreach (@filesystem_list)
       {
       	my $fs = $_;
-      	# Workaround: Damit die Readings zw. den Update-Punkte nicht gelˆscht werden, werden die Schl¸ssel leer angelegt
-      	# Die Schl¸ssel kˆnnen u.U. anders sein, als von der Methode am Ende geliefert wird!
+      	# Workaround: Damit die Readings zw. den Update-Punkte nicht geloescht werden, werden die Schluessel leer angelegt
+      	# Die Schluessel koennen u.U. anders sein, als von der Methode am Ende geliefert wird!
       	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
       }
     } else {
       $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
     }
   } else {
-  	# Wenn noch keine Update notwendig, dan einfach alte Schl¸ssel (mit undef als Wert) angeben, 
-  	# damit werden die Readings in der Update-Methode nicht gelˆscht.
-  	# Die ggf. notwendige Lˆschung findet nur bei tats‰chlichen Update statt.
+  	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben, 
+  	# damit werden die Readings in der Update-Methode nicht geloescht.
+  	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
   	my @cKeys=keys (%{$defs{$name}{READINGS}});
     foreach my $aName (@cKeys) {
   	  if(index($aName, FS_PREFIX) == 0) {
@@ -504,7 +504,7 @@ sub SYSMON_getRamAndSwap($$)
   
   $map->{+RAM} = $ram;
   
-  # wenn kein swap definiert ist, ist die Grˆﬂe (total2) gleich Null. Dies w¸rde eine Exception (division by zero) auslˆsen
+  # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if($total2 > 0)
   {
     $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
@@ -610,7 +610,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
 #------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
-# Parameter: Name des SYSMON-Ger‰tes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+# Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($)
 {
@@ -713,7 +713,7 @@ sub logF($$$)
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslieﬂlich f&uuml;r Raspberry Pi verf&uuml;gbar.
+  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslie&szlig;lich f&uuml;r Raspberry Pi verf&uuml;gbar.
   Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
   <br><br>
   <b>Define</b>
