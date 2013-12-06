@@ -17,7 +17,7 @@ set title '<L1>'
 set grid xtics y2tics
 
 set yrange [0:90]
-set y2range [0:7000]
+set y2range [0:7500]
 
 set ylabel "Nutzung %"
 set y2label "Nutzung MB"

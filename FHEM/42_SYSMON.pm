@@ -740,7 +740,8 @@ Time4 (fs):
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Es werden ausschliessliche Linux-basierte Systemen unterst&uuml;tzt. Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
+  Es werden ausschliessliche Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslisslich f&uuml;r Raspberry Pi verf&uuml;gbar.
+  Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
   <br><br>
   <b>Define</b>
   <br><br>
