@@ -705,33 +705,6 @@ sub logF($$$)
 =pod
 =begin html
 
-TODO
-Minutlich (times):
- fhemuptime
- fhemuptime_text
- idletime
- idletime_text
- uptime
- uptime_text
-
-Time1 (cpu):
- cpu_freq
- cpu_temp
- cpu_temp_avg
- loadavg
-
-Time2 (ram):
- ram
- swap
-
-Time3 (network):
- eth0
- eth0_diff
- wlan0
- wlan0_diff
-
-Time4 (fs):
- Filesystems
 
 =end html
 =begin html_DE
@@ -740,7 +713,7 @@ Time4 (fs):
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Es werden ausschliessliche Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslisslich f&uuml;r Raspberry Pi verf&uuml;gbar.
+  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslieﬂlich f&uuml;r Raspberry Pi verf&uuml;gbar.
   Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
   <br><br>
   <b>Define</b>
@@ -998,7 +971,7 @@ Time4 (fs):
     <ul>
     <code>
       # Modul-Definition<br>
-      define sysmon SYSMON 60<br>
+      define sysmon SYSMON 1 1 1 10<br>
       attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
       attr sysmon filesystems /boot, /, /media/usb1<br>
       attr sysmon group RPi<br>
@@ -1046,7 +1019,7 @@ Time4 (fs):
       attr wl_sysmon_fs_usb1 label "USB1 Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
       attr wl_sysmon_fs_usb1 room 9.03_Tech<br>
       <br>
-      # Anzeige der Readings zum EInbinden in ein 'Raum'.<br>
+      # Anzeige der Readings zum Einbinden in ein 'Raum'.<br>
       define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
       attr SysValues group RPi<br>
       attr SysValues room 9.03_Tech<br>
