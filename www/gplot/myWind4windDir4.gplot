@@ -29,7 +29,7 @@ set grid xtics y2tics
 
 set yrange [0:360]
 
-set y2label "Wind m/s"
+set y2label "Wind km/h"
 set ylabel "Richtung (0=Nord)"
 
 #FileLog 4:wind_speed:0:
@@ -37,6 +37,6 @@ set ylabel "Richtung (0=Nord)"
 
 plot \
   "< awk $3=="wind:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Wind m/s' with lines lw 2,\
+     using 1:2 axes x1y2 title 'Wind km/h' with lines lw 2,\
   "< awk $3=="wind_direction:" {print $1, $4}' <IN>"\
      using 1:2 axes x1y1 title 'Windrichtung' with points\
