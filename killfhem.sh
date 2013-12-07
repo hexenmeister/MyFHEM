@@ -12,7 +12,7 @@ echo Stop fhem
 
 RETVAL=0
 
-cnt=$(ps -ef | grep "watchdogloop" | grep -v grep | wc -l)
+cnt=$(ps -ef | grep "fhem.pl" | grep -v grep | wc -l)
 if [ "$cnt" -ge "0" ] ; then
   perl fhem.pl $port "shutdown" &
   RETVAL=$?

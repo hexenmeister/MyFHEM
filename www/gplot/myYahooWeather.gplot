@@ -21,7 +21,7 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 
 set terminal size <SIZE>
-set title '<TL>'
+set title '<L1>'
 set ylabel "Temperature in C"
 set y2label "Humidity (%)"
 set y3label "Windchill C"

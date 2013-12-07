@@ -30,4 +30,4 @@ sudo -u fhem ./runwatchdog.sh 2>>log/watchdog_err.log
 
 sudo -u fhem ./runfhem.sh 2>>log/watchdog_err.log
 
-return $RETVAL
+#return $RETVAL

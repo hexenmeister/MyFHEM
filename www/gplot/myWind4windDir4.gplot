@@ -24,7 +24,7 @@ set xlabel " "
 set ytics nomirror
 set y2tics
 #set ytics
-set title '<TL>'
+set title '<L1>'
 set grid xtics y2tics
 
 set yrange [0:360]
