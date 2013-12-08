@@ -169,8 +169,8 @@ sub OWX_Define ($$) {
   
 	#-- Dummy 1-Wire ROM identifier, empty device lists
 	$hash->{ROM_ID}      = "FF";
-	$hash->{DEVS}        = ();
-	$hash->{ALARMDEVS}   = ();
+	$hash->{DEVS}        = [];
+	$hash->{ALARMDEVS}   = [];
   
   my $owx;
   #-- First step - different methods
