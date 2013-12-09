@@ -170,8 +170,21 @@ SYSMON_Set($@)
   	SYSMON_setInterval($hash, @na);
   	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
   }
+  
+  if($cmd eq "clear")
+  {
+  	my $subcmd = my $cmd= $a[2];
+  	if(defined $subcmd) {
+  		if($subcmd eq "readings") {
+        #delete $defs{$name}{READINGS}{$aName};
+        $defs{$name}{READINGS} = ();
+      }
+    }
+    
+    return;
+  }
 
-  return "Unknown argument $cmd, choose one of interval_multipliers";
+  return "Unknown argument $cmd, choose one of interval_multipliers clear:readings";
 }
 
 sub
@@ -934,8 +947,12 @@ sub logF($$$)
     
   <b>Set:</b><br><br>
     <ul>
-    <li>interval<br>
-    Definiert Polling-Intervale (wie bei der Definition des Ger&auml;tes).
+    <li>interval_multipliers<br>
+    Definiert Multipliers (wie bei der Definition des Ger&auml;tes).
+    </li>
+    <br>
+    <li>clear: readings<br>
+    L&ouml;scht alle Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.
     </li>
     <br>
     </ul><br>
