@@ -171,20 +171,26 @@ SYSMON_Set($@)
   	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
   }
   
-  if($cmd eq "clear")
+  if($cmd eq "clean")
   {
-  	my $subcmd = my $cmd= $a[2];
-  	if(defined $subcmd) {
-  		if($subcmd eq "readings") {
-        #delete $defs{$name}{READINGS}{$aName};
-        $defs{$name}{READINGS} = ();
+  	#my $subcmd = my $cmd= $a[2];
+  	#if(defined $subcmd) {
+  	#	if($subcmd eq "readings") {
+    #    $defs{$name}{READINGS} = ();
+    #  }
+    #}
+    
+    my @cKeys=keys (%{$defs{$name}{READINGS}});
+    foreach my $aName (@cKeys) {
+      if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+        delete $defs{$name}{READINGS}{$aName};
       }
     }
     
     return;
   }
 
-  return "Unknown argument $cmd, choose one of interval_multipliers clear:readings";
+  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg";
 }
 
 sub
@@ -582,7 +588,7 @@ sub SYSMON_getNetworkInfo ($$$)
   my @dataThroughput = qx($cmd);
   
   # check if network available
-  if (not grep(/Fehler/, @dataThroughput[0]) && not grep(/error/, @dataThroughput[0]))
+  if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
   {
     # perform grep from above
     @dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
@@ -951,8 +957,8 @@ sub logF($$$)
     Definiert Multipliers (wie bei der Definition des Ger&auml;tes).
     </li>
     <br>
-    <li>clear: readings<br>
-    L&ouml;scht alle Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.
+    <li>clean<br>
+    L&ouml;scht benutzerdefinierbare Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.<br>
     </li>
     <br>
     </ul><br>
