@@ -301,7 +301,7 @@ SYSMON_Update($@)
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
     	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
-    	if(index($aName, FS_PREFIX) == 0) {
+    	if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
         delete $defs{$name}{READINGS}{$aName};
       }
     }
@@ -366,7 +366,7 @@ SYSMON_obtainParameters($$)
       	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
       }
     } else {
-      $map = SYSMON_getFileSystemInfo($hash, $map, "/dev/root");
+      $map = SYSMON_getFileSystemInfo($hash, $map, "/");
     }
   } else {
   	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben, 
