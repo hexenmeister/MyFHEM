@@ -374,7 +374,7 @@ SYSMON_obtainParameters($$)
   	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
   	my @cKeys=keys (%{$defs{$name}{READINGS}});
     foreach my $aName (@cKeys) {
-  	  if(index($aName, FS_PREFIX) == 0) {
+  	  if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
         $map->{$aName} = undef;
       }
     }
@@ -658,7 +658,7 @@ sub SYSMON_ShowValuesHTML ($)
   # File systems
   foreach my $aName (sort keys %{$map}) {
   	#if(index($aName, "fs[") == 0) {
-  	if(index($aName, FS_PREFIX) == 0) {
+  	if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
       #$aName =~ /fs\[(.+)\]/;
       $aName =~ /^~ (.+)/;
       #my $dName=$1;
