@@ -333,49 +333,57 @@ SYSMON_obtainParameters($$)
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
   
-  # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
-  if($refresh_all || ($ref % $m1) eq 0) {
-    $map = SYSMON_getCPUTemp($hash, $map);
-    $map = SYSMON_getCPUFreq($hash, $map);
-    $map = SYSMON_getLoadAvg($hash, $map);
+  if($m1 gt 0) { # Nur wenn > 0
+    # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
+    if($refresh_all || ($ref % $m1) eq 0) {
+      $map = SYSMON_getCPUTemp($hash, $map);
+      $map = SYSMON_getCPUFreq($hash, $map);
+      $map = SYSMON_getLoadAvg($hash, $map);
+    }
   }
   
-  # M2: ram, swap
-  if($refresh_all || ($ref % $m2) eq 0) {
-    $map = SYSMON_getRamAndSwap($hash, $map);
+  if($m2 gt 0) { # Nur wenn > 0
+    # M2: ram, swap
+    if($refresh_all || ($ref % $m2) eq 0) {
+      $map = SYSMON_getRamAndSwap($hash, $map);
+    }
   }
   
-  # M3: eth0, eth0_diff, wlan0, wlan0_diff
-  if($refresh_all || ($ref % $m3) eq 0) {
-    $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
-    $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+  if($m3 gt 0) { # Nur wenn > 0
+    # M3: eth0, eth0_diff, wlan0, wlan0_diff
+    if($refresh_all || ($ref % $m3) eq 0) {
+      $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
+      $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+    }
   }
   
-  # M4: Filesystem-Informationen
-  my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
-  my $filesystems = AttrVal($name, "filesystems", undef);
-  if($update_fs) {
-    if(defined $filesystems) 
-    {
-      my @filesystem_list = split(/,\s*/, trim($filesystems));
-      foreach (@filesystem_list)
+  if($m4 gt 0) { # Nur wenn > 0
+    # M4: Filesystem-Informationen
+    my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
+    my $filesystems = AttrVal($name, "filesystems", undef);
+    if($update_fs) {
+      if(defined $filesystems) 
       {
-      	my $fs = $_;
-      	# Workaround: Damit die Readings zw. den Update-Punkte nicht geloescht werden, werden die Schluessel leer angelegt
-      	# Die Schluessel koennen u.U. anders sein, als von der Methode am Ende geliefert wird!
-      	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+        my @filesystem_list = split(/,\s*/, trim($filesystems));
+        foreach (@filesystem_list)
+        {
+        	my $fs = $_;
+        	# Workaround: Damit die Readings zw. den Update-Punkte nicht geloescht werden, werden die Schluessel leer angelegt
+        	# Die Schluessel koennen u.U. anders sein, als von der Methode am Ende geliefert wird!
+        	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+        }
+      } else {
+        $map = SYSMON_getFileSystemInfo($hash, $map, "/");
       }
     } else {
-      $map = SYSMON_getFileSystemInfo($hash, $map, "/");
-    }
-  } else {
-  	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben, 
-  	# damit werden die Readings in der Update-Methode nicht geloescht.
-  	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
-  	my @cKeys=keys (%{$defs{$name}{READINGS}});
-    foreach my $aName (@cKeys) {
-  	  if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
-        $map->{$aName} = undef;
+    	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben, 
+    	# damit werden die Readings in der Update-Methode nicht geloescht.
+    	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
+    	my @cKeys=keys (%{$defs{$name}{READINGS}});
+      foreach my $aName (@cKeys) {
+    	  if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+          $map->{$aName} = undef;
+        }
       }
     }
   }
@@ -724,6 +732,7 @@ sub logF($$$)
     Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
     Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
     Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervale in Minuten angesehen werden.<br>
+    Wird einer (oder mehrere) Multiplikator auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
     <br>
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
     <ul>
