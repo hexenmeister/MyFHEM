@@ -8,225 +8,6 @@ use warnings;
 
 my $VERSION = "1.01";
 
-sub
-SYSMON_Initialize($)
-{
-  my ($hash) = @_;
-  
-  Log 5, "SYSMON Initialize";
-
-  $hash->{DefFn}    = "SYSMON_Define";
-  $hash->{UndefFn}  = "SYSMON_Undefine";
-  $hash->{GetFn}    = "SYSMON_Get";
-  $hash->{SetFn}    = "SYSMON_Set";
-  $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "filesystems disable:0,1 ".
-                       $readingFnAttributes;
-}
-
-sub
-SYSMON_Define($$)
-{
-  my ($hash, $def) = @_;
-  
-  logF($hash, "Define", "$def");
-
-  my @a = split("[ \t][ \t]*", $def);
-
-  return "Usage: define <name> SYSMON [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
-
-  if(int(@a)>=3) 
-  {
-    my @na = @a[2..scalar(@a)-1];
-  	SYSMON_setInterval($hash, @na);
-  } else {
-    SYSMON_setInterval($hash, undef);
-  }
-  
-  $hash->{STATE} = "Initialized";
-
-  $hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
-
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
-
-  #$hash->{LOCAL} = 1;
-  #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgehaengt'
-  #delete $hash->{LOCAL};  
-  
-  return undef;
-}
-
-sub
-SYSMON_setInterval($@)
-{
-	my ($hash, @a) = @_;
-	
-	my $interval = 60;
-	$hash->{INTERVAL_BASE} = $interval;
-	
-	my $p1=1;
-	my $p2=1;
-	my $p3=1;
-	my $p4=10;
-	
-	if(defined($a[0]) && int($a[0]) eq $a[0]) {$p1 = $a[0];}
-	if(defined($a[1]) && int($a[1]) eq $a[1]) {$p2 = $a[1];} else {$p2 = $p1;}
-	if(defined($a[2]) && int($a[2]) eq $a[2]) {$p3 = $a[2];} else {$p3 = $p1;}
-	if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
-	
-	$hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
-}
-
-sub
-SYSMON_Undefine($$)
-{
-  my ($hash, $arg) = @_;
-  
-  logF($hash, "Undefine", "");
-
-  RemoveInternalTimer($hash);
-  return undef;
-}
-
-sub
-SYSMON_Get($@)
-{
-  my ($hash, @a) = @_;
-
-  my $name = $a[0];
-  
-  if(@a < 2) 
-  {
-  	logF($hash, "Get", "@a: get needs at least one parameter");
-    return "$name: get needs at least one parameter";
-  }
-  
-  my $cmd= $a[1];
-  
-  logF($hash, "Get", "@a");
-
-  if($cmd eq "update")
-  {
-  	#$hash->{LOCAL} = 1;
-  	SYSMON_Update($hash, 1);
-  	#delete $hash->{LOCAL};
-  	return undef;
-  }
-
-  if($cmd eq "list") {
-    my $map = SYSMON_obtainParameters($hash, 1);
-    my $ret = "";
-    foreach my $name (keys %{$map}) {
-  	  my $value = $map->{$name};
-  	  $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
-    }
-    return $ret;
-  }
-  
-  if($cmd eq "version")
-  {
-  	return $VERSION;
-  }
-
-  if($cmd eq "interval_base")
-  {
-  	return $hash->{INTERVAL_BASE};
-  }
-  
-  if($cmd eq "interval_multipliers")
-  {
-  	return $hash->{INTERVAL_MULTIPLIERS};
-  }
-  
-  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg";
-}
-
-sub
-SYSMON_Set($@)
-{
-  my ($hash, @a) = @_;
-
-  my $name = $a[0];
-  
-  if(@a < 2) 
-  {
-  	logF($hash, "Set", "@a: set needs at least one parameter");
-    return "$name: set needs at least one parameter";
-  }
-  
-  my $cmd= $a[1];
-  
-  logF($hash, "Set", "@a");
-
-  if($cmd eq "interval_multipliers")
-  {
-  	if(@a < 3) {
-  		logF($hash, "Set", "$name: not enought parameters");
-      return "$name: not enought parameters";
-  	} 
-
-  	my @na = @a[2..scalar(@a)-1];
-  	SYSMON_setInterval($hash, @na);
-  	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
-  }
-  
-  if($cmd eq "clean")
-  {
-  	#my $subcmd = my $cmd= $a[2];
-  	#if(defined $subcmd) {
-  	#	if($subcmd eq "readings") {
-    #    $defs{$name}{READINGS} = ();
-    #  }
-    #}
-    
-    my @cKeys=keys (%{$defs{$name}{READINGS}});
-    foreach my $aName (@cKeys) {
-      if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
-        delete $defs{$name}{READINGS}{$aName};
-      }
-    }
-    
-    return;
-  }
-
-  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg";
-}
-
-sub
-SYSMON_Attr($$$)
-{
-  my ($cmd, $name, $attrName, $attrVal) = @_;
-  
-  Log 5, "SYSMON Attr: $cmd $name $attrName $attrVal";
-
-  $attrVal= "" unless defined($attrVal);
-  my $orig = AttrVal($name, $attrName, "");
-
-  if( $cmd eq "set" ) {# set, del
-    if( $orig ne $attrVal ) {
-    	
-    	if($attrName eq "disable")
-      {
-        my $hash = $main::defs{$name};
-        RemoveInternalTimer($hash);
-      	if($attrVal ne "0")
-      	{
-      		InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
-      	}
-       	#$hash->{LOCAL} = 1;
-  	    SYSMON_Update($hash);
-  	    #delete $hash->{LOCAL};
-      }
-    	
-      $attr{$name}{$attrName} = $attrVal;
-      #return $attrName ." set to ". $attrVal;
-      return undef;
-    }
-  }
-  return;
-}
-
 use constant {
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
@@ -256,15 +37,234 @@ use constant {
 
 use constant FS_PREFIX => "~ ";
 
+sub
+SYSMON_Initialize($)
+{
+  my ($hash) = @_;
+
+  Log 5, "SYSMON Initialize";
+
+  $hash->{DefFn}    = "SYSMON_Define";
+  $hash->{UndefFn}  = "SYSMON_Undefine";
+  $hash->{GetFn}    = "SYSMON_Get";
+  $hash->{SetFn}    = "SYSMON_Set";
+  $hash->{AttrFn}   = "SYSMON_Attr";
+  $hash->{AttrList} = "filesystems disable:0,1 ".
+                       $readingFnAttributes;
+}
+
+sub
+SYSMON_Define($$)
+{
+  my ($hash, $def) = @_;
+
+  logF($hash, "Define", "$def");
+
+  my @a = split("[ \t][ \t]*", $def);
+
+  return "Usage: define <name> SYSMON [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
+
+  if(int(@a)>=3)
+  {
+    my @na = @a[2..scalar(@a)-1];
+  	SYSMON_setInterval($hash, @na);
+  } else {
+    SYSMON_setInterval($hash, undef);
+  }
+
+  $hash->{STATE} = "Initialized";
+
+  $hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
+
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
+
+  #$hash->{LOCAL} = 1;
+  #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgehaengt'
+  #delete $hash->{LOCAL};
+
+  return undef;
+}
+
+sub
+SYSMON_setInterval($@)
+{
+	my ($hash, @a) = @_;
+
+	my $interval = 60;
+	$hash->{INTERVAL_BASE} = $interval;
+
+	my $p1=1;
+	my $p2=1;
+	my $p3=1;
+	my $p4=10;
+
+	if(defined($a[0]) && int($a[0]) eq $a[0]) {$p1 = $a[0];}
+	if(defined($a[1]) && int($a[1]) eq $a[1]) {$p2 = $a[1];} else {$p2 = $p1;}
+	if(defined($a[2]) && int($a[2]) eq $a[2]) {$p3 = $a[2];} else {$p3 = $p1;}
+	if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
+
+	$hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
+}
+
+sub
+SYSMON_Undefine($$)
+{
+  my ($hash, $arg) = @_;
+
+  logF($hash, "Undefine", "");
+
+  RemoveInternalTimer($hash);
+  return undef;
+}
+
+sub
+SYSMON_Get($@)
+{
+  my ($hash, @a) = @_;
+
+  my $name = $a[0];
+
+  if(@a < 2)
+  {
+  	logF($hash, "Get", "@a: get needs at least one parameter");
+    return "$name: get needs at least one parameter";
+  }
+
+  my $cmd= $a[1];
+
+  logF($hash, "Get", "@a");
+
+  if($cmd eq "update")
+  {
+  	#$hash->{LOCAL} = 1;
+  	SYSMON_Update($hash, 1);
+  	#delete $hash->{LOCAL};
+  	return undef;
+  }
+
+  if($cmd eq "list") {
+    my $map = SYSMON_obtainParameters($hash, 1);
+    my $ret = "";
+    foreach my $name (keys %{$map}) {
+  	  my $value = $map->{$name};
+  	  $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
+    }
+    return $ret;
+  }
+
+  if($cmd eq "version")
+  {
+  	return $VERSION;
+  }
+
+  if($cmd eq "interval_base")
+  {
+  	return $hash->{INTERVAL_BASE};
+  }
+
+  if($cmd eq "interval_multipliers")
+  {
+  	return $hash->{INTERVAL_MULTIPLIERS};
+  }
+
+  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg";
+}
+
+sub
+SYSMON_Set($@)
+{
+  my ($hash, @a) = @_;
+
+  my $name = $a[0];
+
+  if(@a < 2)
+  {
+  	logF($hash, "Set", "@a: set needs at least one parameter");
+    return "$name: set needs at least one parameter";
+  }
+
+  my $cmd= $a[1];
+
+  logF($hash, "Set", "@a");
+
+  if($cmd eq "interval_multipliers")
+  {
+  	if(@a < 3) {
+  		logF($hash, "Set", "$name: not enought parameters");
+      return "$name: not enought parameters";
+  	}
+
+  	my @na = @a[2..scalar(@a)-1];
+  	SYSMON_setInterval($hash, @na);
+  	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
+  }
+
+  if($cmd eq "clean")
+  {
+  	#my $subcmd = my $cmd= $a[2];
+  	#if(defined $subcmd) {
+  	#	if($subcmd eq "readings") {
+    #    $defs{$name}{READINGS} = ();
+    #  }
+    #}
+
+    my @cKeys=keys (%{$defs{$name}{READINGS}});
+    foreach my $aName (@cKeys) {
+      if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+        delete $defs{$name}{READINGS}{$aName};
+      }
+    }
+
+    return;
+  }
+
+  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg";
+}
+
+sub
+SYSMON_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  Log 5, "SYSMON Attr: $cmd $name $attrName $attrVal";
+
+  $attrVal= "" unless defined($attrVal);
+  my $orig = AttrVal($name, $attrName, "");
+
+  if( $cmd eq "set" ) {# set, del
+    if( $orig ne $attrVal ) {
+
+    	if($attrName eq "disable")
+      {
+        my $hash = $main::defs{$name};
+        RemoveInternalTimer($hash);
+      	if($attrVal ne "0")
+      	{
+      		InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
+      	}
+       	#$hash->{LOCAL} = 1;
+  	    SYSMON_Update($hash);
+  	    #delete $hash->{LOCAL};
+      }
+
+      $attr{$name}{$attrName} = $attrVal;
+      #return $attrName ." set to ". $attrVal;
+      return undef;
+    }
+  }
+  return;
+}
+
 my $u_first_mark = undef;
 
 sub
 SYSMON_Update($@)
 {
   my ($hash, $refresh_all) = @_;
-  
+
   logF($hash, "Update", "");
-  
+
   my $name = $hash->{NAME};
 
   if(!$hash->{LOCAL}) {
@@ -274,7 +274,7 @@ SYSMON_Update($@)
 
   readingsBeginUpdate($hash);
 
-  if( AttrVal($name, "disable", "") eq "1" ) 
+  if( AttrVal($name, "disable", "") eq "1" )
   {
   	logF($hash, "Update", "disabled");
   	$hash->{STATE} = "Inactive";
@@ -284,24 +284,24 @@ SYSMON_Update($@)
 	    $u_first_mark = 1;
 	    $refresh_all = 1;
 	  }
-	  
+
 	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
- 
-    # Existierende Schluessel merken   
+
+    # Existierende Schluessel merken
     my @cKeys=keys (%{$defs{$name}{READINGS}});
- 
+
     $hash->{STATE} = "Active";
     #my $state = $map->{LOADAVG};
     #readingsBulkUpdate($hash,"state",$state);
-  
+
     foreach my $aName (keys %{$map}) {
   	  my $value = $map->{$aName};
   	  # Nur aktualisieren, wenn ein gueltiges Value vorliegt
   	  if(defined $value) {
   	    readingsBulkUpdate($hash,$aName,$value);
   	  }
-  	
+
   	  # Vorhandene Keys aus der Merkliste loeschen
   	  my $i=0;
   	  foreach my $bName (@cKeys) {
@@ -314,9 +314,9 @@ SYSMON_Update($@)
   	    $i=$i+1;
   	  }
     }
-    
-    # Ueberfluessige Readings loeschen 
-    # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden, 
+
+    # Ueberfluessige Readings loeschen
+    # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden,
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
     	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
@@ -334,24 +334,24 @@ SYSMON_obtainParameters($$)
 {
 	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
-	
+
 	my $map;
-	
+
 	my $base=0;
 	my $im = "1 1 1 10";
 	# Wenn wesentliche Parameter nicht definiert sind, soll ktualisierung immer vorgenommen werden
 	if((defined $hash->{INTERVAL_BASE}) && (defined $hash->{INTERVAL_MULTIPLIERS})) {
   	$base = $hash->{INTERVAL_BASE};
   	$im = $hash->{INTERVAL_MULTIPLIERS};
-  } 
-  
+  }
+
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
-	  
+
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
-  
+
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
     if($refresh_all || ($ref % $m1) eq 0) {
@@ -360,14 +360,14 @@ SYSMON_obtainParameters($$)
       $map = SYSMON_getLoadAvg($hash, $map);
     }
   }
-  
+
   if($m2 gt 0) { # Nur wenn > 0
     # M2: ram, swap
     if($refresh_all || ($ref % $m2) eq 0) {
       $map = SYSMON_getRamAndSwap($hash, $map);
     }
   }
-  
+
   if($m3 gt 0) { # Nur wenn > 0
     # M3: eth0, eth0_diff, wlan0, wlan0_diff
     if($refresh_all || ($ref % $m3) eq 0) {
@@ -375,13 +375,13 @@ SYSMON_obtainParameters($$)
       $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
     }
   }
-  
+
   if($m4 gt 0) { # Nur wenn > 0
     # M4: Filesystem-Informationen
     my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
     my $filesystems = AttrVal($name, "filesystems", undef);
     if($update_fs) {
-      if(defined $filesystems) 
+      if(defined $filesystems)
       {
         my @filesystem_list = split(/,\s*/, trim($filesystems));
         foreach (@filesystem_list)
@@ -395,7 +395,7 @@ SYSMON_obtainParameters($$)
         $map = SYSMON_getFileSystemInfo($hash, $map, "/");
       }
     } else {
-    	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben, 
+    	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben,
     	# damit werden die Readings in der Update-Methode nicht geloescht.
     	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
     	my @cKeys=keys (%{$defs{$name}{READINGS}});
@@ -406,7 +406,7 @@ SYSMON_obtainParameters($$)
       }
     }
   }
-  
+
   return $map;
 }
 
@@ -417,20 +417,20 @@ sub
 SYSMON_getUptime($$)
 {
 	my ($hash, $map) = @_;
-	
+
 	my $uptime_str = qx(cat /proc/uptime );
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
-  my $idle_percent = $idle/$uptime*100;  
-	
+  my $idle_percent = $idle/$uptime*100;
+
 	$map->{+UPTIME}=sprintf("%d",$uptime);
 	#$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
 	$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
-	
+
   $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
 	$map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
 	#$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
-	
-	return $map; 
+
+	return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -440,7 +440,7 @@ sub
 SYSMON_getFHEMUptime($$)
 {
 	my ($hash, $map) = @_;
-	
+
 	if(defined ($hash->{DEF_TIME})) {
 	  my $fhemuptime = time()-$hash->{DEF_TIME};
 	  $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
@@ -457,16 +457,16 @@ sub
 SYSMON_getLoadAvg($$)
 {
 	my ($hash, $map) = @_;
-	
+
 	my $la_str = qx(cat /proc/loadavg );
   my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
-	
+
 	$map->{+LOADAVG}="$la1 $la5 $la15";
   #$map->{"load"}="$la1";
 	#$map->{"load5"}="$la5";
 	#$map->{"load15"}="$la15";
-	
-	return $map; 
+
+	return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -476,14 +476,14 @@ sub
 SYSMON_getCPUTemp($$)
 {
 	my ($hash, $map) = @_;
-	
+
 	my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";
-	
-	return $map; 
+
+	return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -493,12 +493,12 @@ sub
 SYSMON_getCPUFreq($$)
 {
 	my ($hash, $map) = @_;
-	
+
 	my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
   my $val_txt = sprintf("%d", $val/1000);
   $map->{+CPU_FREQ}="$val_txt";
-	
-	return $map; 
+
+	return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -507,30 +507,30 @@ SYSMON_getCPUFreq($$)
 sub SYSMON_getRamAndSwap($$)
 {
   my ($hash, $map) = @_;
-  
+
   my @speicher = qx(free -m);
-  
+
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
   shift @speicher;
   my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
-  
+
   if($fs_desc2 ne "Swap:")
   {
     shift @speicher;
     ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
   }
-  
+
   my $ram;
   my $swap;
   my $percentage_ram;
   my $percentage_swap;
-  
+
   $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
   $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
-  
+
   $map->{+RAM} = $ram;
-  
+
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if($total2 > 0)
   {
@@ -541,10 +541,10 @@ sub SYSMON_getRamAndSwap($$)
   {
     $swap = "n/a"
   }
-  
+
   $map->{+SWAP} = $swap;
 
-  return $map; 
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -554,7 +554,7 @@ sub SYSMON_getRamAndSwap($$)
 sub SYSMON_getFileSystemInfo ($$$)
 {
 	my ($hash, $map, $fs) = @_;
-  
+
   my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
 
   my @filesystems = qx($disk);
@@ -568,7 +568,7 @@ sub SYSMON_getFileSystemInfo ($$$)
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB";
     $map->{+FS_PREFIX.$mnt_point} = $out_txt;
   } else {
-  	$map->{+FS_PREFIX.$fs} = "not available"; 
+  	$map->{+FS_PREFIX.$fs} = "not available";
   }
 
   return $map;
@@ -581,12 +581,12 @@ sub SYSMON_getFileSystemInfo ($$$)
 sub SYSMON_getNetworkInfo ($$$)
 {
 	my ($hash, $map, $device) = @_;
-  
-  # in case of network not present get failure from stderr (2>&1)  
+
+  # in case of network not present get failure from stderr (2>&1)
   my $cmd="ifconfig ".$device." 2>&1";
 
   my @dataThroughput = qx($cmd);
-  
+
   # check if network available
   if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
   {
@@ -604,7 +604,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
       @dataThroughput = split(/ /, $dataThroughput); # return of split is array
     }
-    
+
     my $rxRaw = 0;
     $rxRaw = $dataThroughput[0] / 1024 / 1024 if(defined $dataThroughput[0]);
     my $txRaw = 0;
@@ -614,11 +614,11 @@ sub SYSMON_getNetworkInfo ($$$)
     my $totalRxTx = $rx + $tx;
 
     my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
-    $map->{$device} = $out_txt; 
-    
+    $map->{$device} = $out_txt;
+
     my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
     my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
-    
+
     my $d_rx = $rx-$o_rx;
     if($d_rx<0) {$d_rx=0;}
     my $d_tx = $tx-$o_tx;
@@ -626,10 +626,10 @@ sub SYSMON_getNetworkInfo ($$$)
     my $d_tt = $totalRxTx-$o_tt;
     if($d_tt<0) {$d_tt=0;}
     my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-    $map->{$device.DIFF_SUFFIX} = $out_txt_diff; 
+    $map->{$device.DIFF_SUFFIX} = $out_txt_diff;
   } else {
-  	$map->{$device} = "not available"; 
-  	$map->{$device.DIFF_SUFFIX} = "not available"; 
+  	$map->{$device} = "not available";
+  	$map->{$device.DIFF_SUFFIX} = "not available";
   }
 
   return $map;
@@ -643,7 +643,7 @@ sub SYSMON_ShowValuesHTML ($)
 {
 	my ($name) = @_;
 	my $hash = $main::defs{$name};
-	
+
 	# Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
 	my @dataDescription =
   (
@@ -652,8 +652,8 @@ sub SYSMON_ShowValuesHTML ($)
     ["CPU frequency", CPU_FREQ, " MHz"],
     ["System up time", UPTIME_TEXT, ""],
     ["FHEM up time", FHEMUPTIME_TEXT, ""],
-    ["Load average", LOADAVG, ""], 
-    ["RAM", RAM, ""], 
+    ["Load average", LOADAVG, ""],
+    ["RAM", RAM, ""],
     ["Swap", SWAP, ""],
     #["File system", ?, ""],
     #["USB stick", ?, ""],
@@ -673,15 +673,15 @@ sub SYSMON_ShowValuesHTML ($)
   # oben definierte Werte anzeigen
   my $ref_zeile;
   foreach $ref_zeile (@dataDescription) {
-    #foreach my $spalte (@$ref_zeile) { 
-    #	print "$spalte " 
+    #foreach my $spalte (@$ref_zeile) {
+    #	print "$spalte "
     #}
     my $tName = @$ref_zeile[1];
     if(defined $tName) {
       $htmlcode .= "<tr><td valign='top'>".@$ref_zeile[0].":&nbsp;</td><td>".$map->{$tName}.@$ref_zeile[2]."</td></tr>";
     }
   }
-  
+
   # File systems
   foreach my $aName (sort keys %{$map}) {
   	#if(index($aName, "fs[") == 0) {
@@ -747,7 +747,7 @@ sub logF($$$)
   <br><br>
     <code>define <name> SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
-    Diese Anweisung erstellt eine neue SYSMON-Instanz. 
+    Diese Anweisung erstellt eine neue SYSMON-Instanz.
     Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
     Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
     Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervale in Minuten angesehen werden.<br>
@@ -772,7 +772,7 @@ sub logF($$$)
      </li>
     </ul>
   <br>
-  
+
   <b>Readings:</b>
   <br><br>
   <ul>
@@ -805,7 +805,7 @@ sub logF($$$)
     </li>
     <br>
     <li>idletime<br>
-    		Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!) 
+    		Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
     		seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
     </li>
     <br>
@@ -847,10 +847,10 @@ sub logF($$$)
     <br>
   <br>
   </ul>
- 
-  Beispiel-Ausgabe:<br> 
+
+  Beispiel-Ausgabe:<br>
   <ul>
- 
+
 <table style="border: 1px solid black;">
 <tr><td style="border-bottom: 1px solid black;"><div class="dname">cpu_freq</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>900</div></td>
@@ -930,7 +930,7 @@ sub logF($$$)
 </tr>
 </table>
   </ul><br>
-  
+
   <b>Get:</b><br><br>
     <ul>
     <li>interval<br>
@@ -950,7 +950,7 @@ sub logF($$$)
     </li>
     <br>
     </ul><br>
-    
+
   <b>Set:</b><br><br>
     <ul>
     <li>interval_multipliers<br>
@@ -962,7 +962,7 @@ sub logF($$$)
     </li>
     <br>
     </ul><br>
-    
+
   <b>Attributes:</b><br><br>
     <ul>
     <li>filesystems<br>
@@ -975,7 +975,7 @@ sub logF($$$)
     </li>
     <br>
     </ul><br>
-  
+
   <b>Plots:</b><br><br>
     <ul>
     F&uuml;r dieses Modul sind bereits einige gplot-Dateien vordefiniert:<br>
@@ -991,14 +991,14 @@ sub logF($$$)
       </code>
      </ul>
     </ul><br>
-    
+
   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML</b><br><br>
     <ul>
     Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
     Als Parameter wird der Name des definierten SYSMON-Ger&auml;ten erwartet.<br><br>
     <code>define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code>
     </ul><br>
-  
+
   <b>Beispiele:</b><br><br>
     <ul>
     <code>
@@ -1057,8 +1057,8 @@ sub logF($$$)
       attr SysValues room 9.03_Tech<br>
     </code>
     </ul>
-  
+
   </ul>
-  
+
 =end html_DE
 =cut
