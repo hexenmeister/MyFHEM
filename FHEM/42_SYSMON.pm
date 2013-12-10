@@ -418,7 +418,8 @@ SYSMON_getUptime($$)
 {
 	my ($hash, $map) = @_;
 
-	my $uptime_str = qx(cat /proc/uptime );
+	#my $uptime_str = qx(cat /proc/uptime );
+	my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
   my $idle_percent = $idle/$uptime*100;
 
@@ -458,7 +459,8 @@ SYSMON_getLoadAvg($$)
 {
 	my ($hash, $map) = @_;
 
-	my $la_str = qx(cat /proc/loadavg );
+	#my $la_str = qx(cat /proc/loadavg );
+	my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
   my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
 
 	$map->{+LOADAVG}="$la1 $la5 $la15";
@@ -477,7 +479,8 @@ SYSMON_getCPUTemp($$)
 {
 	my ($hash, $map) = @_;
 
-	my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
+	#my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
+	my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp");
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
@@ -494,7 +497,8 @@ SYSMON_getCPUFreq($$)
 {
 	my ($hash, $map) = @_;
 
-	my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
+	#my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
+	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq");
   my $val_txt = sprintf("%d", $val/1000);
   $map->{+CPU_FREQ}="$val_txt";
 
@@ -508,7 +512,8 @@ sub SYSMON_getRamAndSwap($$)
 {
   my ($hash, $map) = @_;
 
-  my @speicher = qx(free -m);
+  #my @speicher = qx(free -m);
+  my @speicher = SYSMON_execute($hash, "free -m");
 
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
@@ -557,7 +562,8 @@ sub SYSMON_getFileSystemInfo ($$$)
 
   my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
 
-  my @filesystems = qx($disk);
+  #my @filesystems = qx($disk);
+  my @filesystems = SYSMON_execute($hash, $disk);
 
   shift @filesystems;
   if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
@@ -585,7 +591,8 @@ sub SYSMON_getNetworkInfo ($$$)
   # in case of network not present get failure from stderr (2>&1)
   my $cmd="ifconfig ".$device." 2>&1";
 
-  my @dataThroughput = qx($cmd);
+  #my @dataThroughput = qx($cmd);
+  my @dataThroughput = SYSMON_execute($hash, $cmd);
 
   # check if network available
   if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
@@ -696,6 +703,13 @@ sub SYSMON_ShowValuesHTML ($)
   $htmlcode .= "</table></div><br>";
 
   return $htmlcode;
+}
+
+sub
+SYSMON_execute($$)
+{
+	my ($hash, $cmd) = @_;
+  return qx($cmd);
 }
 
 #------------------------------------------------------------------------------
