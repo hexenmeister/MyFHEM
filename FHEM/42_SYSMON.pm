@@ -355,8 +355,10 @@ SYSMON_obtainParameters($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
     if($refresh_all || ($ref % $m1) eq 0) {
-      $map = SYSMON_getCPUTemp($hash, $map);
-      $map = SYSMON_getCPUFreq($hash, $map);
+    	if(SYSMON_isRPi($hash)) { # vorerst nur auf Raps
+        $map = SYSMON_getCPUTemp($hash, $map);
+        $map = SYSMON_getCPUFreq($hash, $map);
+      }
       $map = SYSMON_getLoadAvg($hash, $map);
     }
   }
@@ -703,6 +705,27 @@ sub SYSMON_ShowValuesHTML ($)
   $htmlcode .= "</table></div><br>";
 
   return $htmlcode;
+}
+
+my $sys_rpi = undef;
+sub
+SYSMON_isRPi($) {
+	my ($hash) = @_;
+	if(!defined $sys_rpi) {
+	  $sys_rpi = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
+  }
+
+	return $sys_rpi;
+}
+
+my $sys_fb = undef;
+sub
+SYSMON_isFB($) {
+	my ($hash) = @_;
+	if(!defined $sys_fb) {
+	  $sys_fb = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
+  } 
+	return $sys_fb;
 }
 
 sub
