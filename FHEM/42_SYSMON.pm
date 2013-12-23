@@ -1,12 +1,36 @@
+################################################################
+#
+#  Copyright notice
+#
+#  (c) 2013 Alexander Schulz
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#
+################################################################
 
-# $Id: $
+# $Id$
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.01";
+my $VERSION = "1.0.5";
 
 use constant {
   UPTIME          => "uptime",
@@ -355,7 +379,7 @@ SYSMON_obtainParameters($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
     if($refresh_all || ($ref % $m1) eq 0) {
-    	if(SYSMON_isRPi($hash)) { # vorerst nur auf Raps
+    	if(SYSMON_isRPi($hash)) { # vorerst nur auf Rasp
         $map = SYSMON_getCPUTemp($hash, $map);
         $map = SYSMON_getCPUFreq($hash, $map);
       }
@@ -373,8 +397,20 @@ SYSMON_obtainParameters($$)
   if($m3 gt 0) { # Nur wenn > 0
     # M3: eth0, eth0_diff, wlan0, wlan0_diff
     if($refresh_all || ($ref % $m3) eq 0) {
-      $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
-      $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+    	if(SYSMON_isFB($hash)) { 
+    		$map = SYSMON_getNetworkInfo($hash, $map, "ath0");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "ath1");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "dsl");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "eth0");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "guest");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "hotspot");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "lan");
+    		$map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
+    	} else {
+        $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
+        $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+      }
     }
   }
 
@@ -515,7 +551,7 @@ sub SYSMON_getRamAndSwap($$)
   my ($hash, $map) = @_;
 
   #my @speicher = qx(free -m);
-  my @speicher = SYSMON_execute($hash, "free -m");
+  my @speicher = SYSMON_execute($hash, "free");
 
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
@@ -530,19 +566,32 @@ sub SYSMON_getRamAndSwap($$)
 
   my $ram;
   my $swap;
-  my $percentage_ram;
-  my $percentage_swap;
+  #my $percentage_ram;
+  #my $percentage_swap;
+  
+  $total   = $total / 1024;
+  $used    = $used / 1024;
+  $free    = $free / 1024;
+  $buffers = $buffers / 1024;
+  $cached  = $cached / 1024;
+  
+  #$percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
+  #$ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
 
-  $percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
-  $ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
+  $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
 
   $map->{+RAM} = $ram;
 
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if($total2 > 0)
   {
-    $percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
-    $swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap." %, Free: ".$free2." MB";
+  	$total2   = $total2 / 1024;
+    $used2    = $used2 / 1024;
+    $free2    = $free2 / 1024;
+  
+    #$percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
+    #$swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap." %, Free: ".$free2." MB";
+    $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
   }
   else
   {
