@@ -490,7 +490,7 @@ notGreaterThen($$;@)
   # wenn offen, dann gewuenschten Wert redefinieren
   if($wndOpen>0) { $desiredValue = $desiredValueWhenOpened; }
   
-  my $deviceCurrentValue = _getDeviceValueNumeric($device);
+  my $deviceCurrentValue = _getRolloLevel($device);#_getDeviceValueNumeric($device);
   if($desiredValue < $deviceCurrentValue) 
   { 
     fhem "set $device $desiredValue";
@@ -530,7 +530,7 @@ notLesserThen($$;@)
   # wenn offen, dann gewuenschten Wert redefinieren
   if($wndOpen>0) { $desiredValue = $desiredValueWhenOpened; }
   
-  my $deviceCurrentValue = _getDeviceValueNumeric($device);
+  my $deviceCurrentValue = _getRolloLevel($device);#_getDeviceValueNumeric($device);
   if($desiredValue > $deviceCurrentValue) 
   { 
     fhem "set $device $desiredValue";
@@ -542,43 +542,50 @@ notLesserThen($$;@)
   #return $deviceCurrentValue ;
 }
 
-# Liefert den aktuelen numerisschen Wert eines Ger�tezustandes. 
+sub
+_getRolloLevel($)
+{
+	my ($name) = @_;
+	return int(ReadingsVal($name, "level", "100"));
+}
+
+# Liefert den aktuelen numerisschen Wert eines Geraetezustandes. 
 # Setzt bei Bedarf die symbolische Werte (up, down) in ihre 
 # Zahlenwertrepresentationen um.
-sub
-_getDeviceValueNumeric($)
-{
-  return _convertSymParams(Value($_[0]));
-}
+#sub
+#_getDeviceValueNumeric($)
+#{
+#  return _convertSymParams(Value($_[0]));
+#}
 
 # Setzt Parameter-Werte fuer symbolische Werte in ihre Zahlenwerte um.
 # up = 100, down = 0
-sub
-_convertSymParams($)
-{
-  my $value = $_[0];
-  # Endwerte beruecksichtigen, Gross-/Kleinschreibung ignorieren
-  $value = lc($value);
-  if($value eq "down" || $value eq "runter" || $value eq "off") { return 0; } 
-  elsif($value eq "up" || $value eq "hoch" || $value eq "on") { return 100; } 
-  elsif($value =~ /schatten.*/) { return 80; } 
-  elsif($value =~ /halb.*/ ) { return 60; } 
-  # Numerische Werte erwartet
-  my $ivalue = int($value);
-  if($ivalue < 0) { return 0; }
-  elsif($ivalue > 100) { return 100; }
-  elsif($ivalue > 0) { return $ivalue; }
-  # Pruefung, ob bei 0 da wirklich eine Nummer war 
-  if($value eq $ivalue or $value eq "0 %" or $value eq "0%") { return 0; }
-  # Default-Fall: Bei unbekannten Werten soll Rollo offen sein
-  return 100; 
-}
+#sub
+#_convertSymParams($)
+#{
+#  my $value = $_[0];
+#  # Endwerte beruecksichtigen, Gross-/Kleinschreibung ignorieren
+#  $value = lc($value);
+#  if($value eq "down" || $value eq "runter" || $value eq "off") { return 0; } 
+#  elsif($value eq "up" || $value eq "hoch" || $value eq "on") { return 100; } 
+#  elsif($value =~ /schatten.*/) { return 80; } 
+#  elsif($value =~ /halb.*/ ) { return 60; } 
+#  # Numerische Werte erwartet
+#  my $ivalue = int($value);
+#  if($ivalue < 0) { return 0; }
+#  elsif($ivalue > 100) { return 100; }
+#  elsif($ivalue > 0) { return $ivalue; }
+#  # Pruefung, ob bei 0 da wirklich eine Nummer war 
+#  if($value eq $ivalue or $value eq "0 %" or $value eq "0%") { return 0; }
+#  # Default-Fall: Bei unbekannten Werten soll Rollo offen sein
+#  return 100; 
+#}
 
 # --- server heartbeat / watchdog ---->
 sub tickHeartbeat($)
 {
 	my ($device) = @_;
-	my $v = _getDeviceValueNumeric($device);
+	my $v = int(Value($device));#_getDeviceValueNumeric($device);
 	$v = $v+1; 
 	if($v>=60) {$v=0;} 
 	fhem("set $device $v");
@@ -683,5 +690,6 @@ sub left{
     return substr $string, 0, $nr;
 }
 
+#my @@fhts=devspec2array("TYPE=FHT");; 
 
 1;
