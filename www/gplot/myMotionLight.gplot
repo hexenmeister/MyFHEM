@@ -1,0 +1,19 @@
+# Created by FHEM/98_SVG.pm, 2013-12-25 20:44:00
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics ("" 1)
+set y2tics 
+set grid
+set ylabel "Bewegung"
+set y2label "Licht"
+set yrange [0:1.5]
+
+#FileLog 4:CUL_HM_HM_Sen_MDIR_O_22DA0F.brightness\x3a:0:
+#FileLog 4:CUL_HM_HM_Sen_MDIR_O_22DA0F.motion\x3a:0:$fld[2]=~"on"?1:0
+
+plot "<IN>" using 1:2 axes x1y2 title 'Licht' ls l2 lw 2 with lines,\
+     "<IN>" using 1:2 axes x1y1 title 'Bewegung' ls l0fill lw 1 with points
