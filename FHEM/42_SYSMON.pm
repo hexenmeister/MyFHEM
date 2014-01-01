@@ -61,6 +61,11 @@ use constant {
 
 use constant FS_PREFIX => "~ ";
 
+# Marker für die Verfügbarkeit verschiedener (hardwarespezifischen) Werte
+my $avialable_cpuTemp_rpi = 1;
+my $avialable_cpuTemp_bbb = 1;
+my $avialable_cpuFreq = 1;
+
 sub
 SYSMON_Initialize($)
 {
@@ -379,10 +384,15 @@ SYSMON_obtainParameters($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
     if($refresh_all || ($ref % $m1) eq 0) {
-    	if(SYSMON_isRPi($hash)) { # vorerst nur auf Rasp
-        $map = SYSMON_getCPUTemp($hash, $map);
-        $map = SYSMON_getCPUFreq($hash, $map);
+    	#if(SYSMON_isRPi($hash)) { # vorerst nur auf Rasp
+      #}
+      if (defined $avialable_cpuTemp_rpi) {
+        $map = SYSMON_getCPUTemp_RPi($hash, $map);
       }
+      if (defined $avialable_cpuTemp_bbb) {
+        $map = SYSMON_getCPUTemp_BBB($hash, $map);
+      }
+      $map = SYSMON_getCPUFreq($hash, $map);
       $map = SYSMON_getLoadAvg($hash, $map);
     }
   }
@@ -510,35 +520,82 @@ SYSMON_getLoadAvg($$)
 }
 
 #------------------------------------------------------------------------------
-# leifert Raspberry Pi CPU Temperature
+# leifert CPU Temperature (Raspberry Pi)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUTemp($$)
+SYSMON_getCPUTemp_RPi($$)
 {
 	my ($hash, $map) = @_;
 
-	#my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
-	my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp");
-  my $val_txt = sprintf("%.2f", $val/1000);
-  $map->{+CPU_TEMP}="$val_txt";
-  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-  $map->{+CPU_TEMP_AVG}="$t_avg";
+  # wenn verfügbar
+  if(defined $avialable_cpuTemp_rpi) {
+  	#my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
+	  my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");
+	  
+	  # Erkennen, ob der Wert verfügbar ist
+	  if (defined $avialable_cpuTemp_rpi && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
+	    $avialable_cpuTemp_rpi = undef;
+	    return $map;
+	  }
+	  
+    my $val_txt = sprintf("%.2f", $val/1000);
+    $map->{+CPU_TEMP}="$val_txt";
+    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+    $map->{+CPU_TEMP_AVG}="$t_avg";
+  }
 
 	return $map;
 }
 
 #------------------------------------------------------------------------------
-# leifert Raspberry Pi CPU Frequenz
+# leifert CPU Temperature (BeagleBone Black)
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUTemp_BBB($$)
+{
+	my ($hash, $map) = @_;
+
+  # wenn verfügbar
+  if(defined $avialable_cpuTemp_bbb) {
+  	my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
+  	
+  	# Erkennen, ob der Wert verfügbar ist
+	  if (defined $avialable_cpuTemp_bbb && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
+	    $avialable_cpuTemp_bbb = undef;
+	    return $map;
+	  }
+  	
+    my $val_txt = sprintf("%.2f", $val/1000);
+    $map->{+CPU_TEMP}="$val_txt";
+    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+    $map->{+CPU_TEMP_AVG}="$t_avg";
+  }
+  
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Frequenz (Raspberry Pi, BeagleBone Black)
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPUFreq($$)
 {
 	my ($hash, $map) = @_;
 
-	#my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
-	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq");
-  my $val_txt = sprintf("%d", $val/1000);
-  $map->{+CPU_FREQ}="$val_txt";
+  # wenn verfügbar
+  if(defined $avialable_cpuFreq) {
+	  #my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
+	  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
+	  
+	  # Erkennen, ob der Wert verfügbar ist
+	  if (defined $avialable_cpuFreq && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
+	    $avialable_cpuFreq = undef;
+	    return $map;
+	  }
+	  
+    my $val_txt = sprintf("%d", $val/1000);
+    $map->{+CPU_FREQ}="$val_txt";
+  }
 
 	return $map;
 }
