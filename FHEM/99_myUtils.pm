@@ -692,4 +692,28 @@ sub left{
 
 #my @@fhts=devspec2array("TYPE=FHT");; 
 
+
+######################################################
+# Temperatur-Liste fürs Bad
+# setzen per Aufruf von "{SetTempList_Heizung_OG_Bad}"
+# Vorsicht, da kein HM-CC-TC, sondern HM-CC-RT-DN, ist hier ein anderer Channel
+# zu nehmen. Zudem wird mit prep|exec gearbeitet, um nicht alle Zeilen als
+# einzelnen Befehl zu senden, sondern per "prep" erst alles 
+# zusammenzufassen und dann per "exec" an das Thermostat zu senden.
+# Also als ein einziger Befehl statt sieben. Vermeidet "NACKs"
+######################################################
+sub
+SetTempList_Heizung_OG_Bad()
+ {
+   { fhem ("set OG_BZ_TT01_Clima tempListMon prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListTue prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListWed prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListThu prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListFri prep 02:00 20.0 05:00 22.0 09:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListSat prep 02:00 20.0 06:30 22.0 10:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListSun exec 01:00 20.0 06:30 22.0 10:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
+}
+# End SetTempList_Heizung_OG_Bad
+
+
 1;
