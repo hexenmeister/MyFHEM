@@ -646,13 +646,20 @@ sub SYSMON_getNetworkInfo ($$$)
   my @dataThroughput = SYSMON_execute($hash, $cmd);
 
   # check if network available
-  if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
+  #if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
+  if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error'))
   {
     # perform grep from above
-    @dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
-
+    #@dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
     # change array into scalar variable
-    my $dataThroughput = $dataThroughput[0];
+    #my $dataThroughput = $dataThroughput[0];
+    
+    my $dataThroughput = undef;
+    foreach (@dataThroughput) {
+      if(index($_, 'RX bytes') >= 0) {
+        $dataThroughput = $_;
+      }
+    }
 
     if(defined $dataThroughput) {
       # remove RX bytes or TX bytes from string
