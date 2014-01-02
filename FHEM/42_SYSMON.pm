@@ -386,6 +386,7 @@ SYSMON_obtainParameters($$)
     if($refresh_all || ($ref % $m1) eq 0) {
     	#if(SYSMON_isRPi($hash)) { # vorerst nur auf Rasp
       #}
+      Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
       if (defined $avialable_cpuTemp_rpi) {
         $map = SYSMON_getCPUTemp_RPi($hash, $map);
       }
@@ -526,24 +527,27 @@ sub
 SYSMON_getCPUTemp_RPi($$)
 {
 	my ($hash, $map) = @_;
-
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi entering. av: $avialable_cpuTemp_rpi<"; 
   # wenn verfügbar
   if(defined $avialable_cpuTemp_rpi) {
   	#my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
 	  my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");
-	  
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Value: [$val]"; 
 	  # Erkennen, ob der Wert verfügbar ist
 	  if (defined $avialable_cpuTemp_rpi && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi value undefined"; 
 	    $avialable_cpuTemp_rpi = undef;
 	    return $map;
 	  }
-	  
+
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi formating value"; 	  
     my $val_txt = sprintf("%.2f", $val/1000);
     $map->{+CPU_TEMP}="$val_txt";
     my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
     $map->{+CPU_TEMP_AVG}="$t_avg";
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Text value: [".$val_txt."]"; 
   }
-
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi exiting. av: $avialable_cpuTemp_rpi<"; 
 	return $map;
 }
 
@@ -554,7 +558,7 @@ sub
 SYSMON_getCPUTemp_BBB($$)
 {
 	my ($hash, $map) = @_;
-
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_BBB entering. av: $avialable_cpuTemp_bbb<"; 
   # wenn verfügbar
   if(defined $avialable_cpuTemp_bbb) {
   	my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
@@ -890,8 +894,9 @@ sub logF($$$)
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind ausslie&szlig;lich f&uuml;r Raspberry Pi verf&uuml;gbar.
-  Bis jetzt nur auf Raspberry Pi (Debian Wheezy) getestet.
+  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind nich auf jeder Plattform 
+  verf&uuml;gbar.
+  Bis jetzt getestet auf: Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390 (keine CPU-Daten).
   <br><br>
   <b>Define</b>
   <br><br>
