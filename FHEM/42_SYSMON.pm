@@ -539,6 +539,9 @@ Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi value undefined";
 	    $avialable_cpuTemp_rpi = undef;
 	    return $map;
 	  }
+	  
+	  $val = int($val);
+Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Value: [$val]"; 
 
 Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi formating value"; 	  
     my $val_txt = sprintf("%.2f", $val/1000);
