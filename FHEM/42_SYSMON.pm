@@ -62,11 +62,6 @@ use constant {
 use constant FS_PREFIX => "~ ";
 use constant FS_PREFIX_N => "fs_";
 
-# Marker für die Verfügbarkeit verschiedener (hardwarespezifischen) Werte
-my $avialable_cpuTemp_rpi = 1;
-my $avialable_cpuTemp_bbb = 1;
-my $avialable_cpuFreq = 1;
-
 sub
 SYSMON_Initialize($)
 {
@@ -79,7 +74,7 @@ SYSMON_Initialize($)
   $hash->{GetFn}    = "SYSMON_Get";
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "filesystems disable:0,1 ".
+  $hash->{AttrList} = "filesystems network-interfaces disable:0,1 ".
                        $readingFnAttributes;
 }
 
@@ -135,6 +130,84 @@ SYSMON_setInterval($@)
 	if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
 
 	$hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
+}
+
+
+my $cur_readings_map;
+sub
+SYSMON_updateCurrentReadingsMap($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+  my $rMap;
+  
+  # Map aktueller Namen erstellen
+	
+	# Feste Werte
+	if(SYSMON_isCPUFreqRPiBBB($hash)) {
+	  #$rMap->{"cpu_freq"}        = "CPU Frequenz";
+	  $rMap->{"cpu_freq"}        = "CPU frequency";
+	}
+	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash)) {
+    #$rMap->{"cpu_temp"}        = "CPU Temperatur";
+    #$rMap->{"cpu_temp_avg"}    = "Durchschnittliche CPU Temperatur";
+    $rMap->{"cpu_temp"}        = "CPU temperature";
+    $rMap->{"cpu_temp_avg"}    = "Average CPU temperature";
+  }
+  #$rMap->{"fhemuptime"}      = "Betriebszeit FHEM";
+  #$rMap->{"fhemuptime_text"} = "Betriebszeit FHEM";
+  #$rMap->{"idletime"}        = "Leerlaufzeit";
+  #$rMap->{"idletime_text"}   = "Leerlaufzeit";
+  #$rMap->{"loadavg"}         = "Durchschnittliche Auslastung";
+  #$rMap->{"ram"}             = "RAM";
+  #$rMap->{"swap"}            = "Swap";
+  #$rMap->{"uptime"}          = "Betriebszeit";
+  #$rMap->{"uptime_text"}     = "Betriebszeit";
+  $rMap->{"fhemuptime"}      = "System up time";
+  $rMap->{"fhemuptime_text"} = "System up time";
+  $rMap->{"idletime"}        = "Idle time";
+  $rMap->{"idletime_text"}   = "Idle time";
+  $rMap->{"loadavg"}         = "Load average";
+  $rMap->{"ram"}             = "RAM";
+  $rMap->{"swap"}            = "swap";
+  $rMap->{"uptime"}          = "System up time";
+  $rMap->{"uptime_text"}     = "System up time";
+
+	# Filesystems
+	my $filesystems = AttrVal($name, "filesystems", undef);
+  if(defined $filesystems) {
+    my @filesystem_list = split(/,\s*/, trim($filesystems));
+    foreach (@filesystem_list) {
+      
+    }
+  }
+	
+	# Networkadapters
+	
+	# User defined
+	
+  $cur_readings_map = $rMap;
+  return $rMap;
+}
+
+sub
+SYSMON_getObsoleteReadingsMap($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	
+	my $rMap;
+	
+	# alle READINGS durchgehen
+	my @cKeys=keys (%{$defs{$name}{READINGS}});
+  foreach my $aName (@cKeys) {
+    if(defined ($aName)) {
+    	# alles hinzufügen, was nicht in der Aktuellen Liste ist
+    	if(!$cur_readings_map->{$aName}) {
+    		$rMap->{$aName} = 1;
+    	}
+    }
+  }
+	
+	return $rMap;
 }
 
 sub
@@ -385,16 +458,16 @@ SYSMON_obtainParameters($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
     if($refresh_all || ($ref % $m1) eq 0) {
-    	#if(SYSMON_isRPi($hash)) { # vorerst nur auf Rasp
-      #}
-      Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
-      if (defined $avialable_cpuTemp_rpi) {
-        $map = SYSMON_getCPUTemp_RPi($hash, $map);
-      }
-      if (defined $avialable_cpuTemp_bbb) {
+    	#Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
+    	if(SYSMON_isCPUTempRPi($hash)) { # Rasp
+    		 $map = SYSMON_getCPUTemp_RPi($hash, $map);
+      } 
+      if (SYSMON_isCPUTempBBB($hash)) {
         $map = SYSMON_getCPUTemp_BBB($hash, $map);
       }
-      $map = SYSMON_getCPUFreq($hash, $map);
+      if(SYSMON_isCPUFreqRPiBBB($hash)) {
+        $map = SYSMON_getCPUFreq($hash, $map);
+      }
       $map = SYSMON_getLoadAvg($hash, $map);
     }
   }
@@ -526,31 +599,14 @@ SYSMON_getLoadAvg($$)
 sub
 SYSMON_getCPUTemp_RPi($$)
 {
+	
 	my ($hash, $map) = @_;
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi entering. av: $avialable_cpuTemp_rpi<"; 
-  # wenn verfügbar
-  if(defined $avialable_cpuTemp_rpi) {
-  	#my $val = qx( cat /sys/class/thermal/thermal_zone0/temp );
-	  my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Value: [$val]"; 
-	  # Erkennen, ob der Wert verfügbar ist
-	  if (defined $avialable_cpuTemp_rpi && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi value undefined"; 
-	    $avialable_cpuTemp_rpi = undef;
-	    return $map;
-	  }
-	  
-	  $val = int($val);
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Value: [$val]"; 
-
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi formating value"; 	  
-    my $val_txt = sprintf("%.2f", $val/1000);
-    $map->{+CPU_TEMP}="$val_txt";
-    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-    $map->{+CPU_TEMP_AVG}="$t_avg";
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi Text value: [".$val_txt."]"; 
-  }
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_RPi exiting. av: $avialable_cpuTemp_rpi<"; 
+  my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");  
+  $val = int($val);
+  my $val_txt = sprintf("%.2f", $val/1000);
+  $map->{+CPU_TEMP}="$val_txt";
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+  $map->{+CPU_TEMP_AVG}="$t_avg";
 	return $map;
 }
 
@@ -561,24 +617,12 @@ sub
 SYSMON_getCPUTemp_BBB($$)
 {
 	my ($hash, $map) = @_;
-Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_BBB entering. av: $avialable_cpuTemp_bbb<"; 
-  # wenn verfügbar
-  if(defined $avialable_cpuTemp_bbb) {
-  	my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
-  	
-  	# Erkennen, ob der Wert verfügbar ist
-	  if (defined $avialable_cpuTemp_bbb && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
-	    $avialable_cpuTemp_bbb = undef;
-	    return $map;
-	  }
-  	
-  	$val = int($val);
-    my $val_txt = sprintf("%.2f", $val/1000);
-    $map->{+CPU_TEMP}="$val_txt";
-    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-    $map->{+CPU_TEMP_AVG}="$t_avg";
-  }
-  
+ 	my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
+ 	$val = int($val);
+  my $val_txt = sprintf("%.2f", $val/1000);
+  $map->{+CPU_TEMP}="$val_txt";
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+  $map->{+CPU_TEMP_AVG}="$t_avg";  
 	return $map;
 }
 
@@ -589,22 +633,10 @@ sub
 SYSMON_getCPUFreq($$)
 {
 	my ($hash, $map) = @_;
-
-  # wenn verfügbar
-  if(defined $avialable_cpuFreq) {
-	  #my $val = qx( cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq );
-	  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
-	  
-	  # Erkennen, ob der Wert verfügbar ist
-	  if (defined $avialable_cpuFreq && (index($val, 'nicht gefunden') >=0 || index($val, 'not found') >= 0)) {
-	    $avialable_cpuFreq = undef;
-	    return $map;
-	  }
-	  
-    my $val_txt = sprintf("%d", $val/1000);
-    $map->{+CPU_FREQ}="$val_txt";
-  }
-
+	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
+	$val = int($val);
+	my $val_txt = sprintf("%d", $val/1000);
+  $map->{+CPU_FREQ}="$val_txt";
 	return $map;
 }
 
@@ -678,7 +710,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 	
 	# Neue Syntax: benannte Filesystems: <name>:<definition>
 	my($fName, $fDef) = split(/:/, $fs);
-	Log 3, "SYSMON >>>>>>>>>>>>>>> [$fs][$fName:$fDef]";
+	#Log 3, "SYSMON >>>>>>>>>>>>>>> [$fs][$fName|$fDef]";
 	if(defined $fDef) {
 		$fs = $fDef;
 	}
@@ -727,7 +759,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
   # check if network available
   #if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
-  if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error'))
+  if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
   {
     # perform grep from above
     #@dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
@@ -840,11 +872,10 @@ sub SYSMON_ShowValuesHTML ($)
 
   # named file systems
   foreach my $aName (sort keys %{$map}) {
-  	#if(index($aName, "fs[") == 0) {
   	if(defined ($aName) && index($aName, FS_PREFIX_N) == 0) {
       my $fsVal = $map->{$aName};
-      $fsVal = ~ /.* at (.+)/;
-  	  $htmlcode .= "<tr><td valign='top'>File System: ".$aName."&nbsp;(".$1.")&nbsp;</td><td>".$fsVal."</td></tr>";
+      #$fsVal = ~ /.*at\s(.+)/;
+  	  $htmlcode .= "<tr><td valign='top'>File System: ".$aName."&nbsp;</td><td>".$fsVal."</td></tr>";
     }
   }
   
@@ -853,15 +884,37 @@ sub SYSMON_ShowValuesHTML ($)
   return $htmlcode;
 }
 
-my $sys_rpi = undef;
+my $sys_cpu_temp_rpi = undef;
 sub
-SYSMON_isRPi($) {
+SYSMON_isCPUTempRPi($) {
 	my ($hash) = @_;
-	if(!defined $sys_rpi) {
-	  $sys_rpi = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
+	if(!defined $sys_cpu_temp_rpi) {
+	  $sys_cpu_temp_rpi = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
   }
 
-	return $sys_rpi;
+	return $sys_cpu_temp_rpi;
+}
+
+my $sys_cpu_temp_bbb = undef;
+sub
+SYSMON_isCPUTempBBB($) {
+	my ($hash) = @_;
+	if(!defined $sys_cpu_temp_bbb) {
+	  $sys_cpu_temp_bbb = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/temp1_input ] && echo 1 || echo 0"));
+  }
+
+	return $sys_cpu_temp_bbb;
+}
+
+my $sys_cpu_freq_rpi_bbb = undef;
+sub
+SYSMON_isCPUFreqRPiBBB($) {
+	my ($hash) = @_;
+	if(!defined $sys_cpu_freq_rpi_bbb) {
+	  $sys_cpu_freq_rpi_bbb = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+  }
+
+	return $sys_cpu_freq_rpi_bbb;
 }
 
 my $sys_fb = undef;
