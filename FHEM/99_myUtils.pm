@@ -705,13 +705,13 @@ sub left{
 sub
 SetTempList_Heizung_OG_Bad()
  {
-   { fhem ("set OG_BZ_TT01_Clima tempListMon prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListTue prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListWed prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListThu prep 01:00 20.0 05:00 22.0 09:00 20.0 16:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListFri prep 02:00 20.0 05:00 22.0 09:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListSat prep 02:00 20.0 06:30 22.0 10:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
-   { fhem ("set OG_BZ_TT01_Clima tempListSun exec 01:00 20.0 06:30 22.0 10:00 20.0 15:00 21.0 18:00 22.0 24:00 21.0")};
+   { fhem ("set OG_BZ_TT01_Clima tempListMon prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListTue prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListWed prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListThu prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListFri prep 02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListSat prep 02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_TT01_Clima tempListSun exec 01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
 }
 # End SetTempList_Heizung_OG_Bad
 
