@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.0.5";
+my $VERSION = "1.1.0";
 
 use constant {
   UPTIME          => "uptime",
@@ -60,6 +60,7 @@ use constant {
 };
 
 use constant FS_PREFIX => "~ ";
+use constant FS_PREFIX_N => "fs_";
 
 # Marker für die Verfügbarkeit verschiedener (hardwarespezifischen) Werte
 my $avialable_cpuTemp_rpi = 1;
@@ -240,7 +241,7 @@ SYSMON_Set($@)
 
     my @cKeys=keys (%{$defs{$name}{READINGS}});
     foreach my $aName (@cKeys) {
-      if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+      if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
         delete $defs{$name}{READINGS}{$aName};
       }
     }
@@ -349,7 +350,7 @@ SYSMON_Update($@)
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
     	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
-    	if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+    	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
         delete $defs{$name}{READINGS}{$aName};
       }
     }
@@ -436,20 +437,19 @@ SYSMON_obtainParameters($$)
         foreach (@filesystem_list)
         {
         	my $fs = $_;
-        	# Workaround: Damit die Readings zw. den Update-Punkte nicht geloescht werden, werden die Schluessel leer angelegt
-        	# Die Schluessel koennen u.U. anders sein, als von der Methode am Ende geliefert wird!
         	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
         }
       } else {
         $map = SYSMON_getFileSystemInfo($hash, $map, "/");
       }
     } else {
+    	# Workaround: Damit die Readings zw. den Update-Punkten nicht geloescht werden, werden die Schluessel leer angelegt
     	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben,
     	# damit werden die Readings in der Update-Methode nicht geloescht.
     	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
     	my @cKeys=keys (%{$defs{$name}{READINGS}});
       foreach my $aName (@cKeys) {
-    	  if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+    	  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
           $map->{$aName} = undef;
         }
       }
@@ -572,6 +572,7 @@ Log 3, "SYSMON -----------> DEBUG: SYSMON_getCPUTemp_BBB entering. av: $avialabl
 	    return $map;
 	  }
   	
+  	$val = int($val);
     my $val_txt = sprintf("%.2f", $val/1000);
     $map->{+CPU_TEMP}="$val_txt";
     my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
@@ -674,6 +675,13 @@ sub SYSMON_getRamAndSwap($$)
 sub SYSMON_getFileSystemInfo ($$$)
 {
 	my ($hash, $map, $fs) = @_;
+	
+	# Neue Syntax: benannte Filesystems: <name>:<definition>
+	my($fName, $fDef) = split(/:/, $fs);
+	Log 3, "SYSMON >>>>>>>>>>>>>>> [$fs][$fName:$fDef]";
+	if(defined $fDef) {
+		$fs = $fDef;
+	}
 
   my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
 
@@ -686,10 +694,18 @@ sub SYSMON_getFileSystemInfo ($$$)
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     $percentage_used =~ /^(.+)%$/;
     $percentage_used = $1;
-    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB";
-    $map->{+FS_PREFIX.$mnt_point} = $out_txt;
+    my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB at ".$mnt_point;
+    if(defined $fDef) {
+    	$map->{+FS_PREFIX_N.$fName} = $out_txt;
+    } else {
+      $map->{+FS_PREFIX.$mnt_point} = $out_txt;
+    }
   } else {
-  	$map->{+FS_PREFIX.$fs} = "not available";
+  	if(defined $fDef) {
+  		$map->{+FS_PREFIX_N.$fName} = "not available";
+  	} else {
+  	  $map->{+FS_PREFIX.$fs} = "not available";
+  	}
   }
 
   return $map;
@@ -822,6 +838,16 @@ sub SYSMON_ShowValuesHTML ($)
     }
   }
 
+  # named file systems
+  foreach my $aName (sort keys %{$map}) {
+  	#if(index($aName, "fs[") == 0) {
+  	if(defined ($aName) && index($aName, FS_PREFIX_N) == 0) {
+      my $fsVal = $map->{$aName};
+      $fsVal = ~ /.* at (.+)/;
+  	  $htmlcode .= "<tr><td valign='top'>File System: ".$aName."&nbsp;(".$1.")&nbsp;</td><td>".$fsVal."</td></tr>";
+    }
+  }
+  
   $htmlcode .= "</table></div><br>";
 
   return $htmlcode;
@@ -897,9 +923,9 @@ sub logF($$$)
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Es werden nur Linux-basierte Systemen unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind nich auf jeder Plattform 
+  Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform 
   verf&uuml;gbar.
-  Bis jetzt getestet auf: Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390 (keine CPU-Daten).
+  Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390 (keine CPU-Daten).
   <br><br>
   <b>Define</b>
   <br><br>
@@ -1000,7 +1026,10 @@ sub logF($$$)
     </li>
     <br>
     <li>Dateisysteminformationen (z.B. ~ /)<br>
-    		Iformationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.
+    		Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
+    		Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
+    		In diesem Fall werden diese Readings auf folgende Weise benannt: fs_&lt;name&gt;.<br>
+    		Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.
     </li>
     <br>
   <br>
@@ -1074,16 +1103,16 @@ sub logF($$$)
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">~ /</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_root</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB at /</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
 <tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">~ /boot</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
 <tr><td><div class="dname">~ /media/usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB&nbsp;&nbsp;</div></td>
+<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
@@ -1125,7 +1154,11 @@ sub logF($$$)
     <ul>
     <li>filesystems<br>
     Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
-    Beispiel: <code>/boot, /, /media/usb1</code>
+    Jeder angegebene Wert muss entweder direkt den gew&uuml;nschten Mountpoint benennen, oder ein durch ein Doppelpunkt getrenntes Paar &lt;name&gt;:&lt;mountpoint&gt;.
+    Der Name wird bei der Anzeige und Logging verwendet.<br>
+    Beispiel: <code>/boot,/,/media/usb1</code><br>
+    oder: <code>boot:/boot,root:/,USB-Stick:/media/usb1</code><br>
+    Die Liste kann gleichzeitig benannte und unbenannte Angaben enthalten. Im Sinne der besseren &Uuml;bersicht ist das jedoch eher nicht zu empfehlen.
     </li>
     <br>
     <li>disable<br>
@@ -1162,8 +1195,9 @@ sub logF($$$)
     <code>
       # Modul-Definition<br>
       define sysmon SYSMON 1 1 1 10<br>
-      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
-      attr sysmon filesystems /boot, /, /media/usb1<br>
+      #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
+      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
+      attr sysmon filesystems boot:/boot,root:/,USB-Stick:/media/usb1<br>
       attr sysmon group RPi<br>
       attr sysmon room 9.03_Tech<br>
       <br>
