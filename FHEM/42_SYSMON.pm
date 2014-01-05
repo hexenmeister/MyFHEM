@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.1.0";
+my $VERSION = "1.1.5";
 
 use constant {
   UPTIME          => "uptime",
@@ -60,7 +60,7 @@ use constant {
 };
 
 use constant FS_PREFIX => "~ ";
-use constant FS_PREFIX_N => "fs_";
+#use constant FS_PREFIX_N => "fs_";
 
 sub
 SYSMON_Initialize($)
@@ -74,9 +74,10 @@ SYSMON_Initialize($)
   $hash->{GetFn}    = "SYSMON_Get";
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "filesystems network-interfaces disable:0,1 ".
+  $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 ".
                        $readingFnAttributes;
 }
+### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment><Intervel_Minutes><Cmd>]
 
 sub
 SYSMON_Define($$)
@@ -177,14 +178,47 @@ SYSMON_updateCurrentReadingsMap($) {
   if(defined $filesystems) {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
     foreach (@filesystem_list) {
-      
+      my($fName, $fDef) = split(/:/, $_);
+	    if(defined $fDef) {
+	    	# Nur benannte
+		    $rMap->{"$fName"}     = "Filesystem ".$fDef;
+	    } else {
+	    	# ggf. unbenannte TODO
+		    #$fDef = $fName;
+		    #$fName = FS_PREFIX.$fs
+	    }
     }
+  } else {
+  	$rMap->{"root"}     = "Filesystem /";
   }
 	
 	# Networkadapters
-	
+	my $networkadapters = AttrVal($name, "network-interfaces", undef);
+  if(defined $networkadapters) {
+  	my @networkadapters_list = split(/,\s*/, trim($networkadapters));
+    foreach (@networkadapters_list) {
+      my($nName, $nDef) = split(/:/, $_);
+	    if(defined $nDef) {
+	    	# Nur gueltige
+		    $rMap->{"$nName"}     = "Network adapter ".$nDef;
+	    }
+    }
+  }
+  	
 	# User defined
-	
+	my $userdefined = AttrVal($name, "user-defined", undef);
+  if(defined $userdefined) {
+  	my @userdefined_list = split(/,\s*/, trim($userdefined));
+    foreach (@userdefined_list) {
+       # <readingsName>:<Comment><Intervel_Minutes><Cmd>
+	     my($uName, $uComment, $uInterval, $uCmd) = split(/:/, $_);
+	     if(defined $uComment) {
+	    	# Nur gueltige
+		    $rMap->{"$uName"}     = $uComment;
+	    }
+    }
+  }
+
   $cur_readings_map = $rMap;
   return $rMap;
 }
@@ -314,15 +348,27 @@ SYSMON_Set($@)
 
     my @cKeys=keys (%{$defs{$name}{READINGS}});
     foreach my $aName (@cKeys) {
-      if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+      #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+      if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
         delete $defs{$name}{READINGS}{$aName};
       }
     }
 
     return;
   }
+  
+  if($cmd eq "clear")
+  {
+  	my $subcmd = my $cmd= $a[2];
+  	if(defined $subcmd) {
+  		delete $defs{$name}{READINGS}{$subcmd};
+  		return;
+    }
+    
+    return "missing parameter. use clear <reading name>";
+  }
 
-  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg";
+  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg clear";
 }
 
 sub
@@ -423,7 +469,8 @@ SYSMON_Update($@)
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
     foreach my $aName (@cKeys) {
     	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
-    	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    	#if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
         delete $defs{$name}{READINGS}{$aName};
       }
     }
@@ -513,7 +560,7 @@ SYSMON_obtainParameters($$)
         	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
         }
       } else {
-        $map = SYSMON_getFileSystemInfo($hash, $map, "/");
+        $map = SYSMON_getFileSystemInfo($hash, $map, "root:/");
       }
     } else {
     	# Workaround: Damit die Readings zw. den Update-Punkten nicht geloescht werden, werden die Schluessel leer angelegt
@@ -522,7 +569,8 @@ SYSMON_obtainParameters($$)
     	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
     	my @cKeys=keys (%{$defs{$name}{READINGS}});
       foreach my $aName (@cKeys) {
-    	  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    	  #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    	  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
           $map->{$aName} = undef;
         }
       }
@@ -728,13 +776,15 @@ sub SYSMON_getFileSystemInfo ($$$)
     $percentage_used = $1;
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB at ".$mnt_point;
     if(defined $fDef) {
-    	$map->{+FS_PREFIX_N.$fName} = $out_txt;
+    	#$map->{+FS_PREFIX_N.$fName} = $out_txt;
+    	$map->{$fName} = $out_txt;
     } else {
       $map->{+FS_PREFIX.$mnt_point} = $out_txt;
     }
   } else {
   	if(defined $fDef) {
-  		$map->{+FS_PREFIX_N.$fName} = "not available";
+  		#$map->{+FS_PREFIX_N.$fName} = "not available";
+  		$map->{$fName} = "not available";
   	} else {
   	  $map->{+FS_PREFIX.$fs} = "not available";
   	}
@@ -870,14 +920,28 @@ sub SYSMON_ShowValuesHTML ($)
     }
   }
 
+  # named filesystems
+	my $filesystems = AttrVal($name, "filesystems", undef);
+  if(defined $filesystems) {
+    my @filesystem_list = split(/,\s*/, trim($filesystems));
+    foreach (@filesystem_list) {
+      my($fName, $fDef) = split(/:/, $_);
+	    if(defined $fDef) {
+	    	# wenn gueltig
+	    	my $fsVal = $map->{$fName};
+	    	$htmlcode .= "<tr><td valign='top'>File System: ".$fName."&nbsp;</td><td>".$fsVal."</td></tr>";
+	    }
+	  }
+	}
+
   # named file systems
-  foreach my $aName (sort keys %{$map}) {
-  	if(defined ($aName) && index($aName, FS_PREFIX_N) == 0) {
-      my $fsVal = $map->{$aName};
-      #$fsVal = ~ /.*at\s(.+)/;
-  	  $htmlcode .= "<tr><td valign='top'>File System: ".$aName."&nbsp;</td><td>".$fsVal."</td></tr>";
-    }
-  }
+  #foreach my $aName (sort keys %{$map}) {
+  #	if(defined ($aName) && index($aName, FS_PREFIX_N) == 0) {
+  #    my $fsVal = $map->{$aName};
+  #    #$fsVal = ~ /.*at\s(.+)/;
+  #	  $htmlcode .= "<tr><td valign='top'>File System: ".$aName."&nbsp;</td><td>".$fsVal."</td></tr>";
+  #  }
+  #}
   
   $htmlcode .= "</table></div><br>";
 
@@ -1088,7 +1152,7 @@ sub trim($)
     <li>Dateisysteminformationen (z.B. ~ /)<br>
     		Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
     		Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
-    		In diesem Fall werden diese Readings auf folgende Weise benannt: fs_&lt;name&gt;.<br>
+    		In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
     		Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.
     </li>
     <br>
@@ -1167,11 +1231,11 @@ sub trim($)
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB at /</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">~ /boot</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td><div class="dname">~ /media/usb1</div></td>
+<tr><td><div class="dname">fs_usb1</div></td>
 <td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
@@ -1208,6 +1272,12 @@ sub trim($)
     L&ouml;scht benutzerdefinierbare Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.<br>
     </li>
     <br>
+    <li>clear &lt;reading name&gt;<br>
+    L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung) 
+    wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter 
+    benutzerdefinierten Eintr&auml;ge<br>
+    </li>
+    <br>
     </ul><br>
 
   <b>Attributes:</b><br><br>
@@ -1217,7 +1287,7 @@ sub trim($)
     Jeder angegebene Wert muss entweder direkt den gew&uuml;nschten Mountpoint benennen, oder ein durch ein Doppelpunkt getrenntes Paar &lt;name&gt;:&lt;mountpoint&gt;.
     Der Name wird bei der Anzeige und Logging verwendet.<br>
     Beispiel: <code>/boot,/,/media/usb1</code><br>
-    oder: <code>boot:/boot,root:/,USB-Stick:/media/usb1</code><br>
+    oder: <code>fs_boot:/boot,fs_root:/,fs_usb1:/media/usb1</code><br>
     Die Liste kann gleichzeitig benannte und unbenannte Angaben enthalten. Im Sinne der besseren &Uuml;bersicht ist das jedoch eher nicht zu empfehlen.
     </li>
     <br>
@@ -1257,7 +1327,7 @@ sub trim($)
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
       attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
-      attr sysmon filesystems boot:/boot,root:/,USB-Stick:/media/usb1<br>
+      attr sysmon filesystems fs_boot:/boot,fs_root:/,fs_usb1:/media/usb1<br>
       attr sysmon group RPi<br>
       attr sysmon room 9.03_Tech<br>
       <br>
