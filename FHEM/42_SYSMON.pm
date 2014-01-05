@@ -191,7 +191,7 @@ SYSMON_updateCurrentReadingsMap($) {
   } else {
   	$rMap->{"root"}     = "Filesystem /";
   }
-	
+
 	# Networkadapters
 	my $networkadapters = AttrVal($name, "network-interfaces", undef);
   if(defined $networkadapters) {
@@ -199,12 +199,15 @@ SYSMON_updateCurrentReadingsMap($) {
     foreach (@networkadapters_list) {
       my($nName, $nDef) = split(/:/, $_);
 	    if(defined $nDef) {
-	    	# Nur gueltige
+	    	# Benannte
 		    $rMap->{"$nName"}     = "Network adapter ".$nDef;
+	    } else {
+	    	# Unbenannte
+	    	$rMap->{"$nName"}     = "Network adapter ".$nName;
 	    }
     }
   }
-  	
+
 	# User defined
 	my $userdefined = AttrVal($name, "user-defined", undef);
   if(defined $userdefined) {
@@ -214,7 +217,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	     my($uName, $uComment, $uInterval, $uCmd) = split(/:/, $_);
 	     if(defined $uComment) {
 	    	# Nur gueltige
-		    $rMap->{"$uName"}     = $uComment;
+		    $rMap->{"$uName"} = $uComment;
 	    }
     }
   }
@@ -234,7 +237,7 @@ SYSMON_getObsoleteReadingsMap($) {
 	my @cKeys=keys (%{$defs{$name}{READINGS}});
   foreach my $aName (@cKeys) {
     if(defined ($aName)) {
-    	# alles hinzufügen, was nicht in der Aktuellen Liste ist
+    	# alles hinzufuegen, was nicht in der Aktuellen Liste ist
     	if(!$cur_readings_map->{$aName}) {
     		$rMap->{$aName} = 1;
     	}
@@ -528,23 +531,35 @@ SYSMON_obtainParameters($$)
 
   if($m3 gt 0) { # Nur wenn > 0
     # M3: eth0, eth0_diff, wlan0, wlan0_diff
-    if($refresh_all || ($ref % $m3) eq 0) {
-    	if(SYSMON_isFB($hash)) { 
-    		$map = SYSMON_getNetworkInfo($hash, $map, "ath0");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "ath1");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "dsl");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "eth0");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "guest");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "hotspot");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "lan");
-    		$map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
-    	} else {
-        $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
-        $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+    my $update_ns = ($refresh_all || ($ref % $m3) eq 0);
+    #if($refresh_all || ($ref % $m3) eq 0) {
+    my $networks = AttrVal($name, "network-interfaces", undef);
+    if($update_ns) {
+      if(defined $networks) {
+      	my @networks_list = split(/,\s*/, trim($networks));
+        foreach (@networks_list) {
+	        $map = SYSMON_getNetworkInfo($hash, $map, $_);
+        }
+      } else {
+      	# Wenn nichts definiert, werden Default-Werte verwendet
+      	if(SYSMON_isFB($hash)) { 
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "ath0");
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "ath1");
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
+          $map = SYSMON_getNetworkInfo($hash, $map, "dsl");
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
+    	  	$map = SYSMON_getNetworkInfo($hash, $map, "guest");
+        	$map = SYSMON_getNetworkInfo($hash, $map, "hotspot");
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "lan");
+    		  $map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
+    	  } else {
+          $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
+          $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
+        }
       }
     }
   }
+  
 
   if($m4 gt 0) { # Nur wenn > 0
     # M4: Filesystem-Informationen
@@ -556,8 +571,7 @@ SYSMON_obtainParameters($$)
         my @filesystem_list = split(/,\s*/, trim($filesystems));
         foreach (@filesystem_list)
         {
-        	my $fs = $_;
-        	$map = SYSMON_getFileSystemInfo($hash, $map, $fs);
+        	$map = SYSMON_getFileSystemInfo($hash, $map, $_);
         }
       } else {
         $map = SYSMON_getFileSystemInfo($hash, $map, "root:/");
@@ -800,6 +814,12 @@ sub SYSMON_getFileSystemInfo ($$$)
 sub SYSMON_getNetworkInfo ($$$)
 {
 	my ($hash, $map, $device) = @_;
+	
+	my($nName, $nDef) = split(/:/, $device);
+	if(!defined $nDef) {
+	  $nDef = $nName;
+	}
+	$device = $nDef;
 
   # in case of network not present get failure from stderr (2>&1)
   my $cmd="ifconfig ".$device." 2>&1";
@@ -841,7 +861,7 @@ sub SYSMON_getNetworkInfo ($$$)
     my $totalRxTx = $rx + $tx;
 
     my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
-    $map->{$device} = $out_txt;
+    $map->{$nName} = $out_txt;
 
     my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
     my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
@@ -853,10 +873,10 @@ sub SYSMON_getNetworkInfo ($$$)
     my $d_tt = $totalRxTx-$o_tt;
     if($d_tt<0) {$d_tt=0;}
     my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-    $map->{$device.DIFF_SUFFIX} = $out_txt_diff;
+    $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
   } else {
-  	$map->{$device} = "not available";
-  	$map->{$device.DIFF_SUFFIX} = "not available";
+  	$map->{$nName} = "not available";
+  	$map->{$nName.DIFF_SUFFIX} = "not available";
   }
 
   return $map;
@@ -1096,14 +1116,6 @@ sub trim($)
         Durchschnitt der CPU-Temperatur, gebildet &uuml;ber die letzten 4 Werte.
     </li>
     <br>
-    <li>eth0<br>
-    		Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle eth0.
-    </li>
-    <br>
-    <li>eth0_diff<br>
-    	 &Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufrung (f&uuml; eth0).
-    </li>
-    <br>
     <li>fhemuptime<br>
     		Zeit (in Sekunden) seit dem Start des FHEM-Servers.
     </li>
@@ -1141,19 +1153,24 @@ sub trim($)
     		Zeit seit dem Systemstart in menschenlesbarer Form.
     </li>
     <br>
-    <li>wlan0<br>
-        Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle wlan0.
+    <li>Netzwerkinformationen<br>
+    Informationen zu den &uuml;ber die angegebene Netzwerkschnittstellen &uuml;bertragene Datenmengen 
+    und der Differenz zu der vorherigen Messung.
+    <br>
+    Beispiele:<br>
+    Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle eth0.<br>
+    <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
+    &Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml; eth0).<br>
+    <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
     </li>
     <br>
-    <li>wlan0_diff<br>
-    		&Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufrung (f&uuml; wlan0).
-    </li>
-    <br>
-    <li>Dateisysteminformationen (z.B. ~ /)<br>
+    <li>Dateisysteminformationen<br>
     		Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
     		Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
     		In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
-    		Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.
+    		Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.<br>
+    		Beispiel:<br>
+    		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
   <br>
@@ -1289,6 +1306,17 @@ sub trim($)
     Beispiel: <code>/boot,/,/media/usb1</code><br>
     oder: <code>fs_boot:/boot,fs_root:/,fs_usb1:/media/usb1</code><br>
     Die Liste kann gleichzeitig benannte und unbenannte Angaben enthalten. Im Sinne der besseren &Uuml;bersicht ist das jedoch eher nicht zu empfehlen.
+    </li>
+    <br>
+    <li>network-interfaces<br>
+    Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen. Jeder Eintrag besteht aus dem Reading-Namen und dem Namen 
+    des Netwerk-Interfaces (getrennt durch einen Doppelpunkt).<br>
+    Beispiel <code>ethernet:eth0,wlan:wlan0</code><br>
+    Ist kein Doppelpunkt in dem Eintrag, gilt der gegebene Wert als Reading-Name und Interface-Name gleichzeitig.
+    </li>
+    <br>
+    <li>user-defined<br>
+    noch nicht implementiert
     </li>
     <br>
     <li>disable<br>
