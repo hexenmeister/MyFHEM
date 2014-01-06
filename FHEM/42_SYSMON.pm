@@ -78,7 +78,7 @@ SYSMON_Initialize($)
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 ".
                        $readingFnAttributes;
 }
-### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment>:<Intervel_Minutes>:<Cmd>]
+### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment>:<Interval_Minutes>:<Cmd>]
 
 sub
 SYSMON_Define($$)
@@ -1326,7 +1326,7 @@ sub trim($)
     <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
     Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
     Reading-Name wird bei der Anzeige und Logging verwendet, Mount-Point ist die Grundlage der Auswertung, 
-    Kommentar ist f&uuml;r die Anzeige (s. SYSMON_ShowValuesHTML)<br>
+    Kommentar ist relevant f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML)<br>
     Beispiel: <code>/boot,/,/media/usb1</code><br>
     oder: <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
     Im Sinne der besseren &Uuml;bersicht sollten zumindest Name und MountPoint angegeben werden.
@@ -1335,12 +1335,12 @@ sub trim($)
     <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
     Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen.
     Jeder Eintrag besteht aus dem Reading-Namen, dem Namen 
-    des Netwerk-Adapters und einem Kommentar f&uuml;r die Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Dopelpunkt verwendet, 
+    des Netwerk-Adapters und einem Kommentar f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Dopelpunkt verwendet, 
     wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet<br>
     Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
     </li>
     <br>
-    <li>user-defined &lt;readingsName&gt;:&lt;Comment&gt;:&lt;Intervel_Minutes&gt;:&lt;Cmd&gt;,...<br>
+    <li>user-defined &lt;readingsName&gt;:&lt;Comment&gt;:&lt;Interval_Minutes&gt;:&lt;Cmd&gt;,...<br>
     noch nicht implementiert
     </li>
     <br>
