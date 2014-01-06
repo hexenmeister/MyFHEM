@@ -151,9 +151,9 @@ SYSMON_updateCurrentReadingsMap($) {
 	  $rMap->{"cpu_freq"}        = "CPU frequency";
 	}
 	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash)) {
-    #$rMap->{"cpu_temp"}        = "CPU Temperatur";
+    #$rMap->{+CPU_TEMP}        = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}    = "Durchschnittliche CPU Temperatur";
-    $rMap->{"cpu_temp"}        = "CPU temperature";
+    $rMap->{+CPU_TEMP}        = "CPU temperature";
     $rMap->{"cpu_temp_avg"}    = "Average CPU temperature";
   }
   #$rMap->{"fhemuptime"}      = "Betriebszeit FHEM";
@@ -166,7 +166,7 @@ SYSMON_updateCurrentReadingsMap($) {
   #$rMap->{"uptime"}          = "Betriebszeit";
   #$rMap->{"uptime_text"}     = "Betriebszeit";
   $rMap->{"fhemuptime"}      = "System up time";
-  $rMap->{"fhemuptime_text"} = "System up time";
+  $rMap->{"fhemuptime_text"} = "FHEM up time";
   $rMap->{"idletime"}        = "Idle time";
   $rMap->{"idletime_text"}   = "Idle time";
   $rMap->{"loadavg"}         = "Load average";
@@ -905,30 +905,34 @@ sub SYSMON_getNetworkInfo ($$$)
 #------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 #------------------------------------------------------------------------------
-sub SYSMON_ShowValuesHTML ($)
+sub SYSMON_ShowValuesHTML ($;@)
 {
-    my ($name) = @_;
+    my ($name, @data) = @_;
     my $hash = $main::defs{$name};
-    #SYSMON_updateCurrentReadingsMap($hash);
+    SYSMON_updateCurrentReadingsMap($hash);
 
-# TODO
+# TODO: 
 	# Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
-	my @dataDescription =
-  (
-    ["Date", undef, ""],
-    ["CPU temperature", CPU_TEMP, " &deg;C"],
-    ["CPU frequency", CPU_FREQ, " MHz"],
-    ["System up time", UPTIME_TEXT, ""],
-    ["FHEM up time", FHEMUPTIME_TEXT, ""],
-    ["Load average", LOADAVG, ""],
-    ["RAM", RAM, ""],
-    ["Swap", SWAP, ""],
+	my @dataDescription = (CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.":"." &deg;C", 
+	                       CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.":"." MHz", 
+	                       UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP);
+	#my @dataDescription =
+  #(
+    #["Date", undef, ""],
+    #["CPU temperature", CPU_TEMP, " &deg;C"],
+    #["CPU frequency", CPU_FREQ, " MHz"],
+    #["System up time", UPTIME_TEXT, ""],
+    #["FHEM up time", FHEMUPTIME_TEXT, ""],
+    #["Load average", LOADAVG, ""],
+    #["RAM", RAM, ""],
+    #["Swap", SWAP, ""],
     #["File system", ?, ""],
     #["USB stick", ?, ""],
     #["Ethernet", ETH0, ""],
     #["WLAN", WLAN0, ""],
-  );
+  #);
 
   my $map = SYSMON_obtainParameters($hash, 1);
 
@@ -940,16 +944,28 @@ sub SYSMON_ShowValuesHTML ($)
   $htmlcode .= "<tr><td valign='top'>Date:&nbsp;</td><td>".strftime("%d.%m.%Y %H:%M:%S", localtime())."</td></tr>";
 
   # oben definierte Werte anzeigen
-  my $ref_zeile;
-  foreach $ref_zeile (@dataDescription) {
-    #foreach my $spalte (@$ref_zeile) {
-    #	print "$spalte "
-    #}
-    my $tName = @$ref_zeile[1];
-    if(defined $tName) {
-      $htmlcode .= "<tr><td valign='top'>".@$ref_zeile[0].":&nbsp;</td><td>".$map->{$tName}.@$ref_zeile[2]."</td></tr>";
+  foreach (@dataDescription) {
+  	my($rName, $rComment, $rPostfix) = split(/:/, $_);
+  	Log 3, "SYSMON>>>>>>_>>>>>>>>>>>>>>>_>>>>>".$rName."---".$rComment;
+  	if(!defined $rComment) {
+      $rComment = $cur_readings_map->{$rName};
     }
+    Log 3, "SYSMON>>>>>>_>>>>>>>>>>>>>>>_>>>>>".$rName."+++".$rComment;
+    my $rVal = $map->{$rName};
+    $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
   }
+  
+  # oben definierte Werte anzeigen
+  #my $ref_zeile;
+  #foreach $ref_zeile (@dataDescription) {
+  #  #foreach my $spalte (@$ref_zeile) {
+  #  #	print "$spalte "
+  #  #}
+  #  my $tName = @$ref_zeile[1];
+  #  if(defined $tName) {
+  #    $htmlcode .= "<tr><td valign='top'>".@$ref_zeile[0].":&nbsp;</td><td>".$map->{$tName}.@$ref_zeile[2]."</td></tr>";
+  #  }
+  #}
   
   # network-interfaces
 	my $networks = AttrVal($name, "network-interfaces", undef);
