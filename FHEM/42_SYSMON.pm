@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.1.5";
+my $VERSION = "1.1.6";
 
 use constant {
   UPTIME          => "uptime",
@@ -77,7 +77,7 @@ SYSMON_Initialize($)
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 ".
                        $readingFnAttributes;
 }
-### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment><Intervel_Minutes><Cmd>]
+### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment>:<Intervel_Minutes>:<Cmd>]
 
 sub
 SYSMON_Define($$)
@@ -102,13 +102,15 @@ SYSMON_Define($$)
 
   $hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
 
+  SYSMON_updateCurrentReadingsMap($hash);
+
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
 
   #$hash->{LOCAL} = 1;
   #SYSMON_Update($hash); #-> so nicht. hat im Startvorgang gelegentlich (oft) den Server 'aufgehaengt'
   #delete $hash->{LOCAL};
-
+  
   return undef;
 }
 
@@ -173,37 +175,52 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"uptime"}          = "System up time";
   $rMap->{"uptime_text"}     = "System up time";
 
-	# Filesystems
+	# Filesystems <readingName>[:<mountPoint>[:<Comment>]]
 	my $filesystems = AttrVal($name, "filesystems", undef);
   if(defined $filesystems) {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
     foreach (@filesystem_list) {
-      my($fName, $fDef) = split(/:/, $_);
-	    if(defined $fDef) {
-	    	# Nur benannte
-		    $rMap->{"$fName"}     = "Filesystem ".$fDef;
-	    } else {
-	    	# ggf. unbenannte TODO
-		    #$fDef = $fName;
-		    #$fName = FS_PREFIX.$fs
-	    }
+      my($fName, $fDef, $nComment) = split(/:/, $_);
+      if(defined $nComment) {
+      	$rMap->{$fName}       =  $nComment;
+      } else {
+	      if(defined $fDef) {
+	    	  # Benannte
+		      $rMap->{$fName}     = "Filesystem ".$fDef;
+	      } else {
+	    	  # Unbenannte
+	    	  $rMap->{$fName}     = "Mount point ".$fName;
+	      }
+	    }      
+	    #if(defined $fDef) {
+	    #	# Nur benannte
+		  #  $rMap->{$fName}     = "Filesystem ".$fDef;
+	    #} else {
+	    #	# ggf. unbenannte TODO
+		  #  #$fDef = $fName;
+		  #  #$fName = FS_PREFIX.$fs
+	    #}
     }
   } else {
   	$rMap->{"root"}     = "Filesystem /";
   }
 
-	# Networkadapters
+	# Networkadapters: <readingName>[:<interfaceName>[:<Comment>]]
 	my $networkadapters = AttrVal($name, "network-interfaces", undef);
   if(defined $networkadapters) {
   	my @networkadapters_list = split(/,\s*/, trim($networkadapters));
     foreach (@networkadapters_list) {
-      my($nName, $nDef) = split(/:/, $_);
-	    if(defined $nDef) {
-	    	# Benannte
-		    $rMap->{"$nName"}     = "Network adapter ".$nDef;
-	    } else {
-	    	# Unbenannte
-	    	$rMap->{"$nName"}     = "Network adapter ".$nName;
+      my($nName, $nDef, $nComment) = split(/:/, $_);
+      if(defined $nComment) {
+      	$rMap->{$nName}       =  $nComment;
+      } else {
+	      if(defined $nDef) {
+	    	  # Benannte
+		      $rMap->{$nName}     = "Network ".$nDef;
+	      } else {
+	    	  # Unbenannte
+	    	  $rMap->{$nName}     = "Network adapter ".$nName;
+	      }
 	    }
     }
   }
@@ -213,11 +230,11 @@ SYSMON_updateCurrentReadingsMap($) {
   if(defined $userdefined) {
   	my @userdefined_list = split(/,\s*/, trim($userdefined));
     foreach (@userdefined_list) {
-       # <readingsName>:<Comment><Intervel_Minutes><Cmd>
+       # <readingName>:<Comment>:<Interval_Minutes>:<Cmd>
 	     my($uName, $uComment, $uInterval, $uCmd) = split(/:/, $_);
 	     if(defined $uComment) {
 	    	# Nur gueltige
-		    $rMap->{"$uName"} = $uComment;
+		    $rMap->{$uName} = $uComment;
 	    }
     }
   }
@@ -387,9 +404,9 @@ SYSMON_Attr($$$)
   if( $cmd eq "set" ) {# set, del
     if( $orig ne $attrVal ) {
 
+      my $hash = $main::defs{$name};
     	if($attrName eq "disable")
       {
-        my $hash = $main::defs{$name};
         RemoveInternalTimer($hash);
       	if($attrVal ne "0")
       	{
@@ -401,6 +418,9 @@ SYSMON_Attr($$$)
       }
 
       $attr{$name}{$attrName} = $attrVal;
+      
+      SYSMON_updateCurrentReadingsMap($hash);
+      
       #return $attrName ." set to ". $attrVal;
       return undef;
     }
@@ -771,7 +791,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 	my ($hash, $map, $fs) = @_;
 	
 	# Neue Syntax: benannte Filesystems: <name>:<definition>
-	my($fName, $fDef) = split(/:/, $fs);
+	my($fName, $fDef, $fComment) = split(/:/, $fs);
 	#Log 3, "SYSMON >>>>>>>>>>>>>>> [$fs][$fName|$fDef]";
 	if(defined $fDef) {
 		$fs = $fDef;
@@ -888,9 +908,11 @@ sub SYSMON_getNetworkInfo ($$$)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($)
 {
-	my ($name) = @_;
-	my $hash = $main::defs{$name};
+    my ($name) = @_;
+    my $hash = $main::defs{$name};
+    #SYSMON_updateCurrentReadingsMap($hash);
 
+# TODO
 	# Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
 	my @dataDescription =
   (
@@ -904,8 +926,8 @@ sub SYSMON_ShowValuesHTML ($)
     ["Swap", SWAP, ""],
     #["File system", ?, ""],
     #["USB stick", ?, ""],
-    ["Ethernet", ETH0, ""],
-    ["WLAN", WLAN0, ""],
+    #["Ethernet", ETH0, ""],
+    #["WLAN", WLAN0, ""],
   );
 
   my $map = SYSMON_obtainParameters($hash, 1);
@@ -928,6 +950,21 @@ sub SYSMON_ShowValuesHTML ($)
       $htmlcode .= "<tr><td valign='top'>".@$ref_zeile[0].":&nbsp;</td><td>".$map->{$tName}.@$ref_zeile[2]."</td></tr>";
     }
   }
+  
+  # network-interfaces
+	my $networks = AttrVal($name, "network-interfaces", undef);
+  if(defined $networks) {
+    my @networks_list = split(/,\s*/, trim($networks));
+    foreach (@networks_list) {
+      my($nName, $nDef, $nComment) = split(/:/, $_);
+	    #if(!defined $nComment) {
+	    #	$nComment = "Network interface: ".$nName;
+	    #}
+	    my $nComment = $cur_readings_map->{$nName};
+	    my $nVal = $map->{$nName};
+    	$htmlcode .= "<tr><td valign='top'>".$nComment.":&nbsp;</td><td>".$nVal."</td></tr>";
+	  }
+	}
 
   # File systems
   foreach my $aName (sort keys %{$map}) {
@@ -945,12 +982,15 @@ sub SYSMON_ShowValuesHTML ($)
   if(defined $filesystems) {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
     foreach (@filesystem_list) {
-      my($fName, $fDef) = split(/:/, $_);
-	    if(defined $fDef) {
-	    	# wenn gueltig
-	    	my $fsVal = $map->{$fName};
-	    	$htmlcode .= "<tr><td valign='top'>File System: ".$fName."&nbsp;</td><td>".$fsVal."</td></tr>";
-	    }
+      my($fName, $fDef, $fComment) = split(/:/, $_);
+	    #if(defined $fDef) {
+	    #	# wenn gueltig
+	    #	my $fsVal = $map->{$fName};
+	    #	$htmlcode .= "<tr><td valign='top'>File System: ".$fName."&nbsp;</td><td>".$fsVal."</td></tr>";
+	    #}
+	    my $fComment = $cur_readings_map->{$fName};
+	    my $fVal = $map->{$fName};
+	    $htmlcode .= "<tr><td valign='top'>".$fComment.":&nbsp;</td><td>".$fVal."</td></tr>";
 	  }
 	}
 
@@ -1173,6 +1213,13 @@ sub trim($)
     		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
+    <br>
+    <li>Benutzerdefinierte Eintr&auml;ge<br>
+        Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
+        Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
+    		<br>Noch nicht implementiert
+    </li>
+    <br>
   <br>
   </ul>
 
@@ -1299,23 +1346,24 @@ sub trim($)
 
   <b>Attributes:</b><br><br>
     <ul>
-    <li>filesystems<br>
+    <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
     Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
-    Jeder angegebene Wert muss entweder direkt den gew&uuml;nschten Mountpoint benennen, oder ein durch ein Doppelpunkt getrenntes Paar &lt;name&gt;:&lt;mountpoint&gt;.
-    Der Name wird bei der Anzeige und Logging verwendet.<br>
+    Reading-Name wird bei der Anzeige und Logging verwendet, Mount-Point ist die Grundlage der Auswertung, 
+    Kommentar ist f&uuml;r die Anzeige (s. SYSMON_ShowValuesHTML)<br>
     Beispiel: <code>/boot,/,/media/usb1</code><br>
-    oder: <code>fs_boot:/boot,fs_root:/,fs_usb1:/media/usb1</code><br>
-    Die Liste kann gleichzeitig benannte und unbenannte Angaben enthalten. Im Sinne der besseren &Uuml;bersicht ist das jedoch eher nicht zu empfehlen.
+    oder: <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
+    Im Sinne der besseren &Uuml;bersicht sollten zumindest Name und MountPoint angegeben werden.
     </li>
     <br>
-    <li>network-interfaces<br>
-    Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen. Jeder Eintrag besteht aus dem Reading-Namen und dem Namen 
-    des Netwerk-Interfaces (getrennt durch einen Doppelpunkt).<br>
-    Beispiel <code>ethernet:eth0,wlan:wlan0</code><br>
-    Ist kein Doppelpunkt in dem Eintrag, gilt der gegebene Wert als Reading-Name und Interface-Name gleichzeitig.
+    <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
+    Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen.
+    Jeder Eintrag besteht aus dem Reading-Namen, dem Namen 
+    des Netwerk-Adapters und einem Kommentar f&uuml;r die Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Dopelpunkt verwendet, 
+    wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet<br>
+    Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
     </li>
     <br>
-    <li>user-defined<br>
+    <li>user-defined &lt;readingsName&gt;:&lt;Comment&gt;:&lt;Intervel_Minutes&gt;:&lt;Cmd&gt;,...<br>
     noch nicht implementiert
     </li>
     <br>
@@ -1341,7 +1389,7 @@ sub trim($)
      </ul>
     </ul><br>
 
-  <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML</b><br><br>
+  <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instanz&gt;)</b><br><br>
     <ul>
     Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
     Als Parameter wird der Name des definierten SYSMON-Ger&auml;ten erwartet.<br><br>
@@ -1355,7 +1403,8 @@ sub trim($)
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
       attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
-      attr sysmon filesystems fs_boot:/boot,fs_root:/,fs_usb1:/media/usb1<br>
+      attr sysmon filesystems fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick<br>
+      attr sysmon network-interfaces eth0:eth0:Ethernet,wlan0:wlan0:WiFi<br>
       attr sysmon group RPi<br>
       attr sysmon room 9.03_Tech<br>
       <br>
