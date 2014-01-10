@@ -11,7 +11,7 @@
 #
 # ------------------------------------------------------------
 
-## --- Variablen ---------------------------
+## --- Variablen ggf. anpassen! ------------------------------
 
 # Home-Verzeichnis
 home=/opt/fhem
@@ -34,6 +34,9 @@ pollTime=60;
 
 # Zu ueberwachende Log-Datei (erst als Dummy)
 aliveLog=$logDir/undefined.log;
+
+# Spalten in der Ausgabe des Befehls ps -ef , die PID enthalten (von-bis)
+pidCols="10-14"
 
 ## --- Methoden ----------------------------
 
@@ -62,10 +65,8 @@ print(){
 
 # Methode testet, ob in der erwarteten Zeit eine Rueckmeldung des Servers erfolgt ist.
 checkAlive(){
-  pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
-  if test $pid 
-  then
-  
+  cnt=$(ps -ef | grep -v grep | grep fhem.pl | wc -l);
+  if test $cnt -gt 0 ; then
     # Aktuelle Zeit (Sekunden seit 1. Januar 1970 00:00)
     currentTime=$(date +%s);
   
@@ -85,24 +86,24 @@ checkAlive(){
       # Wert unplausibel
       log "V: $diff S: error MSG: value to big";
       #log "S: error";
-      return 0;
+      return 0
      fi
      # Server (vermutlich) abgestürzt
      log "V: $diff S: dead MSG: no response from FHEM Server for $diff sekonds";
      #log "S: dead";
-     return 1;
+     return 1
     else
      # Server am Leben
      log "V: $diff S: alive MSG: FHEM Server alive";
      #log "S: alive";
-     return 0;
+     return 0
     fi
   
   else
     # Server abgestürzt, Prozess nicht (mehr) vorhanden.
     log "MSG: no FHEM Server process found";
     #log "S: dead";
-    return 1;
+    return 1
   fi
   
 }
@@ -122,10 +123,9 @@ then
 fi
 
 
-# FHEM PID suchen
-pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
-if test $pid 
-then
+# FHEM laeuft?
+cnt=$(ps -ef | grep -v grep | grep fhem.pl | wc -l);
+if test $cnt -gt 0 ; then
  print "FHEM running";
  log "MSG: FHEM runing";
 else
@@ -155,7 +155,7 @@ else
  # TODO: Pruefen, ob FHEM gerade Update durchführt (dauert ca. 15 min. auf einer FB)
  print "Server dead";
  # FHEM PID suchen
- pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14);
+ pid=$(ps -ef | grep -v grep | grep fhem.pl | cut -c$pidCols);
  if test $pid 
  then
    print "killing FHEM. PID: $pid";

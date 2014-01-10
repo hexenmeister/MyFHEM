@@ -1,12 +1,19 @@
 #!/bin/sh
 
+## --- Variablen ggf. anpassen! ------------------------------
+
+# Home-Verzeichnis
 home=/opt/fhem
 
-cd $home
-
+# FHEM-Port
 port=7072
 
+# Spalten in der Ausgabe des Befehls ps -ef , die PID enthalten (von-bis)
+pidCols="10-14"
+
 # Stop fhem
+
+cd $home
 
 echo Stop fhem
 
@@ -26,7 +33,7 @@ if [ "$cnt" -ge "0" ] ; then
   #then
   
   # Alle uebriggebliebenen Prozesse beenden
-  for pid in $(ps -ef | grep -v grep | grep fhem.pl | cut -c10-14)
+  for pid in $(ps -ef | grep -v grep | grep fhem.pl | cut -c$pidCols)
   do
     echo "killing FHEM. PID: $pid";
     # Prozess beenden
