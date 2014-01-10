@@ -214,14 +214,17 @@ SYSMON_updateCurrentReadingsMap($) {
     foreach (@networkadapters_list) {
       my($nName, $nDef, $nComment) = split(/:/, $_);
       if(defined $nComment) {
-      	$rMap->{$nName}       =  $nComment;
+      	$rMap->{$nName}           =  $nComment;
+      	$rMap->{$nName."_diff"}   =  $nComment." (diff)";
       } else {
 	      if(defined $nDef) {
 	    	  # Benannte
-		      $rMap->{$nName}     = "Network ".$nDef;
+		      $rMap->{$nName}         = "Network ".$nDef;
+		      $rMap->{$nName."_diff"} = "Network ".$nDef." (diff)";
 	      } else {
 	    	  # Unbenannte
-	    	  $rMap->{$nName}     = "Network adapter ".$nName;
+	    	  $rMap->{$nName}         = "Network adapter ".$nName;
+	    	  $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	      }
 	    }
     }
@@ -367,14 +370,20 @@ SYSMON_Set($@)
     #    $defs{$name}{READINGS} = ();
     #  }
     #}
-
-    my @cKeys=keys (%{$defs{$name}{READINGS}});
-    foreach my $aName (@cKeys) {
-      #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
-      if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
-        delete $defs{$name}{READINGS}{$aName};
-      }
-    }
+    
+    # Nicht mehr benoetigte Readings loeschen
+    my $omap = SYSMON_getObsoleteReadingsMap($hash);
+    foreach my $aName (keys %{$omap}) {
+    	delete $defs{$name}{READINGS}{$aName};
+	  }
+	
+    #my @cKeys=keys (%{$defs{$name}{READINGS}});
+    #foreach my $aName (@cKeys) {
+    #  #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    #  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
+    #    delete $defs{$name}{READINGS}{$aName};
+    #  }
+    #}
 
     return;
   }
@@ -463,7 +472,7 @@ SYSMON_Update($@)
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
     # Existierende Schluessel merken
-    my @cKeys=keys (%{$defs{$name}{READINGS}});
+    #my @cKeys=keys (%{$defs{$name}{READINGS}});
 
     $hash->{STATE} = "Active";
     #my $state = $map->{LOADAVG};
@@ -477,28 +486,35 @@ SYSMON_Update($@)
   	  }
 
   	  # Vorhandene Keys aus der Merkliste loeschen
-  	  my $i=0;
-  	  foreach my $bName (@cKeys) {
-  	  	if(defined $bName) {
-  	  	  if($bName eq $aName) {
-  	        delete $cKeys[$i];
-  	        last;
-  	      }
-  	    }
-  	    $i=$i+1;
-  	  }
+  	  #my $i=0;
+  	  #foreach my $bName (@cKeys) {
+  	  #	if(defined $bName) {
+  	  #	  if($bName eq $aName) {
+  	  #      delete $cKeys[$i];
+  	  #      last;
+  	  #    }
+  	  #  }
+  	  #  $i=$i+1;
+  	  #}
     }
 
     # Ueberfluessige Readings loeschen
     # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden,
     # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
-    foreach my $aName (@cKeys) {
-    	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
-    	#if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
-    	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
-        delete $defs{$name}{READINGS}{$aName};
-      }
-    }
+    #foreach my $aName (@cKeys) {
+    #	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
+    #	#if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+    #	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
+    #    delete $defs{$name}{READINGS}{$aName};
+    #  }
+    #}
+    
+    # Nicht mehr benoetigte Readings loeschen
+    my $omap = SYSMON_getObsoleteReadingsMap($hash);
+    foreach my $aName (keys %{$omap}) {
+    	delete $defs{$name}{READINGS}{$aName};
+	  }
+    
   }
 
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
