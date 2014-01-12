@@ -193,15 +193,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	    	  # Unbenannte
 	    	  $rMap->{$fName}     = "Mount point ".$fName;
 	      }
-	    }      
-	    #if(defined $fDef) {
-	    #	# Nur benannte
-		  #  $rMap->{$fName}     = "Filesystem ".$fDef;
-	    #} else {
-	    #	# ggf. unbenannte TODO
-		  #  #$fDef = $fName;
-		  #  #$fName = FS_PREFIX.$fs
-	    #}
+	    }
     }
   } else {
   	$rMap->{"root"}     = "Filesystem /";
@@ -362,29 +354,12 @@ SYSMON_Set($@)
   	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
   }
 
-  if($cmd eq "clean")
-  {
-  	#my $subcmd = my $cmd= $a[2];
-  	#if(defined $subcmd) {
-  	#	if($subcmd eq "readings") {
-    #    $defs{$name}{READINGS} = ();
-    #  }
-    #}
-    
+  if($cmd eq "clean") {    
     # Nicht mehr benoetigte Readings loeschen
     my $omap = SYSMON_getObsoleteReadingsMap($hash);
     foreach my $aName (keys %{$omap}) {
     	delete $defs{$name}{READINGS}{$aName};
 	  }
-	
-    #my @cKeys=keys (%{$defs{$name}{READINGS}});
-    #foreach my $aName (@cKeys) {
-    #  #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
-    #  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
-    #    delete $defs{$name}{READINGS}{$aName};
-    #  }
-    #}
-
     return;
   }
   
@@ -471,9 +446,6 @@ SYSMON_Update($@)
 	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
-    # Existierende Schluessel merken
-    #my @cKeys=keys (%{$defs{$name}{READINGS}});
-
     $hash->{STATE} = "Active";
     #my $state = $map->{LOADAVG};
     #readingsBulkUpdate($hash,"state",$state);
@@ -485,29 +457,7 @@ SYSMON_Update($@)
   	    readingsBulkUpdate($hash,$aName,$value);
   	  }
 
-  	  # Vorhandene Keys aus der Merkliste loeschen
-  	  #my $i=0;
-  	  #foreach my $bName (@cKeys) {
-  	  #	if(defined $bName) {
-  	  #	  if($bName eq $aName) {
-  	  #      delete $cKeys[$i];
-  	  #      last;
-  	  #    }
-  	  #  }
-  	  #  $i=$i+1;
-  	  #}
     }
-
-    # Ueberfluessige Readings loeschen
-    # (Es geht darum, die Filesystem-Readings entfernen, wenn diese nicht mehr meht angefordert werden,
-    # da sie im Atribut 'filesystems' nicht mehr vorkommen.)
-    #foreach my $aName (@cKeys) {
-    #	# nur Filesystem-Readings loeschen. Alle anderen sind ja je immer da.
-    #	#if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
-    #	if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
-    #    delete $defs{$name}{READINGS}{$aName};
-    #  }
-    #}
     
     # Nicht mehr benoetigte Readings loeschen
     my $omap = SYSMON_getObsoleteReadingsMap($hash);
@@ -598,7 +548,6 @@ SYSMON_obtainParameters($$)
     }
   }
   
-
   if($m4 gt 0) { # Nur wenn > 0
     # M4: Filesystem-Informationen
     my $update_fs = ($refresh_all || ($ref % $m4) eq 0);
@@ -808,9 +757,6 @@ sub SYSMON_getRamAndSwap($$)
   $buffers = $buffers / 1024;
   $cached  = $cached / 1024;
   
-  #$percentage_ram = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
-  #$ram = "Total: ".$total." MB, Used: ".($used - $buffers - $cached)." MB, ".$percentage_ram." %, Free: ".($free + $buffers + $cached)." MB";
-
   $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
 
   $map->{+RAM} = $ram;
@@ -822,8 +768,6 @@ sub SYSMON_getRamAndSwap($$)
     $used2    = $used2 / 1024;
     $free2    = $free2 / 1024;
   
-    #$percentage_swap = sprintf ("%.2f", ($used2 / $total2 * 100));
-    #$swap = "Total: ".$total2." MB, Used: ".$used2." MB,  ".$percentage_swap." %, Free: ".$free2." MB";
     $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
   }
   else
@@ -846,7 +790,6 @@ sub SYSMON_getFileSystemInfo ($$$)
 	
 	# Neue Syntax: benannte Filesystems: <name>:<definition>
 	my($fName, $fDef, $fComment) = split(/:/, $fs);
-	#Log 3, "SYSMON >>>>>>>>>>>>>>> [$fs][$fName|$fDef]";
 	if(defined $fDef) {
 		$fs = $fDef;
 	}
@@ -864,14 +807,12 @@ sub SYSMON_getFileSystemInfo ($$$)
     $percentage_used = $1;
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB at ".$mnt_point;
     if(defined $fDef) {
-    	#$map->{+FS_PREFIX_N.$fName} = $out_txt;
     	$map->{$fName} = $out_txt;
     } else {
       $map->{+FS_PREFIX.$mnt_point} = $out_txt;
     }
   } else {
   	if(defined $fDef) {
-  		#$map->{+FS_PREFIX_N.$fName} = "not available";
   		$map->{$fName} = "not available";
   	} else {
   	  $map->{+FS_PREFIX.$fs} = "not available";
@@ -902,14 +843,8 @@ sub SYSMON_getNetworkInfo ($$$)
   my @dataThroughput = SYSMON_execute($hash, $cmd);
 
   # check if network available
-  #if (not grep(/Fehler/, $dataThroughput[0]) && not grep(/error/, $dataThroughput[0]))
   if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
-  {
-    # perform grep from above
-    #@dataThroughput = grep(/RX bytes/, @dataThroughput); # reduce more than one line to only one line
-    # change array into scalar variable
-    #my $dataThroughput = $dataThroughput[0];
-    
+  {    
     my $dataThroughput = undef;
     foreach (@dataThroughput) {
       if(index($_, 'RX bytes') >= 0) {
@@ -967,7 +902,7 @@ sub SYSMON_ShowValuesHTML ($;@)
     my ($name, @data) = @_;
     my $hash = $main::defs{$name};
     SYSMON_updateCurrentReadingsMap($hash);
-#Log 5, "SYSMON $>name, @data<";
+log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(!defined @data) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
