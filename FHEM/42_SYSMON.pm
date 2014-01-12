@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.2.0";
+my $VERSION = "1.2.1";
 
 use constant {
 	DATE            => "date",
@@ -967,7 +967,7 @@ sub SYSMON_ShowValuesHTML ($;@)
     my ($name, @data) = @_;
     my $hash = $main::defs{$name};
     SYSMON_updateCurrentReadingsMap($hash);
-
+#Log 5, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(!defined @data) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
@@ -975,6 +975,37 @@ sub SYSMON_ShowValuesHTML ($;@)
 	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.":"." &deg;C", 
 	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.":"." MHz", 
 	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP);
+	                      
+	  # network-interfaces
+  	my $networks = AttrVal($name, "network-interfaces", undef);
+    if(defined $networks) {
+      my @networks_list = split(/,\s*/, trim($networks));
+      foreach (@networks_list) {
+      	my($nName, $nDef, $nComment) = split(/:/, $_);
+      	push(@dataDescription, $nName);
+      }
+    }
+    
+    # named filesystems
+  	my $filesystems = AttrVal($name, "filesystems", undef);
+    if(defined $filesystems) {
+      my @filesystem_list = split(/,\s*/, trim($filesystems));
+      foreach (@filesystem_list) {
+        my($fName, $fDef, $fComment) = split(/:/, $_);
+  	    push(@dataDescription, $fName);
+  	  }
+  	}
+  	
+  	# User defined
+	  my $userdefined = AttrVal($name, "user-defined", undef);
+    if(defined $userdefined) {
+    	my @userdefined_list = split(/,\s*/, trim($userdefined));
+      foreach (@userdefined_list) {
+         # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
+	       my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
+	       push(@dataDescription, $uName);
+      }
+    }
   }
   
   my $map = SYSMON_obtainParameters($hash, 1);
@@ -999,17 +1030,17 @@ sub SYSMON_ShowValuesHTML ($;@)
   
   # nur Default (also alles anzeigen)
   if(!defined @data) {
-    # network-interfaces
-  	my $networks = AttrVal($name, "network-interfaces", undef);
-    if(defined $networks) {
-      my @networks_list = split(/,\s*/, trim($networks));
-      foreach (@networks_list) {
-        my($nName, $nDef, $nComment) = split(/:/, $_);
-  	    my $nComment = $cur_readings_map->{$nName};
-  	    my $nVal = $map->{$nName};
-      	$htmlcode .= "<tr><td valign='top'>".$nComment.":&nbsp;</td><td>".$nVal."</td></tr>";
-  	  }
-  	}
+    ## network-interfaces
+  	#my $networks = AttrVal($name, "network-interfaces", undef);
+    #if(defined $networks) {
+    #  my @networks_list = split(/,\s*/, trim($networks));
+    #  foreach (@networks_list) {
+    #    my($nName, $nDef, $nComment) = split(/:/, $_);
+  	#    my $nComment = $cur_readings_map->{$nName};
+  	#    my $nVal = $map->{$nName};
+    #  	$htmlcode .= "<tr><td valign='top'>".$nComment.":&nbsp;</td><td>".$nVal."</td></tr>";
+  	#  }
+  	#}
   
     # File systems
     foreach my $aName (sort keys %{$map}) {
@@ -1019,17 +1050,17 @@ sub SYSMON_ShowValuesHTML ($;@)
       }
     }
   
-    # named filesystems
-  	my $filesystems = AttrVal($name, "filesystems", undef);
-    if(defined $filesystems) {
-      my @filesystem_list = split(/,\s*/, trim($filesystems));
-      foreach (@filesystem_list) {
-        my($fName, $fDef, $fComment) = split(/:/, $_);
-  	    my $fComment = $cur_readings_map->{$fName};
-  	    my $fVal = $map->{$fName};
-  	    $htmlcode .= "<tr><td valign='top'>".$fComment.":&nbsp;</td><td>".$fVal."</td></tr>";
-  	  }
-  	}
+    ## named filesystems
+  	#my $filesystems = AttrVal($name, "filesystems", undef);
+    #if(defined $filesystems) {
+    #  my @filesystem_list = split(/,\s*/, trim($filesystems));
+    #  foreach (@filesystem_list) {
+    #    my($fName, $fDef, $fComment) = split(/:/, $_);
+  	#    my $fComment = $cur_readings_map->{$fName};
+  	#    my $fVal = $map->{$fName};
+  	#    $htmlcode .= "<tr><td valign='top'>".$fComment.":&nbsp;</td><td>".$fVal."</td></tr>";
+  	#  }
+  	#}
   }
 
   $htmlcode .= "</table></div><br>";
@@ -1433,12 +1464,14 @@ sub trim($)
   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instanz&gt;[,&lt;Liste&gt;])</b><br><br>
     <ul>
     Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
-    Als Parameter wird der Name des definierten SYSMON-Ger&auml;ten erwartet.<br>
+    Als Parameter wird der Name des definierten SYSMON-Ger&auml;ts erwartet.<br>
     Der zweite Parameter ist optional und gibt eine Liste der anzuzeigende Readings 
-    im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code> an<br>
-    Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert <code>Comment</code> wird als der Anzeigename verwendet
-    und <code>Postfix</code> wird nach dem Wert des Readings angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden).<br>
-    Werd keine Liste angegeben, wird eine vordefinierte Auswahl verwendet.<br><br>
+    im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code> an.<br>
+    Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert aus <code>Comment</code> wird als der Anzeigename verwendet
+    und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden).<br>
+    Falls kein <code>Comment</code> angegeben ist, wird eine intern vordefinierte Beschreibung angegeben. 
+    Bei benutzerdefinierbaren Readings wird ggf. <code>Comment</code> aus der Definition verwendet.<br>
+    Werd keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
