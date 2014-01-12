@@ -78,7 +78,7 @@ SYSMON_Initialize($)
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 ".
                        $readingFnAttributes;
 }
-### attr NAME user-defined osUpdates:Aktualisierungen:1440:cat ./updates.txt [,<readingsName>:<Comment>:<Interval_Minutes>:<Cmd>]
+### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
 
 sub
 SYSMON_Define($$)
@@ -235,8 +235,8 @@ SYSMON_updateCurrentReadingsMap($) {
   if(defined $userdefined) {
   	my @userdefined_list = split(/,\s*/, trim($userdefined));
     foreach (@userdefined_list) {
-       # <readingName>:<Comment>:<Interval_Minutes>:<Cmd>
-	     my($uName, $uComment, $uInterval, $uCmd) = split(/:/, $_);
+       # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
+	     my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
 	     if(defined $uComment) {
 	    	# Nur gueltige
 		    $rMap->{$uName} = $uComment;
@@ -628,8 +628,44 @@ SYSMON_obtainParameters($$)
       }
     }
   }
+  
+  #Log 3, "SYSMON >>> USER_DEFINED >>>>>>>>>>>>>>> START";
+  my $userdefined = AttrVal($name, "user-defined", undef);
+  if(defined $userdefined) {
+  	my @userdefined_list = split(/,\s*/, trim($userdefined));
+    foreach (@userdefined_list) {
+       # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
+       my $ud = $_;
+	     my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $ud);
+	     logF($hash, "User-Defined Reading", "[$uName][$uInterval][$uComment][$uCmd]");
+	     if(defined $uCmd) { # Also, wenn alle Parameter vorhanden
+	     	 my $iInt = int($uInterval);
+	     	 if($iInt>0) {
+	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
+	     	   if($update_ud) {
+	     	 	   $map = SYSMON_getUserDefined($hash, $map, $uName, $uCmd);
+	     	   }
+	       }
+	    }
+    }
+  }
 
   return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liest Benutzerdefinierte Eintraege
+#------------------------------------------------------------------------------
+sub
+SYSMON_getUserDefined($$$$)
+{
+	my ($hash, $map, $uName, $uCmd) = @_;
+	logF($hash, "SYSMON_getUserDefined", "Name=[$uName] Cmd=[$uCmd]");
+	
+	my $out_str = SYSMON_execute($hash, $uCmd);
+	$map->{$uName} = $out_str;
+	
+	return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1210,7 +1246,6 @@ sub trim($)
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
         Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
-    		<br>Noch nicht implementiert
     </li>
     <br>
   <br>
@@ -1356,8 +1391,21 @@ sub trim($)
     Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
     </li>
     <br>
-    <li>user-defined &lt;readingsName&gt;:&lt;Comment&gt;:&lt;Interval_Minutes&gt;:&lt;Cmd&gt;,...<br>
-    noch nicht implementiert
+    <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
+    Diese kommaseparierte Liste definiert Eintr&auml;ge mit jeweils folgenden Daten: 
+    Reading-Name, Aktualisierungsinterval in Minuten, Kommentar und Betriebsystem-Commando
+    <br>Die BS-Befehle werden entsprechend des angegebenen Intervals ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
+    Kommentare werden f&uuml;r die HTML-Ausgaben (s. SYSMON_ShowValuesHTML) ben&ouml;tigt.
+    <br>Alle Parameter sind nicht optional!
+    <br>Es ist wichtig, dass die angegebenen Befehle schnell ausgef&uuml;hrt werden, denn in dieser Zeit wird der gesamte FHEM-Server blokiert!
+    <br>Werden Ergebnisse der lang laufenden Operationen ben&ouml;ting, solten diese z.B als CRON-Job eingerichtet werden 
+    und in FHEM nur die davor gespeicherten Ausgaben visualisiert.<br><br>
+    Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebsystem:<br>
+    In einem cron-Job wird folgendes t&auml;glich ausgef&uuml;hrt: <br>
+    <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
+    <br>
+    Das Attribute <code>uder-defined</code> wird auf <br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br> gesetzt.
+    Danach wird die Anzahl der verf&uuml;gbaren Aktualisierungen t&auml;glich als Reading 'sys_updates' protokolliert.
     </li>
     <br>
     <li>disable<br>
