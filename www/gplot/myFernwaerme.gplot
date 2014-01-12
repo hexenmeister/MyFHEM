@@ -16,19 +16,19 @@ set y2label "Temperature in C"
 
 #FileLog 4:Vorlauf_Heizung:0:
 #FileLog 4:Vorlauf_Warmwasser:0:
-#FileLog 4:Fernwaerme_Rueckflauf_Gesamt:0:
-#FileLog 4:Rueckflauf_Heizung:0:
-#FileLog 4:Rueckflauf_Warmwasser:0:
+#FileLog 4:Fernwaerme_Ruecklauf_Gesamt:0:
+#FileLog 4:Ruecklauf_Heizung:0:
+#FileLog 4:Ruecklauf_Warmwasser:0:
 plot \
 
   "< awk '/EG_HA_OWTS21\.Fernwaerme_Vorlauf_Heizung/ {print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Vorlauf Heizung' with lines lw 2,\
   "< awk '/EG_HA_OWTS22\.Fernwaerme_Vorlauf_Warmwasser/ {print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Vorlauf Warmwasser' with lines lw 2,\
-  "< awk '/EG_HA_OWTS23\.Fernwaerme_Rueckflauf/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rueckflauf Gesamt' with lines lw 2\
-  "< awk '/Rueckflauf_Heizung/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rueckflauf Heizung' with lines lw 1\
-  "< awk '/Rueckflauf_Warmwasser/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rueckflauf Warmwasser' with lines lw 1
+  "< awk '/EG_HA_OWTS23\.Fernwaerme_Ruecklauf/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Ruecklauf Gesamt' with lines lw 2\
+  "< awk '/Ruecklauf_Heizung/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Ruecklauf Heizung' with lines lw 1\
+  "< awk '/Ruecklauf_Warmwasser/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Ruecklauf Warmwasser' with lines lw 1
  
