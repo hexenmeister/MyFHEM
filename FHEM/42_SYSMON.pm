@@ -1094,6 +1094,361 @@ sub trim($)
 =pod
 =begin html
 
+<!-- ================================ -->
+<a name="SYSMON"></a>
+<h3>SYSMON</h3>
+<ul>
+This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. Some information are hardware specific and are not available on any platform. So far, this module has been tested on the following systems: Raspberry Pi (Debian Wheezy) BeagleBone Black, Fritz box 7390 (no CPU data).
+  <br><br>
+  <b>Define</b>
+  <br><br>
+    <code>define <name> SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <br>
+    
+This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
+If one (or more) of the multiplier is set to zero, the corresponding readings is deactivated.
+    <br>
+    <br>
+    The parameters are responsible for updating the readings according to the following scheme:
+    <ul>
+     <li>M1: (Default: 1)<br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     </li>
+     <li>M2: (Default: M1)<br>
+     ram, swap<br>
+     </li>
+     <li>M3: (Default: M1)<br>
+     eth0, eth0_diff, wlan0, wlan0_diff<br><br>
+     </li>
+     <li>M4: (Default: 10*M1)<br>
+     Filesystem informations<br><br>
+     </li>
+     <li>The following parameters are always updated with the base interval (regardless of the Mx-parameter):<br>
+     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
+     </li>
+    </ul>
+  <br>
+
+  <b>Readings:</b>
+  <br><br>
+  <ul>
+    <li>cpu_freq<br>
+        CPU frequency
+    </li>
+    <br>
+    <li>cpu_temp<br>
+        CPU temperature
+    </li>
+    <br>
+    <li>cpu_temp_avg<br>
+        Average of the CPU temperature, formed over the last 4 values.
+    </li>
+    <br>
+    <li>fhemuptime<br>
+    	Time (in seconds) since the start of FHEM server.
+    </li>
+    <br>
+    <li>fhemuptime_text<br>
+    	Time since the start of the FHEM server: human-readable output (text representation).
+    </li>
+    <br>
+    <li>idletime<br>
+    	Time spent by the system since the start in the idle mode (period of inactivity).
+    </li>
+    <br>
+    <li>idletime_text<br>
+    	The inactivity time of the system since system start in human readable form.
+    </li>
+    <br>
+    <li>loadavg<br>
+        System load (load average): 1 minute, 5 minutes and 15 minutes.
+    </li>
+    <br>
+    <li>ram<br>
+       memory usage.
+    </li>
+    <br>
+    <li>swap<br>
+    	swap usage.
+    </li>
+    <br>
+    <li>uptime<br>
+    	System uptime.
+    </li>
+    <br>
+    <li>uptime_text<br>
+    	System uptime (human readable).
+    </li>
+    <br>
+    <li>Network statistics<br>
+    Statistics for the specified network interface about the data volumes transferred and the difference since the previous measurement.
+    <br>
+    Examples:<br>
+    Amount of the transmitted data via interface eth0.<br>
+    <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
+    Change of the amount of the transferred data in relation to the previous call (for eth0).<br>
+    <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
+    </li>
+    <br>
+    <li>File system information<br>
+    	Usage of the desired file systems.<br>
+    	Example:<br>
+    		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
+    </li>
+    <br>
+    <br>
+    <li>user defined<br>
+        These Readings provide output of commands, which are passed to the operating system. 
+    </li>
+    <br>
+  <br>
+  </ul>
+
+  Sample output:<br>
+  <ul>
+
+<table style="border: 1px solid black;">
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">cpu_freq</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>900</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.77</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp_avg</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.7</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>11231</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>0 days, 03 hours, 07 minutes</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>931024 88.35 %</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime_text</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>10 days, 18 hours, 37 minutes (88.35 %)</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">loadavg</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>0.14 0.18 0.22</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">ram</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">swap</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>n/a</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>1053739</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime_text</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>12 days, 04 hours, 42 minutes</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_root</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB at /</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_boot</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
+<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td><div class="dname">fs_usb1</div></td>
+<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<td><div>2013-11-27 00:05:36</div></td>
+</tr>
+</table>
+  </ul><br>
+
+  <b>Get:</b><br><br>
+    <ul>
+    <li>interval<br>
+    Lists the specified polling intervalls.
+    </li>
+    <br>
+    <li>list<br>
+    Lists all readings.
+    </li>
+    <br>
+    <li>update<br>
+    Refresh all readings.
+    </li>
+    <br>
+    <li>version<br>
+    Displays the version of SYSMON module.
+    </li>
+    <br>
+    </ul><br>
+
+  <b>Set:</b><br><br>
+    <ul>
+    <li>interval_multipliers<br>
+       Defines update intervals (as in the definition of the device).
+    </li>
+    <br>
+    <li>clean<br>
+      Clears user-definable Readings. After an update (manual or automatic) new readings are generated.<br>
+    </li>
+    <br>
+    <li>clear &lt;reading name&gt;<br>
+     Deletes the Reading entry with the given name. After an update this entry is possibly re-created (if defined). This mechanism allows the selective deleting unnecessary custom entries.<br>
+    </li>
+    <br>
+    </ul><br>
+
+  <b>Attributes:</b><br><br>
+    <ul>
+    <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
+    Specifies the file system to be monitored (a comma-separated list). <br>
+    Reading-name is used in the display and logging, the mount point is the basis of the evaluation, comment is relevant to the HTML display (see SYSMON_ShowValuesHTML)<br>
+    Examples: <br>
+    <code>/boot,/,/media/usb1</code><br>
+    <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
+    </li>
+    <br>
+    <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
+    Comma-separated list of network interfaces that are to be monitored. Each entry consists of the Reading-name, the name of the Netwerk adapter and a comment for the HTML output (see SYSMON_ShowValuesHTML). If no colon is used, the value is used simultaneously as a Reading-name and interface name.<br>
+    Example <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
+    </li>
+    <br>
+    <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
+    This comma-separated list defines user defined Readings with the following data: Reading name, refresh interval (in minutes), a Comment, and operating system command.
+    <br>The os commands are executed according to the specified Intervals and are noted as Readings with the specified name. Comments are used for the HTML output (see SYSMON_ShowValuesHTML)..
+    <br>All parameter parts are required!
+    <br>It is important that the specified commands are executed quickly, because at this time the entire FHEM server is blocked!<br>
+    If results of the long-running operations required, these should be set up as a CRON job and store results as a text file.<br><br>
+    Example: Display of package updates for the operating system:<br>
+    cron-Job:<br>
+    <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
+    <br>
+    <code>uder-defined</code> attribute<br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br>
+    the number of available updates is daily recorded as 'sys_updates'.
+    </li>
+    <br>
+    <li>disable<br>
+      Possible values: 0 and 1. '1' means that the update is stopped.
+    </li>
+    <br>
+    </ul><br>
+
+  <b>Plots:</b><br><br>
+    <ul>
+    predefined gplot files:<br>
+     <ul>
+      <code>
+       mySMRAM.gplot<br>
+       mySMCPUTemp.gplot<br>
+       mySMFS_Root.gplot<br>
+       mySMFS_usb1.gplot<br>
+       mySMLoad.gplot<br>
+       mySMNetworkEth0.gplot<br>
+       mySMNetworkEth0t.gplot<br>
+      </code>
+     </ul>
+    </ul><br>
+
+  <b>HTML output method (see Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instance&gt;[,&lt;list&gt;])</b><br><br>
+    <ul>
+    The module provides a function that returns selected Readings as HTML.<br>
+    As a parameter the name of the defined SYSMON device is expected.<br>
+    The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code>.<br>
+    <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after eihentlichen value (such as units or as MHz can be displayed).<br>
+    If no <code>Comment</code> is specified, an internally predefined description is used.<br>
+    If no list specified, a predefined selection is used (all values are displayed).<br><br>
+    <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
+    <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+    </ul><br>
+
+  <b>Examples:</b><br><br>
+    <ul>
+    <code>
+      # Modul-Definition<br>
+      define sysmon SYSMON 1 1 1 10<br>
+      #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
+      attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,fs_.*<br>
+      attr sysmon filesystems fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick<br>
+      attr sysmon network-interfaces eth0:eth0:Ethernet,wlan0:wlan0:WiFi<br>
+      attr sysmon group RPi<br>
+      attr sysmon room 9.03_Tech<br>
+      <br>
+      # Log<br>
+      define FileLog_sysmon FileLog ./log/sysmon-%Y-%m.log sysmon<br>
+      attr FileLog_sysmon group RPi<br>
+      attr FileLog_sysmon logtype mySMCPUTemp:Plot,text<br>
+      attr FileLog_sysmon room 9.03_Tech<br>
+      <br>
+      # Visualisierung: CPU-Temperatur<br>
+      define wl_sysmon_temp SVG FileLog_sysmon:mySMCPUTemp:CURRENT<br>
+      attr wl_sysmon_temp group RPi<br>
+      attr wl_sysmon_temp label "CPU Temperatur: Min $data{min2}, Max $data{max2}, Last $data{currval2}"<br>
+      attr wl_sysmon_temp room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; eth0<br>
+      define wl_sysmon_eth0 SVG FileLog_sysmon:mySMNetworkEth0:CURRENT<br>
+      attr wl_sysmon_eth0 group RPi<br>
+      attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_eth0 room 9.03_Tech<br>
+      <br>
+      # Visualisierung: CPU-Auslastung (load average)<br>
+      define wl_sysmon_load SVG FileLog_sysmon:mySMLoad:CURRENT<br>
+      attr wl_sysmon_load group RPi<br>
+      attr wl_sysmon_load label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_load room 9.03_Tech<br>
+      <br>
+      # Visualisierung: RAM-Nutzung<br>
+      define wl_sysmon_ram SVG FileLog_sysmon:mySMRAM:CURRENT<br>
+      attr wl_sysmon_ram group RPi<br>
+      attr wl_sysmon_ram label "RAM-Nutzung Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_ram room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Dateisystem: Root-Partition<br>
+      define wl_sysmon_fs_root SVG FileLog_sysmon:mySMFS_Root:CURRENT<br>
+      attr wl_sysmon_fs_root group RPi<br>
+      attr wl_sysmon_fs_root label "Root Partition Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_fs_root room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Dateisystem: USB-Stick<br>
+      define wl_sysmon_fs_usb1 SVG FileLog_sysmon:mySMFS_usb1:CURRENT<br>
+      attr wl_sysmon_fs_usb1 group RPi<br>
+      attr wl_sysmon_fs_usb1 label "USB1 Total: $data{max1}, Min: $data{min2}, Max: $data{max2}, Aktuell: $data{currval2}"<br>
+      attr wl_sysmon_fs_usb1 room 9.03_Tech<br>
+      <br>
+      # Anzeige der Readings zum Einbinden in ein 'Raum'.<br>
+      define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
+      attr SysValues group RPi<br>
+      attr SysValues room 9.03_Tech<br>
+    </code>
+    </ul>
+
+  </ul>
+<!-- ================================ -->
 
 =end html
 =begin html_DE
@@ -1113,7 +1468,7 @@ sub trim($)
     Diese Anweisung erstellt eine neue SYSMON-Instanz.
     Die Parameter M1 bis M4 legen die Aktualisierungsintervale f&uuml;r verschiedenen Readings (Statistiken) fest.
     Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
-    Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervale in Minuten angesehen werden.<br>
+    Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervalle in Minuten angesehen werden.<br>
     Wird einer (oder mehrere) Multiplikator auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
     <br>
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
@@ -1193,9 +1548,9 @@ sub trim($)
     und der Differenz zu der vorherigen Messung.
     <br>
     Beispiele:<br>
-    Menge der &Uuml;betragenen Daten &uuml;ber die Schnittstelle eth0.<br>
+    Menge der &uuml;bertragenen Daten &uuml;ber die Schnittstelle eth0.<br>
     <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
-    &Auml;nderung der &uuml;betragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml; eth0).<br>
+    &Auml;nderung der &uuml;bertragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml;r eth0).<br>
     <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
     </li>
     <br>
@@ -1303,7 +1658,7 @@ sub trim($)
   <b>Get:</b><br><br>
     <ul>
     <li>interval<br>
-    Listet die bei der Definition angegebene Polling-Intervale auf.
+    Listet die bei der Definition angegebene Polling-Intervalle auf.
     </li>
     <br>
     <li>list<br>
@@ -1333,7 +1688,7 @@ sub trim($)
     <li>clear &lt;reading name&gt;<br>
     L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung) 
     wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter 
-    benutzerdefinierten Eintr&auml;ge<br>
+    benutzerdefinierten Eintr&auml;ge.<br>
     </li>
     <br>
     </ul><br>
@@ -1352,21 +1707,21 @@ sub trim($)
     <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
     Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen.
     Jeder Eintrag besteht aus dem Reading-Namen, dem Namen 
-    des Netwerk-Adapters und einem Kommentar f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Dopelpunkt verwendet, 
-    wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet<br>
+    des Netwerk-Adapters und einem Kommentar f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Doppelpunkt verwendet, 
+    wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet.<br>
     Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
     </li>
     <br>
     <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
     Diese kommaseparierte Liste definiert Eintr&auml;ge mit jeweils folgenden Daten: 
-    Reading-Name, Aktualisierungsinterval in Minuten, Kommentar und Betriebsystem-Commando
-    <br>Die BS-Befehle werden entsprechend des angegebenen Intervals ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
+    Reading-Name, Aktualisierungsinterval in Minuten, Kommentar und Betriebssystem-Commando.
+    <br>Die BS-Befehle werden entsprechend des angegebenen Intervalls ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
     Kommentare werden f&uuml;r die HTML-Ausgaben (s. SYSMON_ShowValuesHTML) ben&ouml;tigt.
     <br>Alle Parameter sind nicht optional!
-    <br>Es ist wichtig, dass die angegebenen Befehle schnell ausgef&uuml;hrt werden, denn in dieser Zeit wird der gesamte FHEM-Server blokiert!
-    <br>Werden Ergebnisse der lang laufenden Operationen ben&ouml;ting, solten diese z.B als CRON-Job eingerichtet werden 
+    <br>Es ist wichtig, dass die angegebenen Befehle schnell ausgef&uuml;hrt werden, denn in dieser Zeit wird der gesamte FHEM-Server blockiert!
+    <br>Werden Ergebnisse der lang laufenden Operationen ben&ouml;tigt, sollten diese z.B als CRON-Job eingerichtet werden 
     und in FHEM nur die davor gespeicherten Ausgaben visualisiert.<br><br>
-    Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebsystem:<br>
+    Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebssystem:<br>
     In einem cron-Job wird folgendes t&auml;glich ausgef&uuml;hrt: <br>
     <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
     <br>
@@ -1406,7 +1761,7 @@ sub trim($)
     und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden).<br>
     Falls kein <code>Comment</code> angegeben ist, wird eine intern vordefinierte Beschreibung angegeben. 
     Bei benutzerdefinierbaren Readings wird ggf. <code>Comment</code> aus der Definition verwendet.<br>
-    Werd keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
+    Wird keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
