@@ -220,7 +220,7 @@ MAXLAN_Set($@)
     my $time = time()-946684774;
     my $rmsg = "v:".$timezones.",".sprintf("%08x",$time);
     my $ret = MAXLAN_Write($hash,$rmsg, "A:");
-    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},1", {RAWMSG => $rmsg}) if(!$ret);
+    $hash->{clockset} = 1;
     return $ret;
 
   }elsif($setting eq "factoryReset") {
@@ -438,11 +438,14 @@ MAXLAN_Parse($$)
 
   if ($cmd eq 'H'){ #Hello
     $hash->{serial} = $args[0];
-    $hash->{rfaddr} = $args[1];
+    $hash->{addr} = $args[1];
+    $modules{MAX}{defptr}{$hash->{addr}} = $hash;
     $hash->{fwversion} = $args[2];
     my $dutycycle = 0;
     if(@args > 5){
-      $dutycycle = $args[5];
+      $dutycycle = hex($args[5]);
+      $hash->{dutycycle} = sprintf("%3.0f %%", $dutycycle);
+      readingsSingleUpdate( $hash, 'dutycycle', $dutycycle, 1 );
     }
     my $freememory = 0;
     if(@args > 6){
@@ -455,9 +458,9 @@ MAXLAN_Parse($$)
             hour => hex(substr($args[8],0,2)),
             minute => hex(substr($args[8],2,2)),
           };
-    my $clockset = hex($args[9]);
-    #$cubedatetime is only valid if $clockset is 1
-    if($clockset) {
+    $hash->{clockset} = hex($args[9]);
+    #$cubedatetime field is only valid if $clockset is 1
+    if($hash->{clockset}) {
       my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);
       my $difference = ((((($cubedatetime->{year} - $year-1900)*12
                           + $cubedatetime->{month} - $mon-1)*30
@@ -473,10 +476,7 @@ MAXLAN_Parse($$)
       Log 2, "MAXLAN_Parse: Cube has no time set";
     }
 
-    Dispatch($hash, "MAX,1,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
-    Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
-    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},$clockset", {RAWMSG => $rmsg});
-    Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $clockset";
+    Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $hash->{clockset}";
 
   } elsif($cmd eq 'M') {
     #Metadata, this is basically a readwrite part of the cube's memory.
@@ -539,11 +539,19 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
-    $groupid = 0 if($device_types{$devicetype} eq "Cube"); #That field does not mean "groupid" for Cube
-    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid", {}) if($device_types{$devicetype} ne "Cube");
+
+    #Set firmware and testresult on device
+    my $dhash = $modules{MAX}{defptr}{$addr};
+    if(defined($dhash)) {
+      readingsBeginUpdate($dhash);
+      readingsBulkUpdate($dhash, "firmware", sprintf("%u.%u",int($firmware/16),$firmware%16));
+      readingsBulkUpdate($dhash, "testresult", $testresult);
+      readingsEndUpdate($dhash, 1);
+    }
 
     if($len != length($bindata)) {
-      Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {});
       return $name;
     }
 
@@ -553,10 +561,9 @@ MAXLAN_Parse($$)
       #TODO: there is a lot of data left to interpret
 
     }elsif($device_types{$devicetype} =~ /HeatingThermostat.*/){
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH364",substr($bindata,18));
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration = $boost >> 5;
-      #There is some trailing data missing, which maps to the weekly program
       $comforttemp     = MAXLAN_ExtractTemperature($comforttemp); #convert to degree celcius
       $ecotemp         = MAXLAN_ExtractTemperature($ecotemp); #convert to degree celcius
       $tempoffset      = $tempoffset/2.0-3.5; #convert to degree
@@ -564,21 +571,30 @@ MAXLAN_Parse($$)
       $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
       $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
       $windowopendur   *= 5;
-      $maxvalvesetting = int($maxvalvesetting*100/255);
-      $valveoffset     = int($valveoffset*100/255);
+      $maxvalvesetting = int($maxvalvesetting*100/255 + 0.5); # + 0.5 for correct rounding
+      $valveoffset     = int($valveoffset*100/255 + 0.5); # + 0.5 for correct rounding
       my $decalcDay    = ($decalcifiction >> 5) & 0x07;
       my $decalcTime   = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime", {});
 
     }elsif($device_types{$devicetype} eq "WallMountedThermostat"){
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile) = unpack("CCCCH*",substr($bindata,18));
-      $comforttemp /= 2.0; #convert to degree celcius
-      $ecotemp /= 2.0; #convert to degree celcius
-      $maxsetpointtemp /= 2.0;
-      $minsetpointtemp /= 2.0;
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$tempoffset,$windowopentemp,$boost) = unpack("CCCCH364CCC",substr($bindata,18));
+      $comforttemp     = MAXLAN_ExtractTemperature($comforttemp);
+      $ecotemp         = MAXLAN_ExtractTemperature($ecotemp);
+      $maxsetpointtemp = MAXLAN_ExtractTemperature($maxsetpointtemp);
+      $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp";
-      Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {RAWMSG => $rmsg});
+      if(defined($tempoffset)) { #With firmware 18 (opposed to firmware 16)
+        $tempoffset = $tempoffset/2.0-3.5; #convert to degree
+        my $boostValve = ($boost & 0x1F) * 5;
+        my $boostDuration = $boost >> 5;
+        $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
+        Log $ll5, "tempoffset $tempoffset, boostValve $boostValve, boostDuration $boostDuration, windowOpenTemp $windowopentemp";
+        Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp", {});
+      } else {
+        Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {});
+      }
 
     }elsif($device_types{$devicetype} eq "ShutterContact"){
       Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
@@ -589,7 +605,7 @@ MAXLAN_Parse($$)
     }
 
     #Clear Error
-    Dispatch($hash, "MAX,1,Error,$addr", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,Error,$addr", {}) if($addr ne $hash->{addr}); #don't clear own error
 
     #Check if it is already recorded in devices
     my $found = 0;
@@ -611,16 +627,17 @@ MAXLAN_Parse($$)
     $bindata  = decode_base64($args[0]) if(@args > 0);
     #The L command consists of blocks of states (one for each device)
     while(length($bindata)){
-      my ($len,$addr,$errframetype,$bits1) = unpack("CH6Ca",$bindata);
+      my ($len,$addr,$errCmd,$bits1) = unpack("CH6H2a",$bindata);
+      $errCmd = uc($errCmd);
       my $unkbit1 = vec($bits1,0,1);
       my $initialized = vec($bits1,1,1); #I never saw this beeing 0
       my $answer = vec($bits1,2,1); #answer to what?
-      my $rferror1 = vec($bits1,3,1); # if 1 then see errframetype
+      my $error = vec($bits1,3,1); # if 1 then see errframetype
       my $valid = vec($bits1,4,1); #is the status following the common header valid
-      my $unkbit2 = vec($bits1,5,1);
-      my $unkbit3 = vec($bits1,6,2);
+      my $unkbit2 = vec($bits1,5,2);
+      my $unkbit3 = vec($bits1,7,1);
   
-      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, rferror $rferror1, errframetype $errframetype, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
+      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errCmd $errCmd, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
 
       my $payload = unpack("H*",substr($bindata,6,$len-6+1)); #+1 because the len field is not counted
       if($valid) {
@@ -629,17 +646,32 @@ MAXLAN_Parse($$)
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
         }elsif($shash->{type} =~ /HeatingThermostat.*/){
-          Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {});
         }elsif($shash->{type} eq "WallMountedThermostat"){
-          Dispatch($hash, "MAX,1,WallThermostatState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,WallThermostatState,$addr,$payload", {});
         }elsif($shash->{type} eq "ShutterContact"){
-          Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {});
         }elsif($shash->{type} eq "PushButton"){
-          Dispatch($hash, "MAX,1,PushButtonState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,PushButtonState,$addr,$payload", {});
         }else{
           Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
-      } # if($valid)
+      }
+
+      my $dhash = $modules{MAX}{defptr}{$addr};
+      if(defined($dhash)) {
+        readingsBeginUpdate($dhash);
+        readingsBulkUpdate($dhash, "MAXLAN_initialized", $initialized);
+        readingsBulkUpdate($dhash, "MAXLAN_error", $error);
+        readingsBulkUpdate($dhash, "MAXLAN_errorInCommand", $error ? (exists($msgId2Cmd{$errCmd}) ? $msgId2Cmd{$errCmd} : $errCmd) : "");
+        readingsBulkUpdate($dhash, "MAXLAN_valid", $valid);
+        readingsBulkUpdate($dhash, "MAXLAN_isAnswer", $answer);
+        readingsEndUpdate($dhash, 1);
+        if($error) {
+          MAXLAN_Write($hash,"r:01,".encode_base64(pack("H*",$addr),""), "S:");
+        }
+      }
+
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
     } # while(length($bindata))
 
@@ -651,7 +683,7 @@ MAXLAN_Parse($$)
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
-    Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0", {});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
@@ -659,6 +691,8 @@ MAXLAN_Parse($$)
 
   } elsif($cmd eq "S"){#Response to s:
     $hash->{dutycycle} = hex($args[0]); #number of command send over the air
+    readingsSingleUpdate( $hash, 'dutycycle', $hash->{dutycycle}, 1 );
+
     my $discarded = $args[1];
     $hash->{freememoryslot} = hex($args[2]);
     Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
@@ -766,7 +800,7 @@ MAXLAN_Send(@)
   my $ret = MAXLAN_Write($hash,"s:".encode_base64($payload,""), "S:");
   #TODO: actually check return value
   if(defined($opts{callbackParam})) {
-    Dispatch($hash, "MAX,1,Ack$cmd,$dst,$opts{callbackParam}", {RAWMSG => ""});
+    Dispatch($hash, "MAX,1,Ack$cmd,$dst,$opts{callbackParam}", {});
   }
   #Reschedule a poll in the near future after the cube will
   #have gotten an answer
@@ -809,7 +843,7 @@ MAXLAN_RemoveDevice($$)
   <tr><td>
   The MAXLAN is the fhem module for the eQ-3 MAX! Cube LAN Gateway.
   <br><br>
-  The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. (The devices themselves are handled by the <a href="#MAX">MAX</a> module).<br>
+  The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. It also represents properties of the MAX! Cube. The other devices are handled by the <a href="#MAX">MAX</a> module, which uses this module as its backend.<br>
   <br>
 
   <a name="MAXLANdefine"></a>

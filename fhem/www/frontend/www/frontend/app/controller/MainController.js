@@ -41,6 +41,9 @@ Ext.define('FHEM.controller.MainController', {
             'panel[name=fhemaccordion]': {
                 expand: this.showFHEMPanel
             },
+            'panel[name=fhemstatusaccordion]': {
+                expand: this.showFHEMStatusPanel
+            },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
             },
@@ -68,6 +71,9 @@ Ext.define('FHEM.controller.MainController', {
             },
             'button[name=sortedtree]': {
                 click: this.setupTree
+            },
+            'panel[name=statuspanel]': {
+                saveconfig: this.saveObjectToUserConfig
             }
         });
     },
@@ -84,6 +90,8 @@ Ext.define('FHEM.controller.MainController', {
         me.createLineChartPanel();
         me.createDatabaseTablePanel();
         
+        me.showFHEMStatusPanel();
+        
         me.getMainviewport().show();
         me.getMainviewport().getEl().setOpacity(0);
         me.getMainviewport().getEl().animate({
@@ -95,7 +103,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.9 - 2013-07-07");
+            sp.setText(FHEM.version + "; Frontend Version: 1.0.8 - 2014-01-12");
         }
         
         this.setupTree(false);
@@ -145,21 +153,29 @@ Ext.define('FHEM.controller.MainController', {
                     if (result.devices && result.devices.length > 0) {
                         Ext.each(result.devices, function(device) {
                             if (device.ATTR && device.ATTR.room) {
-                                //check if room exists
-                                var resultnode = root.findChild("text", device.ATTR.room, true),
-                                    subnode = {text: device.NAME, leaf: true, data: device};
-                                if (!resultnode) {
-                                    //create roomfolder
-                                    var roomfolder;
-                                    if (device.ATTR.room !== "hidden") {
-                                        roomfolder = {text: device.ATTR.room, leaf: false, expanded: true, children: []};
-                                        roomfolder.children.push(subnode);
-                                        root.appendChild(roomfolder);
+                                //first we check if we have comma separated multiple rooms
+                                var roomArray = device.ATTR.room.split(",");
+                                Ext.each(roomArray, function(room) {
+                                  //check if room exists
+                                    var resultnode = root.findChild("text", room, true),
+                                        subnode = {text: device.NAME, leaf: true, data: device};
+                                    if (!resultnode) {
+                                        //create roomfolder
+                                        var roomfolder;
+                                        if (room !== "hidden") {
+                                            if (room === "Unsorted") {
+                                                roomfolder = {text: room, leaf: false, expanded: false, children: []};
+                                            } else {
+                                                roomfolder = {text: room, leaf: false, expanded: true, children: []};
+                                            }
+                                            roomfolder.children.push(subnode);
+                                            root.appendChild(roomfolder);
+                                        }
+                                    } else {
+                                        resultnode.appendChild(subnode);
+                                        root.appendChild(resultnode);
                                     }
-                                } else {
-                                    resultnode.appendChild(subnode);
-                                    root.appendChild(resultnode);
-                                }
+                                });
                             }
                         }, this);
                     } else {
@@ -184,9 +200,16 @@ Ext.define('FHEM.controller.MainController', {
         //add the charts to the tree
         store.on("load", function() {
             var rootNode = me.getMaintreepanel().getRootNode(),
-                chartfolder = {text: "Charts", expanded: true, children: []};
+                chartfolder = {text: "Charts", expanded: true, children: []},
+                statusfolder = {text: "StatusRoom", expanded: true, children: []};
             rootNode.appendChild(chartfolder);
+            rootNode.appendChild(statusfolder);
             var chartfoldernode = rootNode.findChild("text", "Charts", true);
+            
+            //add the filelogcharts to the store
+            if (FHEM.filelogcharts) {
+                store.add(FHEM.filelogcharts);
+            }
             
             store.each(function(rec) {
                 var chartchild,
@@ -209,10 +232,23 @@ Ext.define('FHEM.controller.MainController', {
                 }
             });
             
+            // sort root by treeindex as inserting with index whil some objects not added may be faulty
+            rootNode.sort(function(rec, rec2) {
+                if (rec && rec.raw && rec.raw.data && rec.raw.data.VALUE && 
+                    rec2 && rec2.raw && rec2.raw.data && rec2.raw.data.VALUE) {
+                        if (rec.raw.data.VALUE.treeIndex > rec2.raw.data.VALUE.treeIndex) {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    }
+            }, true);
+            
             // at last we add a chart template to the folder which wont be saved to db and cannot be deleted
             chartchild = {text: 'Create new Chart', leaf: true, data: {template: true}, iconCls:'x-tree-icon-leaf-chart'};
             chartfoldernode.appendChild(chartchild);
             
+            me.getMaintreepanel().fireEvent('treeloaded');
         });
     },
     
@@ -435,11 +471,20 @@ Ext.define('FHEM.controller.MainController', {
         if (rec.raw.data.template === true || rec.get('leaf') === true && 
             rec.raw.data &&
             rec.raw.data.TYPE && 
-            rec.raw.data.TYPE === "savedchart") {
+            (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart")) {
                 this.showLineChartPanel();
         } else {
             this.showDevicePanel(treeview, rec);
         }
+    },
+    
+    /**
+     * 
+     */
+    showFHEMStatusPanel: function() {
+        var panel = Ext.ComponentQuery.query('statuspanel')[0];
+        this.hideCenterPanels();
+        panel.show();
     },
     
     /**
@@ -559,6 +604,54 @@ Ext.define('FHEM.controller.MainController', {
         var panel = Ext.ComponentQuery.query('tabledatagridpanel')[0];
         this.hideCenterPanels();
         panel.show();
-    }
+    },
     
+    /**
+     * Method appending and saving a given object to the file userconfig.js, which is loaded on page load
+     * The location names the accesible part where the object should be saved in
+     */
+    saveObjectToUserConfig: function(objectToSave, location) {
+        
+        var me = this;
+        
+        if (FHEM.userconfig && objectToSave && !Ext.isEmpty(location)) {
+            
+            FHEM.userconfig[location] = objectToSave;
+            
+            // preapre the string for the file
+            var finalstring = "FHEM = {};;FHEM.userconfig = " + Ext.encode(FHEM.userconfig) + ";;";
+            
+            var cmd = "{ `echo '" + finalstring + "' > " + FHEM.appPath + "userconfig.js`}";
+            
+            Ext.Ajax.request({
+                method: 'POST',
+                disableCaching: false,
+                url: '../../../fhem?',
+                params: {
+                    cmd: cmd,
+                    XHR: 1
+                },
+                success: function(response){
+                    if (response.status === 200) {
+                        Ext.Msg.alert("Success", "Changes successfully saved!");
+                    } else if (response.statusText) {
+                        Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                    } else {
+                        Ext.Msg.alert("Error", "The Changes could not be saved!");
+                    }
+                },
+                failure: function(response) {
+                    if (response.statusText) {
+                        Ext.Msg.alert("Error", "The Changes could not be saved, error Message is:<br><br>" + response.statusText);
+                    } else {
+                        Ext.Msg.alert("Error", "The Changes could not be saved!");
+                    }
+                }
+            });
+            
+        } else {
+            Ext.Msg.alert("Error", "A save attempt was made without enough parameters!");
+        }
+        
+    }
 });

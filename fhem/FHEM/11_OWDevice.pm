@@ -349,10 +349,13 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
+  $hash->{NotifyFn}  = "OWDevice_Notify";
+  $hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
   $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model ".  
+                       "resolution:9,10,11,12 ".
                        $readingFnAttributes;
 }
 
@@ -413,6 +416,14 @@ OWDevice_ReadFromServer($$@)
     $ret = &{$modules{$iohash->{TYPE}}{FindFn}}($iohash, @a);
   }
   use strict "refs";
+
+  if( $iohash->{LAST_READ_FAILED} ) {
+    $hash->{NR_READ_FAILED} = 0 if( !$hash->{NR_READ_FAILED} );
+    $hash->{NR_READ_FAILED}++;
+    $hash->{LAST_READ_FAILED} = 1;
+  } else {
+    $hash->{LAST_READ_FAILED} = 0;
+  }
   return $ret;
 }
 
@@ -425,8 +436,13 @@ OWDevice_ReadValue($$) {
         my $address= $hash->{fhem}{address};
         my $interface= $hash->{fhem}{interfaces};
         my $cache= (AttrVal($hash->{NAME},"uncached","")) ? "/uncached" : "";
-        my $value= OWDevice_ReadFromServer($hash,"read","$cache/$address/$reading");
-        #Debug "/$address/$reading => $value";  
+        my $path = "$cache/$address/$reading";
+        $path .= AttrVal($hash->{NAME},"resolution","") if( $reading eq "temperature" );
+        #my ($seconds, $microseconds) = gettimeofday();
+        my $value= OWDevice_ReadFromServer($hash,"read",$path);
+        #my ($seconds2, $microseconds2) = gettimeofday();
+        #my $msec = sprintf( "%03d msec", (($seconds2-$seconds)*1000000 + $microseconds2-$microseconds)/1000 );
+        #Debug "$path => $value; $msec";  
         if($interface ne "id") {
           if(defined($value)) {
             $value= trim($value) if(AttrVal($hash,"trimvalues",1));
@@ -466,9 +482,7 @@ OWDevice_UpdateValues($) {
           readingsBeginUpdate($hash);
           foreach my $reading (@polls) {
             my $value= OWDevice_ReadValue($hash,$reading);
-            if(defined($value)) {
-              readingsBulkUpdate($hash,$reading,$value);
-            }
+            readingsBulkUpdate($hash,$reading,$value) if(defined($value));
           }
           if(@state) {
             foreach my $reading (@state) {
@@ -480,13 +494,15 @@ OWDevice_UpdateValues($) {
               }
             }
           }
-          if($alerting) {
+          if($alerting
+             && !$hash->{LAST_READ_FAILED}) {
             my $dir= OWDevice_ReadFromServer($hash,"dir","/alarm/");
             my $alarm= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
             readingsBulkUpdate($hash,"alarm",$alarm);
             $state .= "alarm: $alarm";
           }
-          if($interface eq "id") {
+          if($interface eq "id"
+             && !$hash->{LAST_READ_FAILED}) {
             my $dir= OWDevice_ReadFromServer($hash,"dir","/");
             my $present= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
             readingsBulkUpdate($hash,"present",$present);
@@ -499,9 +515,11 @@ OWDevice_UpdateValues($) {
           readingsBulkUpdate($hash,"state",$state,0);
           readingsEndUpdate($hash,1);
         }
-        InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
-          if(defined($hash->{fhem}{interval}));
-
+        RemoveInternalTimer($hash);
+        # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
+        InternalTimer(int(gettimeofday())+$hash->{fhem}{rand}+$hash->{fhem}{interval}, 
+          "OWDevice_UpdateValues", $hash, 0) if(defined($hash->{fhem}{interval}));
+        $hash->{fhem}{rand} = 0;
 }
 
 ###################################
@@ -643,24 +661,63 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log3 $name, 5, "$name: alerting: $alerting";
 
-        $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
-        $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
-        if($interface eq "id" && !defined($hash->{fhem}{interval})) {
-          my $dir= OWDevice_ReadFromServer($hash,"dir","/");
-          my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
-          my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
-          my $location= (defined($bus)) ? $bus :"absent";
-          my $id= OWDevice_Get($hash, $name, "id");
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"id",$id);
-          readingsBulkUpdate($hash,"present",$present);
-          readingsBulkUpdate($hash,"state","present: $present",0);
-          readingsBulkUpdate($hash,"location",$location);
-          readingsEndUpdate($hash,1);
+        if( $init_done ) {
+          $hash->{fhem}{rand} = 0;
+          delete $modules{OWDevice}{NotifyFn};
+          OWDevice_InitValues($hash);
+          OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
+        } else {
+          $hash->{fhem}{rand} = int(rand(20));
+          Log3 $name, 5, "$name: initial delay: $hash->{fhem}{rand}";
         }
-        OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
 
         return undef;
+}
+
+sub
+OWDevice_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  delete $modules{OWDevice}{NotifyFn};
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "OWDevice");
+    OWDevice_InitValues($defs{$d});
+    OWDevice_UpdateValues($defs{$d}) if(defined($defs{$d}->{fhem}{interval}));
+  }
+
+  return undef;
+}
+sub
+OWDevice_InitValues($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
+  $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
+
+  if($hash->{fhem}{interfaces} eq "id" && !defined($hash->{fhem}{interval})) {
+    my $dir= OWDevice_ReadFromServer($hash,"dir","/");
+    my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
+    my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
+    my $location= (defined($bus)) ? $bus :"absent";
+    my $id= OWDevice_Get($hash, $name, "id");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"id",$id);
+    readingsBulkUpdate($hash,"present",$present);
+    readingsBulkUpdate($hash,"state","present: $present",0);
+    readingsBulkUpdate($hash,"location",$location);
+    readingsEndUpdate($hash,1);
+  }
 }
 ###################################
 
@@ -810,6 +867,9 @@ OWDevice_Define($$)
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li>model: preset with device type, e.g. DS18S20.</li>
+    <li>resolution: resolution of temperature reading in bits, can be 9, 10, 11 or 12. 
+    Lower resolutions allow for faster retrieval of values from the bus. 
+    Particularly reasonable for large 1-wire installations to reduce busy times for FHEM.</li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>

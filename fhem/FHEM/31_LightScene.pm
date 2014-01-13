@@ -7,11 +7,12 @@ use strict;
 use warnings;
 use POSIX;
 #use JSON;
-use Data::Dumper;
+#use Data::Dumper;
 
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
+my $LightScene_hasDataDumper = 1;
 
 sub LightScene_Initialize($)
 {
@@ -29,11 +30,16 @@ sub LightScene_Initialize($)
 
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
+
+  eval "use Data::Dumper";
+  $LightScene_hasDataDumper = 0 if($@);
 }
 
 sub LightScene_Define($$)
 {
   my ($hash, $def) = @_;
+
+  return "install JSON or Data::Dumper to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
 
   my @args = split("[ \t]+", $def);
 
@@ -41,6 +47,9 @@ sub LightScene_Define($$)
 
   my $name = shift(@args);
   my $type = shift(@args);
+
+  $hash->{HAS_JSON} = $LightScene_hasJSON;
+  $hash->{HAS_DataDumper} = $LightScene_hasDataDumper;
 
   my %list;
   foreach my $a (@args) {
@@ -229,7 +238,7 @@ myStatefileName()
   my $statefile = $attr{global}{statefile};
   $statefile = substr $statefile,0,rindex($statefile,'/')+1;
   return $statefile ."LightScenes.save" if( $LightScene_hasJSON );
-  return $statefile ."LightScenes.dd.save";
+  return $statefile ."LightScenes.dd.save" if( $LightScene_hasDataDumper );
 }
 my $LightScene_LastSaveTime="";
 sub
@@ -256,7 +265,7 @@ LightScene_Save()
 
     if( $LightScene_hasJSON ) {
       print FH encode_json($hash) if( defined($hash) );
-    } else {
+    } elsif( $LightScene_hasDataDumper ) {
       my $dumper = Data::Dumper->new([]);
       $dumper->Terse(1);
 
@@ -295,7 +304,7 @@ LightScene_Load($)
     my $decoded;
     if( $LightScene_hasJSON ) {
       $decoded = decode_json( $encoded );
-    } else {
+    } elsif( $LightScene_hasDataDumper ) {
       $decoded = eval $encoded;
     }
     $hash->{SCENES} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
@@ -352,6 +361,7 @@ LightScene_Set($@)
       $type = "" if( !defined($type) );
 
       if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
+        $icon = Value($d);
         if( $toSave =~ m/^{.*}$/) {
           my $DEVICE = $d;
           $toSave = eval $toSave;
@@ -374,7 +384,8 @@ LightScene_Set($@)
               $get = $2 if( $2 );
               $set = $5 if( $5 );
             }
-            ($get,$regex) = split('#', $get, 2);
+            ($get,$regex) = split('@', $get, 2);
+            $set = $get if( $regex && $set eq $param );
             $set = "state" if( $set eq "STATE" );
 
             $saved .= "$set " if( $set ne "state" );
@@ -574,7 +585,7 @@ LightScene_Get($@)
   the scene names ic clickable to activate the scene.<br><br>
 
   A weblink with a scene overview that can be included in any room or a floorplan can be created with:
-   <ul><code>define wlScene weblink htmlCode {LightScene_2html("Scene")}</code></ul>
+   <ul><code>define wlScene weblink htmlCode {LightScene_2html("LightSceneName")}</code></ul>
 
   <a name="LightScene_Set"></a>
     <b>Set</b>
@@ -602,14 +613,15 @@ LightScene_Get($@)
       <li>lightSceneParamsToSave<br>
       this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
       that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
-      by the device). each reading can have a perl expression appended with '#' that will be used to alter the $value used for
-      the set command. this can for example be used to strip a trailing % from a dimmer state.
+      by the device). each reading can have a perl expression appended with '@' that will be used to alter the $value used for
+      the set command. this can for example be used to strip a trailing % from a dimmer state. this perl expression must not contain
+      spaces,colons or commas.<br>
       in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
       or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
       string or as a perl expression enclosed in {} that returns this string.<br>
       <code>attr myReceiver lightSceneParamsToSave volume,channel</code></br>
       <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
-      <code>attr myDimmer lightSceneParamsToSave state#{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
+      <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
     </ul><br>
 </ul>
 

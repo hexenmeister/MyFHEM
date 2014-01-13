@@ -3,8 +3,6 @@
 # Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
 package main;
 
-use v5.10.1;
-
 use strict;
 use warnings;
 use MaxCommon;
@@ -144,7 +142,7 @@ CUL_MAX_Attr(@)
   my ($hash, $action, $name, $attr, $value) = @_;
   if ($action eq "set") {
     return "No such attribute" if($attr !~ ["fakeWTaddr", "fakeSCaddr", "IODev"]);
-    return "Invalid value" if($attr ~~ ["fakeWTaddr", "fakeSCaddr"] && $value !~ /^[0-9a-fA-F]{6}$/);
+    return "Invalid value" if(grep( /^\Q$attr\E$/, ("fakeWTaddr", "fakeSCaddr")) && $value !~ /^[0-9a-fA-F]{6}$/);
   }
 }
 
@@ -174,7 +172,7 @@ CUL_MAX_Set($@)
   } elsif($setting eq "broadcastTime") {
     CUL_MAX_BroadcastTime($hash, 1);
 
-  } elsif($setting ~~ ["fakeSC", "fakeWT"]) {
+  } elsif(grep /^\Q$setting\E$/, ("fakeSC", "fakeWT")) {
     return "Invalid number of arguments" if(@args == 0);
     my $dest = $args[0];
     my $destname;
@@ -272,7 +270,7 @@ CUL_MAX_Parse($$)
       return $shash->{NAME} if($src eq CUL_MAX_fakeWTaddr($hash));
       return $shash->{NAME} if($src eq CUL_MAX_fakeSCaddr($hash));
 
-      Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {RAWMSG => $rmsg});
+      Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {});
 
       return $shash->{NAME} if(!@{$shash->{sendQueue}}); #we are not waiting for any Ack
 
@@ -310,8 +308,9 @@ CUL_MAX_Parse($$)
         Log $ll5, "CUL_MAX_Parse: Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
       }
     } elsif($msgType eq "PairPing") {
-      my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
-      Log $ll5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      my ($firmware,$type,$testresult,$serial) = unpack("CCCa*",pack("H*",$payload));
+      #What does testresult mean?
+      Log $ll5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), firmware $firmware, type $type, testresult $testresult, serial $serial";
 
       #There are two variants of PairPing:
       #1. It has a destination address of "000000" and can be paired to any device.
@@ -324,21 +323,31 @@ CUL_MAX_Parse($$)
       #If $isToMe is true, this device is already paired and just wants to be reacknowledged
       if($shash->{pairmode} || $isToMe) {
         Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
-        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
+        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0", {});
+
+        #Set firmware and testresult on device
+        my $dhash = CUL_MAX_DeviceHash($src);
+        if(defined($dhash)) {
+          readingsBeginUpdate($dhash);
+          readingsBulkUpdate($dhash, "firmware", sprintf("%u.%u",int($firmware/16),$firmware%16));
+          readingsBulkUpdate($dhash, "testresult", $testresult);
+          readingsEndUpdate($dhash, 1);
+        }
+
         #Send after dispatch the define, otherwise Send will create an invalid device
         CUL_MAX_Send($shash, "PairPong", $src, "00");
 
-        return $shash->{NAME} if($isToMe); #Skip default values if just rePairing
+        return $shash->{NAME} if($isToMe); #if just re-pairing, default values are not restored (I checked)
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
-          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekProfile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile,80,5,0,12,15,100,0,0,12", {});
         } elsif($device_types{$type} eq "WallMountedThermostat") {
-          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile,80,5,0,12", {});
         }
       }
-    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"])  {
-      Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
+    } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"))  {
+      Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {});
     } else {
       Log $ll5, "Unhandled message $msgType";
     }
@@ -505,7 +514,7 @@ CUL_MAX_SendQueueHandler($$)
 
   } elsif( $packet->{sent} == 2 ) { #Got ack
     if(defined($packet->{callbackParam})) {
-      Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {RAWMSG => ""});
+      Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {});
     }
     splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
 

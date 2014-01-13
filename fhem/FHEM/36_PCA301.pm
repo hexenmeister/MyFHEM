@@ -196,7 +196,7 @@ PCA301_Parse($$)
   } else {
     DoTrigger($name, "UNKNOWNCODE $msg");
     Log3 $name, 3, "$name: Unknown code $msg, help me!";
-    return undef;
+    return "";
   }
 
   my $raddr = $addr;
@@ -216,6 +216,14 @@ PCA301_Parse($$)
 
   $rhash->{PCA301_lastRcv} = TimeNow();
 
+  if( $rhash->{channel} ne $channel ) {
+    Log3 $rname, 3, "PCA301 $rname, channel changed from $rhash->{channel} to $channel";
+
+    $rhash->{channel} = $channel;
+    $rhash->{DEF} = "$rhash->{addr} $rhash->{channel}";
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+  }
+
   my $readonly = AttrVal($rname, "readonly", "0" );
   my $state = "";
 
@@ -225,9 +233,9 @@ PCA301_Parse($$)
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
     my $state = $state; $state = $power if( $readonly );
     readingsBeginUpdate($rhash);
-    readingsBulkUpdate($rhash, "power", $power) if( $data != 0x00 );
-    readingsBulkUpdate($rhash, "consumption", $consumption) if( $data != 0x00 );
-    readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
+    readingsBulkUpdate($rhash, "power", $power) if( $power != ReadingsVal($rname,"power",0) );
+    readingsBulkUpdate($rhash, "consumption", $consumption) if( $consumption != ReadingsVal($rname,"consumption",0) );
+    readingsBulkUpdate($rhash, "state", $state) if( $state ne ReadingsVal($rname,"state","") );
     readingsEndUpdate($rhash,1);
   } elsif( $cmd eq 0x05 ) {
     $state = $data==0x00?"off":"on";

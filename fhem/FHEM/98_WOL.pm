@@ -23,9 +23,8 @@ use strict;
 use warnings;
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
-
-sub WOL_Initialize($)
-{
+################################################################################
+sub WOL_Initialize($) {
   my ($hash) = @_;
 
   $hash->{SetFn}     = "WOL_Set";
@@ -34,13 +33,9 @@ sub WOL_Initialize($)
   $hash->{AttrList}  = "interval shutdownCmd sysCmd ".
                         $readingFnAttributes;
 }
-#
-#
-#
-sub WOL_Set($@)
-{
+################################################################################
+sub WOL_Set($@) {
   my ($hash, @a) = @_;
-
   return "no set value specified" if(int(@a) < 2);
   return "Unknown argument $a[1], choose one of on off refresh" if($a[1] eq "?");
   
@@ -64,19 +59,18 @@ sub WOL_Set($@)
     ;
   }
 
+  WOL_UpdateReadings($hash);
+
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5, "WOL_UpdateReadings", $hash, 0);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 
   if ($hash->{STATE} eq "on") {
-      InternalTimer(gettimeofday()+1, "WOL_GetUpdate", $hash, 0);
+      WOL_GetUpdate($hash);
   }
   return undef;
 }
-#
-#
-#
-sub WOL_Define($$)
-{
+################################################################################
+sub WOL_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
@@ -120,9 +114,7 @@ sub WOL_Define($$)
   readingsSingleUpdate($hash, "packet_via_UDP", "none",0);
   return undef;
 }
-#
-#
-#
+################################################################################
 sub WOL_Undef($$) {
 
   my ($hash, $arg) = @_;
@@ -130,11 +122,8 @@ sub WOL_Undef($$) {
   RemoveInternalTimer($hash);
   return undef;
 }
-#
-#
-#
-sub WOL_UpdateReadings($)
-{
+################################################################################
+sub WOL_UpdateReadings($) {
   my ($hash) = @_;
   $hash->{INTERVAL} = AttrVal($hash->{NAME}, "interval", 900);
 
@@ -151,11 +140,8 @@ sub WOL_UpdateReadings($)
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 }
-#
-#
-#
-sub WOL_GetUpdate($)
-{
+################################################################################
+sub WOL_GetUpdate($) {
   my ($hash) = @_;
 
   if ($hash->{STATE} eq "on") {
@@ -166,11 +152,8 @@ sub WOL_GetUpdate($)
      InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
   }
 }
-#
-#
-#
-sub wake($)
-{
+################################################################################
+sub wake($){
   my ($hash) = @_;
   my $name  = $hash->{NAME};
   my $mac   = $hash->{MAC};
@@ -190,9 +173,7 @@ sub wake($)
   }
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
 }
-
-#
-#
+################################################################################
 # method to wakevia lan, taken from Net::Wake package
 sub wol_by_udp {
   my ($hash, $mac_addr, $host, $port) = @_;
@@ -218,8 +199,7 @@ sub wol_by_udp {
 
   return 1;
 }
-#
-#
+################################################################################
 # method to wake via system command
 sub wol_by_ew($$) {
   my ($hash, $mac) = @_;

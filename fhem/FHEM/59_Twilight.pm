@@ -5,6 +5,8 @@
 #     Copyright by Sebastian Stuecker
 #     erweitert von Dietmar Ortmann
 #
+#     used algorithm see:          http://lexikon.astronomie.info/zeitgleichung/
+#
 #     Sun position computing
 #     Copyright (C) 2013 Julian Pawlowski, julian.pawlowski AT gmail DOT com
 #     based on Twilight.tcl  http://www.homematic-wiki.info/mw/index.php/TCLScript:twilight
@@ -63,8 +65,7 @@ sub Twilight_my_gmt_offset()
   }
   return $hh+($mm/60);
 }
-
-##################################### 
+################################################################################
 sub Twilight_Initialize($)
 {
   my ($hash) = @_;
@@ -96,9 +97,7 @@ sub Twilight_Get($@)
   }
   return "$a[0] $reading => $value";
 }
-#
-#
-#
+################################################################################
 sub Twilight_Define($$)
 {
   my ($hash, $def) = @_;
@@ -147,40 +146,34 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{SUNPOS_OFFSET}  = 1;
+  $hash->{SUNPOS_OFFSET}  = 30;
  
   Twilight_sunposTimerSet($hash);
   RemoveInternalTimer($hash);
   InternalTimer(time()+1, "Twilight_Midnight", $hash, 0);
   return undef;
 }
-#
-#
-#
-sub Twilight_Undef($$)
-{
+################################################################################
+sub Twilight_Undef($$) {
   my ($hash, $arg) = @_;
 
-  RemoveInternalTimer($hash->{$hash->{SP}{SUNPOS}});
   foreach my $key (keys %{$hash->{TW}}) {
-     my $hashSx = $hash->{$hash->{TW}{$key}{NAME}};
-     RemoveInternalTimer($hashSx);
+     myRemoveInternalTimer($key, $hash);
   }
-  RemoveInternalTimer($hash);
+  myRemoveInternalTimer    ("",         $hash);
+  myRemoveInternalTimer    ("perlTime", $hash);
+  myRemoveInternalTimer    ("sunpos",   $hash);
+
   return undef;
 }
-#
-#
-#
+################################################################################
 sub Twilight_midnight_seconds()
 {
   my @time = localtime();
   my $secs = ($time[2] * 3600) + ($time[1] * 60) + $time[0];
   return $secs;
 }
-#
-#
-#
+################################################################################
 sub Twilight_TwilightTimes($$)
 {
   my ($hash, $whitchTimes) = @_;
@@ -192,7 +185,10 @@ sub Twilight_TwilightTimes($$)
   my $midseconds = $now-$midnight;
 
   my $doy        = strftime("%j",localtime);
-
+  #
+  # WOZ - MOZ   = -0.171*sin(0.0337 * T + 0.465) - 0.1299*sin(0.01787 * T - 0.168)
+  # Deklination = 0.4095*sin(0.016906*(T-80.086))
+  #
   my $timezone   = Twilight_my_gmt_offset();
   my $timediff   = -0.171 *sin(0.0337  * $doy+0.465) - 0.1299*sin(0.01787 * $doy - 0.168);
   my $declination=  0.4095*sin(0.016906*($doy-80.086));
@@ -262,8 +258,7 @@ sub Twilight_TwilightTimes($$)
   readingsEndUpdate   ($hash, defined($hash->{LOCAL} ? 0 : 1));
   return 1;
 }
-#
-#
+################################################################################
 sub myInternalTimer($$$$$) {
    my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
@@ -281,9 +276,7 @@ sub myInternalTimer($$$$$) {
    }
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
 }
-#
-#
-#
+################################################################################
 sub myRemoveInternalTimer($$) {
    my ($modifier, $hash) = @_;
 
@@ -292,63 +285,59 @@ sub myRemoveInternalTimer($$) {
       RemoveInternalTimer($hash);
    } else {
       my $myHash = $hash->{TIMER}{$timerName};
-      delete $hash->{TIMER}{$timerName};
-      RemoveInternalTimer($myHash);
+      if (defined($myHash)) {
+         delete $hash->{TIMER}{$timerName};
+         RemoveInternalTimer($myHash);
+      }
    }
 }
-#
-#
-#
-sub Twilight_WeatherTimerSet($)
-{
-  my ($hash) = @_;
-  my $now    = time();
-
-  foreach my $key ("ss_weather", "sr_weather" ) {
-     my $tim = $hash->{TW}{$key}{TIME};
-     if ($tim-60*60>$now) {
-        InternalTimer     ($tim - 60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
-     }
-  }
-}
-#
-#
-#
-sub Twilight_Midnight($)
-{
+################################################################################
+sub Twilight_Midnight($) {
   my ($hash) = @_;
 
   Twilight_TwilightTimes      ($hash, "Mid");
   Twilight_StandardTimerSet   ($hash);
 }
-#
-sub Twilight_WeatherTimerUpdate($)
-{
-  my ($hash) = @_;
+################################ ################################################
+sub Twilight_WeatherTimerUpdate($) {
+   my ($myHash) = @_;
+   my $hash     = $myHash->{HASH};
 
   Twilight_TwilightTimes      ($hash, "Wea");
   Twilight_StandardTimerSet   ($hash);
 }
-#
+################################################################################
 sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
   my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
 
-  myRemoveInternalTimer    ("", $hash);
-  myInternalTimer          ("", $midnight,    "Twilight_Midnight", $hash, 0);
-  Twilight_WeatherTimerSet ($hash);
+  myRemoveInternalTimer       ("", $hash);
+  myInternalTimer             ("", $midnight,    "Twilight_Midnight", $hash, 0);
+  Twilight_WeatherTimerSet    ($hash);
 }
-#
+################################################################################
+sub Twilight_WeatherTimerSet($) {
+  my ($hash) = @_;
+  my $now    = time();
+
+  myRemoveInternalTimer    ("perlTime", $hash);
+  foreach my $key ("ss_weather", "sr_weather" ) {
+     my $tim = $hash->{TW}{$key}{TIME};
+     if ($tim-60*60>$now) {
+        myInternalTimer       ("perlTime", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+     }
+  }
+}
+################################################################################
 sub Twilight_sunposTimerSet($) {
   my ($hash) = @_;
 
-  myRemoveInternalTimer("sunpos", $hash);
-  myInternalTimer ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
+  myRemoveInternalTimer       ("sunpos", $hash);
+  myInternalTimer             ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
+
   $hash->{SUNPOS_OFFSET} = 5*60;
 }
-#
-#
-#
+################################################################################
 sub Twilight_fireEvent($)
 {
    my ($myHash) = @_;
@@ -382,18 +371,22 @@ sub Twilight_fireEvent($)
    readingsEndUpdate  ($hash, !$doNotTrigger);
 
 }
-#
+################################################################################
 sub Twilight_calc($$$$$$$)
 {
   my ($latitude, $longitude, $horizon, $declination, $timezone, $midseconds, $timediff) = @_;
 
-  my $s1 = sin($horizon /57.29578);
-  my $s2 = sin($latitude/57.29578) * sin($declination);
-  my $s3 = cos($latitude/57.29578) * cos($declination);
+  my $bogRad = 360/2/pi;            # ~ 57.29578°
+  #                              $s1--|   $s2-------------------|   $s3---------------------|
+  #   Zeitdifferenz = 12*arccos((sin(h) - sin(B)*sin(Deklination)) / (cos(B)*cos(Deklination)))/Pi;
+  my $s1 = sin($horizon /$bogRad);
+  my $s2 = sin($latitude/$bogRad) * sin($declination);
+  my $s3 = cos($latitude/$bogRad) * cos($declination);
+
 
   my ($suntime, $sunrise, $sunset);
   my $acosArg = ($s1 - $s2) / $s3;
-  if (abs($acosArg) < 1.0) {   # ok
+  if (abs($acosArg) < 1.0) {        # ok
      $suntime = 12*acos($acosArg)/pi;
      $sunrise = $midseconds + (12-$timediff -$suntime -$longitude/15+$timezone) * 3600;
      $sunset  = $midseconds + (12-$timediff +$suntime -$longitude/15+$timezone) * 3600;
@@ -403,7 +396,7 @@ sub Twilight_calc($$$$$$$)
 
   return $sunrise, $sunset;
 }
-#
+################################################################################
 sub Twilight_getWeatherHorizon($)
 {
   my $hash=shift; # 0
@@ -449,7 +442,7 @@ sub Twilight_getWeatherHorizon($)
   $hash->{WEATHER_HORIZON}="0";
   $hash->{CONDITION}="-1";
 }
-
+################################################################################
 sub Twilight_sunpos($)
 {
   my ($myHash) = @_;
@@ -464,10 +457,9 @@ sub Twilight_sunpos($)
   $iYear += 100;
   $dSeconds = 0;
 
-  ############################
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
-  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude";
+  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude" if($dHours == 0 && $dMinutes <= 6 );
 
   my $pi=3.14159265358979323846;
   my $twopi=(2*$pi);
@@ -558,8 +550,7 @@ sub Twilight_sunpos($)
 
   return undef;
 }
-
-##########################
+################################################################################
 sub Twilight_CompassPoint($) {
   my ($azimuth) = @_;
 
@@ -601,8 +592,18 @@ sub Twilight_CompassPoint($) {
   return $compassPoint;
 }
 
-1;
+sub twilight($$$$) {
+  my ($twilight, $reading, $min, $max) = @_;
 
+  my $t = hms2h(ReadingsVal($twilight,$reading,0));
+
+  $t = hms2h($min) if(defined($min) && (hms2h($min) > $t));
+  $t = hms2h($max) if(defined($max) && (hms2h($max) < $t));
+
+  return h2hms_fmt($t);
+}
+
+1;
 
 =pod
 =begin html
@@ -682,30 +683,30 @@ sub Twilight_CompassPoint($) {
 
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
     <table>
-    <tr><td>light</td><td>the current virtual daylight value</td></tr>
-    <tr><td>nextEvent</td><td>the name of the next event</td></tr>
-    <tr><td>nextEventTime</td><td>the time when the next event will probably happen (during light phase 5 and 6 this is updated when weather conditions change</td></tr>
-    <tr><td>sr_astro</td><td>time of astronomical sunrise</td></tr>
-    <tr><td>sr_naut</td><td>time of nautical sunrise</td></tr>
-    <tr><td>sr_civil</td><td>time of civil sunrise</td></tr>
-    <tr><td>sr</td><td>time of sunrise</td></tr>
-    <tr><td>sr_indoor</td><td>time of indoor sunrise</td></tr>
-    <tr><td>sr_weather</td><td>time of weather sunrise</td></tr>
-    <tr><td>ss_weather</td><td>time of weather sunset</td></tr>
-    <tr><td>ss_indoor</td><td>time of indoor sunset</td></tr>
-    <tr><td>ss</td><td>time of sunset</td></tr>
-    <tr><td>ss_civil</td><td>time of civil sunset</td></tr>
-    <tr><td>ss_nautic</td><td>time of nautic sunset</td></tr>
-    <tr><td>ss_astro</td><td>time of astro sunset</td></tr>
-    <tr><td>azimuth</td><td>the current azimuth of the sun 0&deg; ist north 180&deg; is south</td></tr>
-    <tr><td>compasspoint</td><td>a textual representation of the compass point</td></tr>
-    <tr><td>elevation</td><td>the elevaltion of the sun</td></tr>
-    <tr><td>twilight</td><td>a percetal value of a new (twi)light value: (elevation+12)/18 * 100) </td></tr>
-    <tr><td>twilight_weather</td><td>a percetal value of a new (twi)light value: (elevation-WEATHER_HORIZON+12)/18 * 100). So if there is weather, it
+    <tr><td><b>light</b></td><td>the current virtual daylight value</td></tr>
+    <tr><td><b>nextEvent</b></td><td>the name of the next event</td></tr>
+    <tr><td><b>nextEventTime</b></td><td>the time when the next event will probably happen (during light phase 5 and 6 this is updated when weather conditions change</td></tr>
+    <tr><td><b>sr_astro</b></td><td>time of astronomical sunrise</td></tr>
+    <tr><td><b>sr_naut</b></td><td>time of nautical sunrise</td></tr>
+    <tr><td><b>sr_civil</b></td><td>time of civil sunrise</td></tr>
+    <tr><td><b>sr</b></td><td>time of sunrise</td></tr>
+    <tr><td><b>sr_indoor</b></td><td>time of indoor sunrise</td></tr>
+    <tr><td><b>sr_weather</b></td><td>time of weather sunrise</td></tr>
+    <tr><td><b>ss_weather</b></td><td>time of weather sunset</td></tr>
+    <tr><td><b>ss_indoor</b></td><td>time of indoor sunset</td></tr>
+    <tr><td><b>ss</b></td><td>time of sunset</td></tr>
+    <tr><td><b>ss_civil</b></td><td>time of civil sunset</td></tr>
+    <tr><td><b>ss_nautic</b></td><td>time of nautic sunset</td></tr>
+    <tr><td><b>ss_astro</b></td><td>time of astro sunset</td></tr>
+    <tr><td><b>azimuth</b></td><td>the current azimuth of the sun 0&deg; ist north 180&deg; is south</td></tr>
+    <tr><td><b>compasspoint</b></td><td>a textual representation of the compass point</td></tr>
+    <tr><td><b>elevation</b></td><td>the elevaltion of the sun</td></tr>
+    <tr><td><b>twilight</b></td><td>a percetal value of a new (twi)light value: (elevation+12)/18 * 100) </td></tr>
+    <tr><td><b>twilight_weather</b></td><td>a percetal value of a new (twi)light value: (elevation-WEATHER_HORIZON+12)/18 * 100). So if there is weather, it
                                      is always a little bit darker than by fair weather</td></tr>
-    <tr><td>condition</td><td>the yahoo condition weather code</td></tr>
-    <tr><td>condition_txt</td><td>the yahoo condition weather code as textual representation</td></tr>
-    <tr><td>horizon</td><td>value auf the actual horizon 0&deg;, -6&deg;, -12&deg;, -18&deg;</td></tr>
+    <tr><td><b>condition</b></td><td>the yahoo condition weather code</td></tr>
+    <tr><td><b>condition_txt</b></td><td>the yahoo condition weather code as textual representation</td></tr>
+    <tr><td><b>horizon</b></td><td>value auf the actual horizon 0&deg;, -6&deg;, -12&deg;, -18&deg;</td></tr>
     </table>
 
   </ul>
@@ -717,6 +718,20 @@ sub Twilight_CompassPoint($) {
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
+
+  <a name="Twilightfunc"></a>
+  <b>Functions</b>
+  <ul>
+     <li><b>twilight</b>(<b>$twilight</b>, <b>$reading</b>, <b>$min</b>, <b>$max</b>)</li> - implements a routine to compute the twilighttimes like sunrise with min max values.<br><br>
+     <table>
+     <tr><td><b>$twilight</b></td><td>name of the twilight instance</td></tr>
+     <tr><td><b>$reading</b></td><td>name of the reading to use example: ss_astro, ss_weather ...</td></tr>
+     <tr><td><b>$min</b></td><td>parameter min time - optional</td></tr>
+     <tr><td><b>$max</b></td><td>parameter max time - optional</td></tr>
+     </table>
+  </ul>
+  <br>
+
 </ul>
 
 =end html

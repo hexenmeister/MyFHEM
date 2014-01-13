@@ -4,7 +4,6 @@
 #
 package main;
 
-use v5.10.1;
 use strict;
 use warnings;
 use MIME::Base64;
@@ -26,14 +25,14 @@ my %boost_durationsInv = reverse %boost_durations;
 my %decalcDays = (0 => "Sat", 1 => "Sun", 2 => "Mon", 3 => "Tue", 4 => "Wed", 5 => "Thu", 6 => "Fri");
 my %decalcDaysInv = reverse %decalcDays;
 
-sub validWindowOpenDuration { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 60; }
-sub validMeasurementOffset { return $_[0] ~~ /^-?\d+(\.[05])?$/ && $_[0] >= -3.5 && $_[0] <= 3.5; }
-sub validBoostDuration { return $_[0] ~~ /^\d+$/ && exists($boost_durationsInv{$_[0]}); }
-sub validValveposition { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; }
+sub validWindowOpenDuration { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 60; }
+sub validMeasurementOffset { return $_[0] =~ /^-?\d+(\.[05])?$/ && $_[0] >= -3.5 && $_[0] <= 3.5; }
+sub validBoostDuration { return $_[0] =~ /^\d+$/ && exists($boost_durationsInv{$_[0]}); }
+sub validValveposition { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; }
 sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
   return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; }
 sub validWeekProfile { return length($_[0]) == 4*13*7; }
-sub validGroupid { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 255; }
+sub validGroupid { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 255; }
 
 my %readingDef = ( #min/max/default
   "maximumTemperature"    => [ \&validTemperature, "on"],
@@ -96,6 +95,11 @@ MAX_Define($$)
     Log 1, $msg;
     return $msg;
   }
+  if($type eq "Cube") {
+    my $msg = "MAX_Define: Device type 'Cube' is deprecated. All properties have been moved to the MAXLAN device.";
+    Log 1, $msg;
+    return $msg;
+  }
   Log GetLogLevel($hash->{NAME}, 5), "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
@@ -144,7 +148,7 @@ MAX_CheckIODev($)
 sub
 MAX_SerializeTemperature($)
 {
-  if($_[0] ~~ ["on","off"]) {
+  if($_[0] eq  "on" or $_[0] eq "off") {
     return $_[0];
   } elsif($_[0] == 4.5) {
     return "off";
@@ -299,8 +303,8 @@ MAX_Set($@)
     my $groupid = MAX_ReadingsVal($hash,"groupid");
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ));
 
-  }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
-      and $hash->{type} =~ /HeatingThermostat.*/){
+  }elsif(grep (/^\Q$setting\E$/, ("boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"))
+      and $hash->{type} =~ /.*Thermostat.*/){
 
     my $val = join(" ",@args); #decalcification contains a space
 
@@ -335,7 +339,7 @@ MAX_Set($@)
       return ($hash->{IODev}{Send})->($hash->{IODev},"RemoveGroupId",$hash->{addr}, "00", callbackParam => "0");
     }
 
-  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and $hash->{type} =~ /.*Thermostat.*/) {
+  }elsif( grep (/^\Q$setting\E$/, ("ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" )) and $hash->{type} =~ /.*Thermostat.*/) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
 
     if(!MAX_Validate($setting, $args[0])) {
@@ -363,8 +367,13 @@ MAX_Set($@)
     my $windowOpenTemp = int($h{windowOpenTemperature}*2);
     my $windowOpenTime = int($h{windowOpenDuration}/5);
 
+    my $groupid = MAX_ReadingsVal($hash,"groupid");
     my $payload = sprintf("%02x%02x%02x%02x%02x%02x%02x",$comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
-    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, callbackParam => "$setting,$args[0]")
+    if($setting eq "measurementOffset") {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, groupId => "00", flags => "00", callbackParam => "$setting,$args[0]");
+    } else {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ), callbackParam => "$setting,$args[0]");
+    }
 
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
@@ -407,7 +416,7 @@ MAX_Set($@)
       return "fake does not work for device type $hash->{type}";
     }
 
-  } elsif($setting ~~ ["associate", "deassociate"]) {
+  } elsif(grep /^\Q$setting\E$/, ("associate", "deassociate")) {
     my $dest = $args[0];
     my $destType;
     if($dest eq "fakeWallThermostat") {
@@ -506,23 +515,50 @@ MAX_Set($@)
     my $assoclist;
     #Build list of devices which this device can be associated to
     if($hash->{type} =~ /HeatingThermostat.*/) {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat", "ShutterContact"] && $_ != $hash ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      $assoclist = join(",", map { defined($_->{type}) &&
+        ($_->{type} eq "HeatingThermostat"
+          || $_->{type} eq "HeatingThermostatPlus"
+          || $_->{type} eq "WallMountedThermostat"
+          || $_->{type} eq "ShutterContact")
+        && $_ != $hash ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
       if($hash->{IODev}->{TYPE} eq "CUL_MAX") {
         $assoclist .= "," if(length($assoclist));
         $assoclist .= "fakeWallThermostat,fakeShutterContact";
       }
-    } elsif($hash->{type} ~~ ["ShutterContact", "WallMountedThermostat"]) {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /HeatingThermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+
+    } elsif($hash->{type} =~ /WallMountedThermostat/) {
+      $assoclist = join(",", map { defined($_->{type}) &&
+        ($_->{type} eq "HeatingThermostat"
+          || $_->{type} eq "HeatingThermostatPlus"
+          || $_->{type} eq "ShutterContact")
+        && $_ != $hash ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      if($hash->{IODev}->{TYPE} eq "CUL_MAX") {
+        $assoclist .= "," if(length($assoclist));
+        $assoclist .= "fakeShutterContact";
+      }
+
+    } elsif($hash->{type} eq "ShutterContact") {
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /.*Thermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
 
+    my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
+    my $boostDurVal = join(",", values(%boost_durations));
     if($hash->{type} =~ /HeatingThermostat.*/) {
-      #Create numbers from 4.5 to 30.5
-      my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
-      my $boostDurVal = join(",", values(%boost_durations));
-      return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      my $shash;
+      my $wallthermo = 0;
+      # check if Wallthermo is in same group
+      foreach my $addr ( keys %{$modules{MAX}{defptr}} ) {
+        $shash = $modules{MAX}{defptr}{$addr};
+        $wallthermo = 1 if(defined $shash->{type} && $shash->{type} eq "WallMountedThermostat" && (MAX_ReadingsVal($shash,"groupid") eq MAX_ReadingsVal($hash,"groupid")));
+      }
 
+      if ($wallthermo eq 1) {
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      } else {
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      }
     } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
+      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist minimumTemperature:$templist measurementOffset:$templistOffset windowOpenTemperature:$templist boostDuration:$boostDurVal boostValveposition ";
     } elsif($hash->{type} eq "ShutterContact") {
       return "$ret associate:$assoclist deassociate:$assoclist";
     } else {
@@ -565,15 +601,14 @@ MAX_Parse($$)
   if(!$shash)
   {
     my $devicetype = undef;
-    $devicetype = $args[0] if($msgtype eq "define");
+    $devicetype = $args[0] if($msgtype eq "define" and $args[0] ne "Cube");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
-    $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
-    $devicetype = "WallMountedThermostat" if($msgtype ~~ ["WallThermostatConfig","WallThermostatState","WallThermostatControl"]);
-    $devicetype = "HeatingThermostat" if($msgtype ~~ ["HeatingThermostatConfig", "ThermostatState"]);
+    $devicetype = "WallMountedThermostat" if(grep /^$msgtype$/, ("WallThermostatConfig","WallThermostatState","WallThermostatControl"));
+    $devicetype = "HeatingThermostat" if(grep /^$msgtype$/, ("HeatingThermostatConfig", "ThermostatState"));
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
     } else {
-      Log 2, "Got message for undefined device, and failed to guess type from msg '$msgtype' - ignoring";
+      Log 2, "Got message for undefined device $addr, and failed to guess type from msg '$msgtype' - ignoring";
       return $hash->{NAME};
     }
   }
@@ -638,14 +673,14 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature)) if($desiredTemperature != 0);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", MAX_SerializeTemperature($measuredTemperature));
-      if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
-        readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
-      } else {
-        readingsBulkUpdate($shash, "valveposition", $valveposition);
-      }
+   }
+    if($shash->{type} =~ /HeatingThermostatPlus/ and $hash->{TYPE} eq "MAXLAN") {
+      readingsBulkUpdate($shash, "valveposition", int($valveposition*MAX_ReadingsVal($shash,"maxValveSetting")/100));
+    } else {
+      readingsBulkUpdate($shash, "valveposition", $valveposition);
     }
 
-  }elsif($msgtype ~~ ["WallThermostatState", "WallThermostatControl" ]){
+  }elsif(grep /^$msgtype$/,  ("WallThermostatState", "WallThermostatControl" )){
     my ($bits2,$displayActualTemperature,$desiredTemperatureRaw,$null1,$heaterTemperature,$null2,$temperature);
     if( length($args[0]) == 4 ) { #WallThermostatControl
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
@@ -670,7 +705,6 @@ MAX_Parse($$)
         $untilStr = MAX_ParseDateTime($null1,$heaterTemperature,$null2)->{str};
         $heaterTemperature = "";
       }
-
       $heaterTemperature = "" if(!defined($heaterTemperature));
 
       Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
@@ -716,49 +750,34 @@ MAX_Parse($$)
 
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     readingsBulkUpdate($shash, "onoff", $onoff);
+    readingsBulkUpdate($shash, "connection", $gateway);
 
-  }elsif($msgtype eq "CubeClockState"){
-    my $clockset = $args[0];
-    $shash->{clocknotset} = !$clockset;
-
-  }elsif($msgtype eq "CubeConnectionState"){
-    my $connected = $args[0];
-
-    readingsBulkUpdate($shash, "connection", $connected);
-
-  } elsif($msgtype ~~ ["HeatingThermostatConfig", "WallThermostatConfig"]) {
+  } elsif(grep /^$msgtype$/, ("HeatingThermostatConfig", "WallThermostatConfig")) {
     readingsBulkUpdate($shash, "ecoTemperature", MAX_SerializeTemperature($args[0]));
     readingsBulkUpdate($shash, "comfortTemperature", MAX_SerializeTemperature($args[1]));
     readingsBulkUpdate($shash, "maximumTemperature", MAX_SerializeTemperature($args[2]));
     readingsBulkUpdate($shash, "minimumTemperature", MAX_SerializeTemperature($args[3]));
-    if($shash->{type} =~ /HeatingThermostat.*/) {
-      readingsBulkUpdate($shash, "boostValveposition", $args[4]);
-      readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
-      readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[6]));
-      readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[7]));
-      readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
-      readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
-      readingsBulkUpdate($shash, "valveOffset", $args[10]);
-      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
-      readingsBulkUpdate($shash, ".weekProfile", $args[13]);
-    } else {
-      #With firmware 18 (opposed to firmware 16), the WallThermostat sends 3 more bytes (6 more hex)
-      my ($weekProfile, $unknownBytes) = $args[4] =~ m/^(.{364})(.*)$/;
-      readingsBulkUpdate($shash, ".weekProfile", $weekProfile);
-      #We still have to find out what $unknownBytes mean, so hopefully
-      #we can observe some other values
-      if($unknownBytes ne "071830" and $unknownBytes ne "") {
-        Log GetLogLevel($shash->{NAME}, 2), "While parsing weekProfile of WallThermostat: Additional bytes $unknownBytes differ from 071830. Please report to http://forum.fhem.de/index.php?topic=15567";
-      }
+    readingsBulkUpdate($shash, ".weekProfile", $args[4]);
+    if(@args > 5) { #HeatingThermostat and WallThermostat with new firmware
+      readingsBulkUpdate($shash, "boostValveposition", $args[5]);
+      readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[6]});
+      readingsBulkUpdate($shash, "measurementOffset", MAX_SerializeTemperature($args[7]));
+      readingsBulkUpdate($shash, "windowOpenTemperature", MAX_SerializeTemperature($args[8]));
+    }
+    if(@args > 9) { #HeatingThermostat
+      readingsBulkUpdate($shash, "windowOpenDuration", $args[9]);
+      readingsBulkUpdate($shash, "maxValveSetting", $args[10]);
+      readingsBulkUpdate($shash, "valveOffset", $args[11]);
+      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[12]} $args[13]:00");
     }
 
-   MAX_ParseWeekProfile($shash);
+    MAX_ParseWeekProfile($shash);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
       delete $shash->{ERROR} if(exists($shash->{ERROR}));
     } else {
-      $shash->{ERROR} = join(",",$args[0]);
+      $shash->{ERROR} = join(",",@args);
     }
 
   } elsif($msgtype eq "AckWakeUp") {
@@ -774,11 +793,20 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, ".weekProfile", $curWeekProfile);
     MAX_ParseWeekProfile($shash);
 
-  } elsif($msgtype ~~ ["AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" ]) {
+  } elsif(grep /^$msgtype$/, ("AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" )) {
 
-    readingsBulkUpdate($shash, $args[0], $args[1]);
+    if($args[0] eq "windowOpenTemperature"
+    || $args[0] eq "comfortTemperature"
+    || $args[0] eq "ecoTemperature"
+    || $args[0] eq "maximumTemperature"
+    || $args[0] eq "minimumTemperature" ) {
+      readingsBulkUpdate($shash, $args[0], MAX_SerializeTemperature($args[1]));
+    } else {
+      #displayActualTemperature, boostDuration, boostValveSetting, maxValve, decalcification, valveOffset
+      readingsBulkUpdate($shash, $args[0], $args[1]);
+    }
 
-  } elsif($msgtype ~~ ["AckSetGroupId", "AckRemoveGroupId" ]) {
+  } elsif(grep /^$msgtype$/, ("AckSetGroupId", "AckRemoveGroupId" )) {
 
     readingsBulkUpdate($shash, "groupid", $args[0]);
 
@@ -849,7 +877,7 @@ MAX_Parse($$)
     <br><br>
 
     Define an MAX device of type &lt;type&gt; and rf address &lt;addr&gt.
-    The &lt;type&gt; is one of Cube, HeatingThermostat, HeatingThermostatPlus, WallMountedThermostat, ShutterContact, PushButton.
+    The &lt;type&gt; is one of HeatingThermostat, HeatingThermostatPlus, WallMountedThermostat, ShutterContact, PushButton.
     The &lt;addr&gt; is a 6 digit hex number.
     You should never need to specify this by yourself, the <a href="#autocreate">autocreate</a> module will do it for you.<br>
     It's advisable to set event-on-change-reading, like

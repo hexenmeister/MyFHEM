@@ -28,6 +28,7 @@ TcpServer_Open($$$)
     LocalHost => ($global ? undef : "localhost"),
     LocalPort => $port,
     Listen    => 10,
+    Blocking  => ($^O =~ /Win/ ? 1 : 0), # Needed for .WRITEBUFFER@darwin
     ReuseAddr => 1
   );
   $hash->{STATE} = "Initialized";
@@ -137,12 +138,15 @@ TcpServer_Close($)
 
   if(defined($hash->{CD})) { # Clients
     close($hash->{CD});
+    delete($hash->{CD}); 
     delete($selectlist{$name});
+    delete($hash->{FD});  # Avoid Read->Close->Write
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
     $name = $name . "." . $hash->{PORT};
     delete($selectlist{$name});
+    delete($hash->{FD});  # Avoid Read->Close->Write
   }
   return undef;
 }

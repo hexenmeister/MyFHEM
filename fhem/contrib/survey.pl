@@ -32,6 +32,7 @@ my @hw = qw(
   EMWZ
   ESA2000
   EnOcean
+  FB_CALLMONITOR
   FBAHA
   FBDECT
   FHT
@@ -57,6 +58,7 @@ my @hw = qw(
   KM271
   KS300
   LGTV
+  LINDY_HDMI_SWITCH
   LIRC
   LUXTRONIK2
   M232
@@ -79,6 +81,7 @@ my @hw = qw(
   OWTHERM
   OWX
   POKEYS
+  PRESENCE
   RFXCOM
   RFXMETER
   RFXX10REC

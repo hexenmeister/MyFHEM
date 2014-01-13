@@ -26,6 +26,7 @@ sub HUEBridge_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
+  $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
@@ -37,10 +38,14 @@ HUEBridge_Read($@)
 {
   my ($hash,$name,$id,$obj)= @_;
 
+  if( $id =~ m/^G(\d.*)/ ) {
+    return HUEBridge_Call($hash, 'groups/' . $1, $obj);
+  }
   return HUEBridge_Call($hash, 'lights/' . $id, $obj);
 }
 
-sub HUEBridge_Define($$)
+sub
+HUEBridge_Define($$)
 {
   my ($hash, $def) = @_;
 
@@ -80,8 +85,37 @@ sub HUEBridge_Define($$)
 
   $attr{$name}{"key"} = join "",map { unpack "H*", chr(rand(256)) } 1..16 unless defined( AttrVal($name, "key", undef) );
 
-  #HUEBridge_OpenDev($hash);
-  InternalTimer(gettimeofday()+10, "HUEBridge_OpenDev", $hash, 0);
+  if( !defined($hash->{helper}{count}) ) {
+    $modules{$hash->{TYPE}}{helper}{count} = 0 if( !defined($modules{$hash->{TYPE}}{helper}{count}) );
+    $hash->{helper}{count} =  $modules{$hash->{TYPE}}{helper}{count}++;
+  }
+
+  if( $init_done ) {
+    delete $modules{$hash->{TYPE}}{NotifyFn};
+    HUEBridge_OpenDev( $hash );
+  }
+
+  return undef;
+}
+sub
+HUEBridge_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  delete $modules{$type}{NotifyFn};
+  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "$type");
+    HUEBridge_OpenDev($defs{$d});
+  }
 
   return undef;
 }
@@ -164,6 +198,9 @@ HUEBridge_Set($@)
     $hash->{updatestate} = 3;
     $hash->{STATE} = "updating";
     return "starting update";
+  } elsif($cmd eq 'autocreate') {
+    HUEBridge_Autocreate($hash);
+    return undef;
   } else {
     my $list = "statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
@@ -186,8 +223,16 @@ HUEBridge_Get($@)
       $ret .= $key .": ". $result->{$key}{name} ."\n";
     }
     return $ret;
+  } elsif($cmd eq 'groups') {
+    my $result =  HUEBridge_Call($hash, 'groups', undef);
+    $result->{0} = { name => "Lightset 0", };
+    my $ret = "";
+    foreach my $key ( sort keys %$result ) {
+      $ret .= $key .": ". $result->{$key}{name} ."\n";
+    }
+    return $ret;
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg";
   }
 }
 
@@ -203,6 +248,9 @@ HUEBridge_GetUpdate($)
   }
 
   my $result = HUEBridge_Call($hash, 'config', undef);
+  #my $result = HUEBridge_Call($hash, undef, undef);
+  #Log 3, Dumper $result;
+  #$result = $result->{config};
   $hash->{name} = $result->{name};
   $hash->{swversion} = $result->{swversion};
 
@@ -232,43 +280,55 @@ HUEBridge_Autocreate($)
   }
 
   my $result =  HUEBridge_Call($hash, 'lights', undef);
+  foreach my $key ( keys %$result ) {
+    my $id= $key;
 
-  my @defined = ();
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "HUEDevice");
-    if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{id})) {
-      push(@defined,$defs{$d}{fhem}{id});
+    my $code = $name ."-". $id;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      Log3 $name, 4, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+      next;
+    }
+
+    my $devname = "HUEDevice" . $id;
+    $devname = $name ."_". $devname if( $hash->{helper}{count} );
+    my $define= "$devname HUEDevice $id IODev=$name";
+
+    Log3 $name, 4, "$name: create new device '$devname' for address '$id'";
+
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
     }
   }
 
-  foreach my $key ( keys %$result )
-    {
-      my $id= $key;
+  $result =  HUEBridge_Call($hash, 'groups', undef);
+  $result->{0} = { name => "Lightset 0", };
+  foreach my $key ( keys %$result ) {
+    my $id= $key;
 
-      my $found = 0;
-      foreach my $d (keys %defs) {
-        next if($defs{$d}{TYPE} ne "HUEDevice");
-        if(defined($defs{$d}{fhem}) &&
-           defined($defs{$d}{fhem}{id}) && $defs{$d}{fhem}{id} eq $id) {
-          Log3 $name, 5, "$name id '$id' already defined as '$defs{$d}{NAME}'";
-          $found = 1;
-          last;
-        }
+    my $code = $name ."-G". $id;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      Log3 $name, 4, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+      next;
     }
 
-    if( !$found ) {
-      my $devname= "HUEDevice" . $id;
-      my $define= "$devname HUEDevice $id";
+    my $devname= "HUEGroup" . $id;
+    $devname = $name ."_". $devname if( $hash->{helper}{count} );
+    my $define= "$devname HUEDevice group $id IODev=$name";
 
-      Log3 $name, 5, "$name create new device '$devname' for address '$id'";
+    Log3 $name, 4, "$name: create new group '$devname' for address '$id'";
 
-      my $cmdret= CommandDefine(undef,$define);
-      if($cmdret) {
-        Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
-      } else {
-        $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
-        $cmdret= CommandAttr(undef,"$devname room HUEDevice");
-      }
+    my $cmdret= CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+    } else {
+      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname IODev $name");
     }
   }
 
@@ -407,7 +467,7 @@ HUEBridge_HTTP_Request($$$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log3 undef, 1, "HUEBridge_HTTP_Request $displayurl: Can't connect to $protocol://$host:$port";
     undef $conn;
     return undef;
   }
@@ -471,13 +531,13 @@ HUEBridge_HTTP_Request($$$@)
   The actual hue bulbs, living colors or living whites devices are defined as <a href="#HUEDevice">HUEDevice</a> devices.
 
   <br><br>
-  All newly found devices are autocreated at startup and added to the room HUEDevice.
+  All newly found devices and groups are autocreated at startup and added to the room HUEDevice.
 
   <br><br>
   Notes:
   <ul>
     <li>This module needs <code>JSON</code>.<br>
-        Pleease install with '<code>cpan install JSON</code>' or your method of choice.</li>
+        Please install with '<code>cpan install JSON</code>' or your method of choice.</li>
     <li>autocreate only works for the first bridge. devices on other bridges have to be manualy defined.</li>
   </ul>
 
@@ -508,6 +568,8 @@ HUEBridge_HTTP_Request($$$@)
   <ul>
     <li>devices<br>
     list the devices known to the bridge.</li>
+    <li>groups<br>
+    list the groups known to the bridge.</li>
   </ul><br>
 
   <a name="HUEBridge_Set"></a>
@@ -516,7 +578,8 @@ HUEBridge_HTTP_Request($$$@)
     <li>statusRequest<br>
     Update bridge status.</li>
     <li>swupdate<br>
-    Update bridge firmware. This command is only available if a new firmware is available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate. </li>
+    Update bridge firmware. This command is only available if a new firmware is available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
+    A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code> can be used to be informed about available firmware updates.<br></li>
   </ul><br>
 </ul><br>
 

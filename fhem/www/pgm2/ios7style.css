@@ -1,3 +1,5 @@
+@import url("dashboard_ios7.css");
+
 /*
 Edit: fhainz
 */
@@ -60,6 +62,11 @@ table.block tr.odd { background: #fff; }
 table.block tr.sel { background: #d9d9d9; }
 table.block td { padding:3px; }
 
+/* Bugfix fuer readingsGroup */
+table.block table.block {
+width: 100%;
+}
+
 table.assoc a { color: #147bff; }
 
 table.fileList { width:790px; }
@@ -86,6 +93,7 @@ div.dval a { color: #147bff; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 
 a img { border-style:none; }
+tr.column td { padding:0; vertical-align:top;}
 
 /* detail-selector & slider */
 .makeTable { display:inline; float:left; clear:left;

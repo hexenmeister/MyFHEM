@@ -37,6 +37,7 @@ sub SVG_showLog($);
 sub SVG_substcfg($$$$$$);
 sub SVG_time_align($$);
 sub SVG_time_to_sec($);
+sub SVG_openFile($$$);
 
 my ($SVG_lt, $SVG_ltstr);
 my %SVG_devs;       # hash of from/to entries per device
@@ -48,7 +49,7 @@ SVG_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "SVG_Define";
-  $hash->{AttrList} = "fixedrange startDate plotsize label title plotfunction";
+  $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize nrAxis label title plotfunction";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -133,15 +134,17 @@ SVG_FwFn($$$$)
   my $ret = "";
 
   # plots navigation buttons
-  if((!$pageHash || !$pageHash->{buttons}) &&
-     AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
+  if (AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
+    if((!$pageHash || !$pageHash->{buttons}) &&
+       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
-    $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
-    $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
-    $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
-    $ret .= SVG_zoomLink("off=1",   "Next",    "next");
-    $pageHash->{buttons} = 1 if($pageHash);
-    $ret .= "<br>";
+      $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
+      $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
+      $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
+      $ret .= SVG_zoomLink("off=1",   "Next",    "next");
+      $pageHash->{buttons} = 1 if($pageHash);
+      $ret .= "<br>";
+    }
   }
 
   my $arg="$FW_ME/SVG_showLog?dev=$d".
@@ -269,6 +272,13 @@ SVG_PEdit($$$$)
   $ret .= "<td>$desc</td>";
   $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 
+  my @lineStyles;
+  if(SVG_openFile($FW_cssdir,
+                  AttrVal($FW_wname,"stylesheetPrefix",""), "svg_style.css")) {
+    map { push(@lineStyles,$1) if($_ =~ m/^\.(l[^{ ]*)/) } <FH>;
+    close(FH);
+  }
+
   my $r = 0;
   for($r=0; $r < $max; $r++) {
     $ret .= "<tr class=\"".(($r&1)?"odd":"even")."\"><td>";
@@ -287,8 +297,7 @@ SVG_PEdit($$$$)
       $ls =~ s/class=//g;
       $ls =~ s/"//g; 
     }
-    $ret .= SVG_sel("style_${r}", "l0,l1,l2,l3,l4,l5,l6,l7,l8,".
-                    "l0fill,l1fill,l2fill,l3fill,l4fill,l5fill,l6fill", $ls);
+    $ret .= SVG_sel("style_${r}", join(",", @lineStyles), $ls);
     my $lw = $conf{lWidth}[$r]; 
     if($lw) {
       $lw =~ s/.*stroke-width://g;
@@ -543,6 +552,17 @@ SVG_substcfg($$$$$$)
   }
 }
 
+sub
+SVG_tspec($$@)
+{
+  my ($n,$e) = (shift,shift);
+  for(my $i=1; $i<$n; $i++) {
+    $_[$i] = 0;
+  }
+  return sprintf("%04d-%02d-%02d_%02d:%02d:%02d",
+                 $_[5]+1900,$_[4]+1,$_[3],$_[2],$_[1],$e);
+}
+
 ##################
 # Calculate either the number of scrollable SVGs (for $d = undef) or
 # for the device the valid from and to dates for the given zoom and offset
@@ -554,13 +574,12 @@ SVG_calcOffsets($$)
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
 
-  my $frx;
+  my ($fr, $fo);
   if($defs{$wl}) {
-    my $fr = AttrVal($wl, "fixedrange", undef);
+    $fr = AttrVal($wl, "fixedrange", undef);
     if($fr) {
-      #klaus fixed range day, week, month or year
-      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
-        $frx=$fr;
+      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ||
+        $fr =~ m/^\d+days$/ ) {
 
       } else {
         my @range = split(" ", $fr);
@@ -570,11 +589,14 @@ SVG_calcOffsets($$)
         return;
       }
     }
+
+    $fo = AttrVal( $wl, "fixedoffset", undef);
   }
 
   my $off = $FW_pos{$d};
   $off = 0 if(!$off);
   $off += $FW_pos{off} if($FW_pos{off});
+  $off = $fo if(defined($fo) && $fo =~ m/^[+-]?\d+$/);
 
   my $now;
   my $st = AttrVal($wl, "startDate", undef);
@@ -586,75 +608,64 @@ SVG_calcOffsets($$)
 
   my $zoom = $FW_pos{zoom};
   $zoom = "day" if(!$zoom);
-  $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
+  $zoom = $fr if(defined($fr)); 
 
 
+  my $endPlotNow = (AttrVal($FW_wname, "endPlotNow", undef) && !$st);
   if($zoom eq "hour") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+    if($endPlotNow) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
+
     } else { 
       my $t = $now + $off*3600;
       my @l = localtime($t);
-      $SVG_devs{$d}{from}
-          = sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
       @l = localtime($t+3600);
-      $SVG_devs{$d}{to}
-          = sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
   } elsif($zoom eq "qday") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
+    if($endPlotNow) {
       my $t = int(($now + $off*21600 - 21600)/300.0)*300 + 300;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
       @l = localtime($t+21600);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
     } else { 
       my $t = $now + $off*21600;
       my @l = localtime($t);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:00:00",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{from} = SVG_tspec(2,0,@l);
       @l = localtime($t+21600);
       $l[2] = int($l[2]/6)*6;
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:00:01",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $SVG_devs{$d}{to}   = SVG_tspec(2,1,@l);
     }
-  } elsif($zoom eq "day") {
-    if(AttrVal($FW_wname, "endPlotNow", undef) && !$st) {
-      my $t = int(($now + $off*86400 - 86400)/900.0)*900 + 900;
+  } elsif($zoom =~ m/^(\d+)?day/) {
+    my $nDays = $1 ? ($1-1) : 0;
+    if($endPlotNow) {
+      my $t = int(($now + ($off-$nDays-1)*86400)/900.0)*900 + 900;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:00",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
-      @l = localtime($t+86400);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_%02d:%02d:01",$l[5]+1900,$l[4]+1,$l[3],$l[2],$l[1]);
+      $SVG_devs{$d}{from} = SVG_tspec(1,0,@l);
+      @l = localtime($t+(1+$nDays)*86400);
+      $SVG_devs{$d}{to}   = SVG_tspec(1,1,@l);
     } else { 
-      my $t = $now + $off*86400;
+      my $t = $now + ($off-$nDays)*86400;
       my @l = localtime($t);
-      $SVG_devs{$d}{from} =
-          sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
-      @l = localtime($t+86400);
-      $SVG_devs{$d}{to} =
-          sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
+      $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
+      @l = localtime($t+(1+$nDays)*86400);
+      $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
     }
   } elsif($zoom eq "week") {
     my @l = localtime($now);
     my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $SVG_devs{$d}{from} = 
-        sprintf("%04d-%02d-%02d_00:00:00",$l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
     @l = localtime($t+7*86400);
-    $SVG_devs{$d}{to} = 
-        sprintf("%04d-%02d-%02d_00:00:01",$l[5]+1900,$l[4]+1,$l[3]);
+    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
@@ -671,12 +682,11 @@ SVG_calcOffsets($$)
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $SVG_devs{$d}{from} =
-        sprintf("%04d-%02d-%02d_00:00:00", $l[5]+1900, $l[4]+1,$endDay);
+    $l[3] = $endDay;
+    $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
     $l[4]++;
     $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $SVG_devs{$d}{to} =
-        sprintf("%04d-%02d-%02d_00:00:01", $l[5]+1900, $l[4]+1,$endDay);
+    $SVG_devs{$d}{to}   = SVG_tspec(3,1,@l);
 
   } elsif($zoom eq "year") {
     my @l = localtime($now);
@@ -726,25 +736,35 @@ SVG_showLog($)
     my $errfile = "/tmp/gnuplot.err";
 
     if($pm eq "gnuplot" || !$SVG_devs{$d}{from}) {
-      # Looking for the logfile....
-      $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
-      my $path = "$1/$file";
-      $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
-      return ($FW_RETTYPE, "Cannot read $path") if(!-r $path);
+      # Fix range, as we are without scroll
+      my $f = 0;     # From the beginning of time...
+      my $t = 9;     # till the end
 
-      my ($err, $cfg, $plot, undef) = SVG_readgplotfile($wl, $gplot_pgm);
+      my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
       return ($FW_RETTYPE, $err) if($err);
-      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
 
-      my $fr = AttrVal($wl, "fixedrange", undef);
-      if($fr) {
-        $fr =~ s/ /\":\"/;
-        $fr = "set xrange [\"$fr\"]\n";
-        $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
+      # Read the data from the filelog
+      my $oll = $attr{global}{verbose};
+      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
+      my @path = split(" ", FW_fC("get $d $file $tmpfile $f $t " .
+                                  join(" ", @{$flog})));
+      $attr{global}{verbose} = $oll;
+
+      # replace the path with the temporary filenames of the filelog output
+      my $i = 0;
+      $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
+      my $xrange = "\n";        #We don't have a range, but need the new line
+      foreach my $p (@path) {   # If the file is empty, write a 0 line
+        next if(!-z $p);
+        open(FH, ">$p");
+        print FH "$f 0\n";
+        close(FH);
       }
 
+      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
+
       open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script;
+      print FH $gplot_script, $xrange, $plot;
       close(FH);
 
     } elsif($pm eq "gnuplot-scroll") {
@@ -874,6 +894,20 @@ SVG_digestConf($$)
   return %conf;
 }
 
+sub
+SVG_openFile($$$)
+{
+  my ($dir, $prf, $fName) = @_;
+  my $baseStyle = $prf;
+  $baseStyle =~ s/(touchpad|smallscreen)//;
+  if(open(FH, "$dir/${prf}$fName") ||
+     open(FH, "$dir/${baseStyle}$fName") ||
+     open(FH, "$dir/$fName")) {
+    return 1;
+  }
+  return 0;
+}
+
 #####################################
 sub
 SVG_render($$$$$$$$$)
@@ -889,11 +923,17 @@ SVG_render($$$$$$$$$)
   my $flog        = shift;  # #FileLog lines, as array pointer
 
   $SVG_RET="";
-
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
   return $SVG_RET if(!defined($dp));
+
+  my $nr_axis = AttrVal($parent_name,"nrAxis","1,1");
+  my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) = split(",", AttrVal($name,"nrAxis",$nr_axis));
+  $use_left_axis = $nr_left_axis if( !defined($use_left_axis) );
+  $use_right_axis = $nr_right_axis if( !defined($use_right_axis) );
+
   my $th = 16;                          # "Font" height
-  my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
+  my $axis_width = ($SVG_ss ? 2 : 3)*$th;
+  my ($x, $y) = ($axis_width*$nr_left_axis,  1.2*$th);      # Rect offset
 
   ######################
   # Convert the configuration to a "readable" form -> array to hash
@@ -902,7 +942,7 @@ SVG_render($$$$$$$$$)
   my $ps = "800,400";
   $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
   my ($ow,$oh) = split(",", $ps);       # Original width
-  my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
+  my ($w, $h) = ($ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width, $oh-2*$y);   # Rect size
 
   # Keep only the Filter part of the #FileLog
   $flog = join(" ", map { my @a=split(":",$_);
@@ -918,8 +958,7 @@ SVG_render($$$$$$$$$)
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
   SVG_pO "<style type=\"text/css\"><![CDATA[";
-  if(open(FH, "$parent_dir/${prf}svg_style.css") ||
-     open(FH, "$parent_dir/svg_style.css")) {
+  if(SVG_openFile($parent_dir, $prf, "svg_style.css")) {
     SVG_pO join("", <FH>);
     close(FH);
   } else {
@@ -929,8 +968,7 @@ SVG_render($$$$$$$$$)
 
   ######################
   # gradient definitions
-  if(open(FH, "$parent_dir/${prf}svg_defs.svg") ||
-     open(FH, "$parent_dir/svg_defs.svg")) {
+  if(SVG_openFile($parent_dir, $prf, "svg_defs.svg")) {
     SVG_pO join("", <FH>);
     close(FH);
   } else {
@@ -944,7 +982,7 @@ SVG_render($$$$$$$$$)
   SVG_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
 
-  my ($off1,$off2) = ($ow/2, 3*$y/4);
+  my ($off1,$off2) = ($x+$w/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
@@ -953,31 +991,39 @@ SVG_render($$$$$$$$$)
 
   ######################
   # Copy and Paste labels, hidden by default
-  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$axis_width-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
-  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
   ######################
   # Left label = ylabel and right label = y2label
-  my $t = ($conf{ylabel} ? $conf{ylabel} : "");
-  $t =~ s/"//g;
   if(!$SVG_ss) {
-    ($off1,$off2) = (3*$th/4, $oh/2);
-    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-        "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    for my $idx (1..$use_left_axis)  {
+      my $name = "y".($idx)."label";
+      $name = "ylabel" if( $idx == 1 );
+      my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/"//g;
+      ($off1,$off2) = ($x-($idx)*$axis_width+3*$th/4, $oh/2);
+      SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+          "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    }
 
-    $t = ($conf{y2label} ? $conf{y2label} : "");
-    $t =~ s/"//g;
-    ($off1,$off2) = ($ow-$th/4, $oh/2);
-    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-        "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    for my $idx ($use_left_axis+1..$use_left_axis+$use_right_axis)  {
+      my $name = "y".($idx)."label";
+      $name = "ylabel" if( $idx == 1 );
+      my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/"//g;
+      ($off1,$off2) = ($x+$w+($idx-$use_left_axis)*$axis_width-$th/4, $oh/2);
+      SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+          "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    }
   }
 
   ######################
-  ($off1,$off2) = ($ow-$x-$th, $y+$th);
+  ($off1,$off2) = ($ow-$nr_right_axis*$axis_width-$th, $y+$th);
 
 
   ######################
@@ -1105,7 +1151,7 @@ SVG_render($$$$$$$$$)
   # then the text and the grid
   $off1 = $x;
   $off2 = $y+$h+$th;
-  $t = SVG_fmtTime($first_tag, $fromsec);
+  my $t = SVG_fmtTime($first_tag, $fromsec);
   SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
   $initoffset = $step;
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
@@ -1146,21 +1192,21 @@ SVG_render($$$$$$$$$)
     #-- Round values, compute a nice step  
     my $dh = $hmax{$a} - $hmin{$a};
     my ($step, $mi, $ma) = (1, 1, 1);
-    my @limit = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100,
-                 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
+    my @limit = (0.001, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50,
+                 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
                  200000, 500000, 1000000, 2000000);
+
     for my $li (0..$#limit-1) {
       my $l = $limit[$li];
-      next if($dh > $l);
-      $ma = SVG_doround($hmax{$a}, $l/10, 1);
-      $mi = SVG_doround($hmin{$a}, $l/10, 0);
-
-      if(($ma-$mi)/($l/10) >= 7) {    # If more then 7 steps, then choose next
+      next if($dh > $l*10);
+      $ma = $conf{$yra} ? $hmax{$a} : SVG_doround($hmax{$a}, $l, 1);
+      $mi = $conf{$yra} ? $hmin{$a} : SVG_doround($hmin{$a}, $l, 0);
+      if(($ma-$mi)/$l >= 7) {    # If more then 7 steps, then choose next
         $l = $limit[$li+1];
-        $ma = SVG_doround($hmax{$a}, $l/10, 1);
-        $mi = SVG_doround($hmin{$a}, $l/10, 0);
+        $ma = $conf{$yra} ? $hmax{$a} : SVG_doround($hmax{$a}, $l, 1);
+        $mi = $conf{$yra} ? $hmin{$a} : SVG_doround($hmin{$a}, $l, 0);
       }
-      $step = $l/10;
+      $step = $l;
       last;
     }
     if($step==0.001 && $hmax{$a}==$hmin{$a}) { # Don't want 0.001 range for nil
@@ -1194,30 +1240,30 @@ SVG_render($$$$$$$$$)
    
     # offsets
     my ($align,$display,$cll);
-    if( $a eq "x1y1" ){
-      # first axis = left
-      $off1 = $x-4-$th*0.3;
-      $off3 = $x-4;
-      $off4 = $off3+5;
-      $align = " text-anchor=\"end\"";
-      $display = "";
-      $cll = "";
-    } elsif ( $a eq "x1y2" ){
-      # second axis = right
-      $off1 = $x+4+$w+$th*0.3;
-      $off3 = $x+4+$w-5;
-      $off4 = $off3+5;
-      $align = "";
-      $display = "";
-      $cll = "";
-    } else {
-      # other axes in between
-      $off1 = $x-$th*0.3+30;
-      $off3 = $x+30;
-      $off4 = $off3+5;
-      $align = " text-anchor=\"end\"";
-      $display = " display=\"none\" id=\"hline_$idx\"";
-      $cll = " class=\"l$idx\"";
+    if( $a =~ m/x1y(\d)/ ) {
+      my $idx = $1;
+      if( $idx <= $use_left_axis ) {
+        $off1 = $x - ($idx-1)*$axis_width-4-$th*0.3;
+        $off3 = $x - ($idx-1)*$axis_width-4;
+        $off4 = $off3+5;
+        $align = " text-anchor=\"end\"";
+        $display = "";
+        $cll = "";
+      } elsif( $idx <= $use_left_axis+$use_right_axis ) {
+        $off1 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width+$th*0.3;
+        $off3 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width-5;
+        $off4 = $off3+5;
+        $align = "";
+        $display = "";
+        $cll = "";
+      } else {
+        $off1 = $x-$th*0.3+30;
+        $off3 = $x+30;
+        $off4 = $off3+5;
+        $align = " text-anchor=\"end\"";
+        $display = " display=\"none\" id=\"hline_$idx\"";
+        $cll = " class=\"l$idx\"";
+      }
     };
     
     #-- grouping
@@ -1462,10 +1508,15 @@ SVG_doround($$$)
 {
   my ($v, $step, $isup) = @_;
   $step = 1 if(!$step); # Avoid division by zero
+
+  my $d = $v/$step;
+  my $dr = int($d);
+  return $v if($d == $dr);
+
   if($v >= 0) {
-    return (int($v/$step))*$step+($isup ? $step : 0);
+    return int($v/$step)*$step+($isup ? $step : 0);
   } else {
-    return (int($v/$step))*$step+($isup ? 0 : -$step);
+    return int($v/$step)*$step+($isup ? 0 : -$step);
   }
 }
 
@@ -1480,7 +1531,60 @@ SVG_pO($)
   $SVG_RET .= "\n";
 }
 
+##################
+
+# this is a helper function which creates a PNG image from a given plot
+sub
+plotAsPng(@)
+{
+  my (@plotName) = @_;
+  my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
+  
+  @webs=devspec2array("TYPE=FHEMWEB");
+  foreach(@webs) {
+    if(!InternalVal($_,'TEMPORARY',undef)) {
+      $FW_wname=InternalVal($_,'NAME','');
+      last;
+    }
+  }
+  #Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
+
+  $FW_RET                 = undef;
+  $FW_webArgs{dev}        = $plotName[0];
+  $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
+  $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
+  $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+  $FW_pos{zoom}           = $plotName[1] if $plotName[1];
+  $FW_pos{off}            = $plotName[2] if $plotName[2];
+
+  ($mimetype, $svgdata)   = SVG_showLog("unused");
+  
+  #Debug "MIME type= $mimetype";
+  #Debug "SVG= $svgdata";
+
+  my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
+
+  eval {
+    require Image::LibRSVG;
+    $rsvg = new Image::LibRSVG();
+    $rsvg->loadImageFromString($svgdata);
+    $pngImg = $rsvg->getImageBitmap();
+  };
+  Log3 $FW_wname, 1, 
+    "plotAsPng(): Cannot create plot as png image for \"" . 
+    join(" ", @plotName) . "\": $@" 
+    if($@ or !defined($pngImg) or ($pngImg eq ""));
+
+  return $pngImg if $pngImg;
+  return;
+}
+
+##################
+
 1;
+
+##################
 
 =pod
 =begin html
@@ -1538,12 +1642,19 @@ SVG_pO($)
     <li>fixedrange<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
-        and no scrolling for this weblinks will be possible. Needed e.g. for
+        and no scrolling for this SVG will be possible. Needed e.g. for
         looking at last-years data without scrolling.<br><br>
-        If the value is one of day, week, month, year then set the zoom level
-        for this weblink independently of the user specified zoom-level.
-        This is useful for pages with multiple plots: one of the plots is best
-        viewed in with the default (day) zoom, the other one with a week zoom.
+        If the value is one of day, &lt;N&gt;days, week, month, year than set
+        the zoom level for this SVG independently of the user specified
+        zoom-level. This is useful for pages with multiple plots: one of the
+        plots is best viewed in with the default (day) zoom, the other one with
+        a week zoom.
+
+        </li><br>
+
+    <a name="fixedoffset"></a>
+    <li>fixedoffset &lt;nDays&gt;<br>
+        Set an fixed offset (in days) for the plot.
         </li><br>
 
     <a name="startDate"></a>

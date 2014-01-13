@@ -107,6 +107,7 @@ OWServer_Initialize($)
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
   $hash->{NotifyFn}= "OWServer_Notify";
+  $hash->{NotifyOrderPrefix}= "50a-";
   $hash->{UndefFn} = "OWServer_Undef";
   $hash->{GetFn}   = "OWServer_Get";
   $hash->{SetFn}   = "OWServer_Set";
@@ -129,12 +130,14 @@ OWServer_Define($$)
   }
 
   my $protocol = $a[2];
-  
-  OWServer_CloseDev($hash);
 
   $hash->{fhem}{protocol}= $protocol;
 
-  OWServer_OpenDev($hash);
+  if( $init_done ) {
+    delete $modules{OWServer}{NotifyFn};
+    OWServer_OpenDev($hash);
+  }
+
   return undef;
 }
 
@@ -201,15 +204,18 @@ OWServer_Notify($$)
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global" ||
-            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
   return if($attr{$name} && $attr{$name}{disable});
 
   delete $modules{OWServer}{NotifyFn};
   delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
 
-  OWServer_DoInit($hash);
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "OWServer");
+    OWServer_OpenDev($defs{$d});
+  }
 
   return undef;
 }
@@ -228,7 +234,7 @@ OWServer_DoInit($)
     readingsEndUpdate($hash,1);
   }
   readingsSingleUpdate($hash, "state", "Initialized", 1);
-  OWServer_Autocreate($hash) if($init_done);
+  OWServer_Autocreate($hash);
   return undef;
 }
 
@@ -238,13 +244,14 @@ OWServer_Read($@)
 {
   my ($hash,$path)= @_;
 
-  return undef unless(defined($hash->{fhem}{owserver}));
+  return undef unless(defined($hash->{fhem}{owserver}) || $hash->{LAST_READ_FAILED});
 
   my $ret= undef;
 
   if(AttrVal($hash->{NAME},"nonblocking",undef) && $init_done) {
     $hash->{".path"}= $path;
     pipe(READER,WRITER);
+    #READER->autoflush(1);
     WRITER->autoflush(1);
 
     my $pid= fork;
@@ -253,7 +260,7 @@ OWServer_Read($@)
       return undef;
     }
 
-    InternalTimer(gettimeofday()+20, "OWServer_TimeoutChild", $pid, 0);
+    InternalTimer(gettimeofday()+6, "OWServer_TimeoutChild", $pid, 0);
     if($pid == 0) {
       close READER;
       $ret= OWNet::read($hash->{DEF},$path);
@@ -271,11 +278,29 @@ OWServer_Read($@)
 
     Log3 $hash, 5, "OWServer child ID for reading '$path' is $pid";
     close WRITER;
-    chomp($ret= <READER>);
+    # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
+    my ($rout,$rin, $eout,$ein) = ('','', '','');
+    vec($rin, fileno(READER),  1) = 1;
+    $ein = $rin;
+    my $nfound = select($rout=$rin, undef, $eout=$ein, 4);
+    if( $nfound ) {
+      chomp($ret= <READER>);
+      RemoveInternalTimer($pid);
+      OWServer_OpenDev($hash) if( $hash->{LAST_READ_FAILED} );
+      $hash->{LAST_READ_FAILED} = 0;
+    } else {
+      Log3 undef, 1, "OWServer: read timeout for child $pid";
+      $hash->{NR_READ_FAILED} = 0 if( !$hash->{NR_READ_FAILED} );
+      $hash->{NR_READ_FAILED}++;
+      OWServer_CloseDev($hash) if( !$hash->{LAST_READ_FAILED} );
+      $hash->{LAST_READ_FAILED} = 1;
+    }
     close READER;
+
   } else {
     $ret= $hash->{fhem}{owserver}->read($path);
     $ret =~ s/^\s+//g if(defined($ret));
+    $hash->{LAST_READ_FAILED} = 0;
   }
 
   # if a device does not exist, the server returns undef
@@ -299,7 +324,10 @@ OWServer_Write($@)
 {
   my ($hash,$path,$value)= @_;
 
+  return undef if($hash->{LAST_READ_FAILED});
+
   return undef unless(defined($hash->{fhem}{owserver}));
+
   return $hash->{fhem}{owserver}->write($path,$value);
 }
 
@@ -309,7 +337,10 @@ OWServer_Dir($@)
 {
   my ($hash,$path)= @_;
 
+  return undef if($hash->{LAST_READ_FAILED});
+
   return undef unless(defined($hash->{fhem}{owserver}));
+
   $path= ($path) ? $path : "/";
   return $hash->{fhem}{owserver}->dir($path);
 }
@@ -319,6 +350,8 @@ sub
 OWServer_Find($@)
 {
   my ($hash,$slave)= @_;
+
+  return undef if($hash->{LAST_READ_FAILED});
 
   return undef unless(defined($hash->{fhem}{owserver}));
 
@@ -346,17 +379,17 @@ OWServer_Autocreate($)
     next if($defs{$d}{TYPE} ne "autocreate");
     return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
   }
-  
+
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir("/"));
   my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
 
-  my @defined = ();
+  my %defined = ();
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "OWDevice");
     if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{address})) {
-      push(@defined,$defs{$d}{fhem}{address});
+      $defined{$defs{$d}{fhem}{address}} = $d;
     }
   }
 
@@ -372,31 +405,21 @@ OWServer_Autocreate($)
       if($owtype !~ m/$type/) {
         Log3 $name, 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
         next;
+      } elsif( defined($defined{$address}) ) {
+        Log3 $name, 5, "$name address '$address' already defined as '$defined{$address}'";
+        next;
       } else {
-        foreach my $d (keys %defs) {
-          next if($defs{$d}{TYPE} ne "OWDevice");
-          if(defined($defs{$d}{fhem}) &&
-             defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address) {
-            Log3 $name, 5, "$name address '$address' already defined as '$defs{$d}{NAME}'";
-            next;
-          } else {
-            my $id= substr($address,3);
-            my $devname= $type . "_" . $id;
-            if(defined($defs{$devname}) || grep {$_ eq $address} @defined) {
-              next;
-            } else {
-              Log3 $name, 5, "$name create new device '$devname' for address '$address'";
-              my $interval= ($family eq "81") ? "" : " 60";
-              my $define= "$devname OWDevice $address" . $interval;
-              my $cmdret;
-              $cmdret= CommandDefine(undef,$define);
-              if($cmdret) {
-                Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
-              } else {
-                $cmdret= CommandAttr(undef,"$devname room OWDevice");
-              }
-            }
-          }
+        my $id= substr($address,3);
+        my $devname= $type . "_" . $id;
+        Log3 $name, 5, "$name create new device '$devname' for address '$address'";
+        my $interval= ($family eq "81") ? "" : " 60";
+        my $define= "$devname OWDevice $address" . $interval;
+        my $cmdret;
+        $cmdret= CommandDefine(undef,$define);
+        if($cmdret) {
+          Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
+        } else {
+          $cmdret= CommandAttr(undef,"$devname room OWDevice");
         }
       }
     }
@@ -530,7 +553,7 @@ OWServer_Set($@)
     to the owserver configuration file
     on the remote host.
     <br><br>
-    
+
   </ul>
 
   <a name="OWServerset"></a>
@@ -615,6 +638,7 @@ OWServer_Set($@)
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
+  Note: unset <code>nonblocking</code> if you experience lockups of FHEM.
 
 </ul>
 

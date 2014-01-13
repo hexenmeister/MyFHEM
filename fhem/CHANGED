@@ -1,6 +1,72 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: YAMAHA_AVR: new readings for radio stations, current title
+             and more. see commandref for more details.
+  - feature: new module 32_withings.pm added (justme1968)
+  - bugfix:  PRESENCE: fixing user detection on FritzBox!
+  - feature: new module 38_CO20.pm added (justme1968)
+  - feature: new module 98_GEOFANCY.pm added (loredo)
+  - feature: new module 70_XBMC.pm added (dbokermann)
+  - feature: new module 51_RPI_GPIO.pm added (klausw)
+  - bugfix:  Dashboard: fixed bug identification an existing Weblink.
+             fixed bug dashboard_sorting check. Buttonbar can now placed on 
+             top or bottom of the Dashboard. Dashboard is always edited out 
+             the Room Dashboard.
+  - bugfix:  VIERA: fixed bug related to set command remoteControl
+  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
+  	     Webif versions
+  - feature: readingsGroup: process events only if visible in browser,
+             allow <br> for line breaks in multi-reading lines
+  - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
+             even with longpoll; Text "desiredTemperature" will now 
+             be eliminated - for MAX devices.
+  - feature: HCS has now MAX Thermostat support
+  - change:  integrated OWServer/OWDevice nonblocking and random start
+             time patches (justme1968 & Boris)
+  - feature: Add new module Dashboard
+  - change:  ONKYO_AVR: transfer command database into separate packet
+             ONKYOdb.pm
+  - feature: ENIGMA2: bouquet support e.g. for named channels
+  - feature: Add new module ONKYO_AVR
+  - feature: SYSSTAT: allow (remote) monitoring via snmp, support
+             for monitoring windows systems and synology system temperature
+  - feature: New module LINDY_HDMI_SWITCH.pm added
+  - change:  ENIGMA2: improved logging, default attributes for webCmd and
+             devStateIcon
+  - feature: ENIGMA2: support for option channels
+  - feature: mailcheck: decode non ascii subjet to utf-8, verify gpg signatures
+  - feature: PRESENCE: "statusRequest" command for lan-bluetooth mode
+             (collectord >= 1.4, presenced >= 1.1 required)
+  - feature: PRESENCE: new collectord package
+  - feature: devspec: removed range, added :FILTER and more general search
+  - feature: HUEBridge,HUEDevice: support for groups added
+  - feature: YAMAHA_AVR: new argument "toggle" for mute command
+  - feature: FB_CALLMONITOR: replace &amp; to & at reverse search
+  - feature: new module 33_readingsProxy to make (a subset of) a reading
+             from one device available as a new device. can be used to
+             separate channels from 1-wire, EnOcean or SWAP multichannel
+             devices (by justme1968)
+  - change:  improvements for OWDevice and OWServer (justme1968)
+  - feature: new attribute resolution for 1-wire temperature readings 
+             (justme1968 & Boris)
+  - feature: new layout commands moveto, moveby and relative positioning
+             in 02_RSS.pm (Betateilchen & Boris)
+  - feature: FHEMWEB column attribute
+  - feature: new layout commands halign, valign, condition in 02_RSS.pm 
+             (Betateilchen & Boris)
+  - bugfix:  PRESENCE: Fix nonworking initialization in mode "lan-bluetooth"
+  - bugfix:  fhem.pl: write-select to avoid blocking in inform/Event Monitor
+  - bugfix:  fix issue with DST changes in 57_Calendar.pm
+  - feature: new module 36_LaCrosse.pm for LaCrosse IT+ temperature and
+             humidity sensors with a JeeLabs JeeLink as RF modem.
+             The matching JeeNode sketch can be found in
+             .../36_LaCrosse-LaCrosseITPlusReader.zip (by ohweh&justme1968)
+  - feature: YAMAHA_AVR: new attribute request-timeout.
+  - bugfix:  YAMAHA_AVR: fix missing greater-than sign. Use different
+             Control-Tag name for RX-Vx75 series
+  - bugfix:  PRESENCE: fixing not working re-initialization when
+             disabled attribute is set to 0 in lan-bluetooth mode
   - feature: LightScene: added attribute lightSceneParamsToSave for
              device specific configuration of reading/command pairs
              used to save/restore device state
@@ -14,7 +80,8 @@
              selection
   - feature: RSS amended (read image from pipe, scaling options, line width)
   - feature: WWO Module by baumrasen
-  
+  - feature: plotAsPng() in 98_SVG.pm (Boris & betateilchen)
+
 - 2013-09-29 (5.5)
   - feature: new module 55_PIFACE.pm added (betateilchen)
   - feature: Calendar can read from file and limit number of calendar events
@@ -40,7 +107,7 @@
   - feature: new modules JeeLink and PCA301 and for the ELV PCA 301 power
              meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
              sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
-             (by justme1968)
+             (by ohweh&justme1968)
   - change:  PRESENCE: using ping command line utility to check presence on Windows
              based machines.
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt

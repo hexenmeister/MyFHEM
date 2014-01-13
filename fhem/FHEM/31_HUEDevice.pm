@@ -59,6 +59,8 @@ sub HUEDevice_Initialize($)
   $hash->{SetFn}    = "HUEDevice_Set";
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
+                      "delayedUpdate:1 ".
+                      "realtimePicker:1 ".
                       "color-icons:1,2 ".
                       "model:".join(",", sort keys %hueModels)." ".
                       "subType:colordimmer,dimmer,switch ".
@@ -76,27 +78,24 @@ HUEDevice_devStateIcon($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
+  return undef if( $hash->{helper}->{group} );
 
   my $name = $hash->{NAME};
 
-  return ".*:light_question" if( !$hash->{fhem}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:light_question" if( !$hash->{helper}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
 
   return ".*:off:toggle"
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
-  return undef
-         if( AttrVal($name, "model", "") eq "LWB001" );
-
-  return undef
-         if( AttrVal($name, "model", "") eq "LWL001" );
-
-  #return '<div style="height:19px;'.
-  #       'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
-  #       '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-  #       '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
-
   my $percent = ReadingsVal($name,"pct","100");
   my $s = $dim_values{int($percent/7)};
+  $s="on" if( $percent eq "100" );
+
+  return ".*:$s:toggle"
+         if( AttrVal($name, "model", "") eq "LWB001" );
+
+  return ".*:$s:toggle"
+         if( AttrVal($name, "model", "") eq "LWL001" );
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
@@ -120,46 +119,80 @@ sub HUEDevice_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  return "Usage: define <name> HUEDevice <id> [interval]"  if(@args < 3);
+  $hash->{helper}->{group} = "";
+  if( $args[2] eq "group" ) {
+    $hash->{helper}->{group} = "G";
+    splice( @args, 2, 1 );
+  }
+
+  my $iodev;
+  my $i = 0;
+  foreach my $param ( @args ) {
+    if( $param =~ m/IODev=(.*)/ ) {
+      $iodev = $1;
+      splice( @args, $i, 1 );
+      last;
+    }
+    $i++;
+  }
+
+
+  return "Usage: define <name> HUEDevice [group] <id> [interval]"  if(@args < 3);
 
   my ($name, $type, $id, $interval) = @args;
 
   $interval= 60 unless defined($interval);
   if( $interval < 10 ) { $interval = 60; }
 
-
   $hash->{STATE} = 'Initialized';
-  $hash->{fhem}{interfaces}= "dimmer";
+  $hash->{helper}{interfaces}= "dimmer";
 
-  $hash->{ID} = $id;
-  $hash->{fhem}{id} = $id;
+  $hash->{ID} = $hash->{helper}->{group}.$id;
 
-  $hash->{INTERVAL} = $interval;
-
-  $hash->{fhem}{on} = -1;
-  $hash->{fhem}{reachable} = '';
-  $hash->{fhem}{colormode} = '';
-  $hash->{fhem}{bri} = -1;
-  $hash->{fhem}{ct} = -1;
-  $hash->{fhem}{hue} = -1;
-  $hash->{fhem}{sat} = -1;
-  $hash->{fhem}{xy} = '';
-  $hash->{fhem}{alert} = '';
-  $hash->{fhem}{effect} = '';
-
-  $hash->{fhem}{percent} = -1;
-
-
-  $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
-
-  AssignIoPort($hash);
+  AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
   if(defined($hash->{IODev}->{NAME})) {
     Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
   } else {
     Log3 $name, 1, "$name: no I/O device";
   }
 
-  #HUEDevice_GetUpdate($hash);
+  my $code = $hash->{ID};
+  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}->{NAME}) );
+  my $d = $modules{HUEDevice}{defptr}{$code};
+  return "HUEDevice device $hash->{ID} on HUEBridge $d->{IODev}->{NAME} already defined as $d->{NAME}."
+         if( defined($d)
+             && $d->{IODev} == $hash->{IODev}
+             && $d->{NAME} ne $name );
+
+  $modules{HUEDevice}{defptr}{$code} = $hash;
+
+  $args[3] = "" if( !defined( $args[3] ) );
+  if( !$hash->{helper}->{group} ) {
+    $hash->{DEF} = "$id $args[3]";
+
+    $hash->{INTERVAL} = $interval;
+
+    $hash->{helper}{on} = -1;
+    $hash->{helper}{reachable} = '';
+    $hash->{helper}{colormode} = '';
+    $hash->{helper}{bri} = -1;
+    $hash->{helper}{ct} = -1;
+    $hash->{helper}{hue} = -1;
+    $hash->{helper}{sat} = -1;
+    $hash->{helper}{xy} = '';
+    $hash->{helper}{alert} = '';
+    $hash->{helper}{effect} = '';
+
+    $hash->{helper}{percent} = -1;
+
+
+    $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+  } else {
+    $hash->{DEF} = "group $id $args[3]";
+    $attr{$name}{webCmd} = 'on:off' if( !defined( $attr{$name}{webCmd} ) );
+  }
+
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
 
   return undef;
@@ -171,7 +204,10 @@ sub HUEDevice_Undefine($$)
 
   RemoveInternalTimer($hash);
 
-  delete($hash->{fhem}{id});
+  my $code = $hash->{ID};
+  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}->{NAME}) );
+
+  delete($modules{HUEDevice}{defptr}{$code});
 
   return undef;
 }
@@ -200,37 +236,55 @@ HUEDevice_SetParam($$@)
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
-    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
   } elsif($cmd eq 'off') {
     $obj->{'on'}  = JSON::false;
-    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+    $obj->{'transitiontime'} = $value * 10 if( defined($value) );
   } elsif($cmd eq "pct") {
     $value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = int(2.54 * $value);
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "bri") {
     $value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+  } elsif($cmd eq "dimUp") {
+    my $bri = ReadingsVal($name,"bri","0");
+    $bri += 25;
+    $bri = 254 if( $bri > 254 );
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = 0+$bri;
+    $obj->{'transitiontime'} = 1;
+    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $defs{$name}->{helper}->{update_timeout} = 0;
+  } elsif($cmd eq "dimDown") {
+    my $bri = ReadingsVal($name,"bri","0");
+    $bri -= 25;
+    $bri = 0 if( $bri < 0 );
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = 0+$bri;
+    $obj->{'transitiontime'} = 1;
+    #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
+    $defs{$name}->{helper}->{update_timeout} = 0;
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
     $obj->{'ct'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "hue") {
     $obj->{'on'}  = JSON::true;
     $obj->{'hue'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "sat") {
     $obj->{'on'}  = JSON::true;
     $obj->{'sat'}  = 0+$value;
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
     my ($x,$y) = ($1, $2);
     $obj->{'on'}  = JSON::true;
     $obj->{'xy'}  = [0+$x, 0+$y];
-    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
@@ -277,6 +331,12 @@ HUEDevice_SetParam($$@)
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
+  } elsif( $cmd eq "delayedUpdate" ) {
+    $defs{$name}->{helper}->{update_timeout} = 1;
+  } elsif( $cmd eq "immediateUpdate" ) {
+    $defs{$name}->{helper}->{update_timeout} = 0;
+  } elsif( $cmd eq "noUpdate" ) {
+    $defs{$name}->{helper}->{update_timeout} = -1;
   } else {
     return 0;
   }
@@ -290,6 +350,8 @@ HUEDevice_Set($@)
   my ($hash, $name, @aa) = @_;
 
   my %obj;
+
+  $defs{$name}->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
     my @cmds = split(":", $joined);
@@ -308,23 +370,47 @@ HUEDevice_Set($@)
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
+#  if( $defs{$name}->{helper}->{update_timeout} == -1 ) {
+#    my $diff;
+#    my ($seconds, $microseconds) = gettimeofday();
+#    if( $defs{$name}->{helper}->{timestamp} ) {
+#      my ($seconds2, $microseconds2) = @{$defs{$name}->{helper}->{timestamp}};
+#
+#      $diff = (($seconds-$seconds2)*1000000 + $microseconds-$microseconds2)/1000;
+#    }
+#    $defs{$name}->{helper}->{timestamp} = [$seconds, $microseconds];
+#
+#    return undef if( $diff < 100 );
+#  }
 
   if( scalar keys %obj ) {
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
+    my $result;
+    if( $hash->{helper}->{group} ) {
+      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/action",\%obj);
+    } else {
+      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
+    }
     if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
 
-    $hash->{LOCAL} = 1;
-    HUEDevice_GetUpdate($hash);
-    delete $hash->{LOCAL};
+    if( $defs{$name}->{helper}->{update_timeout} == -1 ) {
+    } elsif( $defs{$name}->{helper}->{update_timeout}
+        && !$hash->{helper}->{group} ) {
+      RemoveInternalTimer($hash);
+      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);
+    } else {
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate( $hash );
+    }
 
     return undef;
   }
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{group} && AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
   return SetExtensions($hash, $list, $name, @aa);
@@ -504,6 +590,22 @@ HUEDevice_GetUpdate($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  if( $hash->{helper}->{group} ) {
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
+
+    if( !defined($result) ) {
+      $hash->{STATE} = "unknown";
+      return;
+    } elsif( $result->{'error'} ) {
+      $hash->{STATE} = $result->{'error'}->{'description'};
+      return;
+    }
+
+    $hash->{lights} = join( ",", @{$result->{lights}} );
+
+    return undef;
+  }
+
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 1);
@@ -534,7 +636,7 @@ HUEDevice_GetUpdate($)
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
     $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
     $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
-    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" );
+    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" || $hash->{helper}->{group} );
   }
 
   readingsBeginUpdate($hash);
@@ -553,9 +655,9 @@ HUEDevice_GetUpdate($)
   my $alert = $state->{alert};
   my $effect = $state->{effect};
 
-  if( defined($colormode) && $colormode ne $hash->{fhem}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
-  if( defined($bri) && $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
-  if( defined($ct) && $ct != $hash->{fhem}{ct} ) {
+  if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
+  if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
+  if( defined($ct) && $ct != $hash->{helper}{ct} ) {
     if( $ct == 0 ) {
       readingsBulkUpdate($hash,"ct",$ct);
     }
@@ -563,19 +665,19 @@ HUEDevice_GetUpdate($)
       readingsBulkUpdate($hash,"ct",$ct . " (".int(1000000/$ct)."K)");
     }
   }
-  if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
-  if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
-  if( defined($xy) && $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
-  if( defined($reachable) && $reachable ne $hash->{fhem}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
-  if( defined($alert) && $alert ne $hash->{fhem}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
-  if( defined($effect) && $effect ne $hash->{fhem}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
+  if( defined($hue) && $hue != $hash->{helper}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
+  if( defined($sat) && $sat != $hash->{helper}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
+  if( defined($xy) && $xy ne $hash->{helper}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
+  if( defined($reachable) && $reachable ne $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
+  if( defined($alert) && $alert ne $hash->{helper}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
+  if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
   my $s = '';
   my $percent;
   if( $on )
     {
       $s = 'on';
-      if( $on != $hash->{fhem}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
+      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
       $percent = int( $bri * 100 / 254 );
       if( $percent > 0
@@ -588,31 +690,31 @@ HUEDevice_GetUpdate($)
     {
       $s = 'off';
       $percent = 0;
-      if( $on != $hash->{fhem}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
+      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
-  if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
-  if( $percent != $hash->{fhem}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
+  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
+  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
 
   $s = 'off' if( !$reachable );
 
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
   readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
-  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") ); 
+  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
 
-  $hash->{fhem}{on} = $on;
-  $hash->{fhem}{reachable} = $reachable;
-  $hash->{fhem}{colormode} = $colormode;
-  $hash->{fhem}{bri} = $bri;
-  $hash->{fhem}{ct} = $ct;
-  $hash->{fhem}{hue} = $hue;
-  $hash->{fhem}{sat} = $sat;
-  $hash->{fhem}{xy} = $xy;
-  $hash->{fhem}{alert} = $alert;
-  $hash->{fhem}{effect} = $effect;
+  $hash->{helper}{on} = $on;
+  $hash->{helper}{reachable} = $reachable;
+  $hash->{helper}{colormode} = $colormode;
+  $hash->{helper}{bri} = $bri;
+  $hash->{helper}{ct} = $ct;
+  $hash->{helper}{hue} = $hue;
+  $hash->{helper}{sat} = $sat;
+  $hash->{helper}{xy} = $xy;
+  $hash->{helper}{alert} = $alert;
+  $hash->{helper}{effect} = $effect;
 
-  $hash->{fhem}{percent} = $percent;
+  $hash->{helper}{percent} = $percent;
 }
 
 1;
@@ -627,19 +729,20 @@ HUEDevice_GetUpdate($)
   <a name="HUEDevice_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HUEDevice &lt;id&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; HUEDevice [group] &lt;id&gt; [&lt;interval&gt;]</code><br>
     <br>
 
     Defines a device connected to a <a href="#HUEBridge">HUEBridge</a>.<br><br>
 
     This can be a hue bulb, a living colors light or a living whites bulb or dimmer plug.<br><br>
 
-    The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
+    The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60. Groups are updated only on definition and statusRequest<br><br>
 
     Examples:
     <ul>
       <code>define bulb HUEDevice 1</code><br>
       <code>define LC HUEDevice 2</code><br>
+      <code>define allLights HUEDevice group 0</code><br>
     </ul>
   </ul><br>
 
@@ -667,6 +770,7 @@ HUEDevice_GetUpdate($)
     <br>
     Notes:
       <ul>
+      <li>groups have no readings.</li>
       <li>not all readings show the actual device state. all readings not related to the current colormode have to be ignored.</li>
       <li>the actual state of a device controlled by a living colors or living whites remote can be different and will
           be updated after some time.</li>
@@ -680,31 +784,36 @@ HUEDevice_GetUpdate($)
       <li>off [&lt;ramp-time&gt;]</li>
       <li>toggle [&lt;ramp-time&gt;]</li>
       <li>statusRequest<br>
-      Request device status update.</li>
+        Request device status update.</li>
       <li>pct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         dim to &lt;value&gt;<br>
         Note: the FS20 compatible dimXX% commands are also accepted.</li>
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
-      <li>bri &lt;value&gt;<br>
+      <li>bri &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set brighness to &lt;value&gt;; range is 1-254.</li>
-      <li>ct &lt;value&gt;<br>
+      <li>dimUp</li>
+      <li>dimDown</li>
+      <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set colortemperature to &lt;value&gt; mireds; range is 154-500.</li>
-      <li>hue &lt;value&gt;<br>
+      <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
-      <li>sat &lt;value&gt;<br>
+      <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
-      <li>xy &lt;x&gt;,&lt;y&gt;<br>
+      <li>xy &lt;x&gt;,&lt;y&gt; [&lt;ramp-time&gt;]<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
       <li>alert [none|select|lselect]</li>
       <li>effect [none|colorloop]</li>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
       <li>rgb &lt;rrggbb&gt;</li>
+      <li>delayedUpdate</li>
+      <li>immediateUpdate</li>
       <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
       Note:
         <ul>
+        <li>&lt;ramp-time&gt; is given in seconds</li>
         <li>multiple paramters can be set at once separated by <code>:</code><br>
           Examples:<br>
             <code>set LC on : transitiontime 100</code><br>
@@ -729,6 +838,9 @@ HUEDevice_GetUpdate($)
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
       colordimmer, dimmer or switch, default is initialized according to device model.</li>
+    <li>delayedUpdate<br>
+      1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will ne switched.
+</li>
     <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
     <li>webCmd<br>

@@ -19,6 +19,7 @@ sub FW_digestCgi($);
 sub FW_doDetail($);
 sub FW_fatal($);
 sub FW_fileList($);
+sub FW_parseColumns();
 sub FW_htmlEscape($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
@@ -93,7 +94,7 @@ my %FW_hiddengroup;# hash of hidden groups
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
-my $FW_headercors; # 
+my $FW_headercors; #
 my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 
@@ -112,20 +113,48 @@ FHEMWEB_Initialize($)
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_SecurityCheck";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
-  $hash->{AttrList}= 
-    "webname fwcompress:0,1 ".
-    "plotmode:gnuplot,gnuplot-scroll,SVG plotsize endPlotToday:1,0 endPlotNow:1,0 plotfork ".
-    "stylesheetPrefix touchpad:deprecated smallscreen:deprecated ".
-    "basicAuth basicAuthMsg hiddenroom hiddengroup HTTPS allowfrom CORS:0,1 ".
-    "refresh longpoll:0,1 longpollSVG:1,0 redirectCmds:0,1 reverseLogs:0,1 ".
-    "menuEntries roomIcons SVGcache iconPath";
+  no warnings 'qw';
+  my @attrList = qw(
+    CORS:0,1
+    HTTPS:1,0
+    SVGcache:1,0
+    allowfrom
+    basicAuth
+    basicAuthMsg
+    column
+    endPlotNow:1,0
+    endPlotToday:1,0
+    fwcompress:0,1
+    hiddengroup
+    hiddenroom
+    iconPath
+    longpoll:0,1
+    longpollSVG:1,0
+    menuEntries
+    plotfork:1,0
+    plotmode:gnuplot,gnuplot-scroll,SVG
+    plotsize
+    nrAxis
+    redirectCmds:0,1
+    refresh
+    reverseLogs:0,1
+    roomIcons
+    sortRooms
+    smallscreen:unused
+    stylesheetPrefix
+    touchpad:unused
+    webname
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
+
 
   ###############
   # Initialize internal structures
   map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
                                 "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
-  
+
   $FW_dir      = "$attr{global}{modpath}/www";
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
@@ -173,7 +202,7 @@ FW_Define($$)
   foreach my $pe ("fhemSVG", "openautomation", "default") {
     FW_readIcons($pe);
   }
-        
+
   my $ret = TcpServer_Open($hash, $port, $global);
 
   # Make sure that fhem only runs once
@@ -256,7 +285,7 @@ FW_Read($)
   }
   return if($hash->{CONTENT_LENGTH} &&
             length($hash->{BUF})<$hash->{CONTENT_LENGTH});
-    
+
   @FW_httpheader = split("[\r\n]", $hash->{HDR});
   delete($hash->{HDR});
 
@@ -310,7 +339,7 @@ FW_Read($)
     };
   }
   #############################
-  
+
   my $now = time();
   @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
@@ -324,7 +353,7 @@ FW_Read($)
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
-    return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
+    return if(($arg =~ m+/SVG_showLog+) && ($pid = fork));
   }
 
   my $cacheable = FW_answerCall($arg);
@@ -381,6 +410,10 @@ FW_answerCall($)
   $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
   @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
                                 "$FW_sp:default:fhemSVG:openautomation"));
+  if($arg =~ m,$FW_ME/floorplan/([a-z0-9.:_]+),i) { # FLOORPLAN: special icondir
+    unshift @FW_iconDirs, $1;
+    FW_readIcons($1);
+  }
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
@@ -416,7 +449,7 @@ FW_answerCall($)
       return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1);
     }
     $arg = "/$dir/$ofile";
-    
+
   } elsif($arg =~ m/^$FW_ME(.*)/) {
     $arg = $1; # The stuff behind FW_ME, continue to check for commands/FWEXT
 
@@ -429,7 +462,7 @@ FW_answerCall($)
     return -1;
 
   }
-  
+
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
@@ -438,14 +471,30 @@ FW_answerCall($)
 
 
   if($FW_inform) {      # Longpoll header
-    $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
+    if($FW_inform =~ /type=/) {
+      foreach my $kv (split(";", $FW_inform)) {
+        my ($key,$value) = split("=", $kv, 2);
+        $me->{inform}{$key} = $value;
+      }
+
+    } else {                     # Compatibility mode
+      $me->{inform}{type}   = ($FW_room ? "status" : "raw");
+      $me->{inform}{filter} = ($FW_room ? $FW_room : ".*");
+    }
+    my $filter = $me->{inform}{filter};
+    $filter = "NAME=.*" if($filter eq "room=all");
+    $filter = "room!=.*" if($filter eq "room=Unsorted");
+
+    my %h = map { $_ => 1 } devspec2array($filter);
+    $me->{inform}{devices} = \%h;
+
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
        $FW_headercors,
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n",
-       FW_roomStatesForInform($FW_room);
+       FW_roomStatesForInform($me);
     return -1;
   }
 
@@ -522,7 +571,7 @@ FW_answerCall($)
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
-    my $icon = $FW_ME."/images/default/fhemicon.png";
+    my $icon = $FW_ME."/images/default/fhemicon_ios.png";
     if($FW_ss) {
        FW_pO '<meta name="viewport" '.
                    'content="initial-scale=1.0,user-scalable=1"/>';
@@ -541,21 +590,25 @@ FW_answerCall($)
   }
 
   FW_pO "<link href=\"$FW_ME/pgm2/style.css\" rel=\"stylesheet\"/>";
- 
+
   ########################
   # FW Extensions
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      FW_pO "<script type=\"text/javascript\" src=\"$script\"></script>";
+      FW_pO sprintf($jsTemplate, $script);
     }
   }
 
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
+  if($FW_plotmode eq"jsSVG") {
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jsSVG.js");
+    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
+  }
   foreach my $js (@FW_fhemwebjs) {
     FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
   }
@@ -634,7 +687,7 @@ FW_digestCgi($)
     my ($p,$v) = split("=",$pv, 2);
 
     # Multiline: escape the NL for fhem
-    $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
+    $v =~ s/[\r]//g if($v && $p && $p ne "data");
     $FW_webArgs{$p} = $v;
 
     if($p eq "detail")       { $FW_detail = $v; }
@@ -655,7 +708,6 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-#Log3 $FW_wname, 1, "GOT:$arg -> CMD:$cmd";
   return ($cmd, $c);
 }
 
@@ -734,7 +786,7 @@ FW_makeTable($$$@)
         if($FW_ss) {
           $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
-        } else {		
+        } else {
           $t = "" if(!$t);
           FW_pO "<td><div informId=\"$name-$n\">$v</div></td>";
           FW_pO "<td><div informId=\"$name-$n-ts\">$t</div></td>";
@@ -746,22 +798,22 @@ FW_makeTable($$$@)
         if ($n eq "room"){
           FW_pO "<td><div class=\"dval\">".
                 join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
-                "</div></td>";	
+                "</div></td>";
 
         } elsif ($n eq "webCmd"){
           my $lc = "detail=$name&cmd.$name=set $name";
           FW_pO "<td><div name=\"$name-$n\" class=\"dval\">".
                   join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
-                "</div></td>";	
+                "</div></td>";
 
         } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){ #special for Floorplan
           FW_pH "detail=$1", $val,1;
 
         } else {
-	  FW_pO "<td><div class=\"dval\">".
-	        join(",", map { ($_ ne $name && $defs{$_}) ?
-                    FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
-		"</div></td>";				
+           FW_pO "<td><div class=\"dval\">".
+                   join(",", map { ($_ ne $name && $defs{$_}) ?
+                     FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
+                 "</div></td>";
         }
       }
 
@@ -773,7 +825,7 @@ FW_makeTable($$$@)
   }
   FW_pO "</table>";
   FW_pO "</div>";
-  
+
 }
 
 ##############################
@@ -810,7 +862,6 @@ sub
 FW_doDetail($)
 {
   my ($d) = @_;
-
 
   my $h = $defs{$d};
   my $t = $h->{TYPE};
@@ -855,7 +906,7 @@ FW_doDetail($)
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
   ## dependent objects
   my @dob;  # dependent objects - triggered by current device
-  foreach my $dn (sort keys %defs) { 
+  foreach my $dn (sort keys %defs) {
     next if(!$dn || $dn eq $d);
     my $dh = $defs{$dn};
     if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
@@ -895,6 +946,17 @@ FW_makeTableFromArray($$@) {
     FW_pO "</table></div>";
   }
 }
+
+sub
+FW_roomIdx(\@$)
+{
+  my ($arr,$v) = @_;
+  my ($index) = grep { $arr->[$_] =~ /^$v$/ } 0..$#$arr;
+
+  return "9999-$v" if( !defined($index) );
+  return sprintf( "%03i", $index );
+}
+
 
 ##############
 # Header, Zoom-Icons & list of rooms at the left.
@@ -937,7 +999,7 @@ FW_roomOverview($)
     push(@list2, "$FW_ME?cmd=save");
     push(@list1, ""); push(@list2, "");
   }
-     
+
   ########################
   # Show FW Extensions in the menu
   if(defined($data{FWEXT})) {
@@ -945,6 +1007,7 @@ FW_roomOverview($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
+      next if($FW_hiddenroom{$h->{NAME}});
       push(@list1, $h->{NAME});
       push(@list2, $FW_ME ."/".$h->{LINK});
       $cnt++;
@@ -955,9 +1018,13 @@ FW_roomOverview($)
   }
   $FW_room = "" if(!$FW_room);
 
+  my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
+  @sortBy = sort keys %FW_rooms if( scalar @sortBy == 0 );
+
   ##########################
   # Rooms and other links
-  foreach my $r (sort keys %FW_rooms) {
+  foreach my $r ( sort { FW_roomIdx(@sortBy,$a) cmp
+                         FW_roomIdx(@sortBy,$b) } keys %FW_rooms ) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
     $r =~ s/</&lt;/g;
@@ -1003,7 +1070,7 @@ FW_roomOverview($)
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      FW_pO "<option value='$list2[$idx]$sel'>$list1[$idx]</option>";
+      FW_pO "<option value='$list2[$idx]'$sel>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
     FW_pO "</tr>";
@@ -1071,24 +1138,26 @@ FW_showRoom()
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
     $FW_hiddengroup{$r} = 1;
   }
-  
+
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
   FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
-  
+
   # array of all device names in the room (exception weblinks without group
   # attribute)
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
-  my (%group, @atEnds);
+  my (%group, @atEnds, %usuallyAtEnd);
   foreach my $dev (@devs) {
-    if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd} &&
-       !AttrVal($dev, "group", undef)) {
-      push @atEnds, $dev;
-      next;
+    if($modules{$defs{$dev}{TYPE}}{FW_atPageEnd}) {
+      $usuallyAtEnd{$dev} = 1;
+      if(!AttrVal($dev, "group", undef)) {
+        push @atEnds, $dev;
+        next;
+      }
     }
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
@@ -1099,67 +1168,78 @@ FW_showRoom()
   # row counter
   my $row=1;
   my %extPage = ();
-    
-  # iterate over the distinct groups  
-  foreach my $g (sort keys %group) {
 
-    #################
-    # Check if there is a device of this type in the room
+  my ($columns, $maxc) = FW_parseColumns();
+  FW_pO "<tr class=\"column\">" if($maxc != -1);
+  for(my $col=1; $col < ($maxc==-1 ? 2 : $maxc); $col++) {
+    FW_pO "<td><table class=\"column tblcol_$col\">" if($maxc != -1);
 
-    FW_pO "\n<tr><td><div class=\"devType\">$g</div></td></tr>";
-    FW_pO "<tr><td>";
-    FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
+    # iterate over the distinct groups  
+    foreach my $g (sort keys %group) {
 
-    foreach my $d (sort { lc(AttrVal($a, "sortby", AttrVal($a,"alias",$a))) cmp
-                          lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
-                   keys %{$group{$g}}) {
-      my $type = $defs{$d}{TYPE};
+      next if($maxc != -1 && (!$columns->{$g} || $columns->{$g} != $col));
 
-      FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
-      my $devName = AttrVal($d, "alias", $d);
-      my $icon = AttrVal($d, "icon", "");
-      $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
+      #################
+      # Check if there is a device of this type in the room
+      FW_pO "\n<tr><td><div class=\"devType\">$g</div></td></tr>";
+      FW_pO "<tr><td>";
+      FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
-      if($FW_hiddenroom{detail}) {
-        FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
-      } else {
-        FW_pH "detail=$d", "$icon$devName", 1, "col1";
-      }
-      $row++;
+      foreach my $d (sort { lc(AttrVal($a,"sortby",AttrVal($a,"alias",$a))) cmp
+                            lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) }
+                     keys %{$group{$g}}) {
+        my $type = $defs{$d}{TYPE};
 
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
+        FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
+        my $devName = AttrVal($d, "alias", $d);
+        my $icon = AttrVal($d, "icon", "");
+        $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
-      FW_pO "<td informId=\"$d\">$txt</td>";
+        if($FW_hiddenroom{detail}) {
+          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
+        } else {
+          FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd{$d});
+        }
+        $row++;
 
-      ######
-      # Commands, slider, dropdown
-      if(!$FW_ss && $cmdlist) {
-        foreach my $cmd (split(":", $cmdlist)) {
-          my $htmlTxt;
-          my @c = split(' ', $cmd);
-          if($allSets && $allSets =~ m/$c[0]:([^ ]*)/) {
-            my $values = $1;
-            foreach my $fn (sort keys %{$data{webCmdFn}}) {
-              no strict "refs";
-              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
-                                                 $d, $FW_room, $cmd, $values);
-              use strict "refs";
-              last if(defined($htmlTxt));
+        my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
+
+        my $colSpan = ($usuallyAtEnd{$d} ? ' colspan="2"' : '');
+        FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
+
+        ######
+        # Commands, slider, dropdown
+        if(!$FW_ss && $cmdlist) {
+          foreach my $cmd (split(":", $cmdlist)) {
+            my $htmlTxt;
+            my @c = split(' ', $cmd);
+            if($allSets && $allSets =~ m/$c[0]:([^ ]*)/) {
+              my $values = $1;
+              foreach my $fn (sort keys %{$data{webCmdFn}}) {
+                no strict "refs";
+                $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+                                                   $d, $FW_room, $cmd, $values);
+                use strict "refs";
+                last if(defined($htmlTxt));
+              }
+            }
+            if($htmlTxt) {
+              FW_pO $htmlTxt;
+
+            } else {
+              FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3";
             }
           }
-          if($htmlTxt) {
-            FW_pO $htmlTxt;
-
-          } else {
-            FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3";
-          }
         }
+        FW_pO "</tr>";
       }
-      FW_pO "</tr>";
+      FW_pO "</table>";
+      FW_pO "</td></tr>";
     }
-    FW_pO "</table>";
-    FW_pO "</td></tr>";
+    FW_pO "</table></td>" if($maxc != -1); # Column
   }
+  FW_pO "</tr>";
+
   FW_pO "</table><br>";
 
   # Now the "atEnds"
@@ -1167,13 +1247,35 @@ FW_showRoom()
                         lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
                    @atEnds) {
     no strict "refs";
-    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_chash, $d, 
+    FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, 
                                                         $FW_room, \%extPage);
     use strict "refs";
   }
   FW_pO "</div>";
   FW_pO "</form>";
 }
+
+sub
+FW_parseColumns()
+{
+  my %columns;
+  my $colNo = -1;
+
+  foreach my $roomgroup (split("[ \t\r\n]+", AttrVal($FW_wname,"column",""))) {
+    my ($room, $groupcolumn)=split(":",$roomgroup);
+    last if(!defined($room) || !defined($groupcolumn));
+    next if($room ne $FW_room);
+    $colNo = 1;
+    foreach my $groups (split(/\|/,$groupcolumn)) {
+      foreach my $group (split(",",$groups)) {
+        $columns{$group} = $colNo;
+      }
+      $colNo++;
+    }
+  }
+  return (\%columns, $colNo);
+}
+
 
 #################
 # return a sorted list of actual files for a given regexp
@@ -1402,7 +1504,7 @@ FW_style($$)
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = grep { $_ !~ m/floorplan/ } FW_fileList("$FW_cssdir/.*style.css");
+    my @fl = grep { $_ !~ m/(floorplan|dashboard)/ } FW_fileList("$FW_cssdir/.*style.css");
     FW_pO "$start<table class=\"block fileList\">";
     my $row = 0;
     foreach my $file (@fl) {
@@ -1435,6 +1537,8 @@ FW_style($$)
     my $data = join("", <FH>);
     close(FH);
 
+    $data =~ s/&/&amp;/g;
+	
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form method=\"$FW_formmethod\">";
@@ -1513,6 +1617,7 @@ FW_iconTable($$$$)
       next if(!$FW_icons{$style}{$imgName}); # Dont cut it twice: FS20.on.png
       next if($FW_icons{$style}{$imgName} !~ m/$imgName/); # Skip alias
       next if($imgName=~m+^(weather/|shutter.*big|fhemicon|favicon|ws_.*_kl)+);
+      next if($imgName=~m+^(dashboardicons)+);
       $icoList{$imgName} = 1;
     }
   }
@@ -1715,7 +1820,7 @@ FW_readIconsFrom($$)
   my $ldir = ($subdir ? "$dir/$subdir" : $dir);
   my @entries;
   if(opendir(DH, "$FW_icondir/$ldir")) {
-    @entries= sort readdir(DH); # assures order: .gif  .ico  .jpg  .png
+    @entries= sort readdir(DH); # assures order: .gif  .ico  .jpg  .png .svg
     closedir(DH);
   }
 
@@ -1743,6 +1848,7 @@ FW_readIconsFrom($$)
       }
     }
   }
+  $FW_icons{$dir}{""} = 1; # Do not check empty directories again.
 }
 
 sub
@@ -1878,13 +1984,15 @@ FW_makeEdit($$$)
 sub
 FW_roomStatesForInform($)
 {
-  my ($room) = @_;
-  return "" if(!$room);
+  my ($me) = @_;
+  return "" if($me->{inform}{type} !~ m/status/);
 
-  my @rl = devspec2array("room=$room");
   my %extPage = ();
   my @data;
-  foreach my $dn (@rl) {
+  foreach my $dn (keys %{$me->{inform}{devices}}) {
+    next if(!defined($defs{$dn}));
+    my $t = $defs{$dn}{TYPE};
+    next if(!$t || $modules{$t}{FW_atPageEnd});
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
       push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
@@ -1899,16 +2007,16 @@ FW_Notify($$)
 {
   my ($ntfy, $dev) = @_;
 
-  my $filter = $ntfy->{inform};
-  return undef if(!$filter);
+  my $h = $ntfy->{inform};
+  return undef if(!$h);
 
-  my $ln = $ntfy->{NAME};
   my $dn = $dev->{NAME};
+  return undef if(!$h->{devices}{$dn});
+
   my @data;
   my %extPage;
 
-  my $rn = AttrVal($dn, "room", "");
-  if($filter eq "all" || $rn =~ m/\b$filter\b/) {
+  if($h->{type} =~ m/status/) {
     # Why is saving this stuff needed? FLOORPLAN?
     my @old = ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
@@ -1917,6 +2025,12 @@ FW_Notify($$)
     $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", 0);
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+    @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
+                                "$FW_sp:default:fhemSVG:openautomation"));
+    if($h->{iconPath}) {
+      unshift @FW_iconDirs, $h->{iconPath};
+      FW_readIcons($h->{iconPath});
+    }
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
@@ -1935,8 +2049,9 @@ FW_Notify($$)
         push @data, "$dn-$readingName-ts<<$tn<<$tn";
       }
     }
+  }
 
-  } elsif($filter eq "console") {
+  if($h->{type} =~ m/raw/) {
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
       if($attr{global}{mseclog}) {
@@ -1949,32 +2064,11 @@ FW_Notify($$)
         push @data,("$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>");
       }
     }
-
   }
 
-  if(@data) {
-    # Collect multiple changes (e.g. from notifiees) into one message
-    $ntfy->{INFORMBUF} .= join("\n", map { s/\n/ /gm; $_ } @data)."\n";
-    RemoveInternalTimer($ln);
-    if(length($ntfy->{INFORMBUF}) > 1024) {
-      FW_FlushInform($ln);
-    } else {
-      InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
-    }
-  }
-
+  addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n")
+    if(@data);
   return undef;
-}
-
-sub
-FW_FlushInform($)
-{
-  my ($name) = @_;
-  my $hash = $defs{$name};
-  return if(!$hash);
-  my $c = $hash->{CD};
-  print $c $hash->{INFORMBUF};
-  $hash->{INFORMBUF}="";
 }
 
 ###################
@@ -1991,8 +2085,8 @@ FW_devState($$@)
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  $hasOnOff = ($allSets =~ m/(^| )on( |$)/ &&
-               $allSets =~ m/(^| )off( |$)/);
+  $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/ &&
+               $allSets =~ m/(^| )off(:[^ ]*)?( |$)/);
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
@@ -2382,6 +2476,14 @@ FW_ActivateInform()
         smallscreen.
         </li><br>
 
+    <a name="nrAxis"></a>
+    <li>nrAxis<br>
+        the number of axis for which space should be reserved  on the left and right sides of a plot
+        and optionaly how many axes should realy be used on each side, separated by comma:
+        left,right[,useLeft,useRight].  You can set individual numbers by setting the nrAxis of
+        the SVG. Default is 1,1.
+        </li><br>
+
     <a name="SVGcache"></a>
     <li>SVGcache<br>
         if set, cache plots which won't change any more (the end-date is prior
@@ -2451,7 +2553,7 @@ FW_ActivateInform()
         cd certs<br>
         openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
         </ul>
-      <br><br>
+      <br>
     </li>
 
     <li><a href="#allowfrom">allowfrom</a></li>
@@ -2605,6 +2707,14 @@ FW_ActivateInform()
         </li>
         <br>
 
+    <a name="sortRooms"></a>
+    <li>sortRooms<br>
+        Space separated list of rooms to override the default
+        sort order of the room links. Example:<br>
+        attr WEB sortRooms DG OG EG Keller
+        </li>
+        <br>
+
     <a name="sortby"></a>
     <li>sortby<br>
         Take the value of this attribute when sorting the devices in the room
@@ -2701,10 +2811,19 @@ FW_ActivateInform()
         </li>
         <br>
 
-
+     <a name="column"></a>
+     <li>column<br>
+       Allows to display more than one column per room overview, by specifying
+       the groups for the columns. Example:<br>
+       <ul><code>
+         attr WEB column LivingRoom:FS20,notify|FHZ,notify DiningRoom:FS20|FHZ
+       </code></ul>
+       In this example in the LivingRoom the FS20 and the notify group is in
+       the first column, the FHZ and the notify in the second.<br>
+       Note: some elements like SVG plots and readingsGroup can only be part of
+       a column if they are part of a <a href="#group">group</a>.
+       </li>
     </ul>
-
-    See also <a href="#room">room</a> and <a href="#group">group</a> attributes.
   </ul>
 
 

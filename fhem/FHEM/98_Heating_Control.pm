@@ -26,6 +26,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+use Time::Local 'timelocal_nocheck';
 
 ##################################### 
 sub Heating_Control_Initialize($)
@@ -102,7 +103,7 @@ sub Heating_Control_Define($$)
   # test if device is defined
   return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
-  #Altlasten bereinigen
+  #fuer den modify Altlasten bereinigen
   delete($hash->{TIME_AS_PERL})              if($hash->{TIME_AS_PERL});
   delete($hash->{helper}{CONDITION})         if($hash->{helper}{CONDITION});
   delete($hash->{helper}{COMMAND})           if($hash->{helper}{COMMAND});
@@ -140,7 +141,9 @@ sub Heating_Control_Define($$)
   }
 
   # jetzt die switchingtimes und Tagesangaben verarbeiten.
-  Heating_Control_ParseSwitchingProfile($hash, \@switchingtimes, \$shortDays{$language});
+  if (!Heating_Control_ParseSwitchingProfile($hash, \@switchingtimes, \$shortDays{$language})) {
+     return;
+  }
 
   # Profile sortiert aufbauen
   for (my $d=0; $d<=6; $d++) {
@@ -150,15 +153,12 @@ sub Heating_Control_Define($$)
     }
   }
 
-  RemoveInternalTimer($hash);
-  my $now    = time();
-  InternalTimer ($now+30, "$hash->{TYPE}_Update", $hash, 0);
-
-  if (defined($hash->{TIME_AS_PERL})) {
-     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
-     my $midnight  =  $now + 24*3600 -(3600*$hour + 60*$min + $sec) + 10*60;
-     InternalTimer ($midnight, "$hash->{TYPE}_UpdatePerlTime", $hash, 0);
+  my $now = time();
+  if (!defined($hash->{PERLTIMEUPDATEMODE})) {
+     Heating_Control_UpdatePerlTime($hash);
   }
+  RemoveInternalTimer($hash);
+  InternalTimer ($now+1, "$hash->{TYPE}_Update", $hash, 0);
 
   readingsBeginUpdate  ($hash);
   readingsBulkUpdate   ($hash, "nextUpdate",   strftime("Heute, %H:%M:%S",localtime($now+30)));
@@ -236,7 +236,8 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
         $oldDel = $del;
       }
     } else{
-      return "invalid daylist in $name <$daylist> 123... | Sa,So,... | Mo-Di,Do,Fr-Mo | Su-Th,We"
+      Log3 $hash, 1, "invalid daylist in $name <$daylist> use one of 123...|Sa,So,...|Mo-Di,Do,Fr|Su-Th,We|Lu-Me";
+      return 0;
     }
 
     @days = sort(SortNumber keys %hdays);
@@ -252,14 +253,19 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
     } elsif ($time =~  m/^[0-2][0-9](:[0-5][0-9]){2,2}$/g) {  #  HH:MM:SS
       ;                                                       #  ok.
     } else {
-      Log3 $hash, 1, "[$name] invalid time in $name <$time> HH:MM[:SS]"
+      Log3 $hash, 1, "[$name] invalid time in $name <$time> HH:MM[:SS]";
+      return 0;
     }
 
+    my $listOfDays = "";
     for (my $d=0; $d<@days; $d++) {
-      Log3 $hash, 5, "[$name] Switchingtime: @{$switchingtimes}[$i] : $days[$d] -> $time -> $para ";
+      $listOfDays .= @{$$shortDays}[$days[$d]] . ",";
       $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $para;
     }
+    $listOfDays =~ s/,$//g;
+    Log3 $hash, 5, "[$name] Switchingtime: @{$switchingtimes}[$i] : $listOfDays -> $time -> $para ";
   }
+  return 1;
 }
 ################################################################################
 sub Heating_Control_Undef($$) {
@@ -273,7 +279,19 @@ sub Heating_Control_Undef($$) {
 sub Heating_Control_UpdatePerlTime($)
 {
     my ($hash) = @_;
-    Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
+    if (defined($hash->{TIME_AS_PERL})) {
+
+       my $now = time();
+       my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
+
+       my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec) + 10*60;
+       if (abs($secToMidnight-24*3600)<10) {
+          $hash->{PERLTIMEUPDATEMODE} = 1;
+          Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
+          delete $hash->{PERLTIMEUPDATEMODE};
+       }
+       InternalTimer ($now+$secToMidnight, "Heating_Control_UpdatePerlTime", $hash, 0);
+    }
 }
 ################################################################################
 sub Heating_Control_Update($)
@@ -287,20 +305,24 @@ sub Heating_Control_Update($)
   if (Heating_Control_FensterOffen($hash)) {
      return;
   }
+
   # Schaltparameter ermitteln
-  my ($nowSwitch,$nextSwitch,$aktParam,$newParam,$nextParam)
+  my ($nowSwitch,$nextSwitch,$newParam,$nextParam)
      = Heating_Control_akt_next_param($now, $hash);
+
   # ggf. Device schalten
-  if ($nowSwitch gt "" && $aktParam ne $newParam ) {
-     Heating_Control_Device_Schalten($hash, $now, $nowSwitch, $newParam)
-  }
+  Heating_Control_Device_Schalten($hash, $now, $nowSwitch, $newParam);
+
+  Log3 $hash, 4, $mod .strftime('Next switch %d.%m.%Y %H:%M:%S',localtime($nextSwitch));
+
   # Timer und Readings setzen.
   InternalTimer  ($nextSwitch, "$hash->{TYPE}_Update", $hash, 0);
 
   my $active = 1;
   if (defined $hash->{helper}{CONDITION}) {
-     $active = eval ($hash->{helper}{CONDITION});
+     $active = AnalyzeCommandChain(undef, "{".$hash->{helper}{CONDITION}."}");
   }
+
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
   readingsBulkUpdate ($hash,  "nextValue",  $nextParam);
@@ -318,9 +340,9 @@ sub Heating_Control_FensterOffen ($) {
                     "CUL_HM"    => { "READING" => "state",  "STATUS" => "(open|tilted)",  "model" => 1 },
                     "MAX"       => { "READING" => "state",  "STATUS" => "(open)"                       });
 
-  my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor", "nF");
-  if ($fensterKontakte ne "nF" ) {
-     Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
+  my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor", "");
+  Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
+  if ($fensterKontakte ne "" ) {
      my @kontakte = split(/ /, $fensterKontakte);
      foreach my $fk (@kontakte) {
         if(!$defs{$fk}) {
@@ -340,8 +362,11 @@ sub Heating_Control_FensterOffen ($) {
                  Log3 $hash, 5, "$mod windowsensor '$fk' Reading '$reading' is '$windowStatus'";
 
                  if ($windowStatus =~  m/^$statusReg$/g) {
-                    Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - windowsensor '$fk' Reading '$reading' is '$windowStatus'";
+                    if (!defined($hash->{VERZOEGRUNG})) {
+                       Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - windowsensor '$fk' Reading '$reading' is '$windowStatus'";
+                    }
                     InternalTimer  (time()+60, "$hash->{TYPE}_Update", $hash, 0);
+                    $hash->{VERZOEGRUNG} = 1;
                     return 1
                  }
               }
@@ -349,6 +374,10 @@ sub Heating_Control_FensterOffen ($) {
         }
      }
   }
+  if ($hash->{VERZOEGRUNG}) {
+     Log3 $hash, 3, "$mod delay of switching $hash->{DEVICE} stopped.";
+  }
+  delete $hash->{VERZOEGRUNG};
   return 0;
 }
 ################################################################################
@@ -356,14 +385,9 @@ sub Heating_Control_akt_next_param($$) {
   my ($now, $hash) = @_;
 
   my $mod = "[".$hash->{NAME} ."] ";
-
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
-  my $aktParam = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
-     $aktParam = sprintf("%.1f", $aktParam)   if ($aktParam =~ m/^[0-9]{1,3}$/i);
-  my $newParam   = $aktParam;   #default#
-
-  my ($nextParam, $next, $nextSwitch, $nowSwitch) = (0,0,0,0);
+  my ($nextParam, $next, $nextSwitch, $nowSwitch, $newParam) = (0,0,0,0,0);
   # aktuellen und nächsten Schaltzeitpunkt ermitteln.
   my $startIdx;
   for (my $d=-1; $d>=-7; $d--) {
@@ -388,22 +412,20 @@ sub Heating_Control_akt_next_param($$) {
            Log3 $hash,  4, $mod."Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Param: $hash->{helper}{SWITCHINGTIME}{$wd}{$st} ".$secondsToSwitch;
         }
         if ($secondsToSwitch<=0) {
-          $newParam   =  $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $newParam   =  sprintf("%.1f", $newParam)   if ($newParam =~ m/^[0-9]{1,3}$/i);
+          $newParam   = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
+          $newParam   = sprintf("%.1f", $newParam)   if ($newParam =~ m/^[0-9]{1,3}$/i);
           $nowSwitch  = $next;
         } else {
           $nextParam  = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $nextParam  =  sprintf("%.1f", $nextParam)  if ($nextParam =~ m/^[0-9]{1,3}$/i);
+          $nextParam  = sprintf("%.1f", $nextParam)  if ($nextParam =~ m/^[0-9]{1,3}$/i);
           $nextSwitch = $next;
           last;
         }
 
      }
   }
-  #$nextSwitch += get_SummerTimeOffset($now, $nextSwitch);
-  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; aktParam: $aktParam ; newParam: $newParam";
-  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
-  return ($nowSwitch,$nextSwitch,$aktParam,$newParam,$nextParam);
+  $nextSwitch += Heating_Control_DSTOffset($hash, $now, $nextSwitch);
+  return ($nowSwitch,$nextSwitch,$newParam,$nextParam);
 }
 ################################################################################
 sub Heating_Control_Device_Schalten($$$$) {
@@ -413,36 +435,81 @@ sub Heating_Control_Device_Schalten($$$$) {
   my $mod     = "[".$hash->{NAME} ."] ";
 
   #modifier des Zieldevices auswaehlen
-  my %modifier = ("MAX"=>"desiredTemperature","FHT"=>"desired-temp","CUL_HM"=>"desired-temp","FS20"=>"");
-  $hash->{helper}{DESIRED_TEMP_READING} = "";
-  $hash->{helper}{DESIRED_TEMP_READING} = $modifier{$defs{$hash->{DEVICE}}{TYPE}};
+  my $setModifier = isHeizung($hash);
 
+  # Kommando aufbauen
   if (defined $hash->{helper}{CONDITION}) {
-    $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
+    $command = '{ fhem("set @ '. $setModifier .' %") if' . $hash->{helper}{CONDITION} . '}';
   } elsif (defined $hash->{helper}{COMMAND}) {
     $command = $hash->{helper}{COMMAND};
   } else {
-    $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") }';
+    $command = '{ fhem("set @ '. $setModifier .' %") }';
   }
+
+  my $aktParam = ReadingsVal($hash->{DEVICE}, $setModifier, 0);
+     $aktParam = sprintf("%.1f", $aktParam)   if ($aktParam =~ m/^[0-9]{1,3}$/i);
+
+  Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; aktParam: $aktParam ; newParam: $newParam";
+
+  my $disabled = AttrVal($hash->{NAME}, "disable", 0);
+  my $disabled_txt = $disabled ? " " : " not";
+  Log3 $hash, 4, $mod . "is$disabled_txt disabled";
 
   #Kommando ausführen
   my $secondsSinceSwitch = $nowSwitch - $now;
-  # toDo besser eine Positivliste mit Geraeten, die geschaltet werden sollen
-  my %vergangenheitNichtSchalten = ("FS20"  => 1);
-  if ($vergangenheitNichtSchalten{$defs{$hash->{DEVICE}}{TYPE}} && $secondsSinceSwitch < -60) {
-     ;
-  } else {
-     if ($command && AttrVal($hash->{NAME}, "disable", 0) == 0) {
-       $newParam =~ s/:/ /g;
-       $command  =~ s/@/$hash->{DEVICE}/g;
-       $command  =~ s/%/$newParam/g;
-       $command  = SemicolonEscape($command);
-       Log3 $hash, 4, $mod."command: $command";
-       my $ret  = AnalyzeCommandChain(undef, $command);
-       Log3 ($hash, 3, $ret) if($ret);
+  if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
+     if (!$setModifier && $secondsSinceSwitch < -60) {
+        Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type.";
+     } else {
+        if ($command && !$disabled) {
+          $newParam =~ s/:/ /g;
+          $command  =~ s/@/$hash->{DEVICE}/g;
+          $command  =~ s/%/$newParam/g;
+          $command  = SemicolonEscape($command);
+          Log3 $hash, 4, $mod."command: $command executed";
+          my $ret  = AnalyzeCommandChain(undef, $command);
+          Log3 ($hash, 3, $ret) if($ret);
+        }
      }
   }
 }
+################################################################################
+sub isHeizung($) {
+  my ($hash)  = @_;
+
+  my %setmodifiers =
+     ("FHT"    =>  "desired-temp",
+     #"HCS"    =>  1,
+      "MAX"    =>  {  "mode" => "type", "setModifier" => "desiredTemperature",
+                      "HeatingThermostatPlus" => 1,
+                      "HeatingThermostat"     => 1,
+                      "WallMountedThermostat" => 1 },
+      "CUL_HM" =>  {  "mode" => "model","setModifier" => "desired-temp",
+                      "HM-CC-TC"              => 1,
+                      "HM-CC-RT-DN"           => 1 } );
+
+  my $dHash = $defs{$hash->{DEVICE}};
+  my $dType = $dHash->{TYPE};
+  my $setModifier = $setmodifiers{$dType};
+     $setModifier = ""  if (!defined($setModifier));
+  if (ref($setModifier)) {
+
+      my $mode = $setmodifiers{$dType}{mode};
+      my $model;
+      if ($mode eq "model" ) {
+         $model = AttrVal($hash->{DEVICE}, "model", "nF");
+      } elsif   ($mode eq "type") {
+         $model = $dHash->{type};
+      }
+      if (defined($setmodifiers{$dType}{$model})) {
+         $setModifier = $setmodifiers{$dType}{setModifier}
+      } else {
+         $setModifier = "";
+      }
+  }
+  return $setModifier;
+}
+
 ################################################################################
 sub Heating_Control_SetAllTemps() {            # {Heating_Control_SetAllTemps()}
 
@@ -459,6 +526,25 @@ sub Heating_Control_SetAllTemps() {            # {Heating_Control_SetAllTemps()}
      Log3 undef, 3, "Heating_Control_Update() for $hash->{NAME} done!";
   }
   Log3 undef,  3, "Heating_Control_SetAllTemps() done!";
+}
+################################################################################
+sub Heating_Control_DSTOffset($$$) {
+  my ($hash,$t1,$t2)= @_;
+
+  my @lt1 = localtime($t1);
+  my @lt2 = localtime($t2);
+
+  # wenn t2 in der ersten Stunde der dst liegt darf nicht gleich 3600 Sekunden abgezogen werden.
+  # dstEin ist immer am letzten Sonntag im März.
+  my $dstEin = timelocal_nocheck(0,0,2,31,2,$lt2[5]);    # 31. Maerz aktuelles Jahr
+  my @aNow = localtime($dstEin);
+  $dstEin += -$lt2[6]*24*3600;                           # letzen Maerzsonntag ermittlen.
+
+  my $offset = $t2 - $dstEin + 1;                        # $secsSinceDstEin
+     $offset = 3600  if ($offset >3600);                 # maximal 3600 Sekunden
+     $offset *=  ($lt1[8] - $lt2[8]);                    # nur wenn Wechsel der dst
+  Log 3, "[$hash->{NAME}] DST offset=$offset" if ($offset != 0);
+  return $offset;
 }
 ################################################################################
 sub SortNumber {
@@ -555,6 +641,12 @@ sub SortNumber {
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
         The is switched at time myFunction(). It is sent the Command "night-temp 18" and "dayTemp 16".
+
+        If you want to have set all Heating_Controls their current value (after a temperature lowering phase holidays)
+        you can call the function <b> Heating_Control_SetAllTemps ()</b>.
+        This call can be automatically coupled to a dummy by notify:       
+        <code>define HeizStatus2 notify Heating:. * {Heating_Control_SetAllTemps ()}</code>
+
     </ul>
   </ul>
 
@@ -659,6 +751,12 @@ sub SortNumber {
 
         <code>define HCW Heating_Control WZ_Heizung en Mo-Fr|{myFunction}|night-temp:18 Mo-Fr|{myFunction()}|dayTemp:16</code><br>
         Das Gerät wird bei myFunction() geschaltet. Es wird das Kommando "night-temp 18" bzw. "dayTemp 16" gesendet.
+
+        Wenn du beispielsweise nach einer Temperaturabsenkungsphase erreichen willst, dass  alle Heating_Controls ihren aktuellen Wert
+        einstellen sollen, kannst du die Funktion <b>Heating_Control_SetAllTemps()</b> aufrufen.
+        Dieser Aufruf kann per notify automatisch an ein dummy gekoppelt werden:
+        <code>define HeizStatus2            notify Heizung:.*                          {Heating_Control_SetAllTemps()}</code>
+
         <p>
     </ul>
   </ul>

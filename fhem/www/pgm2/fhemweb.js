@@ -83,18 +83,34 @@ FW_longpoll()
   FW_curLine = 0;
 
   FW_pollConn = new XMLHttpRequest();
-  var room="room=all";
-  var embArr = document.getElementsByTagName("embed");
-  if(embArr.length == 0) {      // SVG image content is not room dependent
+
+  var filter="", embArr = document.getElementsByTagName("embed");
+  for(var i = 0; i < embArr.length; i++) {
+    var svg = embArr[i].getSVGDocument();
+    if(svg &&
+       svg.firstChild &&
+       svg.firstChild.nextSibling &&
+       svg.firstChild.nextSibling.getAttribute("flog"))
+      filter=".*";
+  }
+  if(filter == "") {
     var sa = document.location.search.substring(1).split("&");
     for(var i = 0; i < sa.length; i++) {
       if(sa[i].substring(0,5) == "room=")
-        room=sa[i];
+        filter=sa[i];
+      if(sa[i].substring(0,7) == "detail=")
+        filter=sa[i].substring(7);
     }
   }
-  // Needed when using multiple FF windows
-  var timestamp = "&timestamp="+new Date().getTime();
-  var query = document.location.pathname+"?"+room+"&XHR=1&inform=1"+timestamp;
+  if(filter == "" && document.getElementById("floorplan")) { //floorplan special
+    var name = document.getElementsByTagName("body")[0].getAttribute("id");
+    name = name.substring(0,name.length-5);
+    filter=".*;iconPath="+name;
+  }
+
+  var query = document.location.pathname+"?XHR=1"+
+                "&inform=type=status;filter="+filter+
+                "&timestamp="+new Date().getTime();
   FW_pollConn.open("GET", query, true);
   FW_pollConn.onreadystatechange = FW_doUpdate;
   FW_pollConn.send(null);

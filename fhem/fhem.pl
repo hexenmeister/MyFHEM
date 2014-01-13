@@ -44,7 +44,7 @@ sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
 sub AnalyzeInput($);
 sub AnalyzePerlCommand($$);
-sub AssignIoPort($);
+sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
@@ -52,7 +52,6 @@ sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
-sub EventMapAsList($);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -81,6 +80,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToAttrList($);
+sub attrSplit($);
 sub createInterfaceDefinitions();
 sub devspec2array($);
 sub doGlobalDef($);
@@ -171,6 +171,8 @@ use vars qw($devcount);	        # To sort the devices
 use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
 use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 use vars qw(%inform);	        # Used by telnet_ActivateInform
+use vars qw(%intAt);		# Internal at timer hash, global for benchmark
+use vars qw($nextat);           # Time when next timer will be triggered.
 
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
@@ -185,8 +187,6 @@ my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
-my %intAt;			# Internal at timer hash.
-my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
@@ -200,6 +200,7 @@ my $namedef =
   "- a range separated by dash (-)\n";
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $wbName = ".WRITEBUFFER";
 
 $init_done = 0;
 
@@ -455,17 +456,25 @@ sub MAIN {MAIN:};               #Dummy
 
 my $errcount= 0;
 while (1) {
-  my ($rout, $rin) = ('', '');
+  my ($rout,$rin, $wout,$win, $eout,$ein) = ('','', '','', '','');
 
   my $timeout = HandleTimeout();
 
   foreach my $p (keys %selectlist) {
-    vec($rin, $selectlist{$p}{FD}, 1) = 1;
+    my $hash = $selectlist{$p};
+    if(defined($hash->{FD})) {
+      vec($rin, $hash->{FD}, 1) = 1
+        if(!defined($hash->{directWriteFn}));
+      vec($win, $hash->{FD}, 1) = 1
+        if(defined($hash->{directWriteFn}) || defined($hash->{$wbName}));
+    }
+    vec($ein, $hash->{EXCEPT_FD}, 1) = 1
+        if(defined($hash->{"EXCEPT_FD"}));
   }
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
   $timeout = 5 if $winService->{AsAService} && $timeout > 5;
-  my $nfound = select($rout=$rin, undef, undef, $timeout);
+  my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout);
 
   $winService->{serviceCheck}->() if($winService->{serviceCheck});
   CommandShutdown(undef, undef) if($sig_term);
@@ -503,11 +512,46 @@ while (1) {
   # reported by select, but is used by unix too, to check if the device is
   # attached again.
   foreach my $p (keys %selectlist) {
-    next if(!$selectlist{$p} || !$selectlist{$p}{NAME}); # due to rereadcfg/del
+    my $hash = $selectlist{$p};
+    my $isDev = ($hash && $hash->{NAME} && $defs{$hash->{NAME}});
+    my $isDirect = ($hash && ($hash->{directReadFn} || $hash->{directWriteFn}));
+    next if(!$isDev && !$isDirect);
 
-    CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
-      if(vec($rout, $selectlist{$p}{FD}, 1));
+    if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1)) {
+      if($hash->{directReadFn}) {
+        $hash->{directReadFn}($hash);
+      } else {
+        CallFn($hash->{NAME}, "ReadFn", $hash);
+      }
+    }
+
+    if((defined($hash->{$wbName}) || defined($hash->{directWriteFn})) &&
+        defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
+
+      if($hash->{directWriteFn}) {
+        $hash->{directWriteFn}($hash);
+
+      } else {
+        my $wb = $hash->{$wbName};
+        my $ret = syswrite($hash->{CD}, $wb);
+        if(!$ret || $ret < 0) {
+          Log 4, "Write error to $p, deleting $hash->{NAME}";
+          CommandDelete(undef, $hash->{NAME});
+        } else {
+          if($ret == length($wb)) {
+            delete($hash->{$wbName});
+          } else {
+            $hash->{$wbName} = substr($wb, $ret);
+          }
+        }
+      }
+    }
+
+    if(defined($hash->{"EXCEPT_FD"}) && vec($eout, $hash->{EXCEPT_FD}, 1)) {
+      CallFn($hash->{NAME}, "ExceptFn", $hash);
+    }
   }
+
   foreach my $p (keys %readyfnlist) {
     next if(!$readyfnlist{$p});                 # due to rereadcfg / delete
 
@@ -651,6 +695,8 @@ IOWrite($@)
     return;
   }
 
+  return if(IsDummy($iohash->{NAME}));
+
   no strict "refs";
   my $ret = &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
@@ -727,7 +773,7 @@ AnalyzePerlCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/\\ *\n/ /g;               # Multi-line
+  $cmd =~ s/\\ *\n/ /g;               # Multi-line. Probably not needed anymore
 
   # Make life easier for oneliners:
   %value = ();
@@ -766,7 +812,7 @@ AnalyzeCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/^(\\\n|[ \t])*//;# Strip space or \\n at the begginning
+  $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
 
   Log 5, "Cmd: >$cmd<";
@@ -833,8 +879,6 @@ AnalyzeCommand($$)
 sub
 devspec2array($)
 {
-  my %knownattr = ( "DEF"=>1, "STATE"=>1, "TYPE"=>1 );
-
   my ($name) = @_;
 
   return "" if(!defined($name));
@@ -843,59 +887,55 @@ devspec2array($)
     return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
     return $name;
   }
-  # FAKE is set by FHEM2FHEM LOG
 
-  my ($isattr, @ret);
+  my (@ret, $isAttr);
+  foreach my $l (split(",", $name)) {   # List of elements
+    my @names = sort keys %defs;
+    my @res;
+    foreach my $dName (split(":FILTER=", $l)) {
+      my ($n,$op,$re) = ("NAME","=",$dName);
+      if($dName =~ m/^([^!]*)(=|!=)(.*)$/) {
+        ($n,$op,$re) = ($1,$2,$3);
+        $isAttr = 1;    # Compatibility: return "" instead of $name
+      }
+      ($n,$op,$re) = ($1,"eval","") if($dName =~ m/^{(.*)}$/);
 
-  foreach my $l (split(",", $name)) {   # List
+      @res=();
+      foreach my $d (@names) {
+        next if($attr{$d} && $attr{$d}{ignore});
 
-    if($l =~ m/(.*)=(.*)/) {
-      my ($lattr,$re) = ($1, $2);
-      if($knownattr{$lattr}) {
-        eval {                          # a bad regexp may shut down fhem.pl
-          foreach my $l (sort keys %defs) {
-              push @ret, $l
-                if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr}=~m/^$re$/));
+        if($op eq "eval") {
+          my $exec = EvalSpecials($n, %{{"%DEVICE"=>$d}});
+          push @res, $d if(AnalyzePerlCommand(undef, $exec));
+          next;
+        }
+
+        my $hash = $defs{$d};
+        my $val = $hash->{$n};
+        if(!defined($val)) {
+          my $r = $hash->{READINGS};
+          $val = $r->{$n}{VAL} if($r && $r->{$n});
+        }
+        if(!defined($val)) {
+          $val = $attr{$d}{$n} if($attr{$d});
+        }
+        $val="" if(!defined($val));
+        eval { # a bad regexp is deadly
+          if(($op eq  "=" && $val =~ m/\b$re\b/) ||
+             ($op eq "!=" && $val !~ m/\b$re\b/)) {
+            push @res, $d 
           }
         };
         if($@) {
           Log 1, "devspec2array $name: $@";
           return $name;
         }
-      } else {
-        foreach my $l (sort keys %attr) {
-          push @ret, $l
-            if($attr{$l}{$lattr} && (!$re || $attr{$l}{$lattr} =~ m/$re/));
-        }
       }
-      $isattr = 1;
-      next;
+      @names = @res;
     }
-
-    my $regok;
-    eval {                              # a bad regexp may shut down fhem.pl
-      if($l =~ m/[*\[\]^\$]/) {         # Regexp
-        push @ret, grep($_ =~ m/^$l$/, sort keys %defs);
-        $regok = 1;
-      }
-    };
-    if($@) {
-      Log 1, "devspec2array $name: $@";
-      return $name;
-    }
-    next if($regok);
-
-    if($l =~ m/-/) {                    # Range
-      my ($lower, $upper) = split("-", $l, 2);
-      push @ret, grep($_ ge $lower && $_ le $upper, sort keys %defs);
-      next;
-    }
-    push @ret, $l;
+    push @ret,@res;
   }
-
-  return $name if(!@ret && !$isattr);             # No match, return the input
-  @ret = grep { !$attr{$_} || !$attr{$_}{ignore} } @ret
-        if($name !~ m/^ignore=/);
+  return $name if(!@ret && !$isAttr);
   return @ret;
 }
 
@@ -950,7 +990,7 @@ CommandInclude($$)
     $l =~ s/[\r\n]//g;
 
     if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
-      $bigcmd .= "$1\\\n";
+      $bigcmd .= "$1\n";
     } else {
       my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
       push @ret, $tret if(defined($tret));
@@ -1098,6 +1138,7 @@ WriteStatefile()
        $val ne "Initialized" &&
        $val ne "???") {
       $val =~ s/;/;;/g;
+      $val =~ s/\n/\\\n/g;
       print SFH "setstate $d $val\n"
     }
 
@@ -1119,6 +1160,7 @@ WriteStatefile()
         }
         my $val = $rd->{VAL};
         $val =~ s/;/;;/g;
+        $val =~ s/\n/\\\n/g;
 	print SFH "setstate $d $rd->{TIME} $c $val\n";
       }
     }
@@ -1186,6 +1228,7 @@ CommandSave($$)
       my $def = $defs{$d}{DEF};
       if(defined($def)) {
         $def =~ s/;/;;/g;
+        $def =~ s/\n/\\\n/g;
         print $fh "define $d $defs{$d}{TYPE} $def\n";
       } else {
         print $fh "define $d $defs{$d}{TYPE}\n";
@@ -1441,10 +1484,16 @@ CommandModify($$)
 #############
 # internal
 sub
-AssignIoPort($)
+AssignIoPort($;$)
 {
-  my ($hash) = @_;
+  my ($hash, $proposed) = @_;
 
+  if($proposed && $defs{$proposed}) {
+    $hash->{IODev} = $defs{$proposed};
+    $attr{$hash->{NAME}}{IODev} = $proposed;
+    delete($defs{$proposed}{".clientArray"});
+    return;
+  }
   # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
@@ -1528,7 +1577,7 @@ CommandDeleteAttr($$)
 
     $a[0] = $sdev;
     
-    if($a[1] eq "userReadings") {
+    if($a[1] && $a[1] eq "userReadings") {
       delete($defs{$sdev}{'.userReadings'});
     }
 
@@ -1883,7 +1932,7 @@ getAllSets($)
     $em = join(" ", grep { !/ / }
                     map { $_ =~ s/.*?=//s;
                           $_ =~ s/.*?://s; $_ } 
-                    EventMapAsList($em));
+                    attrSplit($em));
     $a2 = "$em $a2";
   }
   return $a2;
@@ -2044,6 +2093,7 @@ CommandAttr($$)
       $hash->{IODev} = $defs{$ioname};
       $hash->{NR} = $devcount++
         if($defs{$ioname}{NR} > $hash->{NR});
+      delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($a[1] eq "stateFormat" && $init_done) {
       evalStateFormat($hash);
@@ -2103,7 +2153,9 @@ CommandSetstate($$)
         next;
       }
 
-      if(!$d->{READINGS}{$sname} || $d->{READINGS}{$sname}{TIME} lt $tim) {
+      if(!defined($d->{READINGS}{$sname}) ||
+         !defined($d->{READINGS}{$sname}{TIME}) ||
+         $d->{READINGS}{$sname}{TIME} lt $tim) {
         $d->{READINGS}{$sname}{VAL} = $sval;
         $d->{READINGS}{$sname}{TIME} = $tim;
       }
@@ -2206,7 +2258,7 @@ CommandSleep($$)
 
   Log 4, "sleeping for $sec";
 
-  if(!$cl && @cmdList && $sec && $init_done) {
+  if(@cmdList && $sec && $init_done) {
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
              quiet        => $quiet);
@@ -2534,7 +2586,8 @@ DoTrigger($$@)
     if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
       $max = int(@{$hash->{CHANGED}}); # can be enriched in the notifies
       foreach my $c (keys %inform) {
-        if(!$defs{$c} || $defs{$c}{NR} != $inform{$c}{NR}) {
+        my $dc = $defs{$c};
+        if(!$dc || $dc->{NR} != $inform{$c}{NR}) {
           delete($inform{$c});
           next;
         }
@@ -2548,9 +2601,8 @@ DoTrigger($$@)
         for(my $i = 0; $i < $max; $i++) {
           my $state = $hash->{CHANGED}[$i];
           next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
-          syswrite($defs{$c}{CD},
-            ($inform{$c}{type} eq "timer" ? "$tn " : "") .
-            "$hash->{TYPE} $dev $state\n");
+          addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$tn " : "").
+                                "$hash->{TYPE} $dev $state\n");
         }
       }
     }
@@ -2708,23 +2760,23 @@ HandleArchiving($)
 
 #####################################
 # Call a logical device (FS20) ParseMessage with data from a physical device
-# (FHZ)
+# (FHZ). Note: $hash may be dummy, used by FHEM2FHEM
 sub
 Dispatch($$$)
 {
   my ($hash, $dmsg, $addvals) = @_;
-  my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
+  my $module = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
   Log3 $hash, 5, "$name dispatch $dmsg";
 
-  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $iohash->{FingerprintFn});
+  my ($isdup, $idx) = CheckDuplicate($name, $dmsg, $module->{FingerprintFn});
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
 
   my $clientArray = $hash->{".clientArray"};
-  $clientArray = computeClientArray($hash, $iohash) if(!$clientArray);
+  $clientArray = computeClientArray($hash, $module) if(!$clientArray);
 
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
@@ -2742,7 +2794,7 @@ Dispatch($$$)
   }
 
   if(!int(@found)) {
-    my $h = $hash->{MatchList}; $h = $iohash->{MatchList} if(!$h);
+    my $h = $hash->{MatchList}; $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
         if($dmsg =~ m/$h->{$m}/) {
@@ -2777,7 +2829,7 @@ Dispatch($$$)
 
   ################
   # Inform raw
-  if(!$iohash->{noRawInform}) {
+  if(!$module->{noRawInform}) {
     foreach my $c (keys %inform) {
       if(!$defs{$c} || $defs{$c}{NR} != $inform{$c}{NR}) {
         delete($inform{$c});
@@ -2798,19 +2850,23 @@ Dispatch($$$)
 
     } else {
       if($defs{$found}) {
-        $defs{$found}{MSGCNT}++;
-        my $avtrigger = ($attr{$name} && $attr{$name}{addvaltrigger});
-        if($addvals) {
-          foreach my $av (keys %{$addvals}) {
-            $defs{$found}{"${name}_$av"} = $addvals->{$av};
-            push(@{$defs{$found}{CHANGED}}, "$av: $addvals->{$av}")
-              if($avtrigger);
+        if(!$defs{$found}{".noDispatchVars"}) { # CUL_HM special
+          $defs{$found}{MSGCNT}++;
+          my $avtrigger = ($attr{$name} && $attr{$name}{addvaltrigger});
+          if($addvals) {
+            foreach my $av (keys %{$addvals}) {
+              $defs{$found}{"${name}_$av"} = $addvals->{$av};
+              push(@{$defs{$found}{CHANGED}}, "$av: $addvals->{$av}")
+                if($avtrigger);
+            }
           }
+          $defs{$found}{"${name}_MSGCNT"}++;
+          $defs{$found}{"${name}_TIME"} = TimeNow();
+          $defs{$found}{LASTInputDev} = $name;
         }
-        $defs{$found}{"${name}_MSGCNT"}++;
-        $defs{$found}{"${name}_TIME"} = TimeNow();
-        $defs{$found}{LASTInputDev} = $name;
+        delete($defs{$found}{".noDispatchVars"});
       }
+
       DoTrigger($found, undef);
     }
   }
@@ -2904,7 +2960,7 @@ addToAttrList($)
 }
 
 sub
-EventMapAsList($)
+attrSplit($)
 {
   my ($em) = @_;
   my $sc = " ";               # Split character
@@ -2929,7 +2985,7 @@ ReplaceEventMap($$$)
 
   my $nstr = join(" ", @{$str}) if(!$dir);
   my $changed;
-  my @emList = EventMapAsList($em);
+  my @emList = attrSplit($em);
   foreach my $rv (@emList) {
     # Real-Event-Regexp:GivenName[:modifier]
     my ($re, $val, $modifier) = split(":", $rv, 3);
@@ -3514,12 +3570,13 @@ fhemTimeLocal($$$$$$) {
     return $t-fhemTzOffset($t);
 }
 
+# compute the list of defined logical modules for a physical module
 sub
 computeClientArray($$)
 {
-  my ($hash, $iohash) = @_;
+  my ($hash, $module) = @_;
   my @a = ();
-  my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$iohash->{Clients});
+  my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$module->{Clients});
 
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep { defined($modules{$_}{ORDER}) } keys %modules) {
@@ -3556,6 +3613,18 @@ sub
 Debug($) {
   my $msg= shift;
   Log 1, "DEBUG>" . $msg;
+}
+
+sub
+addToWritebuffer($$)
+{
+  my ($hash, $txt) = @_;
+
+  if(!$hash->{$wbName}) {
+    $hash->{$wbName} = $txt;
+  } elsif(length($hash->{$wbName}) < 102400) {
+    $hash->{$wbName} .= $txt;
+  }
 }
 
 1;

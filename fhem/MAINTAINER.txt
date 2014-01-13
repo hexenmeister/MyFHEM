@@ -18,7 +18,7 @@ FHEM/00_CM11.pm              borisneubert         http://forum.fhem.de SlowRF
 FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
-FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de Sonstiges
+FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
@@ -86,13 +86,17 @@ FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Sonstige 
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
+FHEM/32_withings.pm          justme1968           http://forum.fhem.de Sonstiges
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
+FHEM/33_readingsproxy.pm     justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
-FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstiges Systeme
-FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
-FHEM/35_SWAP_0000002200000003.pm              justme1968           http://forum.fhem.de Sonstiges Systeme
-FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstiges Systeme
-FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstiges Systeme
+FHEM/34_panStamp.pm          justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/35_SWAP_0000002200000003.pm              justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_LaCrosse.pm          justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/38_CO20.pm              justme1968           http://forum.fhem.de Sonstiges
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
@@ -106,8 +110,9 @@ FHEM/49_IPCAM.pm             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/51_BBB_BMP180.pm        betateilchen         http://forum.fhem.de Raspberry Pi
 FHEM/51_I2C_BMP180.pm        Dirk                 http://forum.fhem.de Raspberry Pi
+FHEM/51_RPI_GPIO.pm          klausw               http://forum.fhem.de Einplatinencomputer
 FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstuetzende Dienste
-FHEM/55_PIFACE.pm            betateilchen         http://forum.fhem.de Raspberry Pi
+FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
@@ -123,14 +128,17 @@ FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
 FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
+FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/70_SISPM.pm             real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_SML.pm               bentele              http://forum.fhem.de Sonstiges
 FHEM/70_STV.pm               bentele              http://forum.fhem.de Sonstiges
+FHEM/70_EFR.pm               bentele              http://forum.fhem.de Sonstiges
 FHEM/70_TellStick.pm         real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_USBWX.pm             wherzig              http://forum.fhem.de Sonstiges
 FHEM/70_VIERA.pm             teevau               http://forum.fhem.de Sonstiges
 FHEM/70_WS3600.pm            Josch                http://forum.fhem.de Sonstiges
+FHEM/70_XBMC.pm              dbokermann           http://forum.fhem.de Multimedia
 FHEM/71_LISTENLIVE.pm        betateilchen         http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
@@ -145,8 +153,9 @@ FHEM/82_LGTV.pm              painseeker           http://forum.fhem.de Sonstiges
 FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstiges
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
 FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/88_LINDY_HDMI_SWITCH.pm sachag               http://forum.fhem.de Multimedia
 FHEM/88_IPWE.pm              tdressler            http://forum.fhem.de Sonstiges
-FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Sonstiges
+FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Automatisierung
 FHEM/88_VantagePro2.pm       sachag               http://forum.fhem.de Sonstiges
 FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
@@ -158,11 +167,14 @@ FHEM/92_FileLog.pm           rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/93_DbLog.pm             tobiasfaust          http://forum.fhem.de Automatisierung
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends
+FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
+FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
-FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de Sonstiges
+FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de HomeMatic
 FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/98_PID.pm               betateilchen         http://forum.fhem.de Automatisierung
@@ -202,6 +214,7 @@ contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
                                                 
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
+www/pgm2/dashboard*          svenson08            http://forum.fhem.de Frontends
 www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends
 www/jscolor/*                justme1968           http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends

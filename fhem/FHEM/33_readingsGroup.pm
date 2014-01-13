@@ -34,7 +34,8 @@ sub readingsGroup_Initialize($)
   $hash->{UndefFn}  = "readingsGroup_Undefine";
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
-  $hash->{AttrList} = "nameIcon valueIcon mapping separator style nameStyle valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1";
+  $hash->{AttrFn}   = "readingsGroup_Attr";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -53,6 +54,12 @@ readingsGroup_updateDevices($)
   my @params = split(" ", $hash->{DEF});
   while (@params) {
     my $param = shift(@params);
+
+    while ($param && $param =~ m/^</ && $param !~ m/>$/ ) {
+      my $next = shift(@params);
+      last if( !defined($next) );
+      $param .= " ". $next;
+    }
 
     # for backwards compatibility with weblink readings
     if( $param eq '*noheading' ) {
@@ -95,12 +102,20 @@ readingsGroup_updateDevices($)
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
         }
+      } elsif($device[0] =~ m/^<.*>$/) {
+        push @devices, [$device[0]];
       } elsif( defined($defs{$device[0]}) ) {
         $list{$device[0]} = 1;
         push @devices, [@device];
       } else {
         foreach my $d (sort keys %defs) {
           next if( IsIgnored($d) );
+          eval { $d =~ m/^$device[0]$/ };
+          if( $@ ) {
+            Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $device[0] .": ". $@;
+            push @devices, ["<<ERROR>>"];
+            last;
+          }
           next if( $d !~ m/^$device[0]$/);
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
@@ -111,6 +126,8 @@ readingsGroup_updateDevices($)
 
   $hash->{CONTENT} = \%list;
   $hash->{DEVICES} = \@devices;
+
+  $hash->{fhem}->{last_update} = gettimeofday();
 }
 
 sub readingsGroup_Define($$)
@@ -183,7 +200,7 @@ lookup2($$$$)
   return $lookup if( !$lookup );
 
   if( ref($lookup) eq 'HASH' ) {
-    my $vf ="";
+    my $vf = "";
     $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
     $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
     $lookup = $vf;
@@ -205,10 +222,35 @@ readingsGroup_2html($)
 
   return undef if( !$hash );
 
+  if( $hash->{DEF} =~ m/=/ ) {
+    if( !$hash->{fhem}->{last_update}
+        || gettimeofday() - $hash->{fhem}->{last_update} > 600 ) {
+      readingsGroup_updateDevices($hash);
+    }
+  }
+
   my $d = $hash->{NAME};
 
   my $show_heading = !AttrVal( $d, "noheading", "0" );
   my $show_links = !AttrVal( $d, "nolinks", "0" );
+
+  my $disable = AttrVal($d,"disable", 0);
+  if( AttrVal($d,"disable", 0) > 2 ) {
+    return undef;
+  } elsif( AttrVal($d,"disable", 0) > 1 ) {
+    my $ret;
+    $ret .= "<table>";
+    my $txt = AttrVal($d, "alias", $d);
+    $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
+    $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
+    $ret .= "<tr><td><table class=\"block wide\">";
+    #$ret .= "<div class=\"devType\"><a style=\"color:#ff8888\" href=\"/fhem?detail=$d\">readingsGroup $txt is disabled.</a></div>";
+    $ret .= "<td><div style=\"color:#ff8888;text-align:center\">disabled</div></td>";
+    $ret .= "</table></td></tr>";
+    $ret .= "</table>";
+    return $ret;
+  }
+
   my $show_state = !AttrVal( $d, "nostate", "0" );
   my $show_time = !AttrVal( $d, "notime", "0" );
 
@@ -222,6 +264,12 @@ readingsGroup_2html($)
   if( $value_format =~ m/^{.*}$/ ) {
     my $vf = eval $value_format;
     $value_format = $vf if( $vf );
+  }
+
+  my $value_columns = AttrVal( $d, "valueColumns", "" );
+  if( $value_columns =~ m/^{.*}$/ ) {
+    my $vc = eval $value_columns;
+    $value_columns = $vc if( $vc );
   }
 
   my $mapping = AttrVal( $d, "mapping", "");
@@ -240,16 +288,21 @@ readingsGroup_2html($)
   my $devices = $hash->{DEVICES};
 
   my $row = 1;
-
   my $ret;
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"/fhem?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
+  $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
   foreach my $device (@{$devices}) {
+    my $item = 0;
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
+    if( !$h && $device->[0] =~ m/^<.*>$/ ) {
+      $h = $hash if( !$h );
+      $regex = $device->[0];
+    }
     my $name = $h->{NAME};
     next if( !$h );
 
@@ -257,16 +310,63 @@ readingsGroup_2html($)
     @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
-    my $show_time = $show_time;
-    $show_time = 0 if( $regex && $regex =~ m/,/ );
-    foreach my $regex (@list) {
+    #foreach my $regex (@list) {
+    for( my $i = 0; $i <= $#list; ++$i ) {
+      my $regex = $list[$i];
+      while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) {
+        $regex .= ",". $list[$i];
+      }
       my $h = $h;
-      if( $regex && $regex =~ m/^\+(.*)/ ) {
+      if( $regex && $regex =~ m/^<(.*)>$/ ) {
+        my $txt = $1;
+        my $readings;
+        if( $txt =~ m/^{(.*)}(@[\w|.*]+)?$/ ) {
+          $txt = "{$1}";
+          $readings = $2;
+
+          my $new_line = $first;
+          my $DEVICE = $name;
+          ($txt,$new_line) = eval $txt;
+          $first = $new_line if( defined($new_line) );
+          if( $@ ) {
+            $txt = "<ERROR>";
+            Log3 $d, 3, $d .": ". $regex .": ". $@;
+          }
+          next if( !defined($txt) );
+        }
+
+        my $name_style = lookup2($name_style,$name,$1,undef);
+
+        if( $txt eq 'br' ) {
+          $ret .= sprintf("<tr class=\"%s\">", ($row-1&1)?"odd":"even");
+          $ret .= "<td><div $name_style class=\"dname\"></div></td>";
+          $first = 0;
+          next;
+        } elsif( $first || $multi == 1 ) {
+          $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+          $row++;
+
+          if( $h != $hash ) {
+            my $a = AttrVal($name, "alias", $name);
+            my $m = "$a$separator";
+            $m = $a if( $multi != 1 );
+            my $room = AttrVal($name, "room", "");
+            my $group = AttrVal($name, "group", "");
+            my $txt = lookup($mapping,$name,$a,"","",$room,$group,$m);
+
+            $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
+          }
+        }
+        $item++;
+        my $inform_id = "";
+        $inform_id = "informId=\"$d-$item.item\"" if( $readings );
+        $ret .= "<td><div $name_style $inform_id class=\"dname\">$txt</div></td>";
+        $first = 0;
+        next;
+      } elsif( $regex && $regex =~ m/^\+(.*)/ ) {
         $regex = $1;
-        $show_time = 0;
       } elsif( $regex && $regex =~ m/^\?(.*)/ ) {
         $regex = $1;
-        $show_time = 0;
         $h = $attr{$name};
       } else {
         $h = $h->{READINGS};
@@ -275,7 +375,14 @@ readingsGroup_2html($)
       foreach my $n (sort keys %{$h}) {
         next if( $n =~ m/^\./);
         next if( $n eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
-        next if( defined($regex) &&  $n !~ m/^$regex$/);
+        if( defined($regex) ) {
+          eval { $n =~ m/^$regex$/ };
+          if( $@ ) {
+            Log3 $name, 3, $name .": ". $regex .": ". $@;
+            last;
+          }
+        next if( $n !~ m/^$regex$/);
+        }
         my $val = $h->{$n};
 
         my ($v, $t);
@@ -284,6 +391,7 @@ readingsGroup_2html($)
           ($v, $t) = ($val->{VAL}, $val->{TIME});
           $v = FW_htmlEscape($v);
           $t = "" if(!$t);
+          $t = "" if( $multi != 1 );
         } else {
           $v = FW_htmlEscape($val);
         }
@@ -293,10 +401,17 @@ readingsGroup_2html($)
 
         my $value_format = lookup2($value_format,$name,$n,$v);
         next if( !defined($value_format) );
-        $v = sprintf( $value_format, $v ) if( $value_format );
+        if(  $value_format =~ m/%/ ) {
+          $v = sprintf( $value_format, $v );
+        } elsif( $value_format ) {
+          $v = $value_format;
+        }
+
+        my $value_columns = lookup2($value_columns,$name,$n,$v);
 
         my $a = AttrVal($name, "alias", $name);
         my $m = "$a$separator$n";
+        $m = $a if( $multi != 1 );
         my $room = AttrVal($name, "room", "");
         my $group = AttrVal($name, "group", "");
         my $txt = lookup($mapping,$name,$a,$n,$v,$room,$group,$m);
@@ -326,15 +441,19 @@ readingsGroup_2html($)
         }
 
         $txt = "<a href=\"/fhem?detail=$name\">$txt</a>" if( $show_links );
+        $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
+
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
-        $ret .= "<td informId=\"$d-$name.$n.icon\">$devStateIcon</td>" if( $devStateIcon );
-        $ret .= "<td><div $value_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
-        $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time );
+        $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
+        $ret .= "<td $value_columns><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
+        $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
       }
     }
   }
+  $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+  $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>" if( $disable > 0 );
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
 
@@ -344,6 +463,15 @@ sub
 readingsGroup_detailFn()
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  my $hash = $defs{$d};
+
+  if( 1 || $hash->{alwaysTrigger} ) {
+    delete( $hash->{helper}->{myDisplay} );
+  } else {
+    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
+    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+  }
 
   return readingsGroup_2html($d);
 }
@@ -363,7 +491,36 @@ readingsGroup_Notify($$)
     return undef;
   }
 
-  return if($dev->{NAME} eq $name);
+  return if( AttrVal($name,"disable", 0) > 0 );
+
+  if( 1 || $hash->{alwaysTrigger} ) {
+  } elsif( !defined($hash->{helper}{myDisplay})
+      || !%{$hash->{helper}{myDisplay}} ) {
+    Log3 $name, 5, "$name: not on any display, ignoring notify";
+    return undef;
+  } else {
+    foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
+      if( defined($defs{$display}) ) {
+        my $filter = $defs{$display}->{inform};
+        return undef if( !defined($filter) );
+        my $rn = AttrVal($name, "room", "");
+        if($filter eq "all" || $rn =~ m/\b$filter\b/) {
+          Log3 $name, 5, "$name: do update";
+        } else {
+          Log3 $name, 5, "$name: $display is not my room, ignoring notify";
+          delete( $hash->{helper}{myDisplay}{$display} );
+          return undef;
+        }
+      } else {
+        Log3 $name, 5, "$name: $display is closed, ignoring notify";
+        delete( $hash->{helper}{myDisplay}{$display} );
+        return undef;
+      }
+    }
+  }
+
+  return if($dev->{TYPE} eq $hash->{TYPE});
+  #return if($dev->{NAME} eq $name);
 
   my $devices = $hash->{DEVICES};
 
@@ -412,6 +569,8 @@ readingsGroup_Notify($$)
         $value = $s;
       }
 
+      my $value_style = AttrVal( $name, "valueStyle", "" );
+
       my $value_format = AttrVal( $name, "valueFormat", "" );
       if( $value_format =~ m/^{.*}$/ ) {
         my $vf = eval $value_format;
@@ -422,17 +581,64 @@ readingsGroup_Notify($$)
       $valueIcon = eval $valueIcon if( $valueIcon =~ m/^{.*}$/ );
 
       foreach my $device (@{$devices}) {
+        my $item = 0;
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
         my $regex = @{$device}[1];
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
-        foreach my $regex (@list) {
+        #foreach my $regex (@list) {
+        for( my $i = 0; $i <= $#list; ++$i ) {
+        my $regex = $list[$i];
+          while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && $list[++$i] ) {
+            $regex .= ",". $list[$i];
+          }
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           next if( $regex && $regex =~ m/^\+/ );
           next if( $regex && $regex =~ m/^\?/ );
+          if( $regex && $regex =~ m/^<(.*)>$/ ) {
+            my $txt = $1;
+            my $readings;
+            if( $txt =~ m/^{(.*)}(@([\w|.*]+))?$/ ) {
+              $txt = "{$1}";
+              $readings = $3;
+
+              next if( !$readings );
+              next if( $reading !~ m/^$readings$/);
+
+              my $new_line;
+              my $DEVICE = $dev->{NAME};
+              ($txt,$new_line) = eval $txt;
+              if( $@ ) {
+                $txt = "<ERROR>";
+                Log3 $name, 3, $name .": ". $regex .": ". $@;
+              }
+              $txt = "" if( !defined($txt) );
+
+              $item++;
+              CommandTrigger( "", "$name $item.item: $txt" );
+            }
+
+            next;
+          }
+
           next if( defined($regex) && $reading !~ m/^$regex$/);
+
+          my $value_style = lookup2($value_style,$dev->{NAME},$reading,$value);
+
+          my $value = $value;
+          if( $value_format ) {
+            my $value_format = lookup2($value_format,$dev->{NAME},$reading,$value);
+
+            if( !defined($value_format) ) {
+              $value = "";
+            } elsif( $value_format =~ m/%/ ) {
+              $value = sprintf( $value_format, $value );
+            } elsif( $value_format ) {
+              $value = $value_format;
+            }
+          }
 
           my $devStateIcon;
           if( $valueIcon ) {
@@ -450,28 +656,11 @@ readingsGroup_Notify($$)
               }
             }
 
-            CommandTrigger( "", "$name $n.$reading.icon: $devStateIcon" ) if( $devStateIcon );
+            CommandTrigger( "", "$name $n.$reading: $devStateIcon" ) if( $devStateIcon );
             next if( $devStateIcon );
           }
 
-          my $value = $value;
-          if( $value_format ) {
-            my $value_format = $value_format;
-            if( ref($value_format) eq 'HASH' ) {
-              my $vf = "";
-              $vf = $value_format->{$reading} if( exists($value_format->{$reading}) );
-              $vf = $value_format->{$dev->{NAME}.".".$reading} if( exists($value_format->{$dev->{NAME}.".".$reading}) );
-              $value_format = $vf;
-              } elsif( $value_format =~ m/^{.*}$/) {
-              my $DEVICE = $dev->{NAME};
-              my $READING = $reading;
-              my $VALUE = $value;
-              $value_format = eval $value_format;
-            }
-
-            $value = "" if( !defined($value_format) );
-            $value = sprintf( $value_format, $value ) if( $value_format );
-          }
+          $value = "<div $value_style>$value</div>" if( $value_style );
 
           CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
         }
@@ -516,6 +705,34 @@ readingsGroup_Get($@)
   return "Unknown argument $cmd, choose one of html:noArg";
 }
 
+sub
+readingsGroup_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $orig = $attrVal;
+
+  if( $attrName eq "alwaysTrigger" ) {
+    my $hash = $defs{$name};
+    $attrVal = 1 if($attrVal);
+
+    if( $cmd eq "set" ) {
+      $hash->{alwaysTrigger} = $attrVal;
+      delete( $hash->{helper}->{myDisplay} ) if( $hash->{alwaysTrigger} );
+    } else {
+      delete $hash->{alwaysTrigger};
+    }
+  }
+
+  if( $cmd eq "set" ) {
+    if( $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return $attrName ." set to ". $attrVal;
+    }
+  }
+
+  return;
+}
+
 1;
 
 =pod
@@ -536,10 +753,17 @@ readingsGroup_Get($@)
     Notes:
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
+      <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
+          inserted as a line in the readings list. skipped if STRING is undef.</li>
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
-      <li>If regex starts with a + it will be matched against the internal values of the device instead of the readings.</li>
-      <li>If regex starts with a ? it will be matched against the attributes of the device instead of the readings.</li>
+      <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
+      <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
+      <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[@readings]&gt; where STRING or the string returned by perl is
+          inserted as the reading. skipped if STRING is undef. if STRING is br a new line will be started. if readings is
+          given the perl expression will be reevaluated during longpoll updates.</li>
       <li>For internal values and attributes longpoll update is not possible. Refresh the page to update the values.</li>
+      <li>the &lt;{perl}&gt; expression is limited to expressions without a space. it is best just to call a small sub
+          in 99_myUtils.pm instead of having a compex expression in the define.</li>
     </ul><br>
 
     Examples:
@@ -548,7 +772,7 @@ readingsGroup_Get($@)
         define batteries readingsGroup .*:battery</code><br>
       <br>
         <code>define temperatures readingsGroup s300th.*:temperature</code><br>
-        <code>define temperatures readingsGroup TYPE=CUL_WS.*:temperature</code><br>
+        <code>define temperatures readingsGroup TYPE=CUL_WS:temperature</code><br>
       <br>
         <code>define culRSSI readingsGroup cul_RSSI=.*:+cul_RSSI</code><br>
       <br>
@@ -560,15 +784,15 @@ readingsGroup_Get($@)
         define systemStatus readingsGroup sysstat<br>
         attr systemStatus notime 1<br>
         attr systemStatus nostate 1<br>
-        attr systemStatus mapping { 'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
+        attr systemStatus mapping {'load' => 'Systemauslastung', 'temperature' => 'Systemtemperatur in &amp;deg;C'}<br>
       <br>
-        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption
-        attr Verbrauch mapping %ALIAS
-        attr Verbrauch nameStyle style="font-weight:bold"
-        attr Verbrauch style style="font-size:20px"
-        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}
-        attr Verbrauch valueIcon { state => '%devStateIcon' }
-        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}
+        define Verbrauch readingsGroup TYPE=PCA301:state,power,consumption<br>
+        attr Verbrauch mapping %ALIAS<br>
+        attr Verbrauch nameStyle style="font-weight:bold"<br>
+        attr Verbrauch style style="font-size:20px"<br>
+        attr Verbrauch valueFormat {power => "%.1f W", consumption => "%.2f kWh"}<br>
+        attr Verbrauch valueIcon { state => '%devStateIcon' }<br>
+        attr Verbrauch valueStyle {($READING eq "power" && $VALUE > 150)?'style="color:red"':'style="color:green"'}<br>
       </code><br>
     </ul>
   </ul><br>
@@ -586,6 +810,12 @@ readingsGroup_Get($@)
   <a name="readingsGroup_Attr"></a>
     <b>Attributes</b>
     <ul>
+      <li>alwaysTrigger<br>
+        1 -> alwaysTrigger update events. even if not visible.</li>
+      <li>disable<br>
+        1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
+        2 -> also disable html table creation<br>
+        3 -> also disable html creation completely</li>
       <li>noheading<br>
         If set to 1 the readings table will have no heading.</li>
       <li>nolinks<br>
@@ -614,6 +844,9 @@ readingsGroup_Get($@)
       <li>valueStyle<br>
         Specify an HTML style for the reading values, e.g.:<br>
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
+      <li>valueColumns<br>
+        Specify an HTML colspan for the reading values, e.g.:<br>
+          <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li>
       <li>valueFormat<br>
         Specify an sprintf style format string used to display the reading values. If the format string is undef
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
@@ -639,10 +872,11 @@ readingsGroup_Get($@)
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
     </ul>
-      Note: The perl expressions are evaluated only once during html creation and will not reflect value updates with longpoll.
+      Note: Only valueStyle, valueFomat, valueIcon and <{...}@reading> are evaluated during longpoll updates
+      and valueStyle has to return a non empty style for every possible value. All other perl expressions are
+      evaluated only once during html creation and will not reflect value updates with longpoll.
       Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
       the font-... and background attributes do work.
-
 </ul>
 
 =end html

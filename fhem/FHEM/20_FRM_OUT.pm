@@ -29,7 +29,7 @@ FRM_OUT_Initialize($)
   $hash->{AttrFn}    = "FRM_OUT_Attr";
   $hash->{StateFn}   = "FRM_OUT_State";
   
-  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -127,6 +127,9 @@ FRM_OUT_Attr($$$$) {
   <b>Set</b><br>
   <ul>
   <code>set &lt;name&gt; on|off</code><br><br>
+  </ul>
+  <ul>
+  <a href="#setExtensions">set extensions</a> are supported<br>
   </ul>
   <a name="FRM_OUTget"></a>
   <b>Get</b><br>

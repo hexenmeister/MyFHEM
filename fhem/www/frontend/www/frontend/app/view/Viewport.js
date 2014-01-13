@@ -9,6 +9,7 @@ Ext.define('FHEM.view.Viewport', {
     requires: [
         'FHEM.view.LineChartPanel',
         'FHEM.view.TableDataGridPanel',
+        'FHEM.view.StatusPanel',
         'FHEM.controller.ChartController',
         'FHEM.store.SavedChartsStore',
         'Ext.layout.container.Border',
@@ -33,7 +34,6 @@ Ext.define('FHEM.view.Viewport', {
                     items: [
                         {
                             xtype: 'container',
-                            //html: '<p><img src="../../fhem/images/default/fhemicon.png" height="40px"</></p><h1 class="x-panel-header">Frontend</h1>',
                             html: 'FHEM Webfrontend',
                             width: '25%',
                             padding: '15px 0 0 5px',
@@ -109,7 +109,13 @@ Ext.define('FHEM.view.Viewport', {
                     },
                     items: [
                         {
-                            xtype: 'panel',
+                            title: 'FHEM Status',
+                            name: 'fhemstatusaccordion',
+                            expanded: true,
+                            bodyPadding: '5 5 5 5',
+                            html: 'See your current FHEM Status / Overview Information here.'
+                        },
+                        {
                             title: 'FHEM',
                             name: 'fhemaccordion',
                             collapsed: true,
@@ -117,77 +123,67 @@ Ext.define('FHEM.view.Viewport', {
                             html: 'You can see and use the original FHEM Frontend here. <br> If you make changes to your config, it may be neccessary to reload this page to get the updated information.'
                         },
                         {
-                            xtype: 'panel',
+                            xtype: 'treepanel',
                             title: 'Charts / Devices / Rooms',
-                            name: 'devicesaccordion',
-                            width: '90%',
+                            name: 'maintreepanel',
                             collapsed: false,
-//                            autoScroll: true,
-                            overflowY: 'auto',
-                            bodyPadding: '2 2 2 2',
-                            items: [
-                                {
-                                    xtype: 'treepanel',
-                                    name: 'maintreepanel',
-                                    border: false,
-                                    rootVisible: false,
-                                    viewConfig: {
-                                        plugins: { ptype: 'treeviewdragdrop' }
-                                    },
-                                    root: { 
-                                        "text": "Root", 
-                                        "expanded": 
-                                        "true", 
-                                        "children": []
-                                    },
-                                    tbar: [
-                                        { 
-                                            xtype: 'button', 
-                                            name: 'unsortedtree',
-                                            toggleGroup: 'treeorder',
-                                            allowDepress: false,
-                                            text: 'Unsorted'
-                                        },
-                                        { 
-                                            xtype: 'button', 
-                                            name: 'sortedtree',
-                                            toggleGroup: 'treeorder',
-                                            allowDepress: false,
-                                            text: 'Order by Room',
-                                            pressed: true
+                            border: false,
+                            rootVisible: false,
+                            viewConfig: {
+                                plugins: { ptype: 'treeviewdragdrop' }
+                            },
+                            root: { 
+                                "text": "Root", 
+                                "expanded": 
+                                "true", 
+                                "children": []
+                            },
+                            tbar: [
+                                { 
+                                    xtype: 'button', 
+                                    name: 'unsortedtree',
+                                    toggleGroup: 'treeorder',
+                                    allowDepress: false,
+                                    text: 'Unsorted'
+                                },
+                                { 
+                                    xtype: 'button', 
+                                    name: 'sortedtree',
+                                    toggleGroup: 'treeorder',
+                                    allowDepress: false,
+                                    text: 'Order by Room',
+                                    pressed: true
+                                }
+                            ],
+                            listeners: {
+                                'itemcontextmenu': function(scope, rec, item, index, e, eOpts) {
+                                    e.preventDefault();
+                                    
+                                    if (rec.raw.data.TYPE &&
+                                        (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart")) {
+                                        var menu = Ext.ComponentQuery.query('menu[id=treecontextmenu]')[0];
+                                        if (menu) {
+                                            menu.destroy();
                                         }
-                                    ],
-                                    listeners: {
-                                        'itemcontextmenu': function(scope, rec, item, index, e, eOpts) {
-                                            e.preventDefault();
-                                            
-                                            if (rec.raw.data.TYPE && rec.raw.data.TYPE === "savedchart") {
-                                                var menu = Ext.ComponentQuery.query('menu[id=treecontextmenu]')[0];
-                                                if (menu) {
-                                                    menu.destroy();
+                                        Ext.create('Ext.menu.Menu', {
+                                            id: 'treecontextmenu',
+                                            items: [
+                                                {
+                                                    text: 'Delete Chart',
+                                                    name: 'deletechartfromcontext',
+                                                    record: rec
+                                                }, '-', {
+                                                    text: 'Rename Chart',
+                                                    name: 'renamechartfromcontext',
+                                                    record: rec
                                                 }
-                                                Ext.create('Ext.menu.Menu', {
-                                                    id: 'treecontextmenu',
-                                                    items: [
-                                                        {
-                                                            text: 'Delete Chart',
-                                                            name: 'deletechartfromcontext',
-                                                            record: rec
-                                                        }, '-', {
-                                                            text: 'Rename Chart',
-                                                            name: 'renamechartfromcontext',
-                                                            record: rec
-                                                        }
-                                                    ]
-                                                }).showAt(e.xy);
-                                            }
-                                        }
+                                            ]
+                                        }).showAt(e.xy);
                                     }
                                 }
-                            ]
+                            }
                         },
                         {
-                            xtype: 'panel',
                             title: 'Database Tables',
                             name: 'tabledataaccordionpanel',
                             autoScroll: true,
@@ -197,7 +193,6 @@ Ext.define('FHEM.view.Viewport', {
                     ]
                 }, 
                 {
-                    xtype: 'panel',
                     region: 'south',
                     title: 'Status',
                     collapsible: true,
@@ -211,29 +206,31 @@ Ext.define('FHEM.view.Viewport', {
                     minHeight: 30
                 },
                 {
-                    xtype: 'panel',
-                    region: 'center',
-                    title: 'Welcome',
-                    layout: 'hbox',
-                    bodyStyle: 'padding:5px 5px 0',
-                    items: [
-                        {
-                            xtype: 'image',
-                            src: '../../fhem/images/default/fhemicon.png',
-                            height: 132,
-                            width: 120
-                        },
-                        {
-                            xtype: 'text',
-                            name: 'statustextfield',
-                            padding: '50 0 0 20',
-                            width: 400,
-                            height: 130,
-                            html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
-                        }
-                    ],
-                    height: '100%'
+                    xtype: 'statuspanel'
                 }
+//                {
+//                    region: 'center',
+//                    title: 'Welcome',
+//                    layout: 'hbox',
+//                    bodyStyle: 'padding:5px 5px 0',
+//                    items: [
+//                        {
+//                            xtype: 'image',
+//                            src: '../../fhem/images/default/fhemicon.png',
+//                            height: 132,
+//                            width: 120
+//                        },
+//                        {
+//                            xtype: 'text',
+//                            name: 'statustextfield',
+//                            padding: '50 0 0 20',
+//                            width: 400,
+//                            height: 130,
+//                            html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
+//                        }
+//                    ],
+//                    height: '100%'
+//                }
             ]
         });
 

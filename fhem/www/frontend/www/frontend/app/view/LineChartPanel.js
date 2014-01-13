@@ -54,6 +54,11 @@ Ext.define('FHEM.view.LineChartPanel', {
         lastXmin: null,
         
         /**
+         * used to suppress setting new lastmin and max values when zooming multiple times 
+         */
+        timesZoomed: 0,
+        
+        /**
          * 
          */
         axiscounter: 0
@@ -91,7 +96,7 @@ Ext.define('FHEM.view.LineChartPanel', {
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
-            maxHeight: 325,
+            maxHeight: 345,
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
@@ -99,7 +104,6 @@ Ext.define('FHEM.view.LineChartPanel', {
             items: [
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
                     title: 'Select data',
                     name: 'axesfieldset',
                     defaults: {
@@ -109,72 +113,102 @@ Ext.define('FHEM.view.LineChartPanel', {
                 },
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'vbox',
+                    autoScroll: true,
                     title: 'Select Timerange',
                     defaults: {
                         margin: '0 0 0 10'
                     },
                     items: [
                         {
-                            xtype: 'radiofield',
-                            fieldLabel: 'Timerange', 
-                            labelWidth: 60,
-                            name: 'rb', 
-                            checked: true,
-                            inputValue: 'timerange',
-                            listeners: {
-                                change: function(rb, newval, oldval) {
-                                    if (newval === false) {
-                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(true);
-                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(true);
-                                    } else {
-                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(false);
-                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(false);
-                                    }
-                                }
-                            }
-                        },
-                        {
-                          xtype: 'datefield',
-                          name: 'starttimepicker',
-                          format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Starttime',
-                          allowBlank: false,
-                          labelWidth: 70
-                        },
-                        {
-                          xtype: 'datefield',
-                          name: 'endtimepicker',
-                          format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Endtime',
-                          allowBlank: false,
-                          labelWidth: 70
-                        },
-                        {
-                            xtype: 'radiogroup',
-                            name: 'dynamictime',
-                            fieldLabel: 'or select a dynamic time',
-                            labelWidth: 140,
-                            allowBlank: true,
+                            xtype: 'fieldset',
+                            layout: 'hbox',
+                            autoScroll: true,
+                            border: false,
                             defaults: {
-                                labelWidth: 42,
-                                padding: "0 25px 0 0",
-                                checked: false
+                                margin: '0 0 0 10'
                             },
                             items: [
-                                { fieldLabel: 'yearly', name: 'rb', inputValue: 'year' },
-                                { fieldLabel: 'monthly', name: 'rb', inputValue: 'month' },
-                                { fieldLabel: 'weekly', name: 'rb', inputValue: 'week' },
-                                { fieldLabel: 'daily', name: 'rb', inputValue: 'day' },
-                                { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour' }
+                                {
+                                    xtype: 'radiofield',
+                                    fieldLabel: 'Timerange', 
+                                    labelWidth: 60,
+                                    name: 'rb', 
+                                    checked: false,
+                                    allowBlank: true,
+                                    inputValue: 'timerange',
+                                    listeners: {
+                                        change: function(rb, newval, oldval) {
+                                            if (newval === false) {
+                                                rb.up().down('datefield[name=starttimepicker]').setDisabled(true);
+                                                rb.up().down('datefield[name=endtimepicker]').setDisabled(true);
+                                            } else {
+                                                rb.up().down('datefield[name=starttimepicker]').setDisabled(false);
+                                                rb.up().down('datefield[name=endtimepicker]').setDisabled(false);
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                  xtype: 'datefield',
+                                  name: 'starttimepicker',
+                                  format: 'Y-m-d H:i:s',
+                                  fieldLabel: 'Starttime',
+                                  allowBlank: false,
+                                  labelWidth: 70,
+                                  value: Ext.Date.add(new Date(), Ext.Date.DAY, -1)
+                                },
+                                {
+                                  xtype: 'datefield',
+                                  name: 'endtimepicker',
+                                  format: 'Y-m-d H:i:s',
+                                  fieldLabel: 'Endtime',
+                                  allowBlank: false,
+                                  labelWidth: 70,
+                                  value: new Date()
+                                }
+                            ]
+                        },
+                        {
+                            xtype: 'fieldset',
+                            layout: 'hbox',
+                            autoScroll: true,
+                            border: false,
+                            defaults: {
+                                margin: '0 0 0 10'
+                            },
+                            items: [
+                                {
+                                    xtype: 'radiogroup',
+                                    name: 'dynamictime',
+                                    fieldLabel: 'or select a dynamic time',
+                                    labelWidth: 140,
+                                    width: 900,
+                                    allowBlank: true,
+                                    defaults: {
+                                        padding: "0px 0px 0px 18px"
+                                    },
+                                    items: [
+                                        { fieldLabel: 'yearly', name: 'rb', inputValue: 'year', labelWidth: 38 },
+                                        { fieldLabel: 'monthly', name: 'rb', inputValue: 'month', labelWidth: 44 },
+                                        { fieldLabel: 'weekly', name: 'rb', inputValue: 'week', labelWidth: 40 },
+                                        { fieldLabel: 'daily', name: 'rb', inputValue: 'day', checked: true, labelWidth: 31 },
+                                        { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour', labelWidth: 38 },
+                                        { fieldLabel: 'last hour', name: 'rb', inputValue: 'lasthour', labelWidth: 60 },
+                                        { fieldLabel: 'last 24h', name: 'rb', inputValue: 'last24h', labelWidth: 48 },
+                                        { fieldLabel: 'last 7 days', name: 'rb', inputValue: 'last7days', labelWidth: 65 },
+                                        { fieldLabel: 'last month', name: 'rb', inputValue: 'lastmonth', labelWidth: 65 }
+                                    ]
+                                }
                             ]
                         }
                     ]
-                }, 
+                },
                 {
 
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     title: 'Axis Configuration',
                     defaults: {
                         margin: '0 0 0 10'
@@ -186,6 +220,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             fieldLabel: 'Left Axis Scalerange',
                             labelWidth: 120,
                             allowBlank: true,
+                            width: 310,
                             defaults: {
                                 labelWidth: 55,
                                 padding: "0 25px 0 0",
@@ -230,6 +265,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             name: 'rightaxisconfiguration',
                             fieldLabel: 'Right Axis Scalerange',
                             labelWidth: 130,
+                            width: 310,
                             allowBlank: true,
                             defaults: {
                                 labelWidth: 55,
@@ -274,7 +310,8 @@ Ext.define('FHEM.view.LineChartPanel', {
                 }, 
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     title: 'Axis Title Configuration',
                     defaults: {
                         margin: '0 0 5 10'
@@ -300,7 +337,8 @@ Ext.define('FHEM.view.LineChartPanel', {
                 }, 
                 {
                     xtype: 'fieldset',
-                    layout: 'column',
+                    layout: 'hbox',
+                    autoScroll: true,
                     defaults: {
                         margin: '10 10 10 10'
                     },
@@ -416,36 +454,68 @@ Ext.define('FHEM.view.LineChartPanel', {
         var me = this;
         
         me.setAxiscounter(me.getAxiscounter() + 1);
+        var countForThisRow = me.getAxiscounter();
         
         var components = 
             {
                 xtype: 'fieldset',
-                name: 'singlerowfieldset',
-                layout: 'column',
+                name: 'singlerowfieldset' + countForThisRow,
+                commonName: 'singlerowfieldset', 
+                layout: 'hbox',
+                autoScroll: true,
                 defaults: {
                     margin: '5 5 5 0'
                 },
                 items: 
                     [
+                       {
+                           xtype: 'radiogroup',
+                           name: 'datasourceradio',
+                           rowCount: countForThisRow,
+                           allowBlank: false,
+                           defaults: {
+                               labelWidth: 40,
+                               padding: "0 5px 0 0"
+                           },
+                           items: [
+                               {
+                                   fieldLabel: 'DbLog',
+                                   name: 'logtype' + countForThisRow,
+                                   inputValue: 'dblog',
+                                   checked: true,
+                                   disabled: !FHEM.dblogname
+                               },
+                               {
+                                   fieldLabel: 'FileLog',
+                                   name: 'logtype' + countForThisRow,
+                                   inputValue: 'filelog',
+                                   checked: false,
+                                   disabled: !FHEM.filelogs
+                               }
+                           ]
+                        },
                         {  
                           xtype: 'combobox', 
                           name: 'devicecombo',
                           fieldLabel: 'Select Device',
                           labelWidth: 90,
                           store: me.devicestore,
+                          triggerAction: 'all',
                           allowBlank: false,
-                          queryMode: 'local',
                           displayField: 'DEVICE',
                           valueField: 'DEVICE',
                           listeners: {
                               select: function(combo) {
+                                  
                                   var device = combo.getValue(),
                                       readingscombo = combo.up().down('combobox[name=yaxiscombo]'),
-                                      readingsstore = readingscombo.getStore(),
-                                      readingsproxy = readingsstore.getProxy();
+                                      readingsstore = readingscombo.getStore();
                                   
-                                  readingsproxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + device + '+getreadings&XHR=1';
-                                  readingsstore.load();
+                                  if (readingsstore && readingsstore.queryMode !== 'local') {
+                                      var readingsproxy = readingsstore.getProxy();
+                                      readingsproxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + device + '+getreadings&XHR=1';
+                                      readingsstore.load();
+                                  }
                                   readingscombo.setDisabled(false);
                               }
                           }
@@ -459,6 +529,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                             labelWidth: 90,
                             inputWidth: 110,
                             store: Ext.create('FHEM.store.ReadingsStore', {
+                                queryMode: 'remote',
                                 proxy: {
                                     type: 'ajax',
                                     method: 'POST',
@@ -474,36 +545,352 @@ Ext.define('FHEM.view.LineChartPanel', {
                             displayField: 'READING',
                             valueField: 'READING'
                         },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'yaxiscolorcombo',
-                            fieldLabel: 'Y-Color',
-                            labelWidth: 50,
-                            inputWidth: 70,
-                            store: Ext.create('Ext.data.Store', {
-                                fields: ['name', 'value'],
-                                data : [
-                                    {'name':'Blue','value':'#2F40FA'},
-                                    {'name':'Green', 'value':'#46E01B'},
-                                    {'name':'Orange','value':'#F0A800'},
-                                    {'name':'Red','value':'#E0321B'},
-                                    {'name':'Yellow','value':'#F5ED16'}
-                                ]
-                            }),
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: '#2F40FA'
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'yaxisfillcheck',
-                            boxLabel: 'Fill'
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'yaxisstepcheck',
-                            boxLabel: 'Steps',
-                            tooltip: 'Check, if the chart should be shown with steps instead of a linear Line'
+                        {
+                            xtype: 'button',
+                            text: 'Styling...',
+                            handler: function() {
+                                Ext.create('Ext.window.Window', {
+                                    width: 470,
+                                    height: 600,
+                                    name: 'stylerwindow',
+                                    title: 'Set the Style for this Axis',
+                                    modal: true,
+                                    constrainHeader: true,
+                                    items: [
+                                        {
+                                            xtype: 'panel',
+                                            title: 'Preview',
+                                            height: 200,
+                                            items: [
+                                                me.createPreviewChart(countForThisRow)
+                                            ]
+                                        },
+                                        {
+                                            xtype: 'panel',
+                                            title: 'Configuration',
+                                            autoScroll: true,
+                                            height: 335,
+                                            defaults: {
+                                                padding: '5px 5px 5px 5px'
+                                            },
+                                            items: [
+                                                {
+                                                    xtype: 'fieldset',
+                                                    layout: 'vbox',
+                                                    title: 'Line Settings',
+                                                    items: [
+                                                        {
+                                                            xtype: 'numberfield',
+                                                            name: 'linestrokewidth',
+                                                            fieldLabel: 'Line Stroke Width',
+                                                            editable: false,
+                                                            labelWidth: 150,
+                                                            value: me.getStyleConfig(countForThisRow).linestrokewidth,
+                                                            maxValue: 10,
+                                                            minValue: 1,
+                                                            listeners: {
+                                                                change: function(field, val) {
+                                                                    me.createPreviewChart(countForThisRow);
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'container',
+                                                            name: 'linecolorcontainer',
+                                                            layout: 'hbox',
+                                                            items: [
+                                                                {
+                                                                    xtype: 'displayfield',
+                                                                    value: 'Select your Linecolor: ',
+                                                                    width: 155
+                                                                },
+                                                                {
+                                                                    xtype: 'colorpicker',
+                                                                    listeners: {
+                                                                        select: function(picker, selColor) {
+                                                                            picker.up().down('textfield').setValue(selColor);
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    xtype: 'textfield',
+                                                                    padding: '0 0 0 5px',
+                                                                    labelWidth: 50,
+                                                                    width: 120,
+                                                                    name: 'linecolorhexcode',
+                                                                    fieldLabel: 'Hexcode',
+                                                                    value: me.getStyleConfig(countForThisRow).linecolorhexcode.indexOf("#") >= 0 ? me.getStyleConfig(countForThisRow).linecolorhexcode.split("#")[1] : me.getStyleConfig(countForThisRow).linecolorhexcode,
+                                                                    listeners: {
+                                                                        change: function(field, val) {
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }        
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    xtype: 'fieldset',
+                                                    layout: 'vbox',
+                                                    title: 'Fill Color',
+                                                    items: [
+                                                        {  
+                                                            xtype: 'checkboxfield', 
+                                                            name: 'yaxisfillcheck',
+                                                            fieldLabel: 'Use a Fill below the line?',
+                                                            labelWidth: 150,
+                                                            checked: (me.getStyleConfig(countForThisRow).yaxisfillcheck === "false" || !me.getStyleConfig(countForThisRow).yaxisfillcheck) ? false : true,
+                                                            listeners: {
+                                                                change: function(box, state) {
+                                                                    if (state === true) {
+                                                                        box.up().down('numberfield').show();
+                                                                        box.up().down('container[name=fillcolorcontainer]').show();
+                                                                        me.createPreviewChart(countForThisRow);
+                                                                    } else {
+                                                                        box.up().down('numberfield').hide();
+                                                                        box.up().down('container[name=fillcolorcontainer]').hide();
+                                                                        me.createPreviewChart(countForThisRow);
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'numberfield',
+                                                            name: 'fillopacity',
+                                                            fieldLabel: 'Opacity for Fill',
+                                                            editable: false,
+                                                            hidden: (me.getStyleConfig(countForThisRow).yaxisfillcheck === "false" || me.getStyleConfig(countForThisRow).yaxisfillcheck === false) ? true : false,
+                                                            labelWidth: 150,
+                                                            value: me.getStyleConfig(countForThisRow).fillopacity,
+                                                            maxValue: 1.0,
+                                                            minValue: 0.1,
+                                                            step: 0.1,
+                                                            listeners: {
+                                                                change: function(field, val) {
+                                                                    me.createPreviewChart(countForThisRow);
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'container',
+                                                            name: 'fillcolorcontainer',
+                                                            layout: 'hbox',
+                                                            hidden: (me.getStyleConfig(countForThisRow).yaxisfillcheck === "false" || me.getStyleConfig(countForThisRow).yaxisfillcheck === false) ? true : false,
+                                                            items: [
+                                                                {
+                                                                    xtype: 'displayfield',
+                                                                    value: 'Select your Fillcolor: ',
+                                                                    width: 155
+                                                                },
+                                                                {
+                                                                    xtype: 'colorpicker',
+                                                                    listeners: {
+                                                                        select: function(picker, selColor) {
+                                                                            picker.up().down('textfield').setValue(selColor);
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    xtype: 'textfield',
+                                                                    padding: '0 0 0 5px',
+                                                                    labelWidth: 50,
+                                                                    width: 120,
+                                                                    name: 'fillcolorhexcode',
+                                                                    fieldLabel: 'Hexcode',
+                                                                    value: me.getStyleConfig(countForThisRow).fillcolorhexcode.indexOf("#") >= 0 ? me.getStyleConfig(countForThisRow).fillcolorhexcode.split("#")[1] : me.getStyleConfig(countForThisRow).fillcolorhexcode,
+                                                                    listeners: {
+                                                                        change: function(field, val) {
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    xtype: 'fieldset',
+                                                    layout: 'vbox',
+                                                    title: 'Point Settings',
+                                                    items: [
+                                                        {
+                                                            xtype: 'displayfield',
+                                                            value: 'Configure how the Points representing Readings should be displayed.<br>'
+                                                        },
+                                                        {  
+                                                            xtype: 'checkboxfield', 
+                                                            name: 'yaxisshowpoints',
+                                                            checked: (me.getStyleConfig(countForThisRow).yaxisshowpoints === "false" || me.getStyleConfig(countForThisRow).yaxisshowpoints === false) ? false : true,
+                                                            fieldLabel: 'Show Points? (if not, you will only see the line)',
+                                                            labelWidth: 150,
+                                                            listeners: {
+                                                                change: function(box, state) {
+                                                                    if (state === true) {
+                                                                        box.up().down('container[name=pointfillcolorcontainer]').show();
+                                                                        box.up().down('combo').show();
+                                                                        box.up().down('numberfield[name=pointradius]').show();
+                                                                        me.createPreviewChart(countForThisRow);
+                                                                    } else {
+                                                                        box.up().down('container[name=pointfillcolorcontainer]').hide();
+                                                                        box.up().down('combo').hide();
+                                                                        box.up().down('numberfield[name=pointradius]').hide();
+                                                                        me.createPreviewChart(countForThisRow);
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'combo',
+                                                            fieldLabel: 'Choose the Shape',
+                                                            name: 'shapecombo',
+                                                            labelWidth: 150,
+                                                            editable: false,
+                                                            allowBlank: false,
+                                                            store: ['circle', 'line', 'triangle', 'diamond', 'cross', 'plus', 'arrow'],
+                                                            queryMode: 'local',
+                                                            value: me.getStyleConfig(countForThisRow).pointshape,
+                                                            listeners: {
+                                                                change: function(combo, val) {
+                                                                    me.createPreviewChart(countForThisRow);
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'numberfield',
+                                                            name: 'pointradius',
+                                                            fieldLabel: 'Point Radius',
+                                                            editable: false,
+                                                            labelWidth: 150,
+                                                            value: me.getStyleConfig(countForThisRow).pointradius,
+                                                            maxValue: 10,
+                                                            minValue: 1,
+                                                            listeners: {
+                                                                change: function(field, val) {
+                                                                    me.createPreviewChart(countForThisRow);
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            xtype: 'container',
+                                                            name: 'pointfillcolorcontainer',
+                                                            layout: 'hbox',
+                                                            items: [
+                                                                {
+                                                                    xtype: 'displayfield',
+                                                                    value: 'Select your Point-Fillcolor: ',
+                                                                    width: 155
+                                                                },
+                                                                {
+                                                                    xtype: 'colorpicker',
+                                                                    listeners: {
+                                                                        select: function(picker, selColor) {
+                                                                            picker.up().down('textfield').setValue(selColor);
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    xtype: 'textfield',
+                                                                    padding: '0 0 0 5px',
+                                                                    labelWidth: 50,
+                                                                    width: 120,
+                                                                    name: 'pointcolorhexcode',
+                                                                    fieldLabel: 'Hexcode',
+                                                                    value: me.getStyleConfig(countForThisRow).pointcolorhexcode.indexOf("#") >= 0 ? me.getStyleConfig(countForThisRow).pointcolorhexcode.split("#")[1] : me.getStyleConfig(countForThisRow).pointcolorhexcode,
+                                                                    listeners: {
+                                                                        change: function(field, val) {
+                                                                            me.createPreviewChart(countForThisRow);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    xtype: 'fieldset',
+                                                    layout: 'vbox',
+                                                    title: 'Advanced Settings',
+                                                    items: [
+                                                        {  
+                                                            xtype: 'checkboxfield', 
+                                                            name: 'yaxisstepcheck',
+                                                            fieldLabel: 'Show Steps for this Axis?',
+                                                            checked: (me.getStyleConfig(countForThisRow).yaxisstepcheck === "false" || me.getStyleConfig(countForThisRow).yaxisstepcheck === false) ? false : true,
+                                                            labelWidth: 200,
+                                                            listeners: {
+                                                                change: function(box, checked) {
+                                                                    if (checked) {
+                                                                        box.up().down('numberfield').setDisabled(true);
+                                                                    } else {
+                                                                        box.up().down('numberfield').setDisabled(false);
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        {  
+                                                            xtype: 'numberfield', 
+                                                            name: 'yaxissmoothing',
+                                                            fieldLabel: 'Smoothing for this Axis (0 for off)',
+                                                            editable: false,
+                                                            value: me.getStyleConfig(countForThisRow).yaxissmoothing,
+                                                            maxValue: 10,
+                                                            minValue: 0,
+                                                            labelWidth: 200,
+                                                            listeners: {
+                                                                change: function(field, val) {
+                                                                    me.createPreviewChart(countForThisRow);
+                                                                }
+                                                            }
+                                                        },
+                                                        {  
+                                                            xtype: 'checkboxfield', 
+                                                            name: 'yaxislegendcheck',
+                                                            fieldLabel: 'Show this Axis in Legend?',
+                                                            labelWidth: 200,
+                                                            checked: (me.getStyleConfig(countForThisRow).yaxislegendcheck === "false" || me.getStyleConfig(countForThisRow).yaxislegendcheck === false) ? false : true
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    buttons: [
+                                        {
+                                            text: "Cancel",
+                                            handler: function(btn) {
+                                                btn.up('window').destroy();
+                                            }
+                                        },
+                                        {
+                                            text: "Save settings",
+                                            handler: function(btn) {
+                                                var win = btn.up('window'),
+                                                    styleConfig = me.getStyleConfig(countForThisRow);
+                                                
+                                                // set all values
+                                                styleConfig.linestrokewidth = win.down('numberfield[name=linestrokewidth]').getValue();
+                                                styleConfig.linecolorhexcode = win.down('textfield[name=linecolorhexcode]').getValue();
+                                                styleConfig.yaxisfillcheck = win.down('checkboxfield[name=yaxisfillcheck]').getValue();
+                                                styleConfig.fillopacity = win.down('numberfield[name=fillopacity]').getValue();
+                                                styleConfig.fillcolorhexcode = win.down('textfield[name=fillcolorhexcode]').getValue();
+                                                styleConfig.yaxisshowpoints = win.down('checkboxfield[name=yaxisshowpoints]').getValue();
+                                                styleConfig.pointshape = win.down('combo[name=shapecombo]').getValue();
+                                                styleConfig.pointradius = win.down('numberfield[name=pointradius]').getValue();
+                                                styleConfig.pointcolorhexcode = win.down('textfield[name=pointcolorhexcode]').getValue();
+                                                styleConfig.yaxisstepcheck = win.down('checkboxfield[name=yaxisstepcheck]').getValue();
+                                                styleConfig.yaxissmoothing = win.down('numberfield[name=yaxissmoothing]').getValue();
+                                                styleConfig.yaxislegendcheck = win.down('checkboxfield[name=yaxislegendcheck]').getValue();
+                                                
+                                                btn.up('window').destroy();
+                                            }
+                                        }
+                                    ]
+                                }).show();
+                            }
                         },
                         {
                             xtype: 'radiogroup',
@@ -515,7 +902,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                                 checked: false
                             },
                             items: [
-                                { labelWidth: 50, fieldLabel: 'Left Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'left', checked: true },
+                                { labelWidth: 60, fieldLabel: 'Left Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'left', checked: true },
                                 { labelWidth: 60, fieldLabel: 'Right Axis', name: 'rbc' + me.getAxiscounter(), inputValue: 'right' }
                             ]
                         },
@@ -569,11 +956,122 @@ Ext.define('FHEM.view.LineChartPanel', {
                                 me.removeRow(btn);
                             }      
                         }
-                ]
+                ],
+                styleConfig: {
+                    linestrokewidth: 2,
+                    linecolorhexcode: 'FF0000',
+                    yaxisfillcheck: false,
+                    fillopacity: 0.5,
+                    fillcolorhexcode: 'FF0000',
+                    yaxisshowpoints: true,
+                    pointshape: 'circle',
+                    pointradius: 2,
+                    pointcolorhexcode: 'FF0000',
+                    yaxisstepcheck: false,
+                    yaxissmoothing: 3,
+                    yaxislegendcheck: true
+                }
             };
         
         Ext.ComponentQuery.query('fieldset[name=axesfieldset]')[0].add(components);
         
+    },
+    
+    /**
+     * 
+     */
+    createPreviewChart: function(countForThisRow) {
+        var me = this,
+            win = Ext.ComponentQuery.query('window[name=stylerwindow]')[0],
+            styleConfig = me.getStyleConfig(countForThisRow),
+            chart = Ext.create('Ext.chart.Chart', {
+                name: 'previewchart',
+                store: Ext.create('Ext.data.Store', {
+                    model: Ext.define('WeatherPoint', {
+                        extend: 'Ext.data.Model',
+                        fields: ['temperature', 'date']
+                    }),
+                    data: [
+                        { temperature: 2, date: new Date(2011, 1, 1, 3) },
+                        { temperature: 20, date: new Date(2011, 1, 1, 4) },
+                        { temperature: 6, date: new Date(2011, 1, 1, 5) },
+                        { temperature: 4, date: new Date(2011, 1, 1, 6) },
+                        { temperature: 30, date: new Date(2011, 1, 1, 7) },
+                        { temperature: 58, date: new Date(2011, 1, 1, 8) },
+                        { temperature: 63, date: new Date(2011, 1, 1, 9) },
+                        { temperature: 73, date: new Date(2011, 1, 1, 10) },
+                        { temperature: 78, date: new Date(2011, 1, 1, 11) },
+                        { temperature: 81, date: new Date(2011, 1, 1, 12) },
+                        { temperature: 64, date: new Date(2011, 1, 1, 13) },
+                        { temperature: 53, date: new Date(2011, 1, 1, 14) },
+                        { temperature: 21, date: new Date(2011, 1, 1, 15) },
+                        { temperature: 4, date: new Date(2011, 1, 1, 16) },
+                        { temperature: 6, date: new Date(2011, 1, 1, 17) },
+                        { temperature: 35, date: new Date(2011, 1, 1, 18) },
+                        { temperature: 8, date: new Date(2011, 1, 1, 19) },
+                        { temperature: 24, date: new Date(2011, 1, 1, 20) },
+                        { temperature: 22, date: new Date(2011, 1, 1, 21) },
+                        { temperature: 18, date: new Date(2011, 1, 1, 22) }
+                    ]
+                }),
+                axes: [
+                    {
+                        type: 'Numeric',
+                        position: 'left',
+                        fields: ['temperature'],
+                        minimum: 0,
+                        maximum: 100
+                    },
+                    {
+                        type: 'Time',
+                        position: 'bottom',
+                        fields: ['date'],
+                        dateFormat: 'ga'
+                    }
+                ],
+                series: [
+                    {
+                        type: 'line',
+                        xField: 'date',
+                        yField: 'temperature',
+                        smooth: win ? win.down('numberfield[name=yaxissmoothing]').getValue() : styleConfig.yaxissmoothing,
+                        fill: win ? win.down('checkboxfield[name=yaxisfillcheck]').getValue() : ((styleConfig.yaxisfillcheck === "false" || !styleConfig.yaxisfillcheck) ? false: true),
+                        style: {
+                            fill: win ? '#' + win.down('textfield[name=fillcolorhexcode]').getValue() : '#' + styleConfig.fillcolorhexcode,
+                            opacity: win ? win.down('numberfield[name=fillopacity]').getValue() : styleConfig.fillopacity,
+                            stroke: win ? '#' + win.down('textfield[name=linecolorhexcode]').getValue() : '#' + styleConfig.linecolorhexcode,
+                            'stroke-width': win ? win.down('numberfield[name=linestrokewidth]').getValue() : styleConfig.linestrokewidth
+                        },
+                        markerConfig: {
+                            type: win ? win.down('combo[name=shapecombo]').getValue() : styleConfig.pointshape,
+                            radius: win ? win.down('numberfield[name=pointradius]').getValue() : styleConfig.pointradius,
+                            stroke: win ? '#' + win.down('textfield[name=pointcolorhexcode]').getValue() : '#' + styleConfig.pointcolorhexcode,
+                            fill: win ? '#' + win.down('textfield[name=pointcolorhexcode]').getValue() : '#' + styleConfig.pointcolorhexcode
+                        },
+                        showMarkers: win ? win.down('checkboxfield[name=yaxisshowpoints]').getValue() : ((styleConfig.yaxisshowpoints === "false" || !styleConfig.yaxisshowpoints) ? false: true)
+                    }
+                ],
+                width: 455,
+                height: 170
+        });
+        
+        // find exisitng chart
+        var existingChart = Ext.ComponentQuery.query('chart[name=previewchart]')[0];
+        if (existingChart && existingChart !== chart) {
+            var parent = existingChart.up();
+            existingChart.destroy();
+            parent.add(chart);
+        } else {
+            return chart;
+        }
+    },
+    
+    /**
+     * 
+     */
+    getStyleConfig: function(axiscount) {
+        var fs = Ext.ComponentQuery.query('fieldset[name=singlerowfieldset' + axiscount + ']')[0];
+        return fs.styleConfig;
     },
     
     /**
@@ -586,7 +1084,8 @@ Ext.define('FHEM.view.LineChartPanel', {
             {
                 xtype: 'fieldset',
                 name: 'baselineowfieldset',
-                layout: 'column',
+                layout: 'hbox',
+                autoScroll: true,
                 defaults: {
                     margin: '5 5 5 0'
                 },

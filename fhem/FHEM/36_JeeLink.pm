@@ -18,7 +18,7 @@ sub JeeLink_Write($$);
 
 sub JeeLink_SimpleWrite(@);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:";
 
 my %matchListPCA301 = (
     "1:PCA301" => "^\\S+\\s+24",
@@ -81,8 +81,6 @@ JeeLink_Define($$)
 
   $hash->{DeviceName} = $dev;
 
-  $hash->{nonce} = 0;
-
   my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
   return $ret;
 }
@@ -119,6 +117,13 @@ JeeLink_Shutdown($)
   return undef;
 }
 
+sub
+JeeLink_RemoveLaCrossePair($)
+{
+  my $hash = shift;
+  delete($hash->{LaCrossePair});
+}
+
 #####################################
 sub
 JeeLink_Set($@)
@@ -127,9 +132,11 @@ JeeLink_Set($@)
 
   my $name = shift @a;
   my $cmd = shift @a;
-  my $arg = join("", @a);
+  my $arg = shift @a;
+  my $arg2 = shift @a;
 
-  my $list = "raw:noArg";
+  my $list = "raw";
+  $list .= " LaCrossePairForSec";
   return $list if( $cmd eq '?' );
 
   if($cmd eq "raw") {
@@ -137,6 +144,11 @@ JeeLink_Set($@)
     #return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
+
+  } elsif( $cmd eq "LaCrossePairForSec" ) {
+    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery") );
+    $hash->{LaCrossePair} = $arg2?2:1;
+    InternalTimer(gettimeofday()+$arg, "JeeLink_RemoveLaCrossePair", $hash, 1);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -192,14 +204,7 @@ JeeLink_DoInit($)
 
   #JeeLink_Clear($hash);
 
-  JeeLink_SimpleWrite($hash, "1a" ); # led on
-  JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-  JeeLink_SimpleWrite($hash, "0x" ); # hex mode
-  JeeLink_SimpleWrite($hash, "0a" ); # led off
-
-  JeeLink_SimpleWrite($hash, "l");   # list known devices
-
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} = "Opened";
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -421,6 +426,26 @@ JeeLink_Parse($$$$)
 
   if($dmsg =~ m/^\[/ ) {
     $hash->{VERSION} = $dmsg;
+
+    if( $hash->{STATE} eq "Opened" ) {
+      if( $dmsg =~m /pcaSerial/ ) {
+        JeeLink_SimpleWrite($hash, "1a" ); # led on
+        JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
+        JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
+        JeeLink_SimpleWrite($hash, "0a" ); # led off
+        JeeLink_SimpleWrite($hash, "l" );  # list known devices
+      } elsif( $dmsg =~m /ec3kSerial/ ) {
+        #JeeLink_SimpleWrite($hash, "ec");
+      }
+
+    $hash->{STATE} = "Initialized";
+   }
+
+    return;
+  }
+
+  if( $dmsg =~m /drecvintr exit/ ) {
+    JeeLink_SimpleWrite($hash, "ec");
     return;
   }
 
@@ -548,6 +573,10 @@ JeeLink_Attr(@)
     <li>raw &lt;datar&gt;<br>
         send &lt;data&gt; as a raw message to the JeeLink to be transmitted over the RF link.
         </li><br>
+    <li>LaCrossePairForSec &lt;sec&gt; [ignore_battery]<br>
+       enable autocreate of new LaCrosse sensors for &lt;sec&gt; seconds. if ignore_battery is not given only sensors
+       sending the 'new battery' flag will be created.
+        </li>
   </ul>
 
   <a name="JeeLink_Get"></a>

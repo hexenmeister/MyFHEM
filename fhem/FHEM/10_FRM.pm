@@ -38,7 +38,7 @@ sub FRM_Initialize($) {
 	require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
-	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:";
+	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:FRM_RGB:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
@@ -49,7 +49,7 @@ sub FRM_Initialize($) {
 	$hash->{SetFn}    = "FRM_Set";
 	$hash->{AttrFn}   = "FRM_Attr";
   
-	$hash->{AttrList} = "model:nano dummy:1,0 loglevel:0,1,2,3,4,5,6 sampling-interval i2c-config $main::readingFnAttributes";
+	$hash->{AttrList} = "model:nano dummy:1,0 sampling-interval i2c-config $main::readingFnAttributes";
 }
 
 #####################################
@@ -78,7 +78,7 @@ sub FRM_Define($$) {
 	DevIo_CloseDev($hash);	
 
 	if ( $dev eq "none" ) {
-		Log (GetLogLevel($hash->{NAME}), "FRM device is none, commands will be echoed only");
+		Log3 $name,3,"device is none, commands will be echoed only";
 		$main::attr{$name}{dummy} = 1;
 		return undef;
 	}
@@ -242,8 +242,7 @@ sub FRM_Attr(@) {
 	if ($command eq "set") {
 		$main::attr{$name}{$attribute}=$value;
 		if ($attribute eq "sampling-interval" 
-			or $attribute eq "i2c-config" 
-			or $attribute eq "loglevel" ) {
+			or $attribute eq "i2c-config") {
 			FRM_apply_attribute($main::defs{$name},$attribute);
 		}
 	}
@@ -274,11 +273,7 @@ sub FRM_apply_attribute {
 				} else {
 					$err = "Error, arduino doesn't support I2C";
 				}
-				Log (GetLogLevel($hash->{NAME},2),$err) if ($err);
-			}
-		} elsif ($attribute eq "loglevel") {
-			if (defined $firmata->{io}) {
-				$firmata->{io}->{loglevel} = AttrVal($name,$attribute,5);
+				Log3 $name,2,$err if ($err);
 			}
 		}
 	}
@@ -308,7 +303,7 @@ sub FRM_DoInit($) {
 			$device->{protocol}->{protocol_version} = $device->{metadata}{firmware_version};
 			$main::defs{$name}{firmware} = $device->{metadata}{firmware};
 			$main::defs{$name}{firmware_version} = $device->{metadata}{firmware_version};
-			Log (3, "Firmata Firmware Version: ".$device->{metadata}{firmware}." ".$device->{metadata}{firmware_version});
+			Log3 $name,3,"Firmata Firmware Version: ".$device->{metadata}{firmware}." ".$device->{metadata}{firmware_version};
 			$device->analog_mapping_query();
 			$device->capability_query();
 			do {
@@ -358,7 +353,7 @@ sub FRM_DoInit($) {
 		} else {
 			select (undef,undef,undef,0.01);
 			if (time > $queryTicks) {
-				Log (3, "querying Firmata Firmware Version");
+				Log3 $name,3,"querying Firmata Firmware Version";
 				$device->firmware_version_query();
 				$queryTicks++;
 			}
@@ -372,7 +367,7 @@ sub FRM_DoInit($) {
 		FRM_forall_clients($shash,\&FRM_Init_Client,undef);
 		return undef;
 	}
-	Log (3, "no response from Firmata, closing DevIO");
+	Log3 $name,3,"no response from Firmata, closing DevIO";
 	DevIo_Disconnected($hash);
 	delete $hash->{FirmataDevice};
 	return "FirmataDevice not responding";
@@ -399,9 +394,10 @@ FRM_Init_Client($@) {
   		my @a = split("[ \t][ \t]*", $hash->{DEF});
   		$args = \@a;
 	}
-	my $ret = CallFn($hash->{NAME},"InitFn",$hash,$args);
+	my $name = $hash->{NAME};
+	my $ret = CallFn($name,"InitFn",$hash,$args);
 	if ($ret) {
-		Log (GetLogLevel($hash->{NAME},2),"error initializing ".$hash->{NAME}.": ".$ret);
+		Log3 $name,2,"error initializing ".$hash->{NAME}.": ".$ret;
 	}
 }
 
@@ -485,7 +481,8 @@ FRM_Client_AssignIOPort($)
 				&& defined( $dev->{IODev} )
 				&& defined( $dev->{PIN} )
 				&& $dev->{IODev} == $hash->{IODev}
-				&& $dev->{PIN} == $hash->{PIN} ) {
+				&& grep {$_ == $hash->{PIN}} split(" ",$dev->{PIN}) ) {
+				  delete $hash->{IODev};
 					die "Device $main::defs{$d}{NAME} allready defined for pin $hash->{PIN}";
 				}
 		}
@@ -506,21 +503,22 @@ sub new {
 	my ($class,$hash) = @_;
 	return bless {
 		hash => $hash,
-		loglevel => main::GetLogLevel($hash->{NAME},5),
 	}, $class;
 }
 
 sub data_write {
    	my ( $self, $buf ) = @_;
-    main::Log ($self->{loglevel}, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf));
-   	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
+   	my $hash = $self->{hash};
+    main::Log3 $hash->{NAME},5,">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
+   	main::DevIo_SimpleWrite($hash,$buf,undef);
 }
 
 sub data_read {
     my ( $self, $bytes ) = @_;
-    my $string = main::DevIo_SimpleRead($self->{hash});
+   	my $hash = $self->{hash};
+    my $string = main::DevIo_SimpleRead($hash);
     if (defined $string ) {
-   	    main::Log ($self->{loglevel},"<".join(",",map{sprintf"%02x",ord$_}split//,$string));
+   	    main::Log3 $hash->{NAME},5,"<".join(",",map{sprintf"%02x",ord$_}split//,$string);
    	}
     return $string;
 }
@@ -531,7 +529,7 @@ sub
 FRM_i2c_observer
 {
 	my ($data,$hash) = @_;
-	Log GetLogLevel($hash->{NAME},5),"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
+	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
 	FRM_forall_clients($hash,\&FRM_i2c_update_device,$data);
 }
 
@@ -552,7 +550,7 @@ sub FRM_i2c_update_device
 sub FRM_string_observer
 {
 	my ($string,$hash) = @_;
-	Log (GetLogLevel($hash->{NAME},3), "received String_data: ".$string);
+	Log3 $hash->{NAME},3,"received String_data: ".$string;
 	readingsSingleUpdate($hash,"error",$string,1);
 }
 
@@ -842,39 +840,40 @@ sub FRM_OWX_Discover ($) {
   <a href="#FRM_IN">FRM_IN</a> for digital input<br>
   <a href="#FRM_OUT">FRM_OUT</a> for digital out<br>
   <a href="#FRM_AD">FRM_AD</a> for analog input<br>
-  <a href="#FRM_PWM">FRM_PWM</a> for analog (pulse_width_modulated) output<br>
+  <a href="#FRM_PWM">FRM_PWM</a> for analog output (pulse_width_modulated)<br>
+  <a href="#FRM_RGB">FRM_RGB</a> control multichannel/RGB-LEDs by pwm<br>
+  <a href="#FRM_SERVO">FRM_SERVO</a> for pwm-controled servos as being used in modelmaking<br>
+  <a href="#FRM_LCD">FRM_LCD</a> output text to LCD attached via I2C<br>
   <a href="#FRM_I2C">FRM_I2C</a> to read data from integrated circutes attached
    to Arduino supporting the <a href="http://en.wikipedia.org/wiki/I%C2%B2C">
-   i2c-protocol</a>.<br><br>
+   i2c-protocol</a>.<br>
+  <a href="#OWX">OWX</a> to read/write sensors and actors on 1-Wire bus.<br><br>
    
   Each client stands for a Pin of the Arduino configured for a specific use 
   (digital/analog in/out) or an integrated circuit connected to Arduino by i2c.<br><br>
   
-  Note: this module requires the <a href="https://github.com/amimoto/perl-firmata">Device::Firmata</a> module (perl-firmata).
-  You can download it <a href="https://github.com/amimoto/perl-firmata/archive/master.zip">as a single zip</a> file from github.
-  Copy 'lib/Device' (with all subdirectories) to e.g. FHEM directory (or other location within perl include path)<br><br>
+  Note: this module is based on <a href="https://github.com/ntruchsess/perl-firmata">Device::Firmata</a> module (perl-firmata).
+  perl-firmata is included in FHEM-distributions lib-directory. You can download the latest version <a href="https://github.com/amimoto/perl-firmata/archive/master.zip">as a single zip</a> file from github.<br><br>
 
   Note: this module may require the Device::SerialPort or Win32::SerialPort
   module if you attach the device via USB and the OS sets strange default
   parameters for serial devices.<br><br>
   
   <a name="FRMdefine"></a>
-  <b>Define</b>
-  <ul>
+  <b>Define</b><br>
+  <ul><br>
   <code>define &lt;name&gt; FRM {&lt;device&gt; | &lt;port&gt; [global]}</code> <br>
-  Specifies the FRM device.   </ul>
-  
-    <br>
-    <ul>
-    USB-connected devices:<br><ul>
-      &lt;device&gt; specifies the serial port to communicate with the Arduino.
+  Specifies the FRM device.<br>
+  <br>
+  <li>USB-connected devices:<br><br>
+      <code>&lt;device&gt;</code> specifies the serial port to communicate with the Arduino.
       The name of the serial-device depends on your distribution, under
       linux the cdc_acm kernel module is responsible, and usually a
       /dev/ttyACM0 device will be created. If your distribution does not have a
       cdc_acm module, you can force usbserial to handle the Arduino by the
-      following command:<ul>modprobe usbserial vendor=0x03eb
-      product=0x204b</ul>In this case the device is most probably
-      /dev/ttyUSB0.<br><br>
+      following command:<br>
+      <code>modprobe usbserial vendor=0x03eb product=0x204b</code></br>
+      In this case the device is most probably /dev/ttyUSB0.<br><br>
 
       You can also specify a baudrate if the device name contains the @
       character, e.g.: /dev/ttyACM0@38400<br><br>
@@ -885,35 +884,50 @@ sub FRM_OWX_Discover ($) {
       defaults for the serial parameters, e.g. some Linux distributions and
       OSX.  <br><br>
       
-      The Arduino has to run 'StandardFirmata'. You can find StandardFirmata
-      in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
-
-    </ul>
-    Network-connected devices:<br><ul>
-    &lt;port&gt; specifies the port the FRM device listens on. If 'global' is
-    specified the socket is bound to all local ip-addresses, otherwise to localhost
-    only.<br>
-    The Arduino must run a Version of firmata that connects in client-mode (the
-    connection is initiated by the arduino). The ip-address and port of the fhem-server
-    has to be configured an the arduino, so it knows where to connect to.<br>
-    As of now only a single Arduino per FRM-device configured is supported. Multiple
-    Arduinos may connect to different FRM-devices configured for different ports.<br>
-    The support for Firmata over ethernet is still experimental. Firmata-ethenet-client
-    can be found here: 
-    <a href="https://github.com/ntruchsess/arduino/blob/configurable_ethernet/examples/ConfigurableEthernetclient/ConfigurableEthernetclient.ino">
-    ConfigurableEthernetclient.ino</a><br>
-    </ul>
-    <br>
-    If the device is called none, then no device will be opened, so you
-    can experiment without hardware attached.<br>
+      The Arduino has to run either 'StandardFirmata' or 'ConfigurableFirmata'.
+      StandardFirmata supports Digital and Analog-I/O, Servo and I2C. In addition
+      to that ConfigurableFirmata supports 1-Wire, Stepper-motors and allows to
+      connect via ethernet in client mode. <br><br>
+      
+      You can find StandardFirmata in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
+      ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino_Firmata#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
+  </li>
+  <br>
+  <li>Network-connected devices:<br><br>
+      <code>&lt;port&gt;</code> specifies the port the FRM device listens on. If <code>global</code> is
+      specified the socket is bound to all local ip-addresses, otherwise to localhost
+      only.<br>
+      The Arduino must ConfigurableFirmata. The connection is initiated by the arduino
+      in client-mode. Therefor the ip-address and port of the fhem-server has to be 
+      configured an the arduino, so it knows where to connect to.<br>
+      As of now only a single Arduino per FRM-device configured is supported. Multiple
+      Arduinos may connect to different FRM-devices configured for different ports.<br>
+      ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+      ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino_Firmata#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
+  </li>
+  <br>
+  <li>
+	  If the device is called none, then no device will be opened, so you
+	  can experiment without hardware attached.<br>
+  </li>
   </ul>
   
   <br>
   <a name="FRMset"></a>
   <b>Set</b>
   <ul>
-  N/A<br>
-  </ul><br>
+  <li>
+    <code>set &lt;name&gt; init</code><br>
+    reinitializes the FRM-Client-devices configured for this Arduino
+  </li><br>
+  <li>
+    <code>set &lt;name&gt; reset</code><br>
+    does a complete reset of FRM by disconnecting from, reconnecting to and reinitializing the Arduino and FRM internals and all attached FRM-client-devices
+  </li>
+  </ul>
+  <br><br>
+  
   <a name="FRMattr"></a>
   <b>Attributes</b><br>
   <ul>
