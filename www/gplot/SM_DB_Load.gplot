@@ -1,4 +1,5 @@
-############################
+# SYSMON
+#
 # Anzeige: system load 
 #
 # define wl_sysmon_load SVG myDbLog:SMLoadDB:CURRENT

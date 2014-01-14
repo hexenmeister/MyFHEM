@@ -1,8 +1,9 @@
+# SYSMON
 #
-# Network-Traffic ETH0
+# Network-Traffic WLAN0
 # 
 # Beispiel aus dem Logfile:
-# 2013-11-17_21:35:57 sysmon eth0_diff: Received: 23.54 MB, Sent: 42.64 MB, Total: 66.18 MB
+# 2013-11-17_21:35:57 sysmon wlan0_diff: Received: 23.54 MB, Sent: 42.64 MB, Total: 66.18 MB
 #
 
 set terminal png transparent size <SIZE> crop
@@ -17,8 +18,8 @@ set grid xtics y2tics
 
 set y2label "Traffic in MB"
 
-#FileLog 5:eth0_diff\x3a:0:
-#FileLog 8:eth0_diff\x3a:0:
+#FileLog 5:wlan0_diff\x3a:0:
+#FileLog 8:wlan0_diff\x3a:0:
 
 plot \
   "< egrep 'RX:' <IN>"\

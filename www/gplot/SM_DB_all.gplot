@@ -1,5 +1,6 @@
+# SYSMON
 #
-# Anzeige verschiedener Statistiken aus SYSMON
+# Anzeige verschiedener Statistiken aus SYSMON (DbLog)
 #
 
 set terminal png transparent size <SIZE> crop

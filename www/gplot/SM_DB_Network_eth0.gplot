@@ -1,6 +1,6 @@
-############################
+# SYSMON
 #
-# Network-Traffic ETH0
+# Network-Traffic ETH0 (DbLog)
 #
 
 set terminal png transparent size <SIZE> crop
