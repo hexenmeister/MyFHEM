@@ -23,14 +23,14 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
-#set ytics
+set ytics ("Nord" 0, "Ost" 80, "S&#252;d" 180, "West" 270, "Nord" 360)
 set title '<L1>'
 set grid xtics y2tics
 
 set yrange [0:360]
 
 set y2label "Wind km/h"
-set ylabel "Richtung (0=Nord)"
+set ylabel "Richtung"
 
 #FileLog 4:wind_speed:0:
 #FileLog 4:wind_direction:0:
