@@ -827,6 +827,7 @@ sub SYSMON_getFileSystemInfo ($$$)
   my @filesystems = SYSMON_execute($hash, $disk);
 
   shift @filesystems;
+  if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
   {
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
