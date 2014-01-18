@@ -61,6 +61,15 @@ package main;
 use strict;
 use warnings;
 
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 #-- unfortunately some things OS-dependent
 my $SER_regexp;
 if( $^O =~ /Win/ ) {
