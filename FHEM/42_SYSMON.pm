@@ -1486,6 +1486,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
       <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
+      attr wl_sysmon_wlan0 group RPi<br>
+      attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_wlan0 room 9.03_Tech<br>
+      <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
       define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
       attr wl_sysmon_load group RPi<br>
@@ -1880,6 +1886,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_eth0 group RPi<br>
       attr wl_sysmon_eth0 label "Netzwerk-Traffic eth0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
       attr wl_sysmon_eth0 room 9.03_Tech<br>
+      <br>
+      # Visualisierung: Netzwerk-Daten&uuml;bertragung f&uuml; wlan0<br>
+      define wl_sysmon_wlan0 SVG FileLog_sysmon:SM_Network_wlan0:CURRENT<br>
+      attr wl_sysmon_wlan0 group RPi<br>
+      attr wl_sysmon_wlan0 label "Netzwerk-Traffic wlan0: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"<br>
+      attr wl_sysmon_wlan0 room 9.03_Tech<br>
       <br>
       # Visualisierung: CPU-Auslastung (load average)<br>
       define wl_sysmon_load SVG FileLog_sysmon:SM_Load:CURRENT<br>
