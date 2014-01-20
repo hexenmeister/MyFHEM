@@ -360,21 +360,20 @@ sub Reset () {
 
 sub Verify ($) {
   my ($self,$dev) = @_;
-  my @rom_id;
   my $i;
     
   #-- from search string to byte id
   my $devs=$dev;
   $devs=~s/\.//g;
   for($i=0;$i<8;$i++){
-     $rom_id[$i]=hex(substr($devs,2*$i,2));
+    @{$self->{ROM_ID}}[$i]=hex(substr($devs,2*$i,2));
   }
   #-- reset the search state
   $self->{LastDiscrepancy} = 64;
   $self->{LastDeviceFlag} = 0;
   #-- now do the search
   my $res=$self->Search("verify");
-  my $dev2=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@rom_id);
+  my $dev2=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$self->{ROM_ID}});
   #-- reset the search state
   $self->{LastDiscrepancy} = 0;
   $self->{LastDeviceFlag} = 0;
