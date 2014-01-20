@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id$
+# $Id: 42_SYSMON.pm 4698 2014-01-19 23:10:26Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.2.2";
+my $VERSION = "1.2.4";
 
 use constant {
   DATE            => "date",
@@ -1060,17 +1060,19 @@ sub SYSMON_ShowValuesHTML ($;@)
   # oben definierte Werte anzeigen
   foreach (@dataDescription) {
   	my($rName, $rComment, $rPostfix) = split(/:/, $_);
-  	if(!defined $rComment) {
-      $rComment = $cur_readings_map->{$rName};
-    }
-    my $rVal = $map->{$rName};
-    if($rName eq DATE) {
-    	# Datum anzeigen
-  	  $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
-  	}
-  	if(!defined $rPostfix) { $rPostfix = ""; }
-  	if(defined $rVal) {
-      $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+  	if(defined $rName) {
+  	  if(!defined $rComment) {
+        $rComment = $cur_readings_map->{$rName};
+      }
+      my $rVal = $map->{$rName};
+      if($rName eq DATE) {
+      	# Datum anzeigen
+  	    $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
+  	  }
+  	  if(!defined $rPostfix) { $rPostfix = ""; }
+  	  if(defined $rVal) {
+        $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+      }
     }
   }
   
