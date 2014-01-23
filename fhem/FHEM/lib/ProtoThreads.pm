@@ -38,7 +38,7 @@
 #Restart the protothread.
 #
 #PT_EXIT;
-#Exit the protothread.
+#Exit the protothread. Use PT_EXIT(value) to pass an exit-value to PT_EXITVAL
 #
 #PT_END;
 #Declare the end of a protothread.
@@ -51,6 +51,9 @@
 #
 #PT_YIELD_UNTIL(condition);
 #Yield from the current protothread until the condition is true.
+#
+#PT_RETVAL
+#return the value that has been (optionaly) passed by PT_EXIT(value)
 
 package ProtoThreads;
 
@@ -90,6 +93,11 @@ sub PT_SCHEDULE(@) {
   return ($state == PT_WAITING or $state == PT_YIELDED);
 }
 
+sub PT_RETVAL() {
+  my $self = shift;
+  return $self->{PT_THREAD_RETURN};
+}
+
 sub PT_NEXTCOMMAND($$) {
   my ($code,$command) = @_;
   if ($code =~ /$command\s*(?=\()/s) {
@@ -109,7 +117,7 @@ sub PT_NEXTCOMMAND($$) {
 use Filter::Simple;
 
 FILTER_ONLY
-  code      => sub {
+  executable => sub {
    
   my $code = $_;
   my $counter = 1;
@@ -155,16 +163,21 @@ FILTER_ONLY
           $code=$before.$arg."->{PT_THREAD_STATE} = 0; PT_WAIT_THREAD($arg);".$after;
           next;
         }
-        if ($code =~ /PT_EXIT\s*;/s) {
-          $code = $`.$thread."->{PT_THREAD_STATE} = 0; return PT_EXITED;".$';
+        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_EXIT");
+        if ($success) {
+          $code=$before.$thread."->{PT_THREAD_STATE} = 0; ".$thread."->{PT_THREAD_RETURN} = $arg; return PT_EXITED;".$after;
           next;
         }
-        if ($code =~ /PT_RESTART\s*;/s) {
-          $code = $`.$thread."->{PT_THREAD_STATE} = 0; return PT_WAITING;".$';
+        if ($code =~ /PT_EXIT(\s*;|\s+)/s) {
+          $code = $`.$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_EXITED".$1.$';
+          next;
+        }
+        if ($code =~ /PT_RESTART(\s*;|\s)/s) {
+          $code = $`.$thread."->{PT_THREAD_STATE} = 0; return PT_WAITING;".$1.$';
           next;
         }
         if ($code =~ /PT_END\s*;/s) {
-          $code = $`."} ".$thread."->{PT_THREAD_STATE} = 0; return PT_ENDED;".$';
+          $code = $`."} ".$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_ENDED;".$';
         }
         last;
       }

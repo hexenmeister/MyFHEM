@@ -628,7 +628,7 @@ sub OWX_Search($) {
 	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
 	if (defined $async) {
 		delete $hash->{DEVS};
-		return $async->search($hash);
+		return $async->discover($hash);
 	} else {
 		my $owx_interface = $hash->{INTERFACE};
 		if( !defined($owx_interface) ) {
@@ -900,28 +900,33 @@ sub OWX_Init ($) {
   
   if (defined $owx) {
 	$hash->{INTERFACE} = $owx->{interface};
-  	  #-- Third step: see, if a bus interface is detected
-  	if (my $ret = $owx->Init($hash)) {
-      $hash->{PRESENT} = 0;
-      $hash->{STATE} = "Init Failed: $ret";
-      #readingsSingleUpdate($hash,"state","failed",1);
-      #$main::init_done = 1; 
-      return "OWX_Init failed: $ret";
-    }
+	my $ret;
+	#-- Third step: see, if a bus interface is detected
+	eval {
+	  $ret = $owx->initialize($hash);
+	};
+	if ($@) {
+	  $hash->{PRESENT} = 0;
+	  $hash->{STATE} = "Init Failed: $ret";
+	  return "OWX_Init failed: $@";
+	};
+	$hash->{ASYNC} = $ret;
    	$hash->{INTERFACE} = $owx->{interface};
   } else {
     return "OWX: Init called with undefined interface";
   }
   
-  if ($hash->{INTERFACE} eq "firmata") {
-  	$hash->{ASYNC} = $owx;
-  } elsif (($hash->{INTERFACE} eq "DS2480") or ($hash->{INTERFACE} eq "DS9097")) {
-	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
-	$hash->{ASYNC} = OWX_Executor->new($owx);
-  } elsif (($hash->{INTERFACE} eq "COC") or ($hash->{INTERFACE} eq "CUNO")) {
-	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
-	$hash->{ASYNC} = OWX_Executor->new($owx);
-  }
+#  if ($hash->{INTERFACE} eq "firmata") {
+#  	$hash->{ASYNC} = $owx;
+#  } elsif ($hash->{INTERFACE} eq "DS2480") {
+#    $hash->{ASYNC} = $owx;
+#  } elsif ($hash->{INTERFACE} eq "DS9097") {
+#	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
+#	$hash->{ASYNC} = OWX_Executor->new($owx);
+#  } elsif (($hash->{INTERFACE} eq "COC") or ($hash->{INTERFACE} eq "CUNO")) {
+#	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
+#	$hash->{ASYNC} = OWX_Executor->new($owx);
+#  }
   
   #-- Fourth step: discovering devices on the bus
   #   in 10 seconds discover all devices on the 1-Wire bus

@@ -4,24 +4,24 @@ use strict;
 use warnings;
 
 use constant {
-	SEARCH  => 1,
-	ALARMS  => 2,
-	EXECUTE => 3,
-	EXIT    => 4,
-	LOG     => 5
+	DISCOVER => 1,
+	ALARMS   => 2,
+	VERIFY   => 3,
+	EXECUTE  => 4,
+	EXIT     => 5,
+	LOG      => 6
 };
 
-sub new($) {
-	my ( $class, $owx ) = @_;
+sub new() {
+	my $class = shift;
+	my $self = {};
+	$self->{worker} = OWX_Worker->new($self);
+	return bless $self,$class;
+};
 
-	return bless {
-		worker => OWX_Worker->new($owx)
-	}, $class;
-}
-
-sub search($) {
+sub discover($) {
 	my ($self,$hash) = @_;
-	if($self->{worker}->submit( { command => SEARCH }, $hash )) {
+	if($self->{worker}->submit( { command => DISCOVER }, $hash )) {
 		$self->poll($hash);
 		return 1;
 	}
@@ -35,6 +35,15 @@ sub alarms($) {
 		return 1;
 	}
 	return undef;
+}
+
+sub verify($$) {
+  my ($self,$hash,$device) = @_;
+  if($self->{worker}->submit( { command => VERIFY, address => $device }, $hash )) {
+    $self->poll($hash);
+    return 1;
+  }
+  return undef;
 }
 
 sub execute($$$$$$$) {
@@ -65,6 +74,7 @@ sub exit($) {
 
 sub poll($) {
 	my ( $self,$hash ) = @_;
+	$self->read();
 	$self->{worker}->PT_SCHEDULE($hash);
 }
 
@@ -74,6 +84,7 @@ package OWX_Worker;
 
 use Time::HiRes qw( gettimeofday tv_interval usleep );
 use ProtoThreads;
+no warnings 'deprecated';
 
 use vars qw/@ISA/;
 @ISA='ProtoThreads';
@@ -85,13 +96,7 @@ sub new($) {
 	
 	$worker->{commands} = [];
 	$worker->{delayed} = {};
-	$worker->{pt_search} = PT_THREAD(\&pt_search);
-	$worker->{pt_search}->{owx} = $owx;
-	$worker->{pt_alarms} = PT_THREAD(\&pt_alarms);
-	$worker->{pt_alarms}->{owx} = $owx;
-	$worker->{pt_execute} = PT_THREAD(\&pt_execute);
-	$worker->{pt_execute}->{owx} = $owx;
-	$worker->{pt_execute}->{delayed} = $worker->{delayed};  
+	$worker->{owx} = $owx;
 	
 	return bless $worker,$class;  
 }
@@ -105,25 +110,72 @@ sub submit($$) {
 
 sub pt_main($) {
 	my ( $self, $hash ) = @_;
-    my $item = undef;
+    my $item = $self->{item};
     PT_BEGIN($self);
 	PT_YIELD_UNTIL($item = $self->nextItem());
-	
+	$self->{item} = $item;
+		
 	REQUEST_HANDLER: {
 		my $command = $item->{command};
 		
-		$command eq OWX_Executor::SEARCH and do {
-			PT_WAIT_THREAD($self->{pt_search},$hash);
+		$command eq OWX_Executor::DISCOVER and do {
+			PT_WAIT_THREAD($self->{owx}->{pt_discover},$self->{owx});
+			my $devices = $self->{owx}->{pt_discover}->PT_RETVAL();
+			if (defined $devices) {
+				main::OWX_AfterSearch($hash,$devices);
+			}
 			PT_EXIT;
 		};
 		
 		$command eq OWX_Executor::ALARMS and do {
-			PT_WAIT_THREAD($self->{pt_alarms},$hash);
+			PT_WAIT_THREAD($self->{owx}->{pt_alarms},$self->{owx});
+			my $devices = $self->{owx}->{pt_alarms}->PT_RETVAL();
+			if (defined $devices) {
+				main::OWX_AfterAlarms($hash,$devices);
+			}
+			PT_EXIT;
+		};
+		
+		$command eq OWX_Executor::VERIFY and do {
+			PT_WAIT_THREAD($self->{owx}->{pt_verify},$self->{owx},$item->{address});
+			my $devices = $self->{owx}->{pt_verify}->PT_RETVAL();
+			if (defined $devices) {
+				main::OWX_AfterVerify($hash,$devices);
+			}
 			PT_EXIT;
 		};
 
 		$command eq OWX_Executor::EXECUTE and do {
-			PT_WAIT_THREAD($self->{pt_execute},$hash,$item);
+		    PT_WAIT_THREAD($self->{owx}->{pt_execute},$self->{owx},$hash,$item->{context},$item->{reset},$item->{address},$item->{writedata},$item->{numread});
+		    my $res = $self->{owx}->{pt_execute}->PT_RETVAL();
+		    unless (defined $res) {
+		      main::OWX_AfterExecute($hash,$item->{context},undef,$item->{reset},$item->{address},$item->{writedata},$item->{numread},undef);
+		      PT_EXIT;
+		    }
+       		my $writelen = defined $item->{writedata} ? split (//,$item->{writedata}) : 0;
+       		my @result = split (//, $res);
+       		my $readdata = 9+$writelen < @result ? substr($res,9+$writelen) : ""; 
+       		main::OWX_AfterExecute($hash,$item->{context},1,$item->{reset},$item->{address},$item->{writedata},$item->{numread},$readdata);
+        	if (my $delay = $item->{delay}) {
+       			my ($seconds,$micros) = gettimeofday;
+       			my $len = length ($delay); #delay is millis, tv_address works with [sec,micros]
+       			if ($len>3) {
+       				$seconds += substr($delay,0,$len-3);
+       				$micros += (substr ($delay,$len-8).000);
+       			} else {
+       				$micros += ($delay.000);
+       			}
+        		if (my $address = $item->{address}) {
+        			my $delayed = $self->{delayed};
+        			unless ($delayed->{$address}) {
+        				$delayed->{$address} = { items => [] };
+        			}
+        			$delayed->{$address}->{'until'} = [$seconds,$micros];
+        		} else {
+        		  $self->{execute_delayed} = [$seconds,$micros];
+        		  PT_YIELD_UNTIL(tv_interval($self->{execute_delayed})>=0);
+        		}
+        	}
 			PT_EXIT;
 		};
 		
@@ -158,66 +210,5 @@ sub nextItem() {
 	};
 	return $item;
 }
-
-sub pt_search($) {
-	my ( $self, $hash ) = @_;
-    PT_BEGIN($self);
-	my $devices = $self->{owx}->Discover();
-	if (defined $devices) {
-		main::OWX_AfterSearch($hash,$devices);
-	}
-	PT_END;
-};
-
-sub pt_alarms($) {
-	my ( $self, $hash ) = @_;
-    PT_BEGIN($self);
-	my $devices = $self->{owx}->Alarms();
-	if (defined $devices) {
-		main::OWX_AfterAlarms($hash,$devices);
-	}
-	PT_END;
-};
-
-sub pt_execute($) {
-	my ( $self, $hash, $item ) = @_;
-    PT_BEGIN($self);
-	if (defined $item->{reset}) {
-		if(!$self->{owx}->Reset()) {
-			main::OWX_AfterExecute($hash,$item->{context},undef,1,$item->{address},$item->{writedata},$item->{numread},undef);						
-			return 1;
-		};
-	};
-	my $address = $item->{address};
-	my $res = $self->{owx}->Complex($address,$item->{writedata},$item->{numread});
-	if (defined $res) {
-		my $writelen = defined $item->{writedata} ? split (//,$item->{writedata}) : 0;
-		my @result = split (//, $res);
-		my $readdata = 9+$writelen < @result ? substr($res,9+$writelen) : ""; 
-		main::OWX_AfterExecute($hash,$item->{context},1,$item->{reset},$item->{address},$item->{writedata},$item->{numread},$readdata);
-	} else {
-		main::OWX_AfterExecute($hash,$item->{context},undef,$item->{reset},$item->{address},$item->{writedata},$item->{numread},undef);
-	}
-	if (my $delay = $item->{delay}) {
-		if ($address) {
-			my $delayed = $self->{delayed};
-			unless ($delayed->{$address}) {
-				$delayed->{$address} = { items => [] };
-			}
-			my ($seconds,$micros) = gettimeofday;
-			my $len = length ($delay); #delay is millis, tv_address works with [sec,micros]
-			if ($len>3) {
-				$seconds += substr($delay,0,$len-3);
-				$micros += (substr ($delay,$len-8).000);
-			} else {
-				$micros += ($delay.000);
-			}
-			$delayed->{$address}->{'until'} = [$seconds,$micros];
-		} else {
-			select (undef,undef,undef,$delay/1000);
-		}
-	}
-	PT_END;
-};
 
 1;
