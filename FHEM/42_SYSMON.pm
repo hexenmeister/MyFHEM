@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 4698 2014-01-19 23:10:26Z hexenmeister $
+# $Id: 42_SYSMON.pm 4703 2014-01-20 23:40:02Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.2.4";
+my $VERSION = "1.3.0";
 
 use constant {
   DATE            => "date",
@@ -63,6 +63,7 @@ use constant {
 
 use constant FS_PREFIX => "~ ";
 #use constant FS_PREFIX_N => "fs_";
+my $DEFAULT_INTERVAL_BASE = 60;
 
 sub
 SYSMON_Initialize($)
@@ -121,7 +122,7 @@ SYSMON_setInterval($@)
 {
 	my ($hash, @a) = @_;
 
-	my $interval = 60;
+	my $interval = $DEFAULT_INTERVAL_BASE;
 	$hash->{INTERVAL_BASE} = $interval;
 
 	my $p1=1;
@@ -179,6 +180,19 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"uptime"}          = "System up time";
   $rMap->{"uptime_text"}     = "System up time";
 
+  # Werte fuer GesamtCPU
+  $rMap->{"stat_cpu"}          = "CPU statistics";
+  $rMap->{"stat_cpu_diff"}     = "CPU statistics (diff)";
+  $rMap->{"stat_cpu_percent"}  = "CPU statistics (diff, percent)";
+  $rMap->{"stat_cpu_text"}     = "CPU statistics (text)";
+  # CPU 0-7 (sollte reichen)
+  for my $i (0..7) { 
+    $rMap->{"stat_cpu".$i}            = "CPU".$i." statistics";
+    $rMap->{"stat_cpu".$i."_diff"}    = "CPU".$i." statistics (diff)";
+    $rMap->{"stat_cpu".$i."_percent"} = "CPU".$i." statistics (diff, percent)";
+    $rMap->{"stat_cpu".$i."_text"} = "CPU".$i." statistics (text)";
+  }
+  
 	# Filesystems <readingName>[:<mountPoint>[:<Comment>]]
 	my $filesystems = AttrVal($name, "filesystems", undef);
   if(defined $filesystems) {
@@ -546,6 +560,7 @@ SYSMON_obtainParameters($$)
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
+  $map = SYSMON_getCPUProcStat($hash, $map);
 
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
@@ -803,6 +818,78 @@ SYSMON_getCPUBogoMIPS($$)
   	$map->{+CPU_BOGOMIPS}=$old_val;
   }
   
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert Werte aus /proc/stat
+# Werte:
+#   neuCPUuser, neuCPUnice, neuCPUsystem, neuCPUidle, neuCPUiowait, neuCPUirq, neuCPUsoftirq
+# Differenzberechnung:
+#   CPUuser = neuCPUuser - altCPUuser (für alle anderen analog)
+#   GesammtCPU = CPUuser + CPUnice + CPUsystem + CPUidle + CPUiowait + CPUirq + CPUsoftirq
+# Belastung in %:
+#   ProzCPUuser = (CPUuser / GesammtCPU) * 100
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUProcStat($$)
+{
+	my ($hash, $map) = @_;
+	my @values = SYSMON_execute($hash, "cat /proc/stat");
+	
+	for my $entry (@values){
+	  if (index($entry, "cpu") < 0){
+      last;
+    }
+    $map = SYSMON_getCPUProcStat_intern($hash, $map, $entry);
+  }
+  
+  # Wenn nur eine CPU vorhanden ist, löschen Werte für CPU0 (nur Gesamt belassen)
+  if(!defined($map->{"stat_cpu1"})){
+  	delete $map->{"stat_cpu0"};
+  	delete $map->{"stat_cpu0_diff"};
+  	delete $map->{"stat_cpu0_percent"};
+  }
+	
+	return $map;
+}
+
+sub
+SYSMON_getCPUProcStat_intern($$$) 
+{
+	my ($hash, $map, $entry) = @_;
+	
+	my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
+	$pName = "stat_".$pName;
+	$map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
+	
+	my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
+	if(defined $lastVal) {
+		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
+	  my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
+    
+    my $CPUuser    = $neuCPUuser    - $altCPUuser;
+    my $CPUnice    = $neuCPUnice    - $altCPUnice;
+    my $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
+    my $CPUidle    = $neuCPUidle    - $altCPUidle;
+    my $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
+    my $CPUirq     = $neuCPUirq     - $altCPUirq;
+    my $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
+    $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
+	  
+    my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
+    my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
+    my $PercentCPUnice    = ($CPUnice    / $GesammtCPU) * 100;
+    my $PercentCPUsystem  = ($CPUsystem  / $GesammtCPU) * 100;
+    my $PercentCPUidle    = ($CPUidle    / $GesammtCPU) * 100;
+    my $PercentCPUiowait  = ($CPUiowait  / $GesammtCPU) * 100;
+    my $PercentCPUirq     = ($CPUirq     / $GesammtCPU) * 100;
+    my $PercentCPUsoftirq = ($CPUsoftirq / $GesammtCPU) * 100;
+    
+    $map->{$pName."_percent"}=sprintf ("%.2f %.2f %.2f %.2f %.2f %.2f %.2f",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+    $map->{$pName."_text"}=sprintf ("user: %.2f %%, nice: %.2f %%, sys: %.2f %%, idle: %.2f %%, io: %.2f %%, irq: %.2f %%, sirq: %.2f %%",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+  }
+
 	return $map;
 }
 
