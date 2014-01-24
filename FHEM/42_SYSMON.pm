@@ -1315,7 +1315,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     The parameters are responsible for updating the readings according to the following scheme:
     <ul>
      <li>M1: (Default: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
      </li>
      <li>M2: (Default: M1)<br>
      ram, swap<br>
@@ -1402,6 +1402,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
+    <li>CPU utilization<br>
+    		Information about the utilization of CPUs.<br>
+    		Example:<br>
+    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+    </li>
     <br>
     <li>user defined<br>
         These Readings provide output of commands, which are passed to the operating system. 
@@ -1486,8 +1494,24 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td><div class="dname">fs_usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
+<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
+<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
+<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td><div class="dname">stat_cpu_text</div></td>
+<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
@@ -1578,9 +1602,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_eth0.gplot<br>
        SM_Network_eth0t.gplot<br>
        SM_Network_wlan0.gplot<br>
+       SM_CPUStat.gplot<br>
+       SM_CPUStatSum.gplot<br>
       </code>
-      <code>
       DbLog versions:<br>
+      <code>
        SM_DB_all.gplot<br>
        SM_DB_CPUFreq.gplot<br>
        SM_DB_CPUTemp.gplot<br>
@@ -1667,6 +1693,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
       attr SysValues group RPi<br>
       attr SysValues room 9.03_Tech<br>
+      <br>
+      # Anzeige CPU Auslasung<br>
+      define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat group RPi<br>
+      attr wl_sysmon_cpustat room 9.99_Test<br>
+      attr wl_sysmon_cpustat plotsize 840,420<br>
+      define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s group RPi<br>
+      attr wl_sysmon_cpustat_s room 9.99_Test<br>
+      attr wl_sysmon_cpustat_s plotsize 840,420<br>
     </code>
     </ul>
 
@@ -1698,7 +1734,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
     <ul>
      <li>M1: (Default-Wert: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
      </li>
      <li>M2: (Default-Wert: M1)<br>
      ram, swap<br>
@@ -1790,6 +1826,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
+    <li>CPU Auslastung<br>
+    		Informationen zu der Auslastung der CPU(s).<br>
+    		Beispiel:<br>
+    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+    </li>
     <br>
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
@@ -1875,8 +1919,24 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
 <td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
 </tr>
-<tr><td><div class="dname">fs_usb1</div></td>
-<td><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
+<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
+<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
+<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
+<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
+<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
+</tr>
+<tr><td><div class="dname">stat_cpu_text</div></td>
+<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
 <td><div>2013-11-27 00:05:36</div></td>
 </tr>
 </table>
@@ -1976,9 +2036,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_Network_eth0.gplot<br>
        SM_Network_eth0t.gplot<br>
        SM_Network_wlan0.gplot<br>
+       SM_CPUStat.gplot<br>
+       SM_CPUStatSum.gplot<br>
       </code>
-      <code>
       DbLog-Versionen:<br>
+      <code>
        SM_DB_all.gplot<br>
        SM_DB_CPUFreq.gplot<br>
        SM_DB_CPUTemp.gplot<br>
@@ -2068,6 +2130,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       define SysValues weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}<br>
       attr SysValues group RPi<br>
       attr SysValues room 9.03_Tech<br>
+      <br>
+      # Anzeige CPU Auslasung<br>
+      define wl_sysmon_cpustat SVG FileLog_sysmon:SM_CPUStat:CURRENT<br>
+      attr wl_sysmon_cpustat group RPi<br>
+      attr wl_sysmon_cpustat room 9.99_Test<br>
+      attr wl_sysmon_cpustat plotsize 840,420<br>
+      define wl_sysmon_cpustat_s SVG FileLog_sysmon:SM_CPUStatSum:CURRENT<br>
+      attr wl_sysmon_cpustat_s group RPi<br>
+      attr wl_sysmon_cpustat_s room 9.99_Test<br>
+      attr wl_sysmon_cpustat_s plotsize 840,420<br>
     </code>
     </ul>
 
