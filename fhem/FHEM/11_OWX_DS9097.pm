@@ -396,4 +396,9 @@ sub WriteBit_9097 ($) {
   } 
 };
 
+# dummy implementation of read - data is actually read within methods above.
+sub read() {
+  return 1;
+}
+
 1;

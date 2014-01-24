@@ -125,6 +125,9 @@ sub pt_query ($$$) {
     main::Log3($serial->{name},3, $res);
   }
   
+  #read and discard any outstanding data from previous commands:
+  PT_WAIT_WHILE($serial->read());
+  
   my $count_out = $hwdevice->write($cmd);
 
   if( !($count_out)){
@@ -138,7 +141,7 @@ sub pt_query ($$$) {
     $serial->{retlen} = $retlen;
     $serial->{retcount} = 0;
     $serial->{query_start} = [gettimeofday];
-    PT_YIELD_UNTIL(($serial->{retcount} > $serial->{retlen}) or (($serial->{num_reads} > 1) and (tv_interval($serial->{query_start}) > QUERY_TIMEOUT)));
+    PT_WAIT_UNTIL(($serial->{retcount} >= $serial->{retlen}) or (($serial->{num_reads} > 1) and (tv_interval($serial->{query_start}) > QUERY_TIMEOUT)));
     PT_EXIT($serial->{string_in});
   } 
   PT_END;
