@@ -72,28 +72,22 @@ sub Define($$) {
 #
 ########################################################################################
 
-sub Init($)
+sub initialize($)
 {
 	my ($self,$hash) = @_;
 	
 	main::LoadModule("FRM");
 	my $pin = $self->{pin};
 	my $ret = main::FRM_Init_Pin_Client($hash,[$pin],PIN_ONEWIRE);
-	return $ret if (defined $ret);
-	eval {
-		my $firmata = main::FRM_Client_FirmataDevice($hash);
-		$firmata->observe_onewire($pin,\&FRM_OWX_observer,$self);
-		$self->{devs} = [];
-		if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-			$firmata->onewire_config($pin,1);
-		}
-		$firmata->onewire_search($pin);
-	};
-	if ($@) {
-		$@ =~ /^(.*)( at.*FHEM.*)$/;
-		return $1;
+	die $ret if (defined $ret);
+	my $firmata = main::FRM_Client_FirmataDevice($hash);
+	$firmata->observe_onewire($pin,\&FRM_OWX_observer,$self);
+	$self->{devs} = [];
+	if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+		$firmata->onewire_config($pin,1);
 	}
-	return undef;
+	$firmata->onewire_search($pin);
+	return $self;
 }
 
 sub Disconnect($)
@@ -175,7 +169,7 @@ sub FRM_OWX_firmata_to_device
 #
 ########################################################################################
 
-sub search($) {
+sub discover($) {
 	my ($self,$hash) = @_;
 	my $success = undef;
 	eval {

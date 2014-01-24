@@ -907,7 +907,7 @@ sub OWX_Init ($) {
 	};
 	if ($@) {
 	  $hash->{PRESENT} = 0;
-	  $hash->{STATE} = "Init Failed: $ret";
+	  $hash->{STATE} = "Init Failed: $@";
 	  return "OWX_Init failed: $@";
 	};
 	$hash->{ASYNC} = $ret;
