@@ -28,6 +28,26 @@ package OWX_DS9097;
 use strict;
 use warnings;
 
+use constant {
+  QUERY_TIMEOUT => 1.0
+};
+
+use vars qw/@ISA/;
+@ISA='OWX_SER';
+
+use ProtoThreads;
+no warnings 'deprecated';
+
+sub new($) {
+  my ($class,$serial) = @_;
+  
+  $serial->{pt_reset} = PT_THREAD(\&pt_reset);
+  $serial->{pt_block} = PT_THREAD(\&pt_block);
+  $serial->{pt_search} = PT_THREAD(\&pt_search);
+  
+  return bless $serial,$class;
+}
+
 ########################################################################################
 #
 # The following subroutines in alphabetical order are only for a DS9097 bus interface
@@ -43,16 +63,17 @@ use warnings;
 #
 ########################################################################################
 
-sub Block_9097 ($) {
-  my ($self,$data) =@_;
-  
-   my $data2="";
-   my $res=0;
-   for (my $i=0; $i<length($data);$i++){
-     $res = $self->TouchByte_9097(ord(substr($data,$i,1)));
-     $data2 = $data2.chr($res);
-   }
-   return $data2;
+sub pt_block ($) {
+  my ($thread,$self,$data) =@_;
+  PT_BEGIN($thread);
+  my $data2="";
+  my $res=0;
+  for (my $i=0; $i<length($data);$i++){
+    $res = $self->TouchByte_9097(ord(substr($data,$i,1)));
+    $data2 = $data2.chr($res);
+  }
+  PT_EXIT($data2);
+  PT_END;
 }
 
 ########################################################################################
@@ -151,20 +172,21 @@ sub ReadBit_9097 () {
 #
 ########################################################################################
 
-sub Reset_9097 () {
+sub pt_reset () {
 
-  my ($self)=@_;
-  
-  my $cmd="";
-    
+  my ($thread,$self)=@_;
+
   #-- Reset command \xF0
-  $cmd="\xF0";
+  my $cmd="\xF0";
+  #-- write 1-Wire bus
+  PT_BEGIN($thread);
   #-- write 1-Wire bus
   my $res = $self->Query_9097($cmd);
-  return undef if (not defined $res);  
+  PT_EXIT if (not defined $res);
   #-- TODO: process result
   #-- may vary between 0x10, 0x90, 0xe0
-  return 1;
+  PT_EXIT(1);
+  PT_END;
 }
 
 ########################################################################################
@@ -180,20 +202,21 @@ sub Reset_9097 () {
 #
 ########################################################################################
 
-sub Search_9097 ($) {
+sub pt_search ($) {
+  my ($thread,$self,$mode)=@_;
 
-  my ($self,$mode)=@_;
-  
+  PT_BEGIN($thread);
   my ($sp1,$sp2,$response,$search_direction,$id_bit_number);
-    
+  
   #-- Response search data parsing operates bitwise
   $id_bit_number = 1;
   my $rom_byte_number = 0;
   my $rom_byte_mask = 1;
   my $last_zero = 0;
-      
+
   #-- issue search command
   $self->{baud}=115200;
+  #TODO: add specific command to search alarmed devices only
   $sp2="\x00\x00\x00\x00\xFF\xFF\xFF\xFF";
   $response = $self->Query_9097($sp2);
   return undef if (not defined $response);
@@ -271,7 +294,8 @@ sub Search_9097 ($) {
     } 
     $self->{LastDiscrepancy} = $last_zero;
   }
-  return 1; 
+  PT_EXIT(1);
+  PT_END; 
 }
 
 ########################################################################################

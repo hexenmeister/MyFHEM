@@ -916,18 +916,6 @@ sub OWX_Init ($) {
     return "OWX: Init called with undefined interface";
   }
   
-#  if ($hash->{INTERFACE} eq "firmata") {
-#  	$hash->{ASYNC} = $owx;
-#  } elsif ($hash->{INTERFACE} eq "DS2480") {
-#    $hash->{ASYNC} = $owx;
-#  } elsif ($hash->{INTERFACE} eq "DS9097") {
-#	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
-#	$hash->{ASYNC} = OWX_Executor->new($owx);
-#  } elsif (($hash->{INTERFACE} eq "COC") or ($hash->{INTERFACE} eq "CUNO")) {
-#	require "$main::attr{global}{modpath}/FHEM/11_OWX_Executor.pm";
-#	$hash->{ASYNC} = OWX_Executor->new($owx);
-#  }
-  
   #-- Fourth step: discovering devices on the bus
   #   in 10 seconds discover all devices on the 1-Wire bus
   InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);

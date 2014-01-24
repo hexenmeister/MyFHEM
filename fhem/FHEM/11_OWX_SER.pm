@@ -360,9 +360,11 @@ sub initialize($) {
   if ($interface eq "DS2480") {
     return $ds2480;
   } elsif ($interface eq "DS9097") {
+    require "$main::attr{global}{modpath}/FHEM/11_OWX_DS9097.pm";
+    return OWX_DS9097->new($self);
   } else {
+    die $ress;
   }
-  main::Log3($hash->{NAME},1, $ress);
 }
 
 sub Disconnect($) {
