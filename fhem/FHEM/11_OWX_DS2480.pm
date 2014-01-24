@@ -101,7 +101,7 @@ sub pt_block ($) {
 #
 ########################################################################################
 
-sub pt_query ($$) {
+sub pt_query ($$$) {
 	
   my ($thread,$serial,$cmd,$retlen) = @_;
   my ($i,$j,$k,$l,$m,$n);
@@ -255,7 +255,7 @@ sub pt_reset () {
 sub pt_search ($) {
   my ($thread,$serial,$mode)=@_;
   
-  my ($sp1,$sp2,$response,$search_direction,$id_bit_number);
+  my ($response,$search_direction,$id_bit_number);
   
   PT_BEGIN($thread); 
   #-- Response search data parsing operates bytewise
@@ -292,15 +292,15 @@ sub pt_search ($) {
   #-- issue data mode \xE1, the normal search command \xF0 or the alarm search command \xEC 
   #   and the command mode \xE3 / start accelerator \xB5 
   if( $mode ne "alarm" ){
-    $sp1 = "\xE1\xF0\xE3\xB5";
+    $thread->{sp1} = "\xE1\xF0\xE3\xB5";
   } else {
-    $sp1 = "\xE1\xEC\xE3\xB5";
+    $thread->{sp1} = "\xE1\xEC\xE3\xB5";
   }
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$sp1,1);
+  PT_WAIT_THREAD($serial->{pt_query},$serial,$thread->{sp1},1);
   PT_EXIT unless $serial->{pt_query}->PT_RETVAL();
   #-- issue data mode \xE1, device ID, command mode \xE3 / end accelerator \xA5
-  $sp2=sprintf("\xE1%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\xE3\xA5",@{$serial->{search}});
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$sp2,16);
+  $thread->{sp2}=sprintf("\xE1%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\xE3\xA5",@{$serial->{search}});
+  PT_WAIT_THREAD($serial->{pt_query},$serial,$thread->{sp2},16);
   $response = $serial->{pt_query}->PT_RETVAL();
   PT_EXIT unless $response;
      
