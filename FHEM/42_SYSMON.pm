@@ -560,7 +560,6 @@ SYSMON_obtainParameters($$)
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
-  $map = SYSMON_getCPUProcStat($hash, $map);
 
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg
@@ -576,6 +575,7 @@ SYSMON_obtainParameters($$)
         $map = SYSMON_getCPUFreq($hash, $map);
       }
       $map = SYSMON_getLoadAvg($hash, $map);
+      $map = SYSMON_getCPUProcStat($hash, $map);
     }
   }
 
