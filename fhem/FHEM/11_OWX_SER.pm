@@ -124,7 +124,7 @@ sub pt_alarms () {
   $self->first("alarm");
   PT_WAIT_THREAD($self->{pt_next},$self,"alarm");
   while( $self->{LastDeviceFlag}==0 and $self->{pt_next}->PT_RETVAL()) {
-    PT_WAIT_THREAD($self->{pt_search},$self,"alarm");
+    PT_WAIT_THREAD($self->{pt_next},$self,"alarm");
   }
   main::Log3($self->{name},1, " Alarms = ".join(' ',@{$self->{alarmdevs}}));
   PT_EXIT($self->{alarmdevs});
@@ -209,7 +209,7 @@ sub pt_execute($$$$$$$) {
   
   #-- for debugging
   if( $main::owx_debug > 1){
-    $res2 = "OWX_SER::Complex: Sending out ";
+    $res2 = "OWX_SER::Execute: Sending out ";
     for($i=0;$i<length($select);$i++){  
       $j=int(ord(substr($select,$i,1))/16);
       $k=ord(substr($select,$i,1))%16;
@@ -224,7 +224,7 @@ sub pt_execute($$$$$$$) {
   
   #-- for debugging
   if( $main::owx_debug > 1){
-    $res2 = "OWX_SER::Complex: Receiving   ";
+    $res2 = "OWX_SER::Execute: Receiving   ";
     for($i=0;$i<length($res);$i++){  
       $j=int(ord(substr($res,$i,1))/16);
       $k=ord(substr($res,$i,1))%16;
@@ -482,7 +482,7 @@ sub pt_next ($) {
   
   #-- Here we call the device dependent part
   PT_WAIT_THREAD($self->{pt_search},$self,$mode);
-  PT_EXIT unless ($self->{pt_reset}->PT_RETVAL());
+  PT_EXIT unless ($self->{pt_search}->PT_RETVAL());
   #--check if we really found a device
   if( main::OWX_CRC($self->{ROM_ID})!= 0){
   #-- reset the search
