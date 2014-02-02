@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 4732 2014-01-24 23:07:34Z hexenmeister $
+# $Id: 42_SYSMON.pm 4766 2014-01-28 22:05:28Z hexenmeister $
 
 package main;
 
@@ -975,7 +975,7 @@ sub SYSMON_getFileSystemInfo ($$$)
   logF($hash, "SYSMON_getFileSystemInfo", "recieved ".scalar(scalar(@filesystems))." lines");
   
   #if(!defined @filesystems) { return $map; } # Ausgabe leer
-  if(scalar(@filesystems) == 0) { return $map; } # Array leer
+  #if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
   logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
 
@@ -983,9 +983,9 @@ sub SYSMON_getFileSystemInfo ($$$)
   
   # Falls kein Eintrag gefunden (z.B: kein Medium im Laufwerk), mit Nullen fuellen (damit die Plots richtig funktionieren).
   if(defined $fDef) {
-  	$map->{$fName} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs;
+  	$map->{$fName} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
   } else {
-    $map->{+FS_PREFIX.$fs} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs;
+    $map->{+FS_PREFIX.$fs} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
   }
   
   if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
