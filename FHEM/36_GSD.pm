@@ -1,28 +1,39 @@
-#-------------------------------------------------------------------------------
-# FHEM-Modul see www.fhem.de
+###############################################################################
+#
+# FHEM-Modul (see www.fhem.de)
 # 36_GSD.pm
-# GenericSmartDevice
+# GenericSmartDevice: sensor data receiver
 #
 # Usage: define  <Name> GSD <Node-Nr>
-#-------------------------------------------------------------------------------
-# This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
+#   Example: define GSD_1.1 GSD 1.1
+#   (or use autocreate)
 #
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
+###############################################################################
 #
-#    You should have received a copy of the GNU General Public License
-#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#-------------------------------------------------------------------------------
-# Autor: 
-# Version: 0.0
-# Datum: 
-# Kontakt: 
-#-------------------------------------------------------------------------------
+#  Copyright notice
+#
+#  (c) 2013 Alexander Schulz
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#
+###############################################################################
+
+# $Id$
 
 package main;
 use strict;
@@ -34,9 +45,11 @@ use vars qw(%attr);
 use vars qw(%data);
 use vars qw(%modules);
 
-my $GSD_MAGIC = 83;
+my $GSD_MAGIC = 83; # ErkennungsByte
 
-#-------------------------------------------------------------------------------
+my $VERSION = "0.1.1";
+
+#------------------------------------------------------------------------------
 sub GSD_Initialize($)
 {
   my ($hash) = @_;
@@ -47,9 +60,14 @@ sub GSD_Initialize($)
   $hash->{DefFn}     = "GSD_Define";
   $hash->{UndefFn}   = "GSD_Undefine";
   $hash->{ParseFn}   = "GSD_Parse";
-  #$hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,5 disable:0,1";
-  $hash->{AttrList}  = "disable:0,1";
-  #-----------------------------------------------------------------------------
+  
+  $hash->{GetFn}    = "GSD_Get";
+  $hash->{SetFn}    = "GSD_Set";
+  $hash->{AttrFn}   = "GSD_Attr";
+  
+  $hash->{AttrList}  = "disable:0,1".
+                       $readingFnAttributes;
+  #----------------------------------------------------------------------------
   
   # Arduino/JeeNodes-Variables:
   # http://arduino.cc/en/Reference/HomePage
@@ -219,17 +237,14 @@ sub GSD_Parse($$) {
   my $magic = $msg_data[2];
   if($magic eq $GSD_MAGIC) {
     my ($dev_hash,$dev_name);
-	if(defined($modules{GSD}{defptr}{$NodeID})) {
-		$dev_hash =  $modules{GSD}{defptr}{$NodeID};
-		$dev_name = $dev_hash->{NAME};
-	} else {
-	  return "UNDEFINED GSD_$NodeID GSD $NodeID";
-	};
+    if(defined($modules{GSD}{defptr}{$NodeID})) {
+      $dev_hash =  $modules{GSD}{defptr}{$NodeID};
+      $dev_name = $dev_hash->{NAME};
+    } else {
+      return "UNDEFINED GSD_$NodeID GSD $NodeID";
+    };
   
     my $data_len = int(@msg_data);
-    
-    #my @msg_data = @msg_data[4..($data_len-1)];
-    #$data_len = int(@msg_data);
     
     my $dMap;
     $dMap->{INDEX} = 4; # erster Byte der eigentlichen Nachricht
@@ -237,7 +252,6 @@ sub GSD_Parse($$) {
     my $rMap;
     $dMap->{READINGS} = $rMap; # readings
     
-    #my $data_index = 4; # erster Byte der eigentlichen Nachricht
     my $index_old = $dMap->{INDEX};
     while ($dMap->{INDEX} < $data_len) {
       #my $msg_data = $dMap->{DATA};
@@ -246,21 +260,21 @@ sub GSD_Parse($$) {
       if(defined($data{JEECONF}{$msg_type}{ReadingName})) {
         if(defined($data{JEECONF}{$msg_type}{Function})) {
           my $func = $data{JEECONF}{$msg_type}{Function};
-	      if(!defined(&$func)) {
-	        # Function nicht bekannt
-	        Log 0, "GSD: ERROR: parse function not defined: $msg_type -> $func";
-	        return undef;
-	      }
-	      no strict "refs";
-	      $dMap = &$func($dMap);
-	      use strict "refs";
-	    } else {
+          if(!defined(&$func)) {
+            # Function nicht bekannt
+            Log 0, "GSD: ERROR: parse function not defined: $msg_type -> $func";
+            return undef;
+          }
+          no strict "refs";
+          $dMap = &$func($dMap);
+          use strict "refs";
+        } else {
           $dMap = GSD_parseDefault($hash, $dMap);
         }
         if (!defined($dMap)) {
-           # Function liefert Abbruch
-	       Log 0, "GSD: ERROR: parse function failure";
-	       return undef;
+          # Function hat Abbruch-Kennzeichen geliefert (es wir alles oder nichts verarbeitet)
+          log 0, "GSD: ERROR: parse function failure";
+          return undef;
         }
         #$data_index = $dMap->{INDEX};
       } else {
@@ -296,6 +310,7 @@ sub GSD_Parse($$) {
   }
 }
 
+#------------------------------------------------------------------------------
 sub GSD_parseDefault($$) {
   my ($hash, $dMap) = @_;
   
@@ -320,141 +335,156 @@ sub GSD_parseDefault($$) {
     Log 3, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
     
     if(defined($data{JEECONF}{$msg_type}{CorrFactor})) {
-	  my $corr = $data{JEECONF}{$msg_type}{CorrFactor};
-	  $value = $value * $corr;
-	}
-	if(defined($data{JEECONF}{$msg_type}{Offset})) {
-	  my $offset = $data{JEECONF}{$msg_type}{Offset};
-	  $value = $value + $offset;
-	}
+      my $corr = $data{JEECONF}{$msg_type}{CorrFactor};
+      $value = $value * $corr;
+    }
+  if(defined($data{JEECONF}{$msg_type}{Offset})) {
+    my $offset = $data{JEECONF}{$msg_type}{Offset};
+    $value = $value + $offset;
+  }
     $dMap->{READINGS}{$reading_name} = $value;
     
-    $dMap->{INDEX} = $data_end; # $data_index + $msg_len +1; # 1 Byte Type und N Bytes Data
+    $dMap->{INDEX} = $data_end; # 1 Byte Type und N Bytes Data
   } else {
-    # Definition des Msg-Typs ungueltig
+    # Definition des Message-Typs ungueltig
     Log 0, "GSD: ERROR: parse failed. no data length defined";
-    return $dMap;
+    return undef;
   }
   
   return $dMap; 
 }
 
-sub _alt_GSD_Parse($$) {
-  my ($iodev, $rawmsg) = @_;
-  # $rawmsg = JeeNodeID + SensorType + SensorData
-  # rawmsg =  GSD 1 83 1 252 241 15 11 172 8 16 66 19
-  Log 3, "GSD PARSE RAW-MSG: " . $rawmsg . " IODEV:" . $iodev->{NAME};
-  #
-  my @data = split(/\s+/,$rawmsg);
-  my $NodeID = $data[1].".".$data[3];
-  my $magic = $data[2];
+#------------------------------------------------------------------------------
+sub GSD_parseTextMsg($$) {
+  my ($hash, $dMap) = @_;
+  #TODO
   
-  my $SType = $data[4];
-  my $data_bytes = $data{JEECONF}{$SType}{DataBytes};
-  my $data_end = int(@data) - 1;
-  # $array[$#array];
-  Log 3, "GSD PARSE N:$NodeID S:$SType B:$data_bytes CNT:" . @data . " END:" . $data_end;
-  my @SData = @data[4..$data_end];
-
-	my ($hash,$name);
-	if(defined($modules{GSD}{defptr}{$NodeID})) {
-		$hash =  $modules{GSD}{defptr}{$NodeID};
-		$name = $hash->{NAME};
-	}
-	else {
-	  return "UNDEFINED GSD_$NodeID GSD $NodeID";
-	};
-	
-  my %readings;
-  
-  # Function-Data --------------------------------------------------------------
-  # If defined $data{JEECONF}{<SensorType>}{Function} then the function handels
-  # data parsing...return a hash key:reading_name Value:reading_value
-  # Param to Function: $iodev,$name,$NodeID, $SType,@SData
-  # Function-Data --------------------------------------------------------------
-  Log 3, "GSD PARSE F:$NodeID S:$SType >".$data{JEECONF}{$SType}{ReadingName};
-  if(defined($data{JEECONF}{$SType}{Function})) {
-	my $func = $data{JEECONF}{$SType}{Function};
-	if(!defined(&$func)) {
-	  Log 0, "GSD PARSE Function not defined: $SType -> $func";
-	  return undef;
-	}
-	no strict "refs";
-	%readings = &$func($iodev,$name,$NodeID, $SType,@SData);
-	use strict "refs";
-  }
-  else {
-	## Sensor-Data Bytes to Values
-	## lowBit HighBit reverse ....
-	#@SData = reverse(@SData);
-	#my $raw_value = join("",@SData);
-	#my $value = "";
-	#map {$value .= sprintf "%02x",$_} @SData;
-	#$value = hex($value);
-	#Log 3, "GSD PARSE DATA $NodeID - $SType - " . join(" " , @SData) . " -> " . $value;
-	Log 3, "GSD PARSE DATA $NodeID - $SType - " . join(" " , @SData) ;
-    #@SData = GSD_parseDefault($NodeID, %readings, @SData);
-    $SType = $SData[0];
-	my $reading_name = $data{JEECONF}{$SType}{ReadingName};
-	#$readings{$reading_name} = $value;
-	#if(defined($data{JEECONF}{$SType}{CorrFactor})) {
-	#  my $corr = $data{JEECONF}{$SType}{CorrFactor};
-	#  $readings{$reading_name} = $value * $corr;
-	#}
-  }
-  
-  # Readings erstellen / updaten
-  my $i = 0;
-  foreach my $r (sort keys %readings) {
-	Log 3, "GSD $name $r:" . $readings{$r};
-	$defs{$name}{READINGS}{$r}{VAL} = $readings{$r};
-	$defs{$name}{READINGS}{$r}{TIME} = TimeNow();
-	#$defs{$name}{STATE} = TimeNow() . " " . $r;
-	# Changed for Notify and Logs
-	$defs{$name}{CHANGED}[$i] = $r . ": " . $readings{$r};
-	$i++;
-  }
-  return $name;
+  return $dMap;
 }
 
-sub _alt_GSD_parseDefault($$$) {
-  my ($NodeID, %readings, @sdata) = @_;
-  my $type = $sdata[0];
-  my $data_bytes = $data{JEECONF}{$type}{DataBytes};
-  my $reading_name = $data{JEECONF}{$type}{ReadingName};
-  my @sensor_data = @sdata[1..$data_bytes];
-  Log 3, "GSD PARSE MSG $NodeID - $type - $data_bytes > $reading_name";
-  my $data_end = int(@sdata) - 1;
-  @sdata = @sdata[$data_bytes+1..$data_end];
-  
-  #todo
-  @sensor_data = reverse(@sensor_data);
-  my $raw_value = join("",@sensor_data);
-  my $value = "";
-  map {$value .= sprintf "%02x",$_} @sensor_data;
-  $value = hex($value);
-  Log 3, "GSD PARSE DATA $NodeID - $type - " . join(" " , @sensor_data) . " -> " . $value;
- 
-  $readings{$reading_name} = $value;
- 
-	if(defined($data{JEECONF}{$type}{CorrFactor})) {
-	  my $corr = $data{JEECONF}{$type}{CorrFactor};
-	  $readings{$reading_name} = $value * $corr;
-	}
-  
-  return @sdata;
+sub
+GSD_Get($@)
+{
+  my ($hash, @a) = @_;
+
+  my $name = $a[0];
+
+  if(@a < 2)
+  {
+    logF($hash, "Get", "@a: get needs at least one parameter");
+    return "$name: get needs at least one parameter";
+  }
+
+  my $cmd= $a[1];
+  logF($hash, "Get", "@a");
+
+  if($cmd eq "list") {
+    my $ret = "";
+    foreach my $kname (keys %{$defs{$name}{READINGS}}) {
+      my $value = $defs{$name}{READINGS}->{$kname}->{VAL};
+      my $time  = $defs{$name}{READINGS}->{$kname}->{TIME};
+      $ret = "$ret\n".sprintf("%-20s %-10s (%s)", $kname, $value, $time);
+    }
+    return $ret;
+  }
+
+  if($cmd eq "version")
+  {
+    return $VERSION;
+  }
+
+  return "Unknown argument $cmd, choose one of list:noArg version:noArg";
 }
 
-################################################################################
-sub GSD_parse_12($$) {
-  my ($iodev,$name,$NodeID, $SType,@SData) = @_;
-  Log 5, "GSD PARSE-12 DATA $NodeID - $SType - " . join(" " , @SData);
-  my %reading;
-  $reading{X} = "XXX";
-  $reading{Y} = "YYY";
-  $reading{Z} = "ZZZ";
-  return \%reading;
+sub
+GSD_Set($@)
+{
+  my ($hash, @a) = @_;
 
+  my $name = $a[0];
+
+  if(@a < 2)
+  {
+    logF($hash, "Set", "@a: set needs at least one parameter");
+    return "$name: set needs at least one parameter";
+  }
+
+  my $cmd= $a[1];
+  logF($hash, "Set", "@a");
+
+  if($cmd eq "clean") {    
+    # alle Readings loeschen
+    foreach my $aName (keys %{$defs{$name}{READINGS}}) {
+      delete $defs{$name}{READINGS}{$aName};
+    }
+    return;
+  }
+  
+  if($cmd eq "clear")
+  {
+    my $subcmd = my $cmd= $a[2];
+    if(defined $subcmd) {
+      delete $defs{$name}{READINGS}{$subcmd};
+      return;
+    }
+    return "missing parameter. use clear <reading name>";
+  }
+
+  return "Unknown argument $cmd, choose one of clean:noArg clear";
 }
-################################################################################
+
+sub
+GSD_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  Log 5, "GSD Attr: $cmd $name $attrName $attrVal";
+
+  $attrVal= "" unless defined($attrVal);
+  my $orig = AttrVal($name, $attrName, "");
+
+  if( $cmd eq "set" ) {
+    if( $orig ne $attrVal ) {
+      my $hash = $main::defs{$name};
+      if($attrName eq "disable")
+      {
+        # TODO
+      }
+
+      $attr{$name}{$attrName} = $attrVal;
+      return undef;
+    }
+  }
+  return;
+}
+
+#------------------------------------------------------------------------------
+# Logging: Funkrionsaufrufe
+#   Parameter: HASH, Funktionsname, Message
+#------------------------------------------------------------------------------
+sub logF($$$)
+{
+	my ($hash, $fname, $msg) = @_;
+  #Log 5, "GSD $fname (".$hash->{NAME}."): $msg";
+  Log 5, "GSD $fname $msg";
+}
+
 1;
+
+=pod
+=begin html
+
+<a name="GSD"></a>
+<h3>GSD</h3>
+
+TODO: EN
+
+=end html
+=begin html_DE
+<a name="GSD"></a>
+<h3>GSD</h3>
+
+TODO: DE
+
+=end html_DE
+=cut
