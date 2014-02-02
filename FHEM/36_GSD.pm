@@ -84,12 +84,15 @@ sub GSD_Initialize($)
 #                  Dabei wird die Anzahl aus dem nächsten Byte genommen.
 #                  Bedeutet bis zu 256 gleichartigen Sensoren, 
 #                  jedoch längere Funknachtricht.
-#                  sID 6 (0b110) - reserviert:
+#                  sID 6 (0b110) - reserviert: => wird wohl vorerst nicht gebraucht, ggf. ein weiteres Sensoren-Set mir einer weiteren MagicNumber
 #                  Nächster Byte enthält Anzahl (sID) und dieSensor-spezifische 
 #                  Anweisungen (z.B. Formatanweisungen , Arten etc.)
 #  Sensoren:
-#  Temperatur, Luftfeuchte, Textnachrichten, Spannung, LowBat-Warnung, Distance,
-#  Licht, Bewegung, Luftdruck, Strommessung, 
+#  Temperatur, Luftfeuchte, Textnachrichten(key(Name):value=> 3 Arten: READING, INTERNAL, ATTRIBUTE), 
+#  Spannung, Strom, LowBat-Warnung, Distance,
+#  Licht, Bewegung, Luftdruck, Strommessung, Regen, Regenmenge, Neigung, Bodenfeuchte, 
+#  ReedKontakt, Wind, Windrichtung, Füllstand, Wassermelder (Unterschied zu Reed?), Lüftgüte (CO, CO2), Fensterkontakt (3state), 
+#  Energiemessung, Wassermenge  
 #
 # IDs:
 #   0 - [reserved]
@@ -126,12 +129,14 @@ sub GSD_Initialize($)
 #  31 - text message
 # 
   # JeeConf
-  # $data{JEECONF}{<SensorType>}{ReadingName}
-  # $data{JEECONF}{<SensorType>}{DataBytes}
-  # $data{JEECONF}{<SensorType>}{Prefix}     => Wozu?
-  # $data{JEECONF}{<SensorType>}{CorrFactor} => Multiplikator
-  # $data{JEECONF}{<SensorType>}{Offset}
-  # $data{JEECONF}{<SensorType>}{Function}
+  # $data{JEECONF}{<SensorType>}{ReadingName} => Reading-Name
+  # $data{JEECONF}{<SensorType>}{DataBytes=>DataLength}   => Laenge des Datenbereiches
+  # $data{JEECONF}{<SensorType>}{Prefix}      => Wozu?
+  # $data{JEECONF}{<SensorType>}{CorrFactor}  => Multiplikator (vlue wird damit multipliziert)
+  # $data{JEECONF}{<SensorType>}{CorrOffset}  => wird zum value hinzuaddiert
+  # $data{JEECONF}{<SensorType>}{ConvertFN}   => Funktion zum Interpretieren von Sensor-Data-Array (ansonsten wird die Standardparsefunktion verwendet)
+  # $data{JEECONF}{<SensorType>}{Function=>ParseFN}    => Parsefunktion, falls sich die Standard-Funktion gar nicht eignet
+  
   # <SensorType>: 0-9 -> Reserved/not Used
   # <SensorType>: 10-99 -> Default
   # <SensorType>: 100-199 -> Userdifined
@@ -208,11 +213,12 @@ sub GSD_Define($){
   if(defined($modules{GSD}{defptr}{$NodeID})) {
     return "Node $NodeID allready defined";
   }
-  $hash->{CODE} = $NodeID;
+  #$hash->{CODE} = $NodeID;
   $hash->{STATE} = "Initialized: " . TimeNow();
   #$hash->{OrderID} = $NodeID;
-  $hash->{NodeID} = $NodeID;
+  $hash->{NODE_ID} = $NodeID;
   $modules{GSD}{defptr}{$NodeID}   = $hash;
+  # TODO: ? ERRCOUNT, IODev,.. rssi,.. Bei Attributen: IODev?, model?, Version?, Activity?
   return undef;
 }
 
@@ -220,7 +226,7 @@ sub GSD_Define($){
 sub GSD_Undefine($$){
   my ($hash, $name) = @_;
   Log 4, "GSD Undef: " . Dumper(@_);
-  my $NodeID = $hash->{NodeID};
+  my $NodeID = $hash->{NODE_ID};
   if(defined($modules{GSD}{defptr}{$NodeID})) {
     delete $modules{GSD}{defptr}{$NodeID}
   }
@@ -299,15 +305,24 @@ sub GSD_Parse($$) {
         my $val = $dMap->{READINGS}->{$reading};
         Log 3, "GSD: update $dev_name $reading: " . $val;
         readingsBulkUpdate($dev_hash, $reading, $val);
+        #readingsSingleUpdate($dev_hash, $reading, $val, 1);
       }
       readingsEndUpdate($dev_hash, 1);
+      
+      # Mitteilen, dass sich die Readings der aktuellen Instanz geaendert haben.
+      my @list;
+      push(@list, $dev_name);
+      return @list;
     }
+    
   } else {
     # Falsche MagicNumber
     DoTrigger($hash->{NAME}, "UNKNOWNCODE $rawmsg");
     Log3 $hash->{NAME}, 3, "$hash->{NAME}: Unknown code $rawmsg, help me!";
     return undef;
   }
+  
+  return undef;
 }
 
 #------------------------------------------------------------------------------
@@ -327,11 +342,13 @@ sub GSD_parseDefault($$) {
     my $reading_name = $data{JEECONF}{$msg_type}{ReadingName};
     my $data_end = $data_index+1+$msg_len;
     my @sensor_data = @msg_data[$data_index+1..$data_end-1];
+    
     @sensor_data = reverse(@sensor_data);
     #my $raw_value = join("",@sensor_data);
     my $value = "";
     map {$value .= sprintf "%02x",$_} @sensor_data;
     $value = hex($value);
+    
     Log 3, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
     
     if(defined($data{JEECONF}{$msg_type}{CorrFactor})) {
