@@ -57,6 +57,7 @@ sub GSD_Initialize($)
   # Match/Prefix
   my $match = "GSD";
   $hash->{Match}     = "^GSD";
+  $hash->{FingerprintFn} = "GSD_Fingerprint";
   $hash->{DefFn}     = "GSD_Define";
   $hash->{UndefFn}   = "GSD_Undefine";
   $hash->{ParseFn}   = "GSD_Parse";
@@ -68,74 +69,313 @@ sub GSD_Initialize($)
   $hash->{AttrList}  = "disable:0,1".
                        $readingFnAttributes;
   #----------------------------------------------------------------------------
-  
+  #
   # Arduino/JeeNodes-Variables:
   # http://arduino.cc/en/Reference/HomePage
   # Integer = 2 Bytes -> form -32,768 to 32,767
   # Long (unsigned) = 4 Bytes -> from 0 to 4,294,967,295
   # Long (signed) = 4 Bytes -> from -2,147,483,648 to 2,147,483,647
   #
-# Proposal: 
-# Typ-Byte-Aufbau: [xxx][xxxxx] => 3Bit sID, 5Bit SensorTyp. 
-#                  Damit sind 32 Sensorarte möglich, mit bis zu 6 gleichartigen Stück 
-#                  (ohne dass die Reihenfolge eingehalten werden muss.
-#                  Teilübertragungen möglich).
-#                  sID 7 (0b111) - reserviert:
-#                  Dabei wird die Anzahl aus dem nächsten Byte genommen.
-#                  Bedeutet bis zu 256 gleichartigen Sensoren, 
-#                  jedoch längere Funknachtricht.
-#                  sID 6 (0b110) - reserviert: => wird wohl vorerst nicht gebraucht, ggf. ein weiteres Sensoren-Set mir einer weiteren MagicNumber
-#                  Nächster Byte enthält Anzahl (sID) und dieSensor-spezifische 
-#                  Anweisungen (z.B. Formatanweisungen , Arten etc.)
-#  Sensoren:
-#  Temperatur, Luftfeuchte, Textnachrichten(key(Name):value=> 3 Arten: READING, INTERNAL, ATTRIBUTE), 
-#  Spannung, Strom, LowBat-Warnung, Distance,
-#  Licht, Bewegung, Luftdruck, Strommessung, Regen, Regenmenge, Neigung, Bodenfeuchte, 
-#  ReedKontakt, Wind, Windrichtung, Füllstand, Wassermelder (Unterschied zu Reed?), Lüftgüte (CO, CO2), Fensterkontakt (3state), 
-#  Energiemessung, Wassermenge  
-#
-# IDs:
-#   0 - [reserved]
-#   1 - [reserved]
-#   2 - [reserved]
-#   3 - [reserved]
-#   4 - [reserved]
-#   5 - temperature
-#   6 - humidity
-#   7 - brightness
-#   8 - pressure
-#   9 - motion
-#  10 - distance
-#  11 - angle
-#  12 - current
-#  13 - voltage
-#  14 - 
-#  15 - 
-#  16 - [reserved]
-#  17 - [reserved]
-#  18 - [reserved]
-#  19 - [reserved]
-#  20 - [reserved]
-#  21 - [reserved] [e] expanding 5 (temperature)
-#  22 - [reserved] [e] expanding 6 (humidity)
-#  23 - 
-#  24 - 
-#  25 - power supply
-#  26 - low bat mark
-#  27 - timemillis
-#  28 - rtiple_axis
-#  29 - counter
-#  30 - raw data
-#  31 - text message
+  #
+  #----------------------------------------------------------------------------
+  #
+  # Message-Format:
+  #   GSD NodeID(1Byte) Magic(1Byte) SubNodeID(1Byte) MsgCounter(2Bytes) [Payload](NBytes)
+  # Payload-Format:
+  #   TypeID(1Byte) [Data](NBytes)
+  #
+  #
+  #
 # 
-  # JeeConf
+# Typ-Byte-Aufbau: Einfach eine TypeID (0-255). 
+#                  Manche Werte sind reserviert, manche identifizieren Sensoren gleicher Art.
+#                  Damit wird es z.B. möglich, mehrere Temperaturwerte zu übermitteln.
+# 000-015   reserved / unused
+#
+# 016-127  Default
+#   16-23  (8)  Temperatur
+#   24-31  (8)  Luftfeuchte
+#   32-39  (8)  Lichtintensität
+#   40-47  (8)  Motion
+#   48-49  (2)  Luftdruck
+#   50-51  (2)  Regen (Zustand)
+#   52-53  (2)  Regenmenge
+#   54-61  (8)  Bodenfeuchte
+#   62-63  (2)  Windstärke
+#   64-65  (2)  Windrichtung
+#   66-73  (8)  reserved / Luft (CO, CO2,..)
+#   74-81  (8)  Distance
+#   82-85  (4)  Neigung
+#   86-93  (8)  ADC Spannungsmessung
+#   094-101(8)  ADC Strommessung
+#   102-103(2)  Energiezähler
+#   104-105(2)  Wasserzähler
+#   106-109(4)  Counter32
+#   110-113(4)  Counter24
+#   114-117(4)  Counter16
+#   118-125(8)  State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
+#   126-127(2)  Prozentwerte (xx,xx: Füllstand etc.)
+# 
+# 128-143 reserved
+#
+# 144-201 Undefined (User defined)
+#
+# 202-255 reserved / internal
+#   202     power supply : main
+#   203     _reserved / power supply
+#   204     _reserved / power supply
+#   205     _reserved / power supply
+#   206     _reserved
+#   207     _reserved
+#   208     _reserved
+#   209     _reserved
+#   210     low bat warning : main
+#   211     _reserved
+#   212     _reserved
+#   213     _reserved
+#   214     _reserved
+#   215     _reserved
+#   216     _reserved
+#   217     _reserved
+#   218     time millis : current
+#   219     _reserved
+#   220     _reserved
+#   221     _reserved
+#   222     _reserved
+#   223     _reserved
+#   224     _reserved
+#   225     _reserved
+#   226     system temperature : main
+#   227     _reserved
+#   228     _reserved
+#   229     _reserved
+#   230     _reserved
+#   231     _reserved
+#   232     _reserved
+#   233     _reserved
+#   234     Bereich INTERNAL:    Textnachricht in Form key:value
+#   235     Bereich READINGS:    Textnachricht in Form key:value
+#   236     Bereich ATTRINBUTES: Textnachricht in Form key:value
+#   237     _reserved / Textnachricht
+#   238     _reserved
+#   239     _reserved
+#   240     _reserved
+#   241     _reserved
+#   242-255 _reserved
+#
+# 
+#
+  #
+  # Config: Sensor-Format
+  #
+  # --- 16-23 (8) --- Temperatur -------------------------
+  $data{GSCONF}{16}{ReadingName} = "temperature";
+  $data{GSCONF}{16}{DataLength} = 2;
+  $data{GSCONF}{16}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{17}{ReadingName} = "temperature1";
+  $data{GSCONF}{17}{DataLength} = 2;
+  $data{GSCONF}{17}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{18}{ReadingName} = "temperature2";
+  $data{GSCONF}{18}{DataLength} = 2;
+  $data{GSCONF}{18}{CorrFactor} = 0.01;
+  # ---  
+  $data{GSCONF}{19}{ReadingName} = "temperature3";
+  $data{GSCONF}{19}{DataLength} = 2;
+  $data{GSCONF}{19}{CorrFactor} = 0.01;
+  # ---  
+  $data{GSCONF}{20}{ReadingName} = "temperature4";
+  $data{GSCONF}{20}{DataLength} = 2;
+  $data{GSCONF}{20}{CorrFactor} = 0.01;
+  # ---  
+  $data{GSCONF}{21}{ReadingName} = "temperature5";
+  $data{GSCONF}{21}{DataLength} = 2;
+  $data{GSCONF}{21}{CorrFactor} = 0.01;
+  # ---  
+  $data{GSCONF}{22}{ReadingName} = "temperature6";
+  $data{GSCONF}{22}{DataLength} = 2;
+  $data{GSCONF}{22}{CorrFactor} = 0.01;
+  # ---  
+  $data{GSCONF}{23}{ReadingName} = "temperature7";
+  $data{GSCONF}{23}{DataLength} = 2;
+  $data{GSCONF}{23}{CorrFactor} = 0.01;
+  # --- 24-31 (8) --- Luftfeuchte ------------------------
+  $data{GSCONF}{24}{ReadingName} = "humidity";
+  $data{GSCONF}{24}{DataLength} = 2;
+  $data{GSCONF}{24}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{25}{ReadingName} = "humidity1";
+  $data{GSCONF}{25}{DataLength} = 2;
+  $data{GSCONF}{25}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{26}{ReadingName} = "humidity2";
+  $data{GSCONF}{26}{DataLength} = 2;
+  $data{GSCONF}{26}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{27}{ReadingName} = "humidity3";
+  $data{GSCONF}{27}{DataLength} = 2;
+  $data{GSCONF}{27}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{28}{ReadingName} = "humidity4";
+  $data{GSCONF}{28}{DataLength} = 2;
+  $data{GSCONF}{28}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{29}{ReadingName} = "humidity5";
+  $data{GSCONF}{29}{DataLength} = 2;
+  $data{GSCONF}{29}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{30}{ReadingName} = "humidity6";
+  $data{GSCONF}{30}{DataLength} = 2;
+  $data{GSCONF}{30}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{31}{ReadingName} = "humidity7";
+  $data{GSCONF}{31}{DataLength} = 2;
+  $data{GSCONF}{31}{CorrFactor} = 0.01;
+  # --- 32-39 (8) --- Lichtintensität --------------------
+  $data{GSCONF}{32}{ReadingName} = "brightness";
+  $data{GSCONF}{32}{DataLength} = 4;
+  $data{GSCONF}{32}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{33}{ReadingName} = "brightness1";
+  $data{GSCONF}{33}{DataLength} = 4;
+  $data{GSCONF}{33}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{34}{ReadingName} = "brightness2";
+  $data{GSCONF}{34}{DataLength} = 4;
+  $data{GSCONF}{34}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{35}{ReadingName} = "brightness3";
+  $data{GSCONF}{35}{DataLength} = 4;
+  $data{GSCONF}{35}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{36}{ReadingName} = "brightness4";
+  $data{GSCONF}{36}{DataLength} = 4;
+  $data{GSCONF}{36}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{37}{ReadingName} = "brightness5";
+  $data{GSCONF}{37}{DataLength} = 4;
+  $data{GSCONF}{37}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{38}{ReadingName} = "brightness6";
+  $data{GSCONF}{38}{DataLength} = 4;
+  $data{GSCONF}{38}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{39}{ReadingName} = "brightness7";
+  $data{GSCONF}{39}{DataLength} = 4;
+  $data{GSCONF}{39}{CorrFactor} = 0.01;
+  # --- 40-47 (8) --- Motion -----------------------------
+  $data{GSCONF}{40}{ReadingName} = "motion";
+  $data{GSCONF}{40}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{41}{ReadingName} = "motion1";
+  $data{GSCONF}{41}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{42}{ReadingName} = "motion2";
+  $data{GSCONF}{42}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{43}{ReadingName} = "motion3";
+  $data{GSCONF}{43}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{44}{ReadingName} = "motion4";
+  $data{GSCONF}{44}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{45}{ReadingName} = "motion5";
+  $data{GSCONF}{45}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{46}{ReadingName} = "motion6";
+  $data{GSCONF}{46}{DataLength} = 1;
+  # ---
+  $data{GSCONF}{47}{ReadingName} = "motion7";
+  $data{GSCONF}{47}{DataLength} = 1;
+  # --- 48-49 (2) --- Luftdruck --------------------------
+  $data{GSCONF}{48}{ReadingName} = "pressure";
+  $data{GSCONF}{48}{DataLength} = 4;
+  $data{GSCONF}{48}{CorrFactor} = 0.01;
+  # ---
+  $data{GSCONF}{49}{ReadingName} = "pressure0";
+  $data{GSCONF}{49}{DataLength} = 4;
+  $data{GSCONF}{49}{CorrFactor} = 0.01;
+  # --- 50-51 (2) --- Regen (Zustand) --------------------
+  # TODO
+  # --- 52-53 (2) --- Regenmenge -------------------------
+  # TODO
+  # --- 54-61 (8) --- Bodenfeuchte -----------------------
+  # TODO
+  # --- 62-63 (2) --- Windstärke -------------------------
+  # TODO
+  # --- 64-65 (2) --- Windrichtung -----------------------
+  # TODO
+  # --- 66-73 (8) --- reserved / Luft (CO, CO2,..) -------
+  # TODO
+  # --- 74-81 (8) --- Distance ---------------------------
+  # TODO
+  # --- 82-85 (4) --- Neigung ----------------------------
+  # TODO
+  # --- 86-93 (8) --- ADC Spannungsmessung ---------------
+  # TODO
+  # --- 094-101(8) -- ADC Strommessung -------------------
+  # TODO
+  # --- 102-103(2) -- Energiezähler ----------------------
+  # TODO
+  # --- 104-105(2) -- Wasserzähler -----------------------
+  # TODO
+  # --- 106-109(4) -- Counter32 --------------------------
+  # TODO
+  # --- 110-113(4) -- Counter24 --------------------------
+  # TODO
+  # --- 114-117(4) -- Counter16 --------------------------
+  # TODO
+  # --- 118-125(8) -- State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
+  # TODO
+  # --- 126-127(2) -- Prozentwerte (xx,xx: Füllstand etc.)
+  # TODO
+  #
+  #
+  # 128-143 reserved
+  #
+  # 144-201 Undefined (User defined)
+  #
+  # 202-255 reserved / internal
+  #
+  # --- 202 --- power supply : main ----------------------
+  $data{GSCONF}{202}{ReadingName} = "power_main";
+  $data{GSCONF}{202}{DataLength} = 2;
+  $data{GSCONF}{202}{CorrFactor} = 0.001;
+  # --- 203-205 reserved / power supply
+  # --- 206-209 reserved
+  # --- 210 --- low bat warning : main -------------------
+  $data{GSCONF}{210}{ReadingName} = "battery";
+  $data{GSCONF}{210}{DataLength} = 1;
+  # --- 211-217 reserved
+  # --- 218 --- time millis : current --------------------
+  $data{GSCONF}{218}{ReadingName} = "timemillis";
+  $data{GSCONF}{218}{DataLength} = 4;
+  # --- 219-225 reserved
+  # --- 226 --- system temperature : main ----------------
+  # --- 227-233 reserved
+  # --- 234 --- Bereich INTERNAL:    Textnachricht in Form key:value
+  # TODO
+  # --- 235 --- Bereich READINGS:    Textnachricht in Form key:value
+  # TODO
+  # --- 236 --- Bereich ATTRINBUTES: Textnachricht in Form key:value
+  # TODO
+  # --- 237 --- reserved / Textnachricht
+  # --- 238-241 reserved
+  #
+  # 242-255 reserved
+  #
+  
+  # 
   # $data{JEECONF}{<SensorType>}{ReadingName} => Reading-Name
   # $data{JEECONF}{<SensorType>}{DataBytes=>DataLength}   => Laenge des Datenbereiches
   # $data{JEECONF}{<SensorType>}{Prefix}      => Wozu?
   # $data{JEECONF}{<SensorType>}{CorrFactor}  => Multiplikator (vlue wird damit multipliziert)
   # $data{JEECONF}{<SensorType>}{CorrOffset}  => wird zum value hinzuaddiert
-  # $data{JEECONF}{<SensorType>}{ConvertFN}   => Funktion zum Interpretieren von Sensor-Data-Array (ansonsten wird die Standardparsefunktion verwendet)
-  # $data{JEECONF}{<SensorType>}{Function=>ParseFN}    => Parsefunktion, falls sich die Standard-Funktion gar nicht eignet
+  # $data{JEECONF}{<SensorType>}{ConvertFn}   => Funktion zum Interpretieren von Sensor-Data-Array (ansonsten wird die Standardparsefunktion verwendet)
+  # $data{JEECONF}{<SensorType>}{Function=>ParseFn}    => Parsefunktion, falls sich die Standard-Funktion gar nicht eignet
+  # $data{JEECONF}{<SensorType>}{FormatStr}   => Formatstring für sprintf
+  # $data{JEECONF}{<SensorType>}{FormatFn}    => Format-Funktion    
   
   # <SensorType>: 0-9 -> Reserved/not Used
   # <SensorType>: 10-99 -> Default
@@ -201,6 +441,19 @@ sub GSD_Initialize($)
   $data{JEECONF}{254}{DataBytes} = 4;
   $data{JEECONF}{254}{Prefix} = $match;
 
+}
+
+sub
+GSD_Fingerprint($$)
+{
+  my ($name, $msg) = @_;
+  # => Message ID (Counter) einführen. Diese als Duplikate einstufen (z.B. Doppel-Empfang von 2 JeeLinks)
+  
+  # Keine Messages als Duplikate einstufen.
+  # (es können ja auch wirklich die gleichen Werte sein)
+  # ggf. später die Message ID (gibt es noch nicht), NodeId und sNodeId auswerten.
+  # (=> msg manupiulieren, s. 00_CUL.pm)
+  return ($name, undef);
 }
 
 #-------------------------------------------------------------------------------
