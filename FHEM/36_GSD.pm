@@ -443,17 +443,30 @@ sub GSD_Initialize($)
 
 }
 
+my $c_pos_nid     = 1;
+my $c_pos_magic   = 2;
+my $c_pos_sid     = 3;
+my $c_pos_counter = 4;
+my $c_len_counter = 2;
+my $c_pos_data = $c_pos_counter+$c_len_counter;
+
 sub
 GSD_Fingerprint($$)
 {
   my ($name, $msg) = @_;
-  # => Message ID (Counter) einführen. Diese als Duplikate einstufen (z.B. Doppel-Empfang von 2 JeeLinks)
-  
-  # Keine Messages als Duplikate einstufen.
-  # (es können ja auch wirklich die gleichen Werte sein)
-  # ggf. später die Message ID (gibt es noch nicht), NodeId und sNodeId auswerten.
-  # (=> msg manupiulieren, s. 00_CUL.pm)
-  return ($name, undef);
+  # Message ID (Counter) zur Identifizieren nutzen. Messages werden ggf. als Duplikate eingestuft (z.B. Doppel-Empfang von 2 JeeLinks)
+  my $p=0;
+  my $i;
+  for ($i=0;$i<$c_pos_data;$i++) { 
+  	$p = index($msg, " ", $p+1);
+  	if($p<0) {last;}
+  }
+  if($p>0) {
+  	$msg = substr($msg, 0, $p);
+  }
+  Log 3, "GSD Fingerprint: " . $msg;
+   
+  return ($name, $msg); # Teil der Message mit NodeID und MsgID
 }
 
 #-------------------------------------------------------------------------------
@@ -492,9 +505,20 @@ sub GSD_Parse($$) {
   # rawmsg =  GSD 1 83 1 252 241 15 11 172 8 16 66 19
   Log 3, "GSD: parse RAW message: " . $rawmsg . " IODev: " . $hash->{NAME};
   my @msg_data = split(/\s+/, $rawmsg);
-  my $NodeID = $msg_data[1].".".$msg_data[3];
-  my $magic = $msg_data[2];
+  
+  my $magic = $msg_data[$c_pos_magic];
   if($magic eq $GSD_MAGIC) {
+  	my $NodeID = $msg_data[$c_pos_nid].".".$msg_data[$c_pos_sid];
+  	my $msgCounter = GSD_parseNumber(@msg_data[$c_pos_counter..$c_pos_counter+$c_len_counter-1]);
+  	Log 3, "GSD: message number: " . $msgCounter;
+  	
+  	my $data_len = int(@msg_data);
+    if($data_len < $c_pos_counter+$c_len_counter-1) { 
+  	  # message to short
+  	  log 3, "GSD: ERROR: message to short";
+      return undef;
+    }
+  	
     my ($dev_hash,$dev_name);
     if(defined($modules{GSD}{defptr}{$NodeID})) {
       $dev_hash =  $modules{GSD}{defptr}{$NodeID};
@@ -502,11 +526,9 @@ sub GSD_Parse($$) {
     } else {
       return "UNDEFINED GSD_$NodeID GSD $NodeID";
     };
-  
-    my $data_len = int(@msg_data);
-    
+      
     my $dMap;
-    $dMap->{INDEX} = 4; # erster Byte der eigentlichen Nachricht
+    $dMap->{INDEX} = $c_pos_data; # erster Byte der eigentlichen Nachricht
     @{$dMap->{DATA}} = @msg_data; # message data
     my $rMap;
     $dMap->{READINGS} = $rMap; # readings
@@ -516,9 +538,9 @@ sub GSD_Parse($$) {
       #my $msg_data = $dMap->{DATA};
       #my $data_index = $dMap->{INDEX};
       my $msg_type = $msg_data[$dMap->{INDEX}];
-      if(defined($data{JEECONF}{$msg_type}{ReadingName})) {
-        if(defined($data{JEECONF}{$msg_type}{Function})) {
-          my $func = $data{JEECONF}{$msg_type}{Function};
+      if(defined($data{GSCONF}{$msg_type}{ReadingName})) {
+        if(defined($data{GSCONF}{$msg_type}{Function})) {
+          my $func = $data{GSCONF}{$msg_type}{Function};
           if(!defined(&$func)) {
             # Function nicht bekannt
             Log 0, "GSD: ERROR: parse function not defined: $msg_type -> $func";
@@ -551,23 +573,26 @@ sub GSD_Parse($$) {
     
     # Readings erstellen / updaten
     Log 3, "GSD: update readings for $dev_name";
+    
+    readingsBeginUpdate($dev_hash);
+    readingsBulkUpdate($dev_hash, "msg_id", $msgCounter);
+    
     my @readings_keys=keys($dMap->{READINGS});
     if(scalar(@readings_keys)>0) {
-      readingsBeginUpdate($dev_hash);
       foreach my $reading (sort @readings_keys) {
         my $val = $dMap->{READINGS}->{$reading};
         Log 3, "GSD: update $dev_name $reading: " . $val;
         readingsBulkUpdate($dev_hash, $reading, $val);
         #readingsSingleUpdate($dev_hash, $reading, $val, 1);
       }
-      readingsEndUpdate($dev_hash, 1);
-      
-      # Mitteilen, dass sich die Readings der aktuellen Instanz geaendert haben.
-      my @list;
-      push(@list, $dev_name);
-      return @list;
     }
+    readingsEndUpdate($dev_hash, 1);
     
+    # Mitteilen, dass sich die Readings der aktuellen Instanz geaendert haben.
+    my @list;
+    push(@list, $dev_name);
+    return @list;
+      
   } else {
     # Falsche MagicNumber
     DoTrigger($hash->{NAME}, "UNKNOWNCODE $rawmsg");
@@ -576,6 +601,17 @@ sub GSD_Parse($$) {
   }
   
   return undef;
+}
+
+#------------------------------------------------------------------------------
+sub GSD_parseNumber(@) {
+  my(@sensor_data) = @_;
+  Log 3, "GSD: parse number: data: ".join(" ",@sensor_data);  
+  @sensor_data = reverse(@sensor_data);
+  my $value = "";
+  map {$value .= sprintf "%02x",$_} @sensor_data;
+  $value = hex($value);
+  return $value;
 }
 
 #------------------------------------------------------------------------------
@@ -590,26 +626,28 @@ sub GSD_parseDefault($$) {
   
   Log 3, "GSD: default parse function. index: " . $data_index . " msg type: " . $msg_type;
    
-  my $msg_len = $data{JEECONF}{$msg_type}{DataBytes};
+  my $msg_len = $data{GSCONF}{$msg_type}{DataLength};
   if(defined($msg_len)) {
-    my $reading_name = $data{JEECONF}{$msg_type}{ReadingName};
+    my $reading_name = $data{GSCONF}{$msg_type}{ReadingName};
     my $data_end = $data_index+1+$msg_len;
     my @sensor_data = @msg_data[$data_index+1..$data_end-1];
     
-    @sensor_data = reverse(@sensor_data);
-    #my $raw_value = join("",@sensor_data);
-    my $value = "";
-    map {$value .= sprintf "%02x",$_} @sensor_data;
-    $value = hex($value);
+    #@sensor_data = reverse(@sensor_data);
+    ##my $raw_value = join("",@sensor_data);
+    #my $value = "";
+    #map {$value .= sprintf "%02x",$_} @sensor_data;
+    #$value = hex($value);
+    
+    my $value = GSD_parseNumber(@sensor_data);
     
     Log 3, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
     
-    if(defined($data{JEECONF}{$msg_type}{CorrFactor})) {
-      my $corr = $data{JEECONF}{$msg_type}{CorrFactor};
+    if(defined($data{GSCONF}{$msg_type}{CorrFactor})) {
+      my $corr = $data{GSCONF}{$msg_type}{CorrFactor};
       $value = $value * $corr;
     }
-  if(defined($data{JEECONF}{$msg_type}{Offset})) {
-    my $offset = $data{JEECONF}{$msg_type}{Offset};
+  if(defined($data{GSCONF}{$msg_type}{Offset})) {
+    my $offset = $data{GSCONF}{$msg_type}{Offset};
     $value = $value + $offset;
   }
     $dMap->{READINGS}{$reading_name} = $value;
