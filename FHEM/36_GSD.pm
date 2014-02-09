@@ -66,9 +66,9 @@ sub GSD_Initialize($)
   $hash->{SetFn}    = "GSD_Set";
   $hash->{AttrFn}   = "GSD_Attr";
   
-  $hash->{AttrList}  = "disable:0,1".
+  $hash->{AttrList}  = "disable:0,1 map-readings ".
                        $readingFnAttributes;
-  #----------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   #
   # Arduino/JeeNodes-Variables:
   # http://arduino.cc/en/Reference/HomePage
@@ -76,99 +76,119 @@ sub GSD_Initialize($)
   # Long (unsigned) = 4 Bytes -> from 0 to 4,294,967,295
   # Long (signed) = 4 Bytes -> from -2,147,483,648 to 2,147,483,647
   #
+  # ---------------------------------------------------------------------------
   #
-  #----------------------------------------------------------------------------
+  # Message-Format: <Head><Payload>
+  #   GSD NodeID(1Byte) Magic(1Byte) SubNodeID(1Byte) MsgCounter(2Bytes) 
+  #   [Payload](NBytes)
   #
-  # Message-Format:
-  #   GSD NodeID(1Byte) Magic(1Byte) SubNodeID(1Byte) MsgCounter(2Bytes) [Payload](NBytes)
   # Payload-Format:
   #   TypeID(1Byte) [Data](NBytes)
   #
+  # Beispiel: GSD 1 83 1 1 0 202 241 15 16 86 9 24 230 20
+  # ---
+  # 
+  # Typ-Byte-Aufbau: 
+  #  Einfach eine TypeID (0-255). 
+  #  Manche Werte sind reserviert, manche identifizieren Sensoren gleicher Art.
+  #  Damit wird es z.B. möglich, mehrere Temperaturwerte zu übermitteln.
+  # 
+  # 000-015   reserved / unused
   #
+  # 016-127  Default
+  #   16-23  (8)  Temperatur
+  #   24-31  (8)  Luftfeuchte
+  #   32-39  (8)  Lichtintensität
+  #   40-47  (8)  Motion
+  #   48-49  (2)  Luftdruck
+  #   50-51  (2)  Regen (Zustand)
+  #   52-53  (2)  Regenmenge
+  #   54-61  (8)  Bodenfeuchte
+  #   62-63  (2)  Windstärke
+  #   64-65  (2)  Windrichtung
+  #   66-73  (8)  reserved / Luft (CO, CO2,..)
+  #   74-81  (8)  Distance
+  #   82-85  (4)  Neigung
+  #   86-93  (8)  ADC Spannungsmessung
+  #   094-101(8)  ADC Strommessung
+  #   102-103(2)  Energiezähler
+  #   104-105(2)  Wasserzähler
+  #   106-109(4)  Counter32
+  #   110-113(4)  Counter24
+  #   114-117(4)  Counter16
+  #   118-125(8)  State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
+  #   126-127(2)  Prozentwerte (xx,xx: Füllstand etc.)
+  # 
+  # 128-143 reserved
   #
-# 
-# Typ-Byte-Aufbau: Einfach eine TypeID (0-255). 
-#                  Manche Werte sind reserviert, manche identifizieren Sensoren gleicher Art.
-#                  Damit wird es z.B. möglich, mehrere Temperaturwerte zu übermitteln.
-# 000-015   reserved / unused
-#
-# 016-127  Default
-#   16-23  (8)  Temperatur
-#   24-31  (8)  Luftfeuchte
-#   32-39  (8)  Lichtintensität
-#   40-47  (8)  Motion
-#   48-49  (2)  Luftdruck
-#   50-51  (2)  Regen (Zustand)
-#   52-53  (2)  Regenmenge
-#   54-61  (8)  Bodenfeuchte
-#   62-63  (2)  Windstärke
-#   64-65  (2)  Windrichtung
-#   66-73  (8)  reserved / Luft (CO, CO2,..)
-#   74-81  (8)  Distance
-#   82-85  (4)  Neigung
-#   86-93  (8)  ADC Spannungsmessung
-#   094-101(8)  ADC Strommessung
-#   102-103(2)  Energiezähler
-#   104-105(2)  Wasserzähler
-#   106-109(4)  Counter32
-#   110-113(4)  Counter24
-#   114-117(4)  Counter16
-#   118-125(8)  State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
-#   126-127(2)  Prozentwerte (xx,xx: Füllstand etc.)
-# 
-# 128-143 reserved
-#
-# 144-201 Undefined (User defined)
-#
-# 202-255 reserved / internal
-#   202     power supply : main
-#   203     _reserved / power supply
-#   204     _reserved / power supply
-#   205     _reserved / power supply
-#   206     _reserved
-#   207     _reserved
-#   208     _reserved
-#   209     _reserved
-#   210     low bat warning : main
-#   211     _reserved
-#   212     _reserved
-#   213     _reserved
-#   214     _reserved
-#   215     _reserved
-#   216     _reserved
-#   217     _reserved
-#   218     time millis : current
-#   219     _reserved
-#   220     _reserved
-#   221     _reserved
-#   222     _reserved
-#   223     _reserved
-#   224     _reserved
-#   225     _reserved
-#   226     system temperature : main
-#   227     _reserved
-#   228     _reserved
-#   229     _reserved
-#   230     _reserved
-#   231     _reserved
-#   232     _reserved
-#   233     _reserved
-#   234     Bereich INTERNAL:    Textnachricht in Form key:value
-#   235     Bereich READINGS:    Textnachricht in Form key:value
-#   236     Bereich ATTRINBUTES: Textnachricht in Form key:value
-#   237     _reserved / Textnachricht
-#   238     _reserved
-#   239     _reserved
-#   240     _reserved
-#   241     _reserved
-#   242-255 _reserved
-#
-# 
-#
+  # 144-201 Undefined (User defined)
+  #
+  # 202-255 reserved / internal
+  #   202     power supply : main
+  #   203     _reserved / power supply
+  #   204     _reserved / power supply
+  #   205     _reserved / power supply
+  #   206     _reserved
+  #   207     _reserved
+  #   208     _reserved
+  #   209     _reserved
+  #   210     low bat warning : main
+  #   211     _reserved
+  #   212     _reserved
+  #   213     _reserved
+  #   214     _reserved
+  #   215     _reserved
+  #   216     _reserved
+  #   217     _reserved
+  #   218     time millis : current
+  #   219     _reserved
+  #   220     _reserved
+  #   221     _reserved
+  #   222     _reserved
+  #   223     _reserved
+  #   224     _reserved
+  #   225     _reserved
+  #   226     system temperature : main
+  #   227     _reserved
+  #   228     _reserved
+  #   229     _reserved
+  #   230     _reserved
+  #   231     _reserved
+  #   232     _reserved
+  #   233     _reserved
+  #   234     Bereich INTERNAL:    Textnachricht in Form key:value
+  #   235     Bereich READINGS:    Textnachricht in Form key:value
+  #   236     Bereich ATTRINBUTES: Textnachricht in Form key:value
+  #   237     _reserved / Textnachricht
+  #   238     _reserved
+  #   239     _reserved
+  #   240     _reserved
+  #   241     _reserved
+  #   242-255 _reserved
+  #
+  # ---------------------------------------------------------------------------
+  # ReadingName: Name der Eigenschaft
+  #   $data{GSCONF}{<SensorType>}{ReadingName}
+  # DataLength:  Laenge des Datenbereiches 
+  #   $data{GSCONF}{<SensorType>}{DataLength}
+  # CorrFactor:  Multiplikator (value wird damit multipliziert)
+  #   $data{GSCONF}{<SensorType>}{CorrFactor}
+  # CorrOffset:  wird zum value hinzuaddiert
+  #   $data{GSCONF}{<SensorType>}{CorrOffset}
+  # ConvertFn:   Funktion zum Interpretieren von Sensor-Data-Array 
+  #              (ansonsten wird die Standardparsefunktion verwendet)
+  #   $data{GSCONF}{<SensorType>}{ConvertFn}  TODO
+  # ParseFn:     Parsefunktion, falls sich die Standard-Funktion gar nicht eignet
+  #   $data{GSCONF}{<SensorType>}{ParseFn}
+  # FormatStr:   Formatstring für sprintf
+  #   $data{GSCONF}{<SensorType>}{FormatStr}  TODO
+  # FormatFn:    Format-Funktion
+  #   $data{GSCONF}{<SensorType>}{FormatFn}   TODO
+  # ---------------------------------------------------------------------------
   #
   # Config: Sensor-Format
   #
-  # --- 16-23 (8) --- Temperatur -------------------------
+  # --- 16-23 (8) --- Temperatur ----------------------------------------------
   $data{GSCONF}{16}{ReadingName} = "temperature";
   $data{GSCONF}{16}{DataLength} = 2;
   $data{GSCONF}{16}{CorrFactor} = 0.01;
@@ -365,82 +385,6 @@ sub GSD_Initialize($)
   #
   # 242-255 reserved
   #
-  
-  # 
-  # $data{JEECONF}{<SensorType>}{ReadingName} => Reading-Name
-  # $data{JEECONF}{<SensorType>}{DataBytes=>DataLength}   => Laenge des Datenbereiches
-  # $data{JEECONF}{<SensorType>}{Prefix}      => Wozu?
-  # $data{JEECONF}{<SensorType>}{CorrFactor}  => Multiplikator (vlue wird damit multipliziert)
-  # $data{JEECONF}{<SensorType>}{CorrOffset}  => wird zum value hinzuaddiert
-  # $data{JEECONF}{<SensorType>}{ConvertFn}   => Funktion zum Interpretieren von Sensor-Data-Array (ansonsten wird die Standardparsefunktion verwendet)
-  # $data{JEECONF}{<SensorType>}{Function=>ParseFn}    => Parsefunktion, falls sich die Standard-Funktion gar nicht eignet
-  # $data{JEECONF}{<SensorType>}{FormatStr}   => Formatstring für sprintf
-  # $data{JEECONF}{<SensorType>}{FormatFn}    => Format-Funktion    
-  
-  # <SensorType>: 0-9 -> Reserved/not Used
-  # <SensorType>: 10-99 -> Default
-  # <SensorType>: 100-199 -> Userdifined
-  # <SensorType>: 200-255 -> Internal/Test
-  # Default-2-Bytes-------------------------------------------------------------
-  $data{JEECONF}{12}{ReadingName} = "SensorData";
-  $data{JEECONF}{12}{DataBytes} = 2;
-  $data{JEECONF}{12}{Prefix} = $match;
-  # Temperature ----------------------------------------------------------------
-  $data{JEECONF}{11}{ReadingName} = "temperature";
-  $data{JEECONF}{11}{DataBytes} = 2;
-  $data{JEECONF}{11}{Prefix} = $match;
-  $data{JEECONF}{11}{CorrFactor} = 0.01;
-  # Brightness- ----------------------------------------------------------------
-  $data{JEECONF}{12}{ReadingName} = "brightness";
-  $data{JEECONF}{12}{DataBytes} = 4;
-  $data{JEECONF}{12}{Prefix} = $match;
-  # Triple-Axis-X-Y-Z----------------------------------------------------------
-  $data{JEECONF}{13}{ReadingName} = "rtiple_axis";
-  $data{JEECONF}{13}{Function} = "GSD_parse_12";
-  $data{JEECONF}{13}{DataBytes} = 12;
-  $data{JEECONF}{13}{Prefix} = $match;
-  #-----------------------------------------------------------------------------
-  # 14 Used by 18_JME
-  # Counter --------------------------------------------------------------------
-  # $data{JEECONF}{14}{ReadingName} = "counter";
-  # $data{JEECONF}{14}{DataBytes} = 4;
-  # $data{JEECONF}{14}{Prefix} = $match;
-  # Pressure -------------------------------------------------------------------
-  $data{JEECONF}{15}{ReadingName} = "pressure";
-  $data{JEECONF}{15}{DataBytes} = 4;
-  $data{JEECONF}{15}{CorrFactor} = 0.01;
-  $data{JEECONF}{15}{Prefix} = $match;
-  # Humidity -------------------------------------------------------------------
-  $data{JEECONF}{16}{ReadingName} = "humidity";
-  $data{JEECONF}{16}{DataBytes} = 2;
-  $data{JEECONF}{16}{CorrFactor} = 0.01;
-  $data{JEECONF}{16}{Prefix} = $match;
-  # Light LDR ------------------------------------------------------------------
-  $data{JEECONF}{17}{ReadingName} = "light_ldr";
-  $data{JEECONF}{17}{DataBytes} = 1;
-  $data{JEECONF}{17}{Prefix} = $match;
-  # Motion ---------------------------------------------------------------------
-  $data{JEECONF}{18}{ReadingName} = "motion";
-  $data{JEECONF}{18}{DataBytes} = 1;
-  $data{JEECONF}{18}{Prefix} = $match;
-  # JeeNode InternalTemperatur -------------------------------------------------
-  $data{JEECONF}{251}{ReadingName} = "AtmelTemp";
-  $data{JEECONF}{251}{DataBytes} = 2;
-  $data{JEECONF}{251}{Prefix} = $match;
-  # JeeNode InternalRefVolatge -------------------------------------------------
-  $data{JEECONF}{252}{ReadingName} = "PowerSupply";
-  $data{JEECONF}{252}{DataBytes} = 2;
-  $data{JEECONF}{252}{CorrFactor} = 0.001;
-  $data{JEECONF}{252}{Prefix} = $match;
-  # JeeNode RF12 LowBat --------------------------------------------------------
-  $data{JEECONF}{253}{ReadingName} = "RF12LowBat";
-  $data{JEECONF}{253}{DataBytes} = 1;
-  $data{JEECONF}{253}{Prefix} = $match;
-  # JeeNode Milliseconds -------------------------------------------------------
-  $data{JEECONF}{254}{ReadingName} = "Millis";
-  $data{JEECONF}{254}{DataBytes} = 4;
-  $data{JEECONF}{254}{Prefix} = $match;
-
 }
 
 my $c_pos_nid     = 1;
@@ -449,6 +393,7 @@ my $c_pos_sid     = 3;
 my $c_pos_counter = 4;
 my $c_len_counter = 2;
 my $c_pos_data = $c_pos_counter+$c_len_counter;
+my $readings_mapping;
 
 sub
 GSD_Fingerprint($$)
@@ -469,7 +414,7 @@ GSD_Fingerprint($$)
   return ($name, $msg); # Teil der Message mit NodeID und MsgID
 }
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 sub GSD_Define($){
   # define GSD_1.1 GSD 1.1
   my ($hash, $def) = @_;
@@ -488,7 +433,7 @@ sub GSD_Define($){
   return undef;
 }
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 sub GSD_Undefine($$){
   my ($hash, $name) = @_;
   Log 4, "GSD Undef: " . Dumper(@_);
@@ -499,11 +444,14 @@ sub GSD_Undefine($$){
   return undef;
 }
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 sub GSD_Parse($$) {
   my ($hash, $rawmsg) = @_;
   # rawmsg =  GSD 1 83 1 252 241 15 11 172 8 16 66 19
   Log 3, "GSD: parse RAW message: " . $rawmsg . " IODev: " . $hash->{NAME};
+  
+  # When disabled => ignore messages
+  
   my @msg_data = split(/\s+/, $rawmsg);
   
   my $magic = $msg_data[$c_pos_magic];
@@ -526,6 +474,11 @@ sub GSD_Parse($$) {
     } else {
       return "UNDEFINED GSD_$NodeID GSD $NodeID";
     };
+    
+    if( AttrVal($dev_name, "disable", "") eq "1" ) {
+  	  Log 4, "GSD: device disabled. ignore message.";
+  	  return undef;
+    }
       
     my $dMap;
     $dMap->{INDEX} = $c_pos_data; # erster Byte der eigentlichen Nachricht
@@ -539,8 +492,8 @@ sub GSD_Parse($$) {
       #my $data_index = $dMap->{INDEX};
       my $msg_type = $msg_data[$dMap->{INDEX}];
       if(defined($data{GSCONF}{$msg_type}{ReadingName})) {
-        if(defined($data{GSCONF}{$msg_type}{Function})) {
-          my $func = $data{GSCONF}{$msg_type}{Function};
+        if(defined($data{GSCONF}{$msg_type}{ParseFn})) {
+          my $func = $data{GSCONF}{$msg_type}{ParseFn};
           if(!defined(&$func)) {
             # Function nicht bekannt
             Log 0, "GSD: ERROR: parse function not defined: $msg_type -> $func";
@@ -575,13 +528,23 @@ sub GSD_Parse($$) {
     Log 3, "GSD: update readings for $dev_name";
     
     readingsBeginUpdate($dev_hash);
-    readingsBulkUpdate($dev_hash, "msg_id", $msgCounter);
+    my $mId_rName="msg_id";
+    #TODO: Mapping in sub auslagern
+    if(defined($readings_mapping->{$mId_rName})) {
+      $mId_rName=$readings_mapping->{$mId_rName};
+    }
+    readingsBulkUpdate($dev_hash, $mId_rName, $msgCounter);
     
     my @readings_keys=keys($dMap->{READINGS});
     if(scalar(@readings_keys)>0) {
       foreach my $reading (sort @readings_keys) {
         my $val = $dMap->{READINGS}->{$reading};
         Log 3, "GSD: update $dev_name $reading: " . $val;
+        my $mReading = $readings_mapping->{$reading};
+        if(defined($mReading)) {
+        	#Log 1, "GSD remapp reading: $reading -> $mReading";
+        	$reading = $mReading;
+        }
         readingsBulkUpdate($dev_hash, $reading, $val);
         #readingsSingleUpdate($dev_hash, $reading, $val, 1);
       }
@@ -754,9 +717,21 @@ GSD_Attr($$$)
   if( $cmd eq "set" ) {
     if( $orig ne $attrVal ) {
       my $hash = $main::defs{$name};
-      if($attrName eq "disable")
+      #if($attrName eq "disable")
+      #{
+      #}
+      
+      if($attrName eq "map-readings")
       {
-        # TODO
+      	my @mapping_list = split(/,\s*/, trim($attrVal));
+      	#Log 1, "GSD remapp reading: ".join(" ",@mapping_list);
+      	undef $readings_mapping;
+        foreach (@mapping_list)
+        {
+        	my($orig_Name, $new_Name) = split(/:/, $_);
+        	$readings_mapping->{$orig_Name} = $new_Name;
+        	#Log 1, "GSD remapp reading: $orig_Name -> $new_Name";
+        }
       }
 
       $attr{$name}{$attrName} = $attrVal;
@@ -767,7 +742,7 @@ GSD_Attr($$$)
 }
 
 #------------------------------------------------------------------------------
-# Logging: Funkrionsaufrufe
+# Logging: Funktionsaufrufe
 #   Parameter: HASH, Funktionsname, Message
 #------------------------------------------------------------------------------
 sub logF($$$)
