@@ -715,5 +715,19 @@ SetTempList_Heizung_OG_Bad()
 }
 # End SetTempList_Heizung_OG_Bad
 
+# Temperatur-Liste fürs Bad
+# Setzen ueber Wandthermostat
+sub
+SetTempList_Heizung_OG_Bad_TC()
+ {
+   { fhem ("set OG_BZ_WT01_Climate tempListMon prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListTue prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListWed prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListThu prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListFri prep 02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListSat prep 02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   { fhem ("set OG_BZ_WT01_Climate tempListSun exec 01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+}
+#---
 
 1;
