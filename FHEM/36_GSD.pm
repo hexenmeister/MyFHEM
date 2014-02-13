@@ -171,6 +171,8 @@ sub GSD_Initialize($)
   #   $data{GSCONF}{<SensorType>}{ReadingName}
   # DataLength:  Laenge des Datenbereiches 
   #   $data{GSCONF}{<SensorType>}{DataLength}
+  # DataLength:  Data sign / unsign (0=no (default), 1=yes)
+  #   $data{GSCONF}{<SensorType>}{DataSign}
   # CorrFactor:  Multiplikator (value wird damit multipliziert)
   #   $data{GSCONF}{<SensorType>}{CorrFactor}
   # CorrOffset:  wird zum value hinzuaddiert
@@ -192,34 +194,42 @@ sub GSD_Initialize($)
   $data{GSCONF}{16}{ReadingName} = "temperature";
   $data{GSCONF}{16}{DataLength} = 2;
   $data{GSCONF}{16}{CorrFactor} = 0.01;
+  $data{GSCONF}{16}{DataSign}   = 1;
   # ---
   $data{GSCONF}{17}{ReadingName} = "temperature1";
   $data{GSCONF}{17}{DataLength} = 2;
   $data{GSCONF}{17}{CorrFactor} = 0.01;
+  $data{GSCONF}{17}{DataSign}   = 1;
   # ---
   $data{GSCONF}{18}{ReadingName} = "temperature2";
   $data{GSCONF}{18}{DataLength} = 2;
   $data{GSCONF}{18}{CorrFactor} = 0.01;
+  $data{GSCONF}{18}{DataSign}   = 1;
   # ---  
   $data{GSCONF}{19}{ReadingName} = "temperature3";
   $data{GSCONF}{19}{DataLength} = 2;
   $data{GSCONF}{19}{CorrFactor} = 0.01;
+  $data{GSCONF}{19}{DataSign}   = 1;
   # ---  
   $data{GSCONF}{20}{ReadingName} = "temperature4";
   $data{GSCONF}{20}{DataLength} = 2;
   $data{GSCONF}{20}{CorrFactor} = 0.01;
+  $data{GSCONF}{20}{DataSign}   = 1;
   # ---  
   $data{GSCONF}{21}{ReadingName} = "temperature5";
   $data{GSCONF}{21}{DataLength} = 2;
   $data{GSCONF}{21}{CorrFactor} = 0.01;
+  $data{GSCONF}{21}{DataSign}   = 1;
   # ---  
   $data{GSCONF}{22}{ReadingName} = "temperature6";
   $data{GSCONF}{22}{DataLength} = 2;
   $data{GSCONF}{22}{CorrFactor} = 0.01;
+  $data{GSCONF}{22}{DataSign}   = 1;
   # ---  
   $data{GSCONF}{23}{ReadingName} = "temperature7";
   $data{GSCONF}{23}{DataLength} = 2;
   $data{GSCONF}{23}{CorrFactor} = 0.01;
+  $data{GSCONF}{23}{DataSign}   = 1;
   # --- 24-31 (8) --- Luftfeuchte ------------------------
   $data{GSCONF}{24}{ReadingName} = "humidity";
   $data{GSCONF}{24}{DataLength} = 2;
@@ -395,6 +405,15 @@ my $c_len_counter = 2;
 my $c_pos_data = $c_pos_counter+$c_len_counter;
 my $readings_mapping;
 
+
+# Uebersetzungstabelle. Daten zum Berechnen von Negativ-Werte.
+my $htmap;
+$htmap->{1} = 256;
+$htmap->{2} = 65536;
+$htmap->{3} = 16777216;
+$htmap->{4} = 4294967296;
+
+
 sub
 GSD_Fingerprint($$)
 {
@@ -569,11 +588,13 @@ sub GSD_Parse($$) {
 #------------------------------------------------------------------------------
 sub GSD_parseNumber(@) {
   my(@sensor_data) = @_;
+  
   Log 3, "GSD: parse number: data: ".join(" ",@sensor_data);  
   @sensor_data = reverse(@sensor_data);
   my $value = "";
   map {$value .= sprintf "%02x",$_} @sensor_data;
   $value = hex($value);
+    
   return $value;
 }
 
@@ -602,6 +623,14 @@ sub GSD_parseDefault($$) {
     #$value = hex($value);
     
     my $value = GSD_parseNumber(@sensor_data);
+    my $sign = $data{GSCONF}{$msg_type}{DataSign};
+    if(defined($sign) && ($sign == 1)) {
+    	Log 3, "GSD: read sensor signed data";
+  	  my $tf = $htmap->{scalar(@sensor_data)};
+      if(defined($tf)&&$value > ($tf/2)) {
+      	$value = $value-$tf;
+  	  }
+    }  
     
     Log 3, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
     
