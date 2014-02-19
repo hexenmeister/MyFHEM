@@ -15,13 +15,13 @@ set title '<L1>'
 set grid xtics y2tics
 
 set y2label "Temperatur in C"
-set ylabel "Ventilposition (%)"
+set ylabel "Luftfeuchtigkeit (%)"
 
 #FileLog 4:measured-temp\x3a:0:
 #FileLog 4:desired-temp\x3a:0:
-#FileLog 4:ValvePosition\x3a:0:
+#FileLog 4:humidity\x3a:0:
 
 plot \
      using 1:2 axes x1y2 title 'Gemessene Temperatur' ls l0 lw 2 with lines,\
      using 1:2 axes x1y2 title 'Wunschtemperatur' ls l1 lw 2 with lines,\
-     using 1:2 axes x1y1 title 'Ventilstellung' ls l2fill lw 0.5 with lines
+     using 1:2 axes x1y1 title 'Luftfeuchtigkeit' ls l2fill lw 0.5 with lines
