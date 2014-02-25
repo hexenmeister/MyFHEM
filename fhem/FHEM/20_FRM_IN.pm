@@ -41,7 +41,7 @@ FRM_IN_Initialize($)
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_Client_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off activeLow:on,off $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -69,7 +69,11 @@ sub
 FRM_IN_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
-	my $name = $hash->{NAME}; 
+	my $name = $hash->{NAME};
+	if (AttrVal($hash->{NAME},"activeLow","off") eq "on") {
+		$old = $old == PIN_LOW ? PIN_HIGH : PIN_LOW;
+		$new = $new == PIN_LOW ? PIN_HIGH : PIN_LOW;
+	}
 	Log3 $name,5,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	my $changed = ((!(defined $old)) or ($old != $new));
 	main::readingsBeginUpdate($hash);
@@ -254,6 +258,7 @@ FRM_IN_Attr($$$$) {
   <a name="FRM_INattr"></a>
   <b>Attributes</b><br>
   <ul>
+      <li>activeLow &lt;on|off&gt;</li>
       <li>count-mode none|rising|falling|both<br>
       Determines whether 'rising' (transitions from 'off' to 'on') of falling (transitions from 'on' to 'off')<br>
       edges (or 'both') are counted. Defaults to 'none'</li>
