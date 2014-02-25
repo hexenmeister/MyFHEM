@@ -41,7 +41,7 @@ FRM_IN_Initialize($)
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_Client_Undef";
   
-  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off activeLow:on,off $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev count-mode:none,rising,falling,both count-threshold reset-on-threshold-reached:yes,no internal-pullup:on,off activeLow:yes,no $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
@@ -53,10 +53,11 @@ FRM_IN_Init($$)
 	return $ret if (defined $ret);
 	eval {
       my $firmata = FRM_Client_FirmataDevice($hash);
-      $firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
-  	  if (defined (my $pullup = AttrVal($hash->{NAME},"internal-pullup",undef))) {
-  	    $firmata->digital_write($hash->{PIN},$pullup eq "on" ? 1 : 0);
-  	  }
+      my $pin = $hash->{PIN};
+      if (defined (my $pullup = AttrVal($hash->{NAME},"internal-pullup",undef))) {
+        $firmata->digital_write($pin,$pullup eq "on" ? 1 : 0);
+      }
+      $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
 	};
 	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
 		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
@@ -70,7 +71,7 @@ FRM_IN_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
 	my $name = $hash->{NAME};
-	if (AttrVal($hash->{NAME},"activeLow","off") eq "on") {
+	if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
 		$old = $old == PIN_LOW ? PIN_HIGH : PIN_LOW;
 		$new = $new == PIN_LOW ? PIN_HIGH : PIN_LOW;
 	}
@@ -150,10 +151,11 @@ FRM_IN_Get($)
 sub
 FRM_IN_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
+  my $hash = $main::defs{$name};
+  my $pin = $hash->{PIN};
   if ($command eq "set") {
     ARGUMENT_HANDLER: {
       $attribute eq "IODev" and do {
-      	my $hash = $main::defs{$name};
       	if (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $value) {
         	$hash->{IODev} = $defs{$value};
       		FRM_Init_Client($hash) if (defined ($hash->{IODev}));
@@ -177,7 +179,6 @@ FRM_IN_Attr($$$$) {
       };
       $attribute eq "count-threshold" and do {
         if (main::ReadingsVal($name,"count",0) > $value) {
-          my $hash = $main::defs{$name};
           main::readingsBeginUpdate($hash);
           if (main::ReadingsVal($name,"alarm","off") ne "on") {
             main::readingsBulkUpdate($hash,"alarm","on",1);
@@ -190,22 +191,36 @@ FRM_IN_Attr($$$$) {
         last;
       };
       $attribute eq "internal-pullup" and do {
-      	eval {
-          my $hash = $main::defs{$name};
+        eval {
           my $firmata = FRM_Client_FirmataDevice($hash);
-          $firmata->digital_write($hash->{PIN},$value eq "on" ? 1 : 0);
+          $firmata->digital_write($pin,$value eq "on" ? 1 : 0);
+          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
       	};
       	#ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
       	last;
-      };  
+      };
+      $attribute eq "activeLow" and do {
+        eval {
+          my $firmata = FRM_Client_FirmataDevice($hash);
+          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
+        };
+        last;
+      };
     }
   } elsif ($command eq "del") {
     ARGUMENT_HANDLER: {
       $attribute eq "internal-pullup" and do {
       	eval {
-          my $hash = $main::defs{$name};
           my $firmata = FRM_Client_FirmataDevice($hash);
-          $firmata->digital_write($hash->{PIN},0);
+          $firmata->digital_write($pin,0);
+          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
+      	};
+        last;
+      };
+      $attribute eq "activeLow" and do {
+      	eval {
+          my $firmata = FRM_Client_FirmataDevice($hash);
+          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
       	};
         last;
       };
@@ -258,7 +273,7 @@ FRM_IN_Attr($$$$) {
   <a name="FRM_INattr"></a>
   <b>Attributes</b><br>
   <ul>
-      <li>activeLow &lt;on|off&gt;</li>
+      <li>activeLow &lt;yes|no&gt;</li>
       <li>count-mode none|rising|falling|both<br>
       Determines whether 'rising' (transitions from 'off' to 'on') of falling (transitions from 'on' to 'off')<br>
       edges (or 'both') are counted. Defaults to 'none'</li>

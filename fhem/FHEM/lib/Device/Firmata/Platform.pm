@@ -404,9 +404,8 @@ sub pin_mode {
     };
 
     $mode == PIN_ANALOG and do {
-      my $port_number = $pin >> 3;
       $self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
-      $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $port_number, 1 ));
+      $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $pin, 1 ));
       last;
     };
 
@@ -769,6 +768,8 @@ sub observe_digital {
       method  => $observer,
       context => $context,
     };
+  my $port_number = $pin >> 3;
+  $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_DIGITAL => $port_number, 1 ));
   return 1;
 }
 
@@ -779,6 +780,7 @@ sub observe_analog {
       method  => $observer,
       context => $context,
     };
+  $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $pin, 1 ));
   return 1;
 }
 
