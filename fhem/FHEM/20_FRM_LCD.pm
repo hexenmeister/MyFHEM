@@ -19,12 +19,15 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "text" => "",
-  "home" => "",
-  "clear" => "",
-  "display" => "on,off",
+  "home:noArg" => "",
+  "clear:noArg" => "",
+  "display:on,off" => "on,off",
   "cursor" => "",
-  "scroll" => "left,right",
-);
+  "scroll:left,right" => "left,right",
+  "backlight:on,off" => "",
+  "reset:noArg" => "",
+  "writeXY" => ""
+ );
 
 my %gets = (
 );
@@ -157,6 +160,9 @@ sub FRM_LCD_Set(@) {
   return unless defined $lcd;
   COMMAND_HANDLER: {
     $command eq "text" and do {
+    	shift @a;
+    	shift @a;
+    	$value = join(" ", @a);
     	if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
     		$lcd->clear();
     	}
@@ -184,6 +190,11 @@ sub FRM_LCD_Set(@) {
     	$lcd->home();
     	last;
     };
+    $command eq "reset" and do {
+    	$lcd->init();
+#    	$hash->{lcd} = $lcd;
+    	last;
+    };
     $command eq "clear" and do {
     	$lcd->clear();
     	main::readingsSingleUpdate($hash,"text","",1);
@@ -209,6 +220,37 @@ sub FRM_LCD_Set(@) {
     		$lcd->scrollDisplayRight();
     	}
     	last;
+    };
+    $command eq "backlight" and do {
+    	if ($value eq "on") {
+    		$lcd->backlight();
+    	} else {
+    		$lcd->noBacklight();
+    	}
+    	last;
+    };
+	$command eq "writeXY" and do { 
+		my ($x,$y,$l,$al) = split(",",$value);
+		$lcd->setCursor($x,$y);
+		shift @a; shift @a; shift @a;
+		my $t = join(" ", @a);
+		my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" ," - " => " " ,"©"=>"@");
+		my $umlautkeys = join ("|", keys(%umlaute));
+		$t =~ s/($umlautkeys)/$umlaute{$1}/g;
+		my $sl = length $t;
+		if ($sl > $l) {$value
+			$t = substr($t,0,$l);
+		}
+		if ($sl < $l) {
+			my $dif = "";
+			for (my $i=$sl; $i<$l; $i++) {
+				$dif .= " ";
+			}
+			$t = ($al eq "l") ? $t.$dif : $dif.$t;
+		}
+		$lcd->print($t);
+		readingsSingleUpdate($hash,"state",$t,1);
+		last; #"X=$x|Y=$y|L=$l|Text=$t";
     };
   }
 }
