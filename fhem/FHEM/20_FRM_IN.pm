@@ -71,18 +71,18 @@ FRM_IN_observer
 {
 	my ($pin,$old,$new,$hash) = @_;
 	my $name = $hash->{NAME};
+	Log3 $name,5,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
-		$old = $old == PIN_LOW ? PIN_HIGH : PIN_LOW;
+		$old = $old == PIN_LOW ? PIN_HIGH : PIN_LOW if (defined $old);
 		$new = $new == PIN_LOW ? PIN_HIGH : PIN_LOW;
 	}
-	Log3 $name,5,"onDigitalMessage for pin ".$pin.", old: ".(defined $old ? $old : "--").", new: ".(defined $new ? $new : "--");
 	my $changed = ((!(defined $old)) or ($old != $new));
 	main::readingsBeginUpdate($hash);
-	if ($changed) { 
+	if ($changed) {
   	if (defined (my $mode = main::AttrVal($name,"count-mode",undef))) {
   		if (($mode eq "both")
-  		or (($mode eq "rising") and ($old == PIN_LOW))
-  		or (($mode eq "falling") and ($old == PIN_HIGH))) {
+  		or (($mode eq "rising") and ($new == PIN_HIGH))
+  		or (($mode eq "falling") and ($new == PIN_LOW))) {
   	    	my $count = main::ReadingsVal($name,"count",0);
   	    	$count++;
   	    	if (defined (my $threshold = main::AttrVal($name,"count-threshold",undef))) {
@@ -194,15 +194,18 @@ FRM_IN_Attr($$$$) {
         eval {
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($pin,$value eq "on" ? 1 : 0);
-          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
       	};
       	#ignore any errors here, the attribute-value will be applied next time FRM_IN_init() is called.
       	last;
       };
       $attribute eq "activeLow" and do {
-        eval {
-          my $firmata = FRM_Client_FirmataDevice($hash);
-          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
+        my $oldval = AttrVal($hash->{NAME},"activeLow","no");
+        if ($oldval ne $value) {
+          $main::attr{$hash->{NAME}}{activeLow} = $value;
+          eval {
+            my $firmata = FRM_Client_FirmataDevice($hash);
+            FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
+          };
         };
         last;
       };
@@ -213,15 +216,17 @@ FRM_IN_Attr($$$$) {
       	eval {
           my $firmata = FRM_Client_FirmataDevice($hash);
           $firmata->digital_write($pin,0);
-          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
       	};
         last;
       };
       $attribute eq "activeLow" and do {
-      	eval {
-          my $firmata = FRM_Client_FirmataDevice($hash);
-          $firmata->observe_digital($pin,\&FRM_IN_observer,$hash);
-      	};
+        if (AttrVal($hash->{NAME},"activeLow","no") eq "yes") {
+          delete $main::attr{$hash->{NAME}}{activeLow};
+          eval {
+            my $firmata = FRM_Client_FirmataDevice($hash);
+            FRM_IN_observer($pin,undef,$firmata->digital_read($pin),$hash);
+          };
+        };
         last;
       };
     }

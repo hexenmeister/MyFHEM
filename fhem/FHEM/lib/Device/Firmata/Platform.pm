@@ -138,8 +138,6 @@ sub messages_handle {
         my $port_number = $message->{command} & 0x0f;
         my $port_state  = $data->[0] | ( $data->[1] << 7 );
         my $old_state   = $self->{ports}[$port_number];
-        my $changed_state =
-          defined $old_state ? $old_state ^ $port_state : 0xFF;
         my $observers = $self->{digital_observer};
         my $pinbase   = $port_number << 3;
         for ( my $i = 0 ; $i < 8 ; $i++ ) {
@@ -147,18 +145,16 @@ sub messages_handle {
           my $observer = $observers->[$pin];
           if ($observer) {
             my $pin_mask = 1 << $i;
-            if ( $changed_state & $pin_mask ) {
-              $observer->{method}(
-                $pin,
-                defined $old_state
-                ? ( $old_state & $pin_mask ) > 0
-                    ? 1
-                    : 0
-                : undef,
-                ( $port_state & $pin_mask ) > 0 ? 1 : 0,
-                $observer->{context}
-              );
-            }
+            $observer->{method}(
+              $pin,
+              defined $old_state
+              ? ( $old_state & $pin_mask ) > 0
+                  ? 1
+                  : 0
+              : undef,
+              ( $port_state & $pin_mask ) > 0 ? 1 : 0,
+              $observer->{context}
+            );
           }
         }
         $self->{ports}[$port_number] = $port_state;
