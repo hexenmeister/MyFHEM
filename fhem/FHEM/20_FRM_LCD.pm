@@ -19,13 +19,13 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "text" => "",
-  "home:noArg" => "",
-  "clear:noArg" => "",
-  "display:on,off" => "on,off",
+  "home" => "noArg",
+  "clear" => "noArg",
+  "display" => "on,off",
   "cursor" => "",
-  "scroll:left,right" => "left,right",
-  "backlight:on,off" => "",
-  "reset:noArg" => "",
+  "scroll" => "left,right",
+  "backlight" => "on,off",
+  "reset" => "noArg",
   "writeXY" => ""
  );
 
@@ -154,8 +154,13 @@ sub FRM_LCD_Set(@) {
   return "Need at least one parameters" if(@a < 2);
   my $command = $a[1];
   my $value = $a[2];
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
-  	if(!defined($sets{$command}));
+  if(!defined($sets{$command})) {
+  	my @commands = ();
+    foreach my $key (sort keys %sets) {
+      push @commands, $sets{$key} ? $key.":".join(",",$sets{$key}) : $key;
+    }
+    return "Unknown argument $a[1], choose one of " . join(" ", @commands);
+  }
   my $lcd = $hash->{lcd};
   return unless defined $lcd;
   COMMAND_HANDLER: {
@@ -238,7 +243,7 @@ sub FRM_LCD_Set(@) {
 		my $umlautkeys = join ("|", keys(%umlaute));
 		$t =~ s/($umlautkeys)/$umlaute{$1}/g;
 		my $sl = length $t;
-		if ($sl > $l) {$value
+		if ($sl > $l) {
 			$t = substr($t,0,$l);
 		}
 		if ($sl < $l) {
@@ -301,8 +306,17 @@ STATEHANDLER: {
   <a name="FRM_LCDset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br>
+      <li><code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br></li>
+      <li><code>set &lt;name&gt; home</code><br></li>
+      <li><code>set &lt;name&gt; clear</code><br></li>
+      <li><code>set &lt;name&gt; display on|off</code><br></li>
+      <li><code>set &lt;name&gt; cursor &lt;...&gt;</code><br></li>
+      <li><code>set &lt;name&gt; scroll left|right</code><br></li>
+      <li><code>set &lt;name&gt; backlight on|off</code><br></li>
+      <li><code>set &lt;name&gt; reset</code><br></li>
+      <li><code>set &lt;name&gt; writeXY x-pos,y-pos,len[,l] &lt;text to be displayed&gt;</code><br></li>
   </ul>
+  
   <a name="FRM_I2Cget"></a>
   <b>Get</b><br>
   <ul>
