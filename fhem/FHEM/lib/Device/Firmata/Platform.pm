@@ -28,6 +28,8 @@ use Device::Firmata::Base
   analog_resolutions          => {},
   pwm_resolutions             => {},
   servo_resolutions           => {},
+  stepper_resolutions         => {},
+  encoder_resolutions         => {},
   ports                       => [],
   pins                        => {},
   pin_modes                   => {},
@@ -283,9 +285,11 @@ sub sysex_handle {
           }
           if ($capabilities->{$pin}->{PIN_STEPPER+0}) {
           	push @stepperpins, $pin;
+            $self->{metadata}{stepper_resolutions}{$pin} = $capabilities->{$pin}->{PIN_STEPPER+0}->{resolution};
           }
           if ($capabilities->{$pin}->{PIN_ENCODER+0}) {
           	push @encoderpins, $pin;
+            $self->{metadata}{encoder_resolutions}{$pin} = $capabilities->{$pin}->{PIN_ENCODER+0}->{resolution};
           }
         }
       }
