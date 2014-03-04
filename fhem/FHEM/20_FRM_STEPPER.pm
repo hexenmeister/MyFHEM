@@ -139,7 +139,7 @@ FRM_STEPPER_Set
       my $direction = $value < $position ? 1 : 0;
       my $steps = $direction ? $position - $value : $value - $position;
       my $speed = shift @a;
-      $speed = AttrVal($name,"speed",1000) unless (defined $speed);
+      $speed = AttrVal($name,"speed",30) unless (defined $speed);
       my $accel = shift @a;
       $accel = AttrVal($name,"acceleration",undef) unless (defined $accel);
       my $decel = shift @a;
@@ -225,25 +225,78 @@ FRM_STEPPER_Attr($$$$) {
 <a name="FRM_STEPPER"></a>
 <h3>FRM_STEPPER</h3>
 <ul>
-  represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
-  configured for digital output.<br>
+  represents a stepper-motor attached to digital-i/o pins of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a><br>
   Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
   
   <a name="FRM_STEPPERdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_STEPPER &lt;pin&gt;</code> <br>
-  Defines the FRM_STEPPER device. &lt;pin&gt> is the arduino-pin to use.
+  <code>define &lt;name&gt; FRM_STEPPER [DRIVER|TWO_WIRE|FOUR_WIRE] &lt;directionPin&gt &lt;stepPin&gt [motorPin3 motorPin4] stepsPerRev [stepper-id]</code><br>
+  Defines the FRM_STEPPER device.
+  <li>[DRIVER|TWO_WIRE|FOUR_WIRE] defines the control-sequence being used to drive the motor.
+    <ul>
+      <li>DRIVER: motor is attached via a smart circuit that is controlled via two lines: 1 line defines the direction to turn, the other triggers one step per impluse.</li>
+      <li>FOUR_WIRE: motor is attached via four wires each driving one coil individually.</li>
+      <li>TWO_WIRE: motor is attached via two wires. This mode makes use of the fact that at any time two of the four motor
+coils are the inverse of the other two so by using an inverting circuit to drive the motor the number of control connections can be reduced from 4 to 2.</li>
+    </ul>
+  </li>
+  <li>
+    <ul>
+      <li>The sequence of control signals for 4 control wires is as follows:<br>
+<br>
+<code>
+Step C0 C1 C2 C3<br>
+   1  1  0  1  0<br>
+   2  0  1  1  0<br>
+   3  0  1  0  1<br>
+   4  1  0  0  1<br>
+</code>
+      </li>
+      <li>The sequence of controls signals for 2 control wires is as follows:<br>
+(columns C1 and C2 from above):<br>
+<br>
+<code>
+Step C0 C1<br>
+   1  0  1<br>
+   2  1  1<br>
+   3  1  0<br>
+   4  0  0<br>
+</code>
+      </li>
+    </ul>
+  </li>
+  <li>
+  If your stepper-motor does not move or does move but only in a single direction you will have to rearrage the pin-numbers to match the control sequence.<br>
+  that can be archived either by rearranging the physical connections, or by mapping the connection to the pin-definitions in FRM_STEPPERS define:<br>
+  e.g. the widely used cheap 28byj-48 you can get for few EUR on eBay including a simple ULN2003 driver interface may be defined by<br>
+  <code>define stepper FRM_STEPPER FOUR_WIRE 7 5 6 8 64 0</code><br>
+  when being connected to the arduio with:<br>
+  <code>motor pin1 <-> arduino pin5<br>
+  motor pin2 <-> arduino pin6<br>
+  motor pin3 <-> arduino pin7<br>
+  motor pin4 <-> arduino pin8<br>
+  motor pin5 <-> ground</code><br>
+  </li>
   </ul>
   
   <br>
   <a name="FRM_STEPPERset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; on|off</code><br><br>
-  </ul>
-  <ul>
-  <a href="#setExtensions">set extensions</a> are supported<br>
+  <code>set &lt;name&gt; reset</code>
+  <li>resets the reading 'position' to 0 without moving the motor</li>
+  <br>
+  <code>set &lt;name&gt; position &lt;position&gt; [speed] [acceleration] [deceleration]</code>
+  <li>moves the motor to the absolute position specified. positive or negative integer<br>
+  speed (10 * revolutions per minute, optional), defaults to 30, higher numbers are faster) At 2048 steps per revolution (28byj-48) a speed of 30 results in 3 rev/min<br>
+  acceleration and deceleration are optional.<br>
+  </li>
+  <br>
+  <code>set &lt;name&gt; step &lt;stepstomove&gt; [speed] [accel] [decel]</code>
+  <li>moves the motor the number of steps specified. positive or negative integer<br>
+  speed, accelleration and deceleration are optional.<br>
+  </li>
   </ul>
   <a name="FRM_STEPPERget"></a>
   <b>Get</b><br>
@@ -255,11 +308,13 @@ FRM_STEPPER_Attr($$$$) {
   <ul>
       <li>restoreOnStartup &lt;on|off&gt;</li>
       <li>restoreOnReconnect &lt;on|off&gt;</li>
-      <li>activeLow &lt;yes|no&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)
       </li>
+      <li>>speed (same meaning as in 'set position')</li>
+      <li>acceleration (same meaning as in 'set position')</li>
+      <li>deceleration (same meaning as in 'set position')</li>
       <li><a href="#eventMap">eventMap</a><br></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
     </ul>
