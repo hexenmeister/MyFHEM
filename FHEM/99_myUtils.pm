@@ -694,39 +694,73 @@ sub left{
 
 
 ######################################################
+sub
+SetTempList_Heizung($$$$$$$$)
+{
+	my($dev, $mo, $di, $mi, $do, $fr, $sa, $so) = @_;
+	fhem ("set ".$dev." tempListMon prep ".$mo);
+  fhem ("set ".$dev." tempListTue prep ".$di);
+  fhem ("set ".$dev." tempListWed prep ".$mi);
+  fhem ("set ".$dev." tempListThu prep ".$do);
+  fhem ("set ".$dev." tempListFri prep ".$fr);
+  fhem ("set ".$dev." tempListSat prep ".$sa);
+  fhem ("set ".$dev." tempListSun exec ".$so);
+}
+
+######################################################
 # Temperatur-Liste fürs Bad
 # setzen per Aufruf von "{SetTempList_Heizung_OG_Bad}"
-# Vorsicht, da kein HM-CC-TC, sondern HM-CC-RT-DN, ist hier ein anderer Channel
-# zu nehmen. Zudem wird mit prep|exec gearbeitet, um nicht alle Zeilen als
-# einzelnen Befehl zu senden, sondern per "prep" erst alles 
-# zusammenzufassen und dann per "exec" an das Thermostat zu senden.
+# Vorsicht, bei HM-CC-RT-DN (im Unterschied zum z.B. HM-CC-TC), ist 
+# ein anderer Channel zu nehmen. Zudem wird mit prep|exec gearbeitet, 
+# um nicht alle Zeilen als einzelnen Befehl zu senden, 
+# sondern per "prep" erst alles zusammenzufassen 
+# und dann per "exec" an das Thermostat zu senden.
 # Also als ein einziger Befehl statt sieben. Vermeidet "NACKs"
 ######################################################
 sub
 SetTempList_Heizung_OG_Bad()
  {
-   { fhem ("set OG_BZ_TT01_Clima tempListMon prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListTue prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListWed prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListThu prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListFri prep 02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListSat prep 02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_TT01_Clima tempListSun exec 01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+    my($mo, $di, $mi, $do, $fr, $sa, $so);
+ 	  
+ 	  $mo = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $di = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $mi = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $do = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $fr = "02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $sa = "02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $so = "01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  
+    SetTempList_Heizung("OG_BZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+    SetTempList_Heizung("OG_BZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
+
+   #{ fhem ("set OG_BZ_WT01_Climate tempListMon prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListTue prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListWed prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListThu prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListFri prep 02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListSat prep 02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+   #{ fhem ("set OG_BZ_WT01_Climate tempListSun exec 01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+
 }
 # End SetTempList_Heizung_OG_Bad
 
-# Temperatur-Liste fürs Bad
-# Setzen ueber Wandthermostat
+# Temperatur-Liste fürs Wohnzimmer
 sub
-SetTempList_Heizung_OG_Bad_TC()
+SetTempList_Heizung_OG_Wohnzimmer()
  {
-   { fhem ("set OG_BZ_WT01_Climate tempListMon prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListTue prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListWed prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListThu prep 01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListFri prep 02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListSat prep 02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
-   { fhem ("set OG_BZ_WT01_Climate tempListSun exec 01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5")};
+ 	  my($mo, $di, $mi, $do, $fr, $sa, $so);
+ 	   	  
+ 	  $mo = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 20.0 22:00 21.5 24:00 21.0";
+ 	  $di = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 20.0 22:00 21.5 24:00 21.0";
+ 	  $mi = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 20.0 22:00 21.5 24:00 21.0";
+ 	  $do = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 20.0 22:00 21.5 24:00 21.0";
+ 	  $fr = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 20.0 22:00 21.5 24:00 21.0";
+ 	  $sa = "02:00 20.0 06:30 18.0 22:00 21.5 24:00 21.0";
+ 	  $so = "02:00 20.0 06:30 18.0 22:00 21.5 24:00 21.0";
+ 	  
+    SetTempList_Heizung("EG_WZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+    SetTempList_Heizung("EG_WZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
+    
 }
 #---
 
