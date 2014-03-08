@@ -12,7 +12,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2013 Alexander Schulz
+#  (c) 2014 Alexander Schulz
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -119,6 +119,8 @@ sub GSD_Initialize($)
   #   118-125(8)  State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
   #   126-127(2)  Prozentwerte (xx,xx: Füllstand etc.)
   # 
+  # TODO: Erschütterung, Wasseralarm=> Alarme
+  #
   # 128-143 reserved
   #
   # 144-201 Undefined (User defined)
@@ -552,7 +554,41 @@ sub GSD_Parse($$) {
     if(defined($readings_mapping->{$mId_rName})) {
       $mId_rName=$readings_mapping->{$mId_rName};
     }
+    my $old_msg_id = ReadingsVal($dev_name,$mId_rName,"0");
+    Log 3, "GSD: DEBUG: old_msg_id = $old_msg_id";
     readingsBulkUpdate($dev_hash, $mId_rName, $msgCounter);
+    my $msg_id_missing_cnt;
+    if($old_msg_id == 65535 && $msgCounter <= 1) { # Max f. 2 bytes. => Ueberlauf beruecksichtigen
+    	Log 3, "GSD: DEBUG: counter overflow";
+    	$msg_id_missing_cnt = 0;
+    } else {
+    	if($old_msg_id >= $msgCounter) { # Wahrscheinlich Batteriewechsel
+    		Log 3, "GSD: DEBUG: probable new battery";
+        $msg_id_missing_cnt = 0;
+      } else {
+      	# Nachrechnen, ob eine oder mehrere Meldungen dazwischen liegen muessten.
+        $msg_id_missing_cnt = $msgCounter-1-$old_msg_id;	
+        Log 3, "GSD: DEBUG: msg counter diff: $msg_id_missing_cnt";
+      }
+    }
+    Log 3, "GSD: DEBUG: msg_id_missing_cnt = $msg_id_missing_cnt";
+    my $mId_miss_rName="lost_msgs";
+    #TODO: Mapping in sub auslagern
+    if(defined($readings_mapping->{$mId_miss_rName})) {
+      $mId_miss_rName=$readings_mapping->{$mId_miss_rName};
+    }
+    my $old_msg_id_missing_cnt = ReadingsVal($dev_name,$mId_miss_rName,undef);
+    if(!defined($old_msg_id_missing_cnt)) {
+    	# wenn noch kein Wert gesetzt ist
+    	$old_msg_id_missing_cnt = 0;
+    	# first time init
+    	readingsBulkUpdate($dev_hash, $mId_miss_rName, $old_msg_id_missing_cnt);
+    }
+    if($msg_id_missing_cnt>0) {
+    	# nur updaten, wenn sich der Wert aendert
+    	$msg_id_missing_cnt += $old_msg_id_missing_cnt;
+      readingsBulkUpdate($dev_hash, $mId_miss_rName, $msg_id_missing_cnt);
+    }
     
     my @readings_keys=keys($dMap->{READINGS});
     if(scalar(@readings_keys)>0) {
