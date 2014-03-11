@@ -45,7 +45,8 @@ use vars qw(%attr);
 use vars qw(%data);
 use vars qw(%modules);
 
-my $GSD_MAGIC = 83; # ErkennungsByte
+my $GSD_MAGIC_1 = 83; # ErkennungsByte
+my $GSD_MAGIC_2 = 84; # ErkennungsByte
 
 my $VERSION = "0.1.1";
 
@@ -399,16 +400,46 @@ sub GSD_Initialize($)
   #
 }
 
-my $c_pos_nid     = 1;
-my $c_pos_magic   = 2;
-my $c_pos_sid     = 3;
-my $c_pos_counter = 4;
-my $c_len_counter = 2;
-my $c_pos_data = $c_pos_counter+$c_len_counter;
+my $c_pos_nid     = 1; # Position: NodeID
+my $c_pos_magic   = 2; # Position: Magic number
+
+my $cmap;
+# Unterschiedliche Message-Formate (Positionen und Lengen) je nach MAGIC_NUMBER
+my $cm_temp;
+
+## Erste MagicNumber: 1-byte lange SubID
+# Position: SubID
+$cm_temp->{c_pos_sid}     =3; 
+# Length:   SubID
+$cm_temp->{c_len_sid}     =1; 
+# Position: Msg Counter
+$cm_temp->{c_pos_counter} =$cm_temp->{c_pos_sid}+$cm_temp->{c_len_sid}; 
+# Length:   Msg Counter
+$cm_temp->{c_len_counter} =2; 
+# Anfangsposition der (Nutz-)Daten
+$cm_temp->{c_pos_data}    =$cm_temp->{c_pos_counter}+$cm_temp->{c_len_counter}; 
+$cmap->{$GSD_MAGIC_1}=$cm_temp;
+
+undef $cm_temp;
+## Erste MagicNumber: 2-byte lange SubID
+# Position: SubID
+$cm_temp->{c_pos_sid}     =3; 
+# Length:   SubID
+$cm_temp->{c_len_sid}     =2; 
+# Position: Msg Counter
+$cm_temp->{c_pos_counter} =$cm_temp->{c_pos_sid}+$cm_temp->{c_len_sid}; 
+# Length:   Msg Counter
+$cm_temp->{c_len_counter} =2; 
+# Anfangsposition der (Nutz-)Daten
+$cm_temp->{c_pos_data}    =$cm_temp->{c_pos_counter}+$cm_temp->{c_len_counter}; 
+$cmap->{$GSD_MAGIC_2}=$cm_temp;
+
+
+## bietet Möglichkeit, Readings zu umbenennen (soll per Attribut steuerbar sein)
 my $readings_mapping;
 
 
-# Uebersetzungstabelle. Daten zum Berechnen von Negativ-Werte.
+# (technik) Uebersetzungstabelle. Daten zum Berechnen von Negativ-Werte.
 my $htmap;
 $htmap->{1} = 256;
 $htmap->{2} = 65536;
@@ -420,19 +451,29 @@ sub
 GSD_Fingerprint($$)
 {
   my ($name, $msg) = @_;
-  # Message ID (Counter) zur Identifizieren nutzen. Messages werden ggf. als Duplikate eingestuft (z.B. Doppel-Empfang von 2 JeeLinks)
-  my $p=0;
-  my $i;
-  for ($i=0;$i<$c_pos_data;$i++) { 
-  	$p = index($msg, " ", $p+1);
-  	if($p<0) {last;}
-  }
-  if($p>0) {
-  	$msg = substr($msg, 0, $p);
-  }
-  Log 3, "GSD Fingerprint: " . $msg;
+  
+  my @msg_data = split(/\s+/, $msg);
+  my $magic = $msg_data[$c_pos_magic];
+  my $cset = $cmap->{$magic};
+  if(defined($cset)) {
+    my $c_pos_data    = $cset->{c_pos_data};
+  
+    # Message ID (Counter) zur Identifizieren nutzen. Messages werden ggf. als Duplikate eingestuft (z.B. Doppel-Empfang von 2 JeeLinks)
+    my $p=0;
+    my $i;
+    for ($i=0;$i<$c_pos_data;$i++) { 
+  	  $p = index($msg, " ", $p+1);
+  	  if($p<0) {last;}
+    }
+    if($p>0) {
+  	  $msg = substr($msg, 0, $p);
+    }
+    Log 3, "GSD Fingerprint: " . $msg;
    
-  return ($name, $msg); # Teil der Message mit NodeID und MsgID
+    return ($name, $msg); # Teil der Message mit NodeID und MsgID
+  } else {
+  	return ($name, $msg); # Komplette Message
+  }
 }
 
 #------------------------------------------------------------------------------
@@ -476,7 +517,19 @@ sub GSD_Parse($$) {
   my @msg_data = split(/\s+/, $rawmsg);
   
   my $magic = $msg_data[$c_pos_magic];
-  if($magic eq $GSD_MAGIC) {
+  
+  my $cset = $cmap->{$magic};
+  
+  #if($magic eq $GSD_MAGIC_1) {
+  if(defined($cset)) {
+    my $c_pos_sid     = $cset->{c_pos_sid};
+    my $c_len_sid     = $cset->{c_len_sid};
+    my $c_pos_counter = $cset->{c_pos_counter};
+    my $c_len_counter = $cset->{c_len_counter};
+    my $c_pos_data    = $cset->{c_pos_data};
+
+    my $sid = GSD_parseNumber(@msg_data[$c_pos_sid..$c_pos_sid+$c_len_sid-1]);
+  	
   	my $NodeID = $msg_data[$c_pos_nid].".".$msg_data[$c_pos_sid];
   	my $msgCounter = GSD_parseNumber(@msg_data[$c_pos_counter..$c_pos_counter+$c_len_counter-1]);
   	Log 3, "GSD: message number: " . $msgCounter;
