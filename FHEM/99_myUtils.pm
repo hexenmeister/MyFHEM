@@ -758,9 +758,9 @@ SetTempList_Heizung_OG_Wohnzimmer()
  	  $sa = "02:00 20.0 06:30 18.0 22:00 21.5 24:00 21.0";
  	  $so = "02:00 20.0 06:30 18.0 22:00 21.5 24:00 21.0";
  	  
-    SetTempList_Heizung("EG_WZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
     SetTempList_Heizung("EG_WZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
-    
+    SetTempList_Heizung("EG_WZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+    SetTempList_Heizung("EG_WZ_TT02_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
 }
 #---
 
