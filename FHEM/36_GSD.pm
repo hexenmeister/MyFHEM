@@ -93,7 +93,9 @@ sub GSD_Initialize($)
   #  Einfach eine TypeID (0-255). 
   #  Manche Werte sind reserviert, manche identifizieren Sensoren gleicher Art.
   #  Damit wird es z.B. möglich, mehrere Temperaturwerte zu übermitteln.
-  # 
+  #
+  #  TODO: LowBat 
+  #
   # 000-015   reserved / unused
   #
   # 016-127  Default
@@ -607,7 +609,7 @@ sub GSD_Parse($$) {
     if(defined($readings_mapping->{$mId_rName})) {
       $mId_rName=$readings_mapping->{$mId_rName};
     }
-    my $old_msg_id = ReadingsVal($dev_name,$mId_rName,"0");
+    my $old_msg_id = ReadingsVal($dev_name,$mId_rName,$msgCounter-1);
     Log 3, "GSD: DEBUG: old_msg_id = $old_msg_id";
     readingsBulkUpdate($dev_hash, $mId_rName, $msgCounter);
     my $msg_id_missing_cnt;
