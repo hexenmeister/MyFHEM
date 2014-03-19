@@ -318,6 +318,10 @@ SYSMON_getObsoleteReadingsMap($) {
 	
 	#return $rMap; # TODO TEST
 	
+	if(!defined($cur_readings_map) {
+	  SYSMON_updateCurrentReadingsMap($hash);
+  }
+
 	# alle READINGS durchgehen
 	my @cKeys=keys (%{$defs{$name}{READINGS}});
   foreach my $aName (@cKeys) {
