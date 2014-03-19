@@ -764,4 +764,116 @@ SetTempList_Heizung_OG_Wohnzimmer()
 }
 #---
 
+######################################################
+# Meldung per Jabber senden
+######################################################
+sub
+sendJabberMessage($$)
+{
+	my($rcp, $msg) = @_;
+  fhem("set jabber msg $rcp $msg");
+}
+
+######################################################
+# Meldung an mein Handy per Jabber senden
+######################################################
+sub
+sendMeJabberMessage($)
+{
+	my($msg) = @_;
+	sendJabberMessage('hexenmeister@jabber.de', $msg);
+}
+
+######################################################
+# Statusdaten an mein Handy per Jabber senden
+######################################################
+sub
+sendMeStatusMsg()
+{
+	#my($msg) = @_;
+	my $msg = "Status: Umwelt";
+	$msg=$msg."\n  Ost: ";
+	$msg=$msg."T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C";
+	#$msg=$msg."\n  : ".$defs{"GSD_1.4"}{STATE};
+	$msg=$msg."\n  West: ";
+	$msg=$msg."T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
+	$msg=$msg." H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
+	$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "power_main", "---")." V";
+	
+	sendMeJabberMessage($msg);
+}
+
+######################################################
+# Test
+######################################################
+sub
+sendJabberAnswer()
+{
+	my $lastsender=ReadingsVal("jabber","LastSenderJID","0");
+  my $lastmsg=ReadingsVal("jabber","LastMessage","0");
+  
+  #Log 3, "Jabber: ".$lastsender." - ".$lastmsg;
+  
+  my $newmsg;
+  if(lc($lastmsg) eq "status") {
+  	#Log 3, "Jabber: CMD: Status";
+  	$newmsg.= "Status: nicht implementiert";
+  }
+  
+  if(lc($lastmsg) eq "umwelt") {
+  	#Log 3, "Jabber: CMD: Umwelt";
+    $newmsg.= "Umwelt";
+	  $newmsg.="\n  Ost: ";
+	  $newmsg.="T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C, ";
+	  $newmsg.="B: ".ReadingsVal("UM_VH_HMBL01.Eingang", "brightness", "---").", ";
+	  $newmsg.="Bat: ".ReadingsVal("UM_VH_HMBL01.Eingang", "battery", "---")." ";
+	  #$newmsg.="\n  : ".$defs{"GSD_1.4"}{STATE};
+	  $newmsg.="\n  West: ";
+	  $newmsg.="T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
+	  $newmsg.=" H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
+	  $newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "power_main", "---")." V";
+  }
+
+  if(lc($lastmsg) eq "system") {
+  	#Log 3, "Jabber: CMD: System";
+  	$newmsg.= "CPU Temp: ".ReadingsVal("sysmon", "cpu_temp_avg", "---")." C\n";
+  	$newmsg.= "loadavg: ".ReadingsVal("sysmon", "loadavg", "---")."\n";
+  	$newmsg.= "Auslastung: ".ReadingsVal("sysmon", "stat_cpu_text", "---")."\n";
+  	$newmsg.= "RAM: ".ReadingsVal("sysmon", "ram", "---")."\n";
+  	$newmsg.= "Uptime: ".ReadingsVal("sysmon", "uptime_text", "---")."\n";
+  	$newmsg.= "Idle: ".ReadingsVal("sysmon", "idletime_text", "---")."\n";
+  	$newmsg.= "FHEM uptime: ".ReadingsVal("sysmon", "fhemuptime_text", "---")."\n";
+  	$newmsg.= "FS Root: ".ReadingsVal("sysmon", "fs_root", "---")."\n";
+  	$newmsg.= "FS USB: ".ReadingsVal("sysmon", "fs_usb1", "---")."\n";
+  	$newmsg.= "Updates: ".ReadingsVal("sysmon", "sys_updates", "---")."\n";
+  }
+    
+  # ggf. weitere Befehle
+  
+  if(lc($lastmsg) eq "help" || lc($lastmsg) eq "hilfe") {
+  	$newmsg.= "Befehle: Help (Hilfe), Status, System, Umwelt";
+  }
+  
+  #Log 3, "Jabber: response: >".$newmsg."<";
+  
+  
+  if(defined($newmsg)) {
+    fhem("set jabber msg ". $lastsender . " ".$newmsg);
+  } else {
+  	fhem("set jabber msg ". $lastsender . " Unbekanter Befehl: ".$lastmsg);
+  }
+}
+
+######################################################
+# Test
+######################################################
+sub
+sendJabberEcho()
+{
+	my $lastsender=ReadingsVal("jabber","LastSenderJID","0");
+  my $lastmsg=ReadingsVal("jabber","LastMessage","0");
+  fhem("set jabber msg ". $lastsender . " Echo: ".$lastmsg);
+}
+
 1;
+
