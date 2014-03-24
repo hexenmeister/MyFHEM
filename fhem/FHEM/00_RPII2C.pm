@@ -40,7 +40,7 @@ sub RPII2C_Initialize($) {
   $hash->{GetFn}   = "RPII2C_Get";
   $hash->{SetFn}   = "RPII2C_Set";
   #$hash->{AttrFn}  = "RPII2C_Attr";
-	$hash->{NotifyFn} = "FRM_Notify";
+  $hash->{NotifyFn} = "RPII2C_Notify";
   $hash->{AttrList}= "do_not_notify:1,0 ignore:1,0 showtime:1,0 " .
                      "$readingFnAttributes";
 }
@@ -88,7 +88,7 @@ sub RPII2C_Define($$) {							#
 }
 
 #####################################
-sub FRM_Notify {										#
+sub RPII2C_Notify {										#
   my ($hash,$dev) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
