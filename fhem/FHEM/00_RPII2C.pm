@@ -7,8 +7,16 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use Device::SMBus;
 
-my $clientsI2C = ":I2C_PC.*:I2C_MCP23017:I2C_BMP180:";
-#my $clientsI2C = ":I2C_PCF8574:I2C_PCA9532:FHT.*:";
+my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
+
+my @clients = qw(
+I2C_LCD
+I2C_DS1307
+I2C_PC.*
+I2C_MCP23017
+I2C_BMP180
+I2C_SHT21
+);
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
 
@@ -22,6 +30,7 @@ sub RPII2C_Initialize($) {
   my ($hash) = @_;
   
 # Provider
+	$hash->{Clients} = join (':',@clients);
   #$hash->{WriteFn}  = "RPII2C_Write";    #wird vom client per IOWrite($@) aufgerufen
   $hash->{I2CWrtFn} = "RPII2C_Write";    #zum testen als alternative für IOWrite
 
@@ -31,6 +40,7 @@ sub RPII2C_Initialize($) {
   $hash->{GetFn}   = "RPII2C_Get";
   $hash->{SetFn}   = "RPII2C_Set";
   #$hash->{AttrFn}  = "RPII2C_Attr";
+	$hash->{NotifyFn} = "FRM_Notify";
   $hash->{AttrList}= "do_not_notify:1,0 ignore:1,0 showtime:1,0 " .
                      "$readingFnAttributes";
 }
@@ -61,8 +71,10 @@ sub RPII2C_Define($$) {							#
   
   my $name = $a[0];
   my $dev = $a[2];
-
-  $hash->{Clients} = $clientsI2C;
+	
+	$hash->{NOTIFYDEV} = "global";
+	
+  #$hash->{Clients} = $clientsI2C;
   #$hash->{MatchList} = \%matchListI2C;
 
   if($dev eq "none") {
@@ -73,6 +85,43 @@ sub RPII2C_Define($$) {							#
   $hash->{DeviceName} = "/dev/i2c-".$dev;
 	$hash->{STATE} = "initialized";
   return undef;
+}
+
+#####################################
+sub FRM_Notify {										#
+  my ($hash,$dev) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+   	RPII2C_forall_clients($hash,\&RPII2C_Init_Client,undef);;
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+#####################################
+sub RPII2C_forall_clients($$$) {		#
+  my ($hash,$fn,$args) = @_;
+  foreach my $d ( sort keys %main::defs ) {
+    if ( defined( $main::defs{$d} )
+      && defined( $main::defs{$d}{IODev} )
+      && $main::defs{$d}{IODev} == $hash ) {
+       &$fn($main::defs{$d},$args);
+    }
+  }
+  return undef;
+}
+#####################################
+sub RPII2C_Init_Client($@) {				#
+	my ($hash,$args) = @_;
+	if (!defined $args and defined $hash->{DEF}) {
+		my @a = split("[ \t][ \t]*", $hash->{DEF});
+		$args = \@a;
+	}
+	my $name = $hash->{NAME};
+	Log3 $name,1,"im init client fuer $name "; 
+	my $ret = CallFn($name,"InitFn",$hash,$args);
+	if ($ret) {
+		Log3 $name,2,"error initializing '".$hash->{NAME}."': ".$ret;
+	}
 }
 #####################################
 sub RPII2C_Undef($$) {			 		   	#
@@ -249,11 +298,16 @@ sub RPII2C_HWACCESS($$) {
 			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array übertragen
 			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar übertragen
 		} elsif ($clientmsg->{direction} eq "i2cread") {																																#Byte lesen
-			$inh = $dev->readByte();
-			Log3 $hash, 5, "$hash->{NAME} Byte lesen; Returnvar.: $inh";
-			#my $rmsg = sprintf("%.2X",$inh);
-			my $rmsg = $inh;
-			$status = "Ok" if ($inh >= 0);
+			my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
+			my $rmsg = "";
+			for (my $n = 0; $n < $nbyte; $n++) {
+				$inh = $dev->readByte();
+				Log3 $hash, 5, "$hash->{NAME} Byte lesen; Returnvar.: $inh";
+				last if ($inh < 0);
+				$rmsg .= $inh;
+				$rmsg .= " " if $n <= $nbyte;
+				$status = "Ok" if ($n + 1) == $nbyte;
+			}
 			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array übertragen
 			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar übertragen
 		}
