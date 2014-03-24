@@ -1,4 +1,3 @@
-#############################################
 package main;
 
 use strict;
@@ -42,7 +41,7 @@ sub I2C_DS1307_Initialize($) {
   
   $hash->{I2CRecFn} = "I2C_DS1307_Receive";
 
-  $hash->{AttrList} = "IODev $main::readingFnAttributes";
+  $hash->{AttrList} = "IODev poll_interval $main::readingFnAttributes";
 }
 
 sub I2C_DS1307_Define($$) {
@@ -63,20 +62,22 @@ sub I2C_DS1307_Init($$) {
   my $u =
     "wrong syntax: define <name> I2C_DS1307 [<address>]";
 
-  return $u unless (defined $args and int(@$args) < 2 );
+  return $u if (defined $args and int(@$args) > 1 );
 
   my $name = $hash->{NAME};
-  my $address = @$args ? shift @$args : 0b1101000; #default address
+  my $address = defined $args ? shift @$args : 0b1101000; #default address
   $hash->{I2C_Address} = $address;
+  if (! (defined AttrVal($name,"stateFormat",undef))) {
+    $main::attr{$name}{"stateFormat"} = "datetime";
+  }
   eval {
     main::AssignIoPort( $hash, AttrVal( $name, "IODev", undef ) );
     $hash->{DS1307} = Device::DS1307->new($address);
     $hash->{DS1307}->attach(I2C_DS1307_IO->new($hash));
-    $hash->{DS1307}->read();
-    
     $hash->{STATE} = "Initialized";
   };
   return I2C_DS1307_Catch($@) if $@;
+  I2C_DS1307_Poll($hash);
   return undef;
 }
 
@@ -96,6 +97,14 @@ sub I2C_DS1307_Attr($$$$) {
           }
           last;
         };
+        $attribute eq "poll_interval" and do {
+          $hash->{POLL_INTERVAL} = $value;
+          if ( $main::init_done )
+          {
+            I2C_DS1307_Poll($hash);
+          }
+          last;
+        }
       }
     }
   };
@@ -138,6 +147,20 @@ sub I2C_DS1307_Set(@) {
   };
   return I2C_DS1307_Catch($@) if $@;
   return undef;
+}
+
+sub I2C_DS1307_Poll {
+  my ( $hash ) = @_;
+  RemoveInternalTimer($hash);
+  eval {
+    $hash->{DS1307}->read();
+  };
+  my $ret = I2C_DS1307_Catch($@) if $@;
+  if ($ret) {
+    $hash->{STATE} = "error reading DS1307: " . $ret;
+    main::Log3 $hash->{NAME},4,"error reading DS1307: ".$ret;
+  }
+  InternalTimer(gettimeofday()+$hash->{POLL_INTERVAL}, 'I2C_DS1307_Poll', $hash, 0) if defined $hash->{POLL_INTERVAL};
 }
 
 # package:
@@ -320,23 +343,15 @@ sub write {
 <a name="I2C_DS1307"></a>
 <h3>I2C_DS1307</h3>
 <ul>
-  drives LiquidCrystal Displays (LCD) that are connected to Firmata (via I2C).
-  Supported are Displays that use a PCF8574T as I2C Bridge (as found on eBay when searching for
-  'LCD' and 'I2C'). Tested is the 1602 type (16 characters, 2 Lines), the 2004 type (and other cheap chinise-made
-  I2C-LCDs for Arduino) ship with the same library, so they should work as well.
-  See <a name="LiquidCrystal tutorial">http://arduino.cc/en/Tutorial/LiquidCrystal</a> for details about
-  how to hook up the LCD to the arduino.
+  reads a DS1307 real-time clock chip via I2C.
 
   Requires a defined <a href="#I2C">I2C</a>-device to work.<br>
-  this I2C-device has to be configures for i2c by setting attr 'i2c-config' on the I2C-device<br>
-    
+
   <a name="I2C_DS1307define"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; I2C_DS1307 &lt;size-x&gt; &lt;size-y&gt; &lt;i2c-address&gt;</code> <br>
+  <code>define &lt;name&gt; I2C_DS1307 &lt;i2c-address&gt;</code> <br>
   Specifies the I2C_DS1307 device.<br>
-  <li>size-x is the number of characters per line</li>
-  <li>size-y is the numbers of rows.</li>
   <li>i2c-address is the (device-specific) address of the ic on the i2c-bus</li>
   </ul>
   
@@ -344,15 +359,8 @@ sub write {
   <a name="I2C_DS1307set"></a>
   <b>Set</b><br>
   <ul>
-      <li><code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br></li>
-      <li><code>set &lt;name&gt; home</code><br></li>
-      <li><code>set &lt;name&gt; clear</code><br></li>
-      <li><code>set &lt;name&gt; display on|off</code><br></li>
-      <li><code>set &lt;name&gt; cursor &lt;...&gt;</code><br></li>
-      <li><code>set &lt;name&gt; scroll left|right</code><br></li>
-      <li><code>set &lt;name&gt; backlight on|off</code><br></li>
-      <li><code>set &lt;name&gt; reset</code><br></li>
-      <li><code>set &lt;name&gt; writeXY x-pos,y-pos,len[,l] &lt;text to be displayed&gt;</code><br></li>
+      <li><code>set &lt;name&gt; datetime</code>; set DS1307 time. Format is JJJJ-MM-DD HH:MM:SSdisplayed&gt;<br></li>
+      <li><code>set &lt;name&gt; now</code><br></li>
   </ul>
   
   <a name="I2C_I2Cget"></a>
@@ -363,11 +371,7 @@ sub write {
   <a name="I2C_DS1307attr"></a>
   <b>Attributes</b><br>
   <ul>
-      <li>backLight &lt;on|off&gt;</li>
-      <li>autoClear &lt;on|off&gt;</li>
-      <li>autoBreak &lt;on|off&gt;</li>
-      <li>restoreOnStartup &lt;on|off&gt;</li>
-      <li>restoreOnReconnect &lt;on|off&gt;</li>
+      <li>poll_interval &lt;seconds&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#I2C">I2C</a> to use. (Optional, only required if there is more
       than one I2C-device defined.)
