@@ -73,7 +73,9 @@ I2C_LCD_Init($$)
   
   $hash->{sizex} = shift @$args;
   $hash->{sizey} = shift @$args;
-  $hash->{I2C_Address} = shift @$args if (@$args); 
+  if (defined (my $address = shift @$args)) {
+    $hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address; 
+  }
 
   my $name = $hash->{NAME};
   if (defined $hash->{I2C_Address}) {
