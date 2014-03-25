@@ -17,6 +17,7 @@ sub I2C_PCF8574_Initialize($) {
 
   #$hash->{Match}     = ".*";
   $hash->{DefFn}     = 	"I2C_PCF8574_Define";
+	  $hash->{InitFn}   = 'I2C_PCF8574_Init';
   $hash->{AttrFn}    = 	"I2C_PCF8574_Attr";
   $hash->{SetFn}     = 	"I2C_PCF8574_Set";
   $hash->{GetFn}     = 	"I2C_PCF8574_Get";
@@ -123,15 +124,30 @@ sub I2C_PCF8574_Attr(@) {					#
 }
 ###################################
 sub I2C_PCF8574_Define($$) {			#
-	my ($hash, $def) = @_;
-	my @args = split("[ \t]+", $def);
-	if (int(@args) != 3)
-	{
+ my ($hash, $def) = @_;
+ my @a = split("[ \t]+", $def);
+ $hash->{STATE} = 'defined';
+ if ($main::init_done) {
+    eval { I2C_PCF8574_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
+    return I2C_PCF8574_Catch($@) if $@;
+  }
+  return undef;
+}
+###################################
+sub I2C_PCF8574_Init($$) {				#
+	my ( $hash, $args ) = @_;
+	#my @a = split("[ \t]+", $args);
+	my $name = $hash->{NAME}; 
+	if (defined $args && int(@$args) != 1)	{
 		return "Define: Wrong syntax. Usage:\n" .
-         "define <name> I2C_PCF8574 <i2caddress>";
+		       "define <name> I2C_PCA9532 <i2caddress>";
 	}
-	return "$args[0] I2C Address not valid" unless ($args[2] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
-	$hash->{I2C_Address} = hex($args[2]);
+ 
+ if (defined (my $address = shift @$args)) {
+   $hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address; 
+ } else {
+   return "$name I2C Address not valid";
+ }
  
 	#für die Nutzung von IOWrite
   #my $code = ( defined( $hash->{ID} )? $hash->{ID} : "00" ) . " " . $hash->{I2C_Address};
@@ -143,6 +159,15 @@ sub I2C_PCF8574_Define($$) {			#
   AssignIoPort($hash);
 	$hash->{STATE} = 'Initialized';
 	return;
+}
+###################################
+sub I2C_PCF8574_Catch($) {
+  my $exception = shift;
+  if ($exception) {
+    $exception =~ /^(.*)( at.*FHEM.*)$/;
+    return $1;
+  }
+  return undef;
 }
 ###################################
 sub I2C_PCF8574_Undef($$) {				#
@@ -258,8 +283,9 @@ sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen 
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Provides an interface to the PCA9532 8 channel port extender IC. On Raspberry Pi the Interrupt Pin can be connected to an GPIO and <a href="#RPI_GPIO">RPI_GPIO</a> can be used to get the port values if an interrupt occurs.<br>
-		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>
-		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>          
+		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
+		<b>attribute IODev must be set</b><br>         
 	<a name="I2C_PCF8574Define"></a><br>
 	<b>Define</b>
 	<ul>
@@ -328,6 +354,7 @@ sub I2C_PCF8574_Parse($$) {	#wird über dispatch vom physical device aufgerufen 
 		Auf einem Raspberry Pi kann der Interrupt Pin des PCF8574 mit einem GPIO verbunden werden und &uml;ber die Interrupt Funktionen von <a href="#RPI_GPIO">RPI_GPIO</a> l&aml;sst sich dann ein get für den PCF8574 bei Pegel&aml;nderung ausl&oml;sen.<br>
 		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
+		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_PCF8574Define"></a><br>
 	<b>Define</b>
 	<ul>
