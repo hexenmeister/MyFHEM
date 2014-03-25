@@ -62,7 +62,7 @@ sub I2C_SHT21_Init($$) {
 	
 	my $name = $hash->{NAME};
 
-	if (defined $args && int(@$args) < 1)
+	 if (defined $args && int(@$args) > 1)
  	{
   	return "Define: Wrong syntax. Usage:\n" .
          	"define <name> I2C_SHT21 [<i2caddress>]";
@@ -71,7 +71,9 @@ sub I2C_SHT21_Init($$) {
  	if (defined (my $address = shift @$args)) {
    	$hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address;
    	return "$name I2C Address not valid" unless ($address < 128 && $address > 3);
- 	} 
+ 	} else {
+		$hash->{I2C_Address} = hex(SHT21_I2C_ADDRESS);
+	}
 
 
 	my $msg = '';
@@ -268,45 +270,42 @@ sub I2C_SHT21_readHumidity($) {
 <a name="I2C_SHT21"></a>
 <h3>I2C_SHT21</h3>
 <ul>
-<a name="I2C_SHT21"></a>
-Provides an interface to the SHT21 I2C Humidity sensor from <a href="www.sensirion.com">Sensirion</a>.
-The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
-or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
-<b>attribute IODev must be set</b><br>
-<a name="I2C_SHT21Define"></a><br>
-<b>Define</b>
-<ul>
-<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
-where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
-</ul>
-
-<a name="I2C_SHT21Set"></a>
-<b>Set</b>
-<ul>
-<code>set &lt;name&gt; readValues</code><br>
-Reads the current temperature and humidity values from sensor.<br><br>
-</ul>
-
-<a name="I2C_SHT21Attr"></a>
-<b>Attributes</b>
-<ul>
-<li>poll_interval<br>
-Set the polling interval in minutes to query data from sensor<br>
-Default: 5, valid values: 1,2,5,10,20,30<br><br>
-</li>
-<li>roundHumidityDecimal<br>
-Number of decimal places for humidity value<br>
-Default: 1, valid values: 0 1 2<br><br>
-</li>
-<li>roundTemperatureDecimal<br>
-Number of decimal places for temperature value<br>
-Default: 1, valid values: 0,1,2<br><br>
-</li>
-<li><a href="#IODev">IODev</a></li>
-<li><a href="#do_not_notify">do_not_notify</a></li>
-<li><a href="#showtime">showtime</a></li>
-</ul>
-<br>
+	<a name="I2C_SHT21"></a>
+		Provides an interface to the SHT21 I2C Humidity sensor from <a href="www.sensirion.com">Sensirion</a>.
+		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
+		<b>attribute IODev must be set</b><br>
+	<a name="I2C_SHT21Define"></a><br>
+	<b>Define</b>
+	<ul>
+		<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
+		where <code>&lt;I2C Address&gt;</code> is an 2 digit hexadecimal value<br>
+	</ul>
+	<a name="I2C_SHT21Set"></a>
+	<b>Set</b>
+	<ul>
+		<code>set &lt;name&gt; readValues</code><br>
+		Reads the current temperature and humidity values from sensor.<br><br>
+	</ul>
+	<a name="I2C_SHT21Attr"></a>
+	<b>Attributes</b>
+	<ul>
+		<li>poll_interval<br>
+			Set the polling interval in minutes to query data from sensor<br>
+			Default: 5, valid values: 1,2,5,10,20,30<br><br>
+		</li>
+		<li>roundHumidityDecimal<br>
+			Number of decimal places for humidity value<br>
+			Default: 1, valid values: 0 1 2<br><br>
+		</li>
+		<li>roundTemperatureDecimal<br>
+			Number of decimal places for temperature value<br>
+			Default: 1, valid values: 0,1,2<br><br>
+		</li>
+		<li><a href="#IODev">IODev</a></li>
+		<li><a href="#do_not_notify">do_not_notify</a></li>
+		<li><a href="#showtime">showtime</a></li>
+	</ul><br>
 </ul>
 
 =end html
@@ -316,45 +315,42 @@ Default: 1, valid values: 0,1,2<br><br>
 <a name="I2C_SHT21"></a>
 <h3>I2C_SHT21</h3>
 <ul>
-<a name="I2C_SHT21"></a>
-Erm&ouml;glicht die Verwendung eines SHT21 I2C Feuchtesensors von <a href="www.sensirion.com">Sensirion</a>.
-I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
-oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
-<b>Das Attribut IODev muss definiert sein.</b><br>
-<a name="I2C_SHT21Define"></a><br>
-<b>Define</b>
-<ul>
-<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
-Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
-</ul>
-
-<a name="I2C_SHT21Set"></a>
-<b>Set</b>
-<ul>
-<code>set &lt;name&gt; readValues</code><br>
-Aktuelle Temperatur und Feuchte Werte vom Sensor lesen.<br><br>
-</ul>
-
-<a name="I2C_SHT21Attr"></a>
-<b>Attribute</b>
-<ul>
-<li>poll_interval<br>
-Aktualisierungsintervall aller Werte in Minuten.<br>
-Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
-</li>
-<li>roundHumidityDecimal<br>
-Anzahl Dezimalstellen für den Feuchtewert<br>
-Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
-</li>
-<li>roundTemperatureDecimal<br>
-Anzahl Dezimalstellen für den Temperaturwert<br>
-Standard: 1, g&uuml;ltige Werte: 0,1,2<br><br>
-</li>
-<li><a href="#IODev">IODev</a></li>
-<li><a href="#do_not_notify">do_not_notify</a></li>
-<li><a href="#showtime">showtime</a></li>
-</ul>
-<br>
+	<a name="I2C_SHT21"></a>
+		Erm&ouml;glicht die Verwendung eines SHT21 I2C Feuchtesensors von <a href="www.sensirion.com">Sensirion</a>.
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
+		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
+		<b>Das Attribut IODev muss definiert sein.</b><br>
+	<a name="I2C_SHT21Define"></a><br>
+	<b>Define</b>
+	<ul>
+		<code>define &lt;name&gt; I2C_SHT21 [&lt;I2C Address&gt;]</code><br>
+		Der Wert <code>&lt;I2C Address&gt;</code> ist ein zweistelliger Hex-Wert<br>
+	</ul>
+	<a name="I2C_SHT21Set"></a>
+	<b>Set</b>
+	<ul>
+		<code>set &lt;name&gt; readValues</code><br>
+		Aktuelle Temperatur und Feuchte Werte vom Sensor lesen.<br><br>
+	</ul>
+	<a name="I2C_SHT21Attr"></a>
+	<b>Attribute</b>
+	<ul>
+		<li>poll_interval<br>
+			Aktualisierungsintervall aller Werte in Minuten.<br>
+			Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
+		</li>
+		<li>roundHumidityDecimal<br>
+			Anzahl Dezimalstellen für den Feuchtewert<br>
+			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
+		</li>
+		<li>roundTemperatureDecimal<br>
+			Anzahl Dezimalstellen für den Temperaturwert<br>
+			Standard: 1, g&uuml;ltige Werte: 0,1,2<br><br>
+		</li>
+		<li><a href="#IODev">IODev</a></li>
+		<li><a href="#do_not_notify">do_not_notify</a></li>
+		<li><a href="#showtime">showtime</a></li>
+	</ul><br>
 </ul>
 
 =end html_DE
