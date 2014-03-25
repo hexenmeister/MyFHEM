@@ -88,7 +88,7 @@ sub RPII2C_Define($$) {							#
 }
 
 #####################################
-sub RPII2C_Notify {										#
+sub RPII2C_Notify {									#
   my ($hash,$dev) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
@@ -117,7 +117,7 @@ sub RPII2C_Init_Client($@) {				#
 		$args = \@a;
 	}
 	my $name = $hash->{NAME};
-	Log3 $name,1,"im init client fuer $name "; 
+	Log3 $name,5,"im init client fuer $name "; 
 	my $ret = CallFn($name,"InitFn",$hash,$args);
 	if ($ret) {
 		Log3 $name,2,"error initializing '".$hash->{NAME}."': ".$ret;
@@ -325,23 +325,20 @@ sub RPII2C_HWACCESS($$) {
 <h3>RPII2C</h3>
 <ul>
 	<a name="RPII2C"></a>
-		Provides access to Raspberry Pi's I2C interfaces for some logical modules and also directly.<br><br>
+		Provides access to Raspberry Pi's I2C interfaces for some logical modules and also directly.<br>
+		This modul will basically work on every linux system that provides <code>/dev/i2c-x</code>.<br><br>	
+
 		<b>preliminary:</b><br>
 		<ul>
 			<li>
 				This module uses gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a> library change access rights of I2C-Interface<br>
 				WiringPi installation is described here: <a href="#RPI_GPIO">RPI_GPIO</a><br>
+				Alternatively for other systems (BeagleBone, etc.) you can manually change access rights for <code>/dev/i2c-x</code>. You will need write-/read access for user that runs FHEM. This can be doen e.g. in etc/init.d/fhem<br>
+
 			</li>
 			<li>
 				installation of i2c dependencies:<br>
 				<code>sudo apt-get install libi2c-dev i2c-tools build-essential</code><br>
-			</li>
-			<li>
-				remove kernel module from blacklist:<br>
-				open raspi-blacklist.conf<br>
-				<code>sudo nano /etc/modprobe.d/raspi-blacklist.conf</code><br>
-				comment out the following line<br>
-				<code>blacklist i2c-bcm2708</code><br>
 			</li>
 			<li>
 				load I2C kernel modules:<br>
@@ -434,22 +431,18 @@ sub RPII2C_HWACCESS($$) {
 <ul>
 	<a name="RPII2C"></a>
 		Erm&ouml;glicht den Zugriff auf die I2C Schnittstellen des Raspberry Pi &uuml;ber logische Module. Register von I2C IC's k&ouml;nnen auch direkt gelesen und geschrieben werden.<br><br>
+		Dieses Modul funktioniert gruns&auml;tzlich auf allen Linux Systemen, die <code>/dev/i2c-x</code> bereitstellen.<br><br>
+		
 		<b>Vorbereitung:</b><br>
 		<ul>
 			<li>
 				Dieses Modul nutzt das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek um FHEM Schreibrechte auf die I2C Schnittstelle zu geben.<br>
 				WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
+				F&uuml;r andere Systeme (BeagleBone, etc.) oder auch für das Raspberry kann auf WiringPi verzichtet werden. In diesem Fall müssen die Dateien <code>/dev/i2c-x</code> Schreib-/Leserechte, für den User unter dem FHEM läuft, gesetzt bekommen. (z.B. in der etc/init.d/fhem)<br>
 			</li>
 			<li>
 				Installation der I2C Abh&auml;ngigkeiten:<br>
 				<code>sudo apt-get install libi2c-dev i2c-tools build-essential</code><br>
-			</li>
-			<li>
-				Kernelmodul aus der Blacklist entfernen:<br>
-				raspi-blacklist.conf &ouml;ffnen<br>
-				<code>sudo nano /etc/modprobe.d/raspi-blacklist.conf</code><br>
-				folgende Zeile auskommentieren oder l&ouml;schen<br>
-				<code>blacklist i2c-bcm2708</code><br>
 			</li>
 			<li>
 				I2C Kernelmodule laden:<br>
