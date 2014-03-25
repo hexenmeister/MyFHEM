@@ -77,20 +77,22 @@ sub I2C_PCA9532_Define($$) {
 }
 ###############################################################################
 sub I2C_PCA9532_Init($$) {
- my ( $hash, $args ) = @_;
- #my @a = split("[ \t]+", $args);
- my $name = $hash->{NAME}; 
- if (int(@$args) != 1)
- {
-  return "Define: Wrong syntax. Usage:\n" .
-         "define <name> I2C_PCA9532 <i2caddress>";
- }
+	my ( $hash, $args ) = @_;
+	#my @a = split("[ \t]+", $args);
+	my $name = $hash->{NAME}; 
+	if (defined $args && int(@$args) != 1)	{
+		return "Define: Wrong syntax. Usage:\n" .
+		       "define <name> I2C_PCA9532 <i2caddress>";
+	}
+ #return "$name I2C Address not valid" unless ($a[0] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
  
  if (defined (my $address = shift @$args)) {
-   $hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address;
-   return "$name I2C Address not valid" unless ($address < 128 && $address > 3);
- } 
+   $hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address; 
+ } else {
+   return "$name I2C Address not valid";
+ }
  
+ #$hash->{I2C_Address} = hex($a[0]);
  AssignIoPort($hash);
  $hash->{STATE} = 'Initialized';
  return;
@@ -324,7 +326,6 @@ sub I2C_PCA9532_UpdReadings($$$) {
 
 1;
 
-
 =pod
 =begin html
 
@@ -334,8 +335,9 @@ sub I2C_PCA9532_UpdReadings($$$) {
 	<a name="I2C_PCA9532"></a>
 		Provides an interface to the PCA9532 I2C 16 channel PWM IC. 
 		The PCA9532 has 2 independent PWM stages and every channel can be attached to on of these stages or directly turned on or off.
-		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>
+		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
+		<b>attribute IODev must be set</b><br>
 	<a name="I2C_PCA9532Define"></a><br>
 	<b>Define</b>
 	<ul>
@@ -414,6 +416,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 		Das PCA9532 hat 2 unabh&auml;ngige PWM Stufen. Jeder Kanal kanne einer der Stufen zugeordnet werden oder direkt auf off/on gesetzt werden.
 		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
+		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_PCA9532Define"></a><br>
 	<b>Define</b>
 	<ul>
