@@ -45,6 +45,7 @@ my %setsP = (
 sub I2C_PCA9532_Initialize($) {
   my ($hash) = @_;
   $hash->{DefFn}    = "I2C_PCA9532_Define";
+  $hash->{InitFn}   = 'I2C_PCA9532_Init';
   $hash->{UndefFn}  = "I2C_PCA9532_Undefine";
   $hash->{AttrFn}   = "I2C_PCA9532_Attr";
   #$hash->{StateFn} = "I2C_PCA9532_SetState";
@@ -66,17 +67,42 @@ sub I2C_PCA9532_SetState($$$$) {
 ###############################################################################
 sub I2C_PCA9532_Define($$) {
  my ($hash, $def) = @_;
- my @args = split("[ \t]+", $def);
- if (int(@args) != 3)
+ my @a = split("[ \t]+", $def);
+ $hash->{STATE} = 'defined';
+ if ($main::init_done) {
+    eval { I2C_PCA9532_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
+    return I2C_PCA9532_Catch($@) if $@;
+  }
+  return undef;
+}
+###############################################################################
+sub I2C_PCA9532_Init($$) {
+ my ( $hash, $args ) = @_;
+ #my @a = split("[ \t]+", $args);
+ my $name = $hash->{NAME}; 
+ if (int(@$args) != 1)
  {
   return "Define: Wrong syntax. Usage:\n" .
          "define <name> I2C_PCA9532 <i2caddress>";
  }
- return "$args[0] I2C Address not valid" unless ($args[2] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
- $hash->{I2C_Address} = hex($args[2]);
+ 
+ if (defined (my $address = shift @$args)) {
+   $hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address;
+   return "$name I2C Address not valid" unless ($address < 128 && $address > 3);
+ } 
+ 
  AssignIoPort($hash);
  $hash->{STATE} = 'Initialized';
  return;
+}
+###############################################################################
+sub I2C_PCA9532_Catch($) {
+  my $exception = shift;
+  if ($exception) {
+    $exception =~ /^(.*)( at.*FHEM.*)$/;
+    return $1;
+  }
+  return undef;
 }
 ###############################################################################
 sub I2C_PCA9532_Undefine($$) {
