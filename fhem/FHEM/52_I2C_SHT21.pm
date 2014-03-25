@@ -66,7 +66,7 @@ sub I2C_SHT21_Init($$) {
 	if( (defined $args and int(@$args) < 1)) {
 		$msg = 'wrong syntax: define <name> I2C_SHT21';
 	}
-	return "$name I2C Address not valid" unless ($args[0] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
+	#return "$name I2C Address not valid" unless ($args[0] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
 	$hash->{I2C_Address} = defined $args ? hex(shift @$args) : hex(SHT21_I2C_ADDRESS); #default address
 	# create default attributes
 	$msg = CommandAttr(undef, $name . ' poll_interval 5');
