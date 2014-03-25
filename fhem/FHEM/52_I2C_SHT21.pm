@@ -62,15 +62,21 @@ sub I2C_SHT21_Init($$) {
 	
 	my $name = $hash->{NAME};
 
+	if (defined $args && int(@$args) < 1)
+ 	{
+  	return "Define: Wrong syntax. Usage:\n" .
+         	"define <name> I2C_SHT21 [<i2caddress>]";
+ 	}
+	 
+ 	if (defined (my $address = shift @$args)) {
+   	$hash->{I2C_Address} = $address =~ /^0.*$/ ? oct($address) : $address;
+   	return "$name I2C Address not valid" unless ($address < 128 && $address > 3);
+ 	} 
+
+
 	my $msg = '';
-	if( (defined $args and int(@$args) < 1)) {
-		$msg = 'wrong syntax: define <name> I2C_SHT21';
-	}
-	#return "$name I2C Address not valid" unless ($args[0] =~ /^(0x|)([0-7]|)[0-9A-F]$/xi);
-	$hash->{I2C_Address} = defined $args ? hex(shift @$args) : hex(SHT21_I2C_ADDRESS); #default address
 	# create default attributes
 	$msg = CommandAttr(undef, $name . ' poll_interval 5');
-
 	if ($msg) {
 		Log3 ($hash, 1, $msg);
 		return $msg;
