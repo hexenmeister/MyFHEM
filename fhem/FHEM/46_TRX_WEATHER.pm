@@ -43,6 +43,7 @@
 # * "TFA_RAIN"	is TFA
 # * "RG700"	is UPM RG700
 # * "WS2300_RAIN" is WS2300
+# * "TX5_RAIN" is La Crosse TX5
 #
 # wind sensors (WIND):
 # * "WTGR800_A" is WTGR800
@@ -395,7 +396,7 @@ sub TRX_WEATHER_common_anemometer {
   }
 
   my $dir = $bytes->[5]*256 + $bytes->[6];
-  my $dirname = $TRX_WEATHER_winddir_name[$dir/22.5];
+  my $dirname = $TRX_WEATHER_winddir_name[int((($dir + 11.25) % 360) / 22.5)];
 
   my $avspeed = ($bytes->[7]*256 + $bytes->[8]) / 10;
   my $speed = ($bytes->[9]*256 + $bytes->[10]) / 10;
@@ -663,6 +664,8 @@ sub TRX_WEATHER_common_rain {
 	0x03 => "TFA_RAIN",
 	0x04 => "RG700",
 	0x05 => "WS2300_RAIN", # WS2300
+	0x06 => "TX5_RAIN", # La Crosse TX5
+
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -707,13 +710,15 @@ sub TRX_WEATHER_common_rain {
   	};
   }
 
-  my $train = ($bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9])/10; # total rain
-  push @res, {
-	device => $dev_str,
-	type => 'train',
-	current => $train,
-	units => 'mm',
-  };
+  if ($dev_type ne "TX5_RAIN") {
+  	my $train = ($bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9])/10; # total rain
+  	push @res, {
+		device => $dev_str,
+		type => 'train',
+		current => $train,
+		units => 'mm',
+  	};
+  }
 
   TRX_WEATHER_battery($bytes, $dev_str, \@res, 10);
   return @res;
@@ -1280,7 +1285,8 @@ TRX_WEATHER_Parse($$)
 			$val .= "ECUR: ".$energy_current." ";
 
 			$sensor = "energy_current";
-			readingsBulkUpdate($def, $sensor, $energy_current." ".$i->{units});
+			#readingsBulkUpdate($def, $sensor, $energy_current." ".$i->{units});
+			readingsBulkUpdate($def, $sensor, $energy_current);
 	}
 	elsif ($i->{type} eq "energy_ch1") { 
 			my $energy_current = $i->{current};
@@ -1322,13 +1328,14 @@ TRX_WEATHER_Parse($$)
 			my $energy_total = $i->{current};
 			if (defined($def->{scale_total}) && defined($def->{add_total})) {
 				$energy_total = sprintf("%.4f",$energy_total * $def->{scale_total} + $def->{add_total});
-				Log3 $name, 1, "TRX_WEATHER: name=$name device=$device_name energy_total scale_total=".$def->{scale_total};			
+				Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_total scale_total=".$def->{scale_total};			
 			}
 			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name energy_total=$energy_total";			
 			$val .= "ESUM: ".$energy_total." ";
 
 			$sensor = "energy_total";
-			readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
+			#readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
+			readingsBulkUpdate($def, $sensor, $energy_total);
 	}
 	elsif ($i->{type} eq "weight") { 
 			Log3 $name, 5, "TRX_WEATHER: name=$name device=$device_name weight ".$i->{current};

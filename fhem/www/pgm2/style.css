@@ -15,7 +15,7 @@ select   { font-family:Arial, sans-serif; font-size:16px; }
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
 
-#connect_err { background-color: #000000; color: #FFFFFF; 
+#errmsg { background-color: #000000; color: #FFFFFF; 
                position:absolute; top:0px; left:40px; z-index: 10; }
 .devType { padding-top:20px; }
 a {  color: #278727; }
@@ -65,7 +65,7 @@ select {  margin-left:5px; margin-right:5px; }
 
 pre { white-space: pre-wrap; }
 
-svg      { height:32px; width:32px; fill:#278727; }
+svg      { height:32px; width:32px; fill:#278727; vertical-align:middle; margin:2px 0; }
 svg.on,svg.FS20_on { fill:orange; }
 
 /* next lines are for remotecontrol */

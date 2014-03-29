@@ -9,10 +9,14 @@ use POSIX;
 #use JSON;
 #use Data::Dumper;
 
+use vars qw($FW_ME);
+use vars qw($FW_subdir);
+use vars qw($FW_wname);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my $LightScene_hasJSON = 1;
 my $LightScene_hasDataDumper = 1;
+my $scn = '';             # scene used for edit-table
 
 sub LightScene_Initialize($)
 {
@@ -23,10 +27,14 @@ sub LightScene_Initialize($)
   $hash->{UndefFn}  = "LightScene_Undefine";
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
+  $hash->{AttrFn}   = "LightScene_Attr";
+  $hash->{AttrList} = "switchingOrder";
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
+  $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
 
   addToAttrList("lightSceneParamsToSave");
+  addToAttrList("lightSceneRestoreOnlyIfChanged:1,0");
 
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
@@ -39,7 +47,7 @@ sub LightScene_Define($$)
 {
   my ($hash, $def) = @_;
 
-  return "install JSON or Data::Dumper to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
+  return "install JSON (or Data::Dumper) to use LightScene" if( !$LightScene_hasJSON && !$LightScene_hasDataDumper );
 
   my @args = split("[ \t]+", $def);
 
@@ -63,6 +71,7 @@ sub LightScene_Define($$)
   $hash->{SCENES} = \%scenes;
 
   LightScene_Load($hash);
+  LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
   $hash->{STATE} = 'Initialized';
 
@@ -97,24 +106,24 @@ LightScene_2html($)
   $ret .= "<tr><td><div class=\"devType\"><a href=\"$FW_ME?detail=$name\">".AttrVal($name, "alias", $name)."</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table class=\"block wide\">";
 
+  if( defined($FW_webArgs{detail}) ) {
+    $room = "&detail=$FW_webArgs{detail}";
+
+    $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+    #$row++;
+    $ret .= "<td><div></div></td>";
+    foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+      my %extPage = ();
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
+      $ret .= "<td style=\"cursor:pointer\" informId=\"$name-$d.state\">$txt</td>";
+    }
+  }
+
   $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
   $row++;
   $ret .= "<td><div></div></td>";
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     $ret .= "<td><div class=\"col2\"><a href=\"$FW_ME?detail=$d\">". AttrVal($d, "alias", $d) ."</a></div></td>";
-  }
-
-  if( defined($FW_webArgs{detail}) ) {
-    $room = "&detail=$FW_webArgs{detail}";
-
-    $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-    $row++;
-    $ret .= "<td><div></div></td>";
-    foreach my $d (sort keys %{ $hash->{CONTENT} }) {
-      my %extPage = ();
-      my ($allSets, $cmdlist, $txt) = FW_devState($d, $room, \%extPage);
-      $ret .= "<td informId=\"$d\">$txt</td>";
-    }
   }
 
   foreach my $scene (sort keys %{ $hash->{SCENES} }) {
@@ -130,7 +139,7 @@ LightScene_2html($)
       $txt = ($isHtml ? $icon : FW_makeImage($icon, $scene)) if( $icon );
     }
     if( AttrVal($FW_wname, "longpoll", 1)) {
-      $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
+      $txt = "<a style=\"cursor:pointer\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
     } else {
       $txt = "<a href=\"$FW_ME$FW_subdir?$link$srf\">$txt</a>";
     }
@@ -175,7 +184,15 @@ LightScene_detailFn()
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  return LightScene_2html($d);
+  my $hash = $defs{$d};
+
+  if( AttrVal($FW_wname, "longpoll", 1) ) {
+    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
+    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
+  }
+  my $html = LightScene_2html($d); #mod
+  $html .= LightScene_editTable($hash); #mod
+  return $html;
 }
 
 sub
@@ -185,12 +202,18 @@ LightScene_Notify($$)
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global");
+  if( !defined($hash->{helper}{myDisplay})
+      || !%{$hash->{helper}{myDisplay}} ) {
+    Log3 $name, 5, "$name: not on any display, ignoring notify";
+    return if($dev->{NAME} ne "global");
+  }
 
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
     LightScene_Save();
   }
+
+  return if($dev->{TYPE} eq $hash->{TYPE});
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
@@ -226,6 +249,56 @@ LightScene_Notify($$)
 
         delete( $hash->{CONTENT}{$name} );
       }
+    } else {
+
+      next if (!$hash->{CONTENT}->{$dev->{NAME}});
+
+      if( !defined($hash->{helper}{myDisplay})
+          || !%{$hash->{helper}{myDisplay}} ) {
+        Log3 $name, 4, "$name: not on any display, ignoring notify";
+        return undef;
+      } else {
+        my $do_update = 0;
+        foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
+          if( defined($defs{$display}) ) {
+            my $filter = $defs{$display}->{inform};
+            $filter = $filter->{filter} if( ref($filter) eq 'HASH' );
+            return undef if( !defined($filter) );
+            if($filter eq "$name") {
+              $do_update = 1;
+            } else {
+              Log3 $name, 4, "$name: $display is not my room, ignoring notify";
+              delete( $hash->{helper}{myDisplay}{$display} );
+            }
+          } else {
+            Log3 $name, 4, "$name: $display is closed, ignoring notify";
+            delete( $hash->{helper}{myDisplay}{$display} );
+          }
+        }
+        if( !$do_update ) {
+          Log3 $name, 4, "$name: not on any display, ignoring notify";
+          return undef;
+        } else {
+          Log3 $name, 5, "$name: do update";
+        }
+      }
+
+
+      my @parts = split(/: /,$s);
+      my $reading = shift @parts;
+      my $value   = join(": ", @parts);
+
+      next if( $value ne "" );
+
+      $reading = "state";
+      $value = $s;
+
+      my $room = AttrVal($name, "room", "");
+      my %extPage = ();
+      (undef, undef, $value) = FW_devState($dev->{NAME}, $room, \%extPage);
+
+      DoTrigger( "$name", "$dev->{NAME}.$reading: $value" );
+      #CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
     }
   }
 
@@ -315,6 +388,138 @@ LightScene_Load($)
   return undef;
 }
 
+sub
+LightScene_SaveDevice($$)
+{
+  my($hash,$d) = @_;
+
+  my $state = "";
+  my $icon = undef;
+  my $type = $defs{$d}->{TYPE};
+  $type = "" if( !defined($type) );
+
+  if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
+    $icon = Value($d);
+    if( $toSave =~ m/^{.*}$/) {
+      my $DEVICE = $d;
+      $toSave = eval $toSave;
+      $toSave = "state" if( $@ );
+    }
+    my @sets = split(',', $toSave);
+    foreach my $set (@sets) {
+      my $saved = "";
+      my @params = split(':', $set);
+      foreach my $param (@params) {
+        $saved .= " : " if( $saved );
+
+        my $use_get = 0;
+        my $get = $param;
+        my $regex;
+        my $set = $param;
+
+        if( $param =~ /(get\s+)?(\S*)(\s*->\s*(set\s+)?)?(\S*)?/ ) {
+          $use_get = 1 if( $1 );
+          $get = $2 if( $2 );
+          $set = $5 if( $5 );
+        }
+        ($get,$regex) = split('@', $get, 2);
+        $set = $get if( $regex && $set eq $param );
+        $set = "state" if( $set eq "STATE" );
+
+        $saved .= "$set " if( $set ne "state" );
+
+        my $value;
+        if( $use_get ) {
+          $value = CommandGet( "", "$d $get" );
+        } elsif( $get eq "STATE" ) {
+          $value = Value($d);
+        } else {
+          $value = ReadingsVal($d,$get,undef);
+        }
+        $value = eval $regex if( $regex );
+        Log3 $hash, 2, "$hash->{NAME}: $@" if($@);
+        $saved .= $value;
+      }
+
+      if( !$state ) {
+        $state = $saved;
+      } else {
+        $state = [$state] if( ref($state) ne 'ARRAY' );
+        push( @{$state}, $saved );
+      }
+    }
+  } elsif( $type eq 'CUL_HM' ) {
+    #my $subtype = AttrVal($d,"subType","");
+    my $subtype = CUL_HM_Get($defs{$d},$d,"param","subType");
+    if( $subtype eq "switch" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "dimmer" ) {
+      $state = Value($d);
+      if ( $state =~ m/^(\d+)/ ) {
+        $icon = $state;
+        $state = $1 if ( $state =~ m/^(\d+)/ );
+      }
+    } else {
+      $state = Value($d);
+    }
+  } elsif( $type eq 'FS20' ) {
+      $state = Value($d);
+  } elsif( $type eq 'SWAP_0000002200000003' ) {
+      $state = Value($d);
+      $state = "rgb ". $state if( $state ne "off" );
+  } elsif( $type eq 'HUEDevice' ) {
+    my $subtype = AttrVal($d,"subType","");
+    if( $subtype eq "switch" || Value($d) eq "off" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "dimmer" ) {
+      $state = "bri ". ReadingsVal($d,'bri',"0");
+    } elsif( $subtype eq "colordimmer" ) {
+      if( ReadingsVal($d,"colormode","") eq "ct" ) {
+        ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
+        $state = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
+      } else {
+        $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
+      }
+    }
+  } elsif( $type eq 'IT' ) {
+    my $subtype = AttrVal($d,"model","");
+    if( $subtype eq "itswitch" ) {
+      $state = Value($d);
+    } elsif( $subtype eq "itdimmer" ) {
+      $state = Value($d);
+    } else {
+      $state = Value($d);
+    }
+  } elsif( $type eq 'TRX_LIGHT' ) {
+    $state = Value($d);
+  } else {
+    $state = Value($d);
+  }
+
+  return($state,$icon,$type);
+}
+
+sub
+LightScene_RestoreDevice($$$)
+{
+  my($hash,$d,$cmd) = @_;
+
+  if( AttrVal($d,"lightSceneRestoreOnlyIfChanged", AttrVal($hash->{NAME},"lightSceneRestoreOnlyIfChanged",0) ) > 0 )
+    {
+      my($state,undef,undef) = LightScene_SaveDevice($hash,$d);
+
+      return "" if( $state eq $cmd );
+    }
+
+  my $ret;
+  if( $cmd =~m/^;/ ) {
+    $ret = AnalyzeCommandChain(undef,"$cmd");
+  } else {
+    $ret = CommandSet(undef,"$d $cmd");
+  }
+
+  return $ret;
+}
 
 sub
 LightScene_Set($@)
@@ -324,7 +529,7 @@ LightScene_Set($@)
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." save set scene:".join(",", sort keys %{$hash->{SCENES}})};
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." save set setcmd scene:".join(",", sort keys %{$hash->{SCENES}})};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
@@ -333,21 +538,35 @@ LightScene_Set($@)
   if( $cmd eq "remove" ) {
     delete( $hash->{SCENES}{$scene} );
     return undef;
-  } elsif( $cmd eq "set" ) {
+  } elsif( $cmd eq "set" || $cmd eq "setcmd" ) {
     my ($d, @args) = @a;
 
-    if( !defined( $scene ) || !defined( $d ) || !@args ) { return "Usage: set $name set <scene_name> <device> <cmd>" };
+    if( !defined( $scene ) || !defined( $d ) ) { return "Usage: set $name set <scene_name> <device> [<cmd>]" };
     return "no stored scene >$scene<" if( !defined($hash->{SCENES}{$scene} ) );
-    return "device >$d< is not a member of scene >$scene<" if( !defined($hash->{CONTENT}{$d} ) );
+    #return "device >$d< is not a member of scene >$scene<" if( !defined($hash->{CONTENT}{$d} ) );
 
-    $hash->{SCENES}{$scene}{$d} = join(" ", @args);
+    if( !@args ) {
+      delete $hash->{SCENES}{$scene}{$d};
+    } else {
+      $hash->{SCENES}{$scene}{$d} = (($cmd eq "setcmd")?';':''). join(" ", @args);
+    }
+
+    LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
+
     return undef;
   }
 
 
   $hash->{INSET} = 1;
 
-  foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+  my @devices;
+  if( $cmd eq "scene" && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scene}) ) {
+    @devices = @{$hash->{switchingOrder}{$scene}};
+  } else {
+    @devices = @{$hash->{devices}};
+  }
+
+  foreach my $d (@devices) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
       Log3 $name, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
@@ -355,108 +574,7 @@ LightScene_Set($@)
     }
 
     if( $cmd eq "save" ) {
-      my $state = "";
-      my $icon = undef;
-      my $type = $defs{$d}->{TYPE};
-      $type = "" if( !defined($type) );
-
-      if( my $toSave = AttrVal($d,"lightSceneParamsToSave","") ) {
-        $icon = Value($d);
-        if( $toSave =~ m/^{.*}$/) {
-          my $DEVICE = $d;
-          $toSave = eval $toSave;
-          $toSave = "state" if( $@ );
-        }
-        my @sets = split(',', $toSave);
-        foreach my $set (@sets) {
-          my $saved = "";
-          my @params = split(':', $set);
-          foreach my $param (@params) {
-            $saved .= " : " if( $saved );
-
-            my $use_get = 0;
-            my $get = $param;
-            my $regex;
-            my $set = $param;
-
-            if( $param =~ /(get\s+)?(\S*)(\s*->\s*(set\s+)?)?(\S*)?/ ) {
-              $use_get = 1 if( $1 );
-              $get = $2 if( $2 );
-              $set = $5 if( $5 );
-            }
-            ($get,$regex) = split('@', $get, 2);
-            $set = $get if( $regex && $set eq $param );
-            $set = "state" if( $set eq "STATE" );
-
-            $saved .= "$set " if( $set ne "state" );
-
-            my $value;
-            if( $use_get ) {
-              $value = CommandGet( "", "$d $get" );
-            } elsif( $get eq "STATE" ) {
-              $value = Value($d);
-            } else {
-              $value = ReadingsVal($d,$get,undef);
-            }
-            $value = eval $regex if( $regex );
-            Log3 $hash, 2, "$name: $@" if($@);
-            $saved .= $value;
-          }
-
-          if( !$state ) {
-            $state = $saved;
-          } else {
-            $state = [$state] if( ref($state) ne 'ARRAY' );
-            push( @{$state}, $saved );
-          }
-        }
-      } elsif( $type eq 'CUL_HM' ) {
-        #my $subtype = AttrVal($d,"subType","");
-        my $subtype = CUL_HM_Get($defs{$d},$d,"param","subType");
-        if( $subtype eq "switch" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "dimmer" ) {
-          $state = Value($d);
-          if ( $state =~ m/^(\d+)/ ) {
-            $icon = $state;
-            $state = $1 if ( $state =~ m/^(\d+)/ );
-          }
-        } else {
-          $state = Value($d);
-        }
-      } elsif( $type eq 'FS20' ) {
-          $state = Value($d);
-      } elsif( $type eq 'SWAP_0000002200000003' ) {
-          $state = Value($d);
-          $state = "rgb ". $state if( $state ne "off" );
-      } elsif( $type eq 'HUEDevice' ) {
-        my $subtype = AttrVal($d,"subType","");
-        if( $subtype eq "switch" || Value($d) eq "off" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "dimmer" ) {
-          $state = "bri ". ReadingsVal($d,'bri',"0");
-        } elsif( $subtype eq "colordimmer" ) {
-          if( ReadingsVal($d,"colormode","") eq "ct" ) {
-            ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
-            $state = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
-          } else {
-            $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
-          }
-        }
-      } elsif( $type eq 'IT' ) {
-        my $subtype = AttrVal($d,"model","");
-        if( $subtype eq "itswitch" ) {
-          $state = Value($d);
-        } elsif( $subtype eq "itdimmer" ) {
-          $state = Value($d);
-        } else {
-          $state = Value($d);
-        }
-      } elsif( $type eq 'TRX_LIGHT' ) {
-        $state = Value($d);
-      } else {
-        $state = Value($d);
-      }
+      my($state,$icon,$type) = LightScene_SaveDevice($hash,$d);
 
       if( $icon || ref($state) eq 'ARRAY' || $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
         my %desc;
@@ -481,13 +599,13 @@ LightScene_Set($@)
         my $r = "";
         foreach my $entry (@{$state}) {
           $r .= "," if( $ret );
-          $r .= CommandSet(undef,"$d $entry");
+          $r .= LightScene_RestoreDevice($hash,$d,$entry);
         }
         $ret .= " " if( $ret );
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        $ret .= CommandSet(undef,"$d $state");
+        $ret .= LightScene_RestoreDevice($hash,$d,$state);
       }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
@@ -496,6 +614,8 @@ LightScene_Set($@)
 
   delete($hash->{INSET});
   Log3 $hash, 5, "SET: $ret" if($ret);
+
+  LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
   return $ret;
 
@@ -550,7 +670,162 @@ LightScene_Get($@)
 
   return "Unknown argument $cmd, choose one of html:noArg scenes:noArg scene:".join(",", sort keys %{$hash->{SCENES}});
 }
+sub
+LightScene_updateHelper($$)
+{
+  my ($hash, $attrVal) = @_;
 
+  my @devices = sort keys %{ $hash->{CONTENT} };
+  $hash->{devices} = \@devices;
+
+  if( !$attrVal ) {
+    delete $hash->{switchingOrder};
+    return;
+  }
+
+  my %switchingOrder = ();
+  my @parts = split( ' ', $attrVal );
+  foreach my $part (@parts) {
+    my ($s,$devices) = split( ':', $part,2 );
+
+    my $reverse = 0;
+    if( $devices =~ m/^!(.*)/ ) {
+      $reverse = 1;
+      $devices = $1;
+    }
+
+    foreach my $scene (keys %{ $hash->{SCENES} }) {
+      eval { $scene =~ m/$s/ };
+      if( $@ ) {
+        my $name = $hash->{NAME};
+        Log3 $name, 3, $name .": ". $s .": ". $@;
+        next;
+      }
+      next if( $scene !~ m/$s/ );
+      next if( $switchingOrder{$scene} );
+
+      my @devs = split( ',', $devices );
+      my @devices = ();
+      @devices = @{$hash->{devices}} if( $reverse );
+      foreach my $d (@devs) {
+        foreach my $device (@{$hash->{devices}}) {
+          next if( !$reverse && grep { $_ eq $device } @devices );
+          eval { $device =~ m/$d/ };
+          if( $@ ) {
+            my $name = $hash->{NAME};
+            Log3 $name, 3, $name .": ". $d .": ". $@;
+            next;
+          }
+          next if( $device !~ m/$d/ );
+
+          @devices = grep { $_ ne $device } @devices if($reverse);
+          push( @devices, $device );
+        }
+      }
+      foreach my $device (@{$hash->{devices}}) {
+        next if( grep { $_ eq $device } @devices );
+        push( @devices, $device );
+      }
+      $switchingOrder{$scene} = \@devices;
+    }
+  }
+
+  $hash->{switchingOrder} = \%switchingOrder;
+}
+sub
+LightScene_Attr($@)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "switchingOrder" ) {
+    my $hash = $defs{$name};
+
+    if( $cmd eq "set" ) {
+      LightScene_updateHelper( $hash, $attrVal );
+    } else {
+      delete $hash->{switchingOrder};
+    }
+  }
+
+  return;
+}
+sub
+LightScene_CGI {
+  my ($cgi) = @_;
+  my ($cmd,$c)=FW_digestCgi($cgi);
+  $scn =  $FW_webArgs{scn};
+  $cmd =~ s/ set / setcmd / if( defined($FW_webArgs{cmd1}) && $FW_webArgs{cmd1} eq 'setcmd' );
+# Debug "LS758: cmd: $cmd";
+  AnalyzeCommand(undef,$cmd);
+  #redirect to return to detail screen
+  my $tgt = "?detail=$FW_webArgs{detail}";
+  $tgt = $FW_ME.$tgt;
+  $c = $defs{$FW_cname}->{CD};
+  print $c "HTTP/1.1 302 Found\r\n",
+            "Content-Length: 0\r\n",
+            "Location: $tgt\r\n",
+            "\r\n";
+  return;
+}
+sub
+LightScene_editTable($) {
+  my ($hash) = @_;
+  my $html="\n\n<!--Beginning Edit-Table-->\n";
+  my $cmd='scn';
+  #make dropdown
+  my @tv = (sort keys %{ $hash->{SCENES} });
+  unshift (@tv,'Choose scene');
+  my $dd.="<form method=\"get\" action=\"" . $FW_ME . "/LightScene\">\n";
+  $dd.=FW_select("$hash->{NAME}-$cmd","scn", \@tv, $scn,"dropdown","submit()")."\n";
+  $dd.=FW_hidden("detail",$hash->{NAME}) . "\n";
+  $dd.="</form>\n";
+  # make table
+  if ($scn eq "Choose scene" || $scn eq '') {
+    $html.="<table><tr><td>Edit scene</td><td>$dd</td></tr>";
+  } else {
+	$html.="<table><tr><td>Edit scene</td><td>$dd</td></tr></table>";
+    $html .= '<table class="block wide">';
+    $html .= '<tr><th>Device</th><th>Command</th></tr>'."\n";
+    my $row=0;
+	my @devices;
+    if( $scn && defined($hash->{switchingOrder}) && defined($hash->{switchingOrder}{$scn}) ) {
+      @devices = @{$hash->{switchingOrder}{$scn}};
+    } else {
+      @devices = @{$hash->{devices}};
+    }
+    #table rows
+	my @cmds    = qw(set setcmd);
+    my $set     = "set $hash->{NAME} set $scn";
+    my $setcmd  = '';
+    foreach my $dev (@devices) {
+      $row+=1;
+      $html .= "<tr class=\"".(($row&1)?"odd":"even")."\">";
+	  $html .= "<td>$dev</td>";
+	  my $default = $hash->{SCENES}{$scn}{$dev};
+
+      if ($hash->{SCENES}{$scn}{$dev} =~ m/^;/) {
+	    $default =~ s/^;//;
+		$setcmd='setcmd';
+      } else {
+		$setcmd='set';
+	  }
+	  $default = $default->{state} if( ref($default) eq 'HASH' );
+	  $html.="<td><form method=\"get\" action=\"" . $FW_ME . "/LightScene\">\n";
+      $html.=FW_select('',"cmd1", \@cmds, $setcmd, 'select')."\n";
+	  $html.=FW_textfieldv("val.$dev", 50, 'class',$default)."\n";
+	  $html.=FW_hidden("dev.$dev", $dev) . "\n";
+	  $html.=FW_hidden("cmd.$dev", $set) . "\n";
+      $html.=FW_submit("lse", 'saveline');
+  	  $html.=FW_hidden("scn", $scn) . "\n";
+	  $html.=FW_hidden("detail",$hash->{NAME}) . "\n";
+	  $html .= "</form></td>\n";
+	}
+  }
+  #table end
+  $html .= "</table><br>\n";
+  $html .= "<!--End Edit-Table-->\n";
+  return $html;
+}
 1;
 
 =pod
@@ -594,8 +869,15 @@ LightScene_Get($@)
       save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
-      <li>set &lt;scene_name&gt; &lt;device&gt; &lt;cmd&gt;<br>
+      <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
       set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
+      <li>setcmd &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
+      set command to be executed for &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;.
+      &lt;cmd&gt; can be any commandline that fhem understands including multiple commands separated by ;;
+      <ul>
+        <li>set kino_group setcmd allOff LampeDecke sleep 30 ;; set LampeDecke off</li>
+        <li>set light_group setcmd test Lampe1 sleep 10 ;; set Lampe1 on ;; sleep 5 ;; set Lampe1 off</li>
+      </ul></li>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
     </ul><br>
@@ -611,17 +893,33 @@ LightScene_Get($@)
     <b>Attributes</b>
     <ul>
       <li>lightSceneParamsToSave<br>
-      this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
-      that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
-      by the device). each reading can have a perl expression appended with '@' that will be used to alter the $value used for
-      the set command. this can for example be used to strip a trailing % from a dimmer state. this perl expression must not contain
-      spaces,colons or commas.<br>
-      in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
-      or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
-      string or as a perl expression enclosed in {} that returns this string.<br>
-      <code>attr myReceiver lightSceneParamsToSave volume,channel</code></br>
-      <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
-      <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
+        this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
+        that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
+        by the device). each reading can have a perl expression appended with '@' that will be used to alter the $value used for
+        the set command. this can for example be used to strip a trailing % from a dimmer state. this perl expression must not contain
+        spaces,colons or commas.<br>
+        in addition to reading names the list can also contain expressions of the form <code>abc -> xyz</code>
+        or <code>get cba -> set uvw</code> to map reading abc to set xyz or get cba to set uvw. the list can be given as a
+        string or as a perl expression enclosed in {} that returns this string.<br>
+        <code>attr myReceiver lightSceneParamsToSave volume,channel</code></br>
+        <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
+        <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code></br>
+      <li>lightSceneRestoreOnlyIfChanged<br>
+        this attribute can be set on the lightscene and/or on the individual devices included in a scene.
+        the device settings have precedence over the scene setting.<br>
+        1 -> for each device do nothing if current device state is the same as the saved state
+        0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
+      <li>switchingOrder<br>
+        space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
+        in which the devices should be switched.<br>
+        the devices from &lt;deviceList&gt; will come before all other devices of this LightScene;
+        if the first character of the &lt;deviceList&gt; ist a ! the devices from the list will come after
+        all other devices from this lightScene.<br>
+        &lt;scene&gt; and each element of &lt;deviceList&gt; are treated as a regex.<br>
+        Example: To switch a master power outlet before every other device at power on and after every device on power off:<br>
+        <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
+              attr media switchingOrder .*On:masterPower,.* allOff:!.*,masterPower</code>
+        </li>
     </ul><br>
 </ul>
 

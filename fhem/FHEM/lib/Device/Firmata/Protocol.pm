@@ -73,6 +73,26 @@ our $SCHEDULER_COMMANDS = {
   QUERY_TASK_REPLY            => 10,
 };
 
+our $STEPPER_COMMANDS = {
+  STEPPER_CONFIG              => 0,
+  STEPPER_STEP                => 1,
+};
+
+our $STEPPER_INTERFACES = {
+  DRIVER                      => 1,
+  TWO_WIRE                    => 2,
+  FOUR_WIRE                   => 4,
+};
+
+our $ENCODER_COMMANDS = {
+  ENCODER_ATTACH              => 0,
+  ENCODER_REPORT_POSITION     => 1,
+  ENCODER_REPORT_POSITIONS    => 2,
+  ENCODER_RESET_POSITION      => 3,
+  ENCODER_REPORT_AUTO         => 4,
+  ENCODER_DETACH              => 5,
+};
+
 our $MODENAMES = {
   0                           => 'INPUT',
   1                           => 'OUTPUT',
@@ -82,6 +102,8 @@ our $MODENAMES = {
   5                           => 'SHIFT',
   6                           => 'I2C',
   7                           => 'ONEWIRE',
+  8                           => 'STEPPER',
+  9                           => 'ENCODER',
 };
 
 =head1 DESCRIPTION
@@ -287,6 +309,16 @@ sub sysex_parse {
 
         $command == $protocol_commands->{SCHEDULER_DATA} and do {
           $return_data = $self->handle_scheduler_response($sysex_data);
+          last;
+        };
+
+        $command == $protocol_commands->{STEPPER_DATA} and do {
+          $return_data = $self->handle_stepper_response($sysex_data);
+          last;
+        };
+
+        $command == $protocol_commands->{ENCODER_DATA} and do {
+          $return_data = $self->handle_encoder_response($sysex_data);
           last;
         };
 
@@ -839,6 +871,125 @@ sub handle_scheduler_response {
       };
     }
   }
+}
+
+#	stepper_data 0
+#	stepper_config 1
+#	devicenum 2 (0 < devicenum < 6)
+#	interface (DRIVER | TWO_WIRE | FOUR_WIRE) 3
+#	stepsPerRev 4+5 (14bit)
+#	directionPin 6
+#	stepPin 7
+#	motorPin3 8 (interface FOUR_WIRE only)
+#	motorPin4 9 (interface FOUR_WIRE only)
+
+sub packet_stepper_config {
+  my ( $self, $stepperNum, $interface, $stepsPerRev, $directionPin, $stepPin, $motorPin3, $motorPin4 ) = @_;
+  
+  die "invalid stepper interface ".$interface unless defined ($STEPPER_INTERFACES->{$interface});
+  my @configdata = ($stepperNum,$STEPPER_INTERFACES->{$interface});
+  
+  push_value_as_two_7bit($stepsPerRev, \@configdata);
+  push @configdata, $directionPin;
+  push @configdata, $stepPin;
+  
+  if ($interface eq 'FOUR_WIRE') {
+    push @configdata, $motorPin3;
+    push @configdata, $motorPin4;
+  }
+  my $packet = $self->packet_sysex_command('STEPPER_DATA',$STEPPER_COMMANDS->{STEPPER_CONFIG},@configdata);
+  return $packet;
+}
+
+#	stepper_data 0
+#	stepper_step 1
+#	devicenum 2
+#	stepDirection 3 0/>0
+#	numSteps 4,5,6 (21bit)
+#	stepSpeed 7,8 (14bit)
+#	accel 9,10 (14bit, optional, aber nur zusammen mit decel)
+#	decel 11,12 (14bit, optional, aber nur zusammen mit accel)
+
+sub packet_stepper_step {
+  my ( $self, $stepperNum, $direction, $numSteps, $stepSpeed, $accel, $decel ) = @_;
+  my @stepdata = ($stepperNum, $direction);
+  push @stepdata, $numSteps & 0x7f;
+  push @stepdata, ($numSteps >> 7) & 0x7f;
+  push @stepdata, ($numSteps >> 14) & 0x7f;
+  push_value_as_two_7bit($stepSpeed, \@stepdata);
+  if (defined $accel and defined $decel) {
+    push_value_as_two_7bit($accel, \@stepdata);
+    push_value_as_two_7bit($decel, \@stepdata);
+  }
+  my $packet = $self->packet_sysex_command('STEPPER_DATA', $STEPPER_COMMANDS->{STEPPER_STEP},@stepdata);
+  return $packet;
+}
+
+sub handle_stepper_response {
+  my ( $self, $sysex_data ) = @_;
+
+  my $stepperNum = shift @$sysex_data;
+  return {
+    stepperNum => $stepperNum,
+  };
+}
+
+
+sub packet_encoder_attach {
+  my ( $self,$encoderNum, $pinA, $pinB ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_ATTACH}, $encoderNum, $pinA, $pinB);
+  return $packet;
+}
+
+sub packet_encoder_report_position {
+  my ( $self,$encoderNum ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_REPORT_POSITION}, $encoderNum);
+  return $packet;
+}
+
+sub packet_encoder_report_positions {
+  my ( $self ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_REPORT_POSITIONS});
+  return $packet;
+}
+
+sub packet_encoder_reset_position {
+  my ( $self,$encoderNum ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_RESET_POSITION}, $encoderNum);
+  return $packet;
+}
+
+sub packet_encoder_report_auto {
+  my ( $self,$arg ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_REPORT_AUTO}, $arg);
+  return $packet;
+}
+
+sub packet_encoder_detach {
+  my ( $self,$encoderNum ) = @_;
+  my $packet = $self->packet_sysex_command('ENCODER_DATA', $ENCODER_COMMANDS->{ENCODER_DETACH}, $encoderNum);
+  return $packet;
+}
+
+sub handle_encoder_response {
+  my ( $self, $sysex_data ) = @_;
+  
+  my @retval = ();
+  
+  while (@$sysex_data) {
+    
+    my $command = shift @$sysex_data;
+    my $direction = ($command & 0x40) >> 6;
+    my $encoderNum = $command & 0x3f;
+    my $value = shift14bit($sysex_data) + (shift14bit($sysex_data) << 14);
+    
+    push @retval,{
+      encoderNum => $encoderNum,
+      value => $direction ? -1 * $value : $value,
+    };
+  };
+  
+  return \@retval;
 }
 
 

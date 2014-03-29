@@ -28,9 +28,12 @@ use Device::Firmata::Base
   analog_resolutions          => {},
   pwm_resolutions             => {},
   servo_resolutions           => {},
+  stepper_resolutions         => {},
+  encoder_resolutions         => {},
   ports                       => [],
   pins                        => {},
   pin_modes                   => {},
+  encoders                    => [],
 
   # To notify on events
   digital_observer            => [],
@@ -38,6 +41,8 @@ use Device::Firmata::Base
   sysex_observer              => undef,
   i2c_observer                => undef,
   onewire_observer            => [],
+  stepper_observer            => [],
+  encoder_observer            => [],
   scheduler_observer          => undef,
   string_observer             => undef,
 
@@ -84,6 +89,8 @@ sub detach {
   $self->{sysex_observer}     = undef;
   $self->{i2c_observer}       = undef;
   $self->{onewire_observer}   = [];
+  $self->{stepper_observer}   = [];
+  $self->{encoder_observer}   = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -108,6 +115,8 @@ sub system_reset {
   $self->{sysex_observer}     = undef;
   $self->{i2c_observer}       = undef;
   $self->{onewire_observer}   = [];
+  $self->{stepper_observer}   = [];
+  $self->{encoder_observer}   = [];
   $self->{scheduler_observer} = undef;
   $self->{tasks}              = [];
   $self->{metadata}           = {};
@@ -138,8 +147,6 @@ sub messages_handle {
         my $port_number = $message->{command} & 0x0f;
         my $port_state  = $data->[0] | ( $data->[1] << 7 );
         my $old_state   = $self->{ports}[$port_number];
-        my $changed_state =
-          defined $old_state ? $old_state ^ $port_state : 0xFF;
         my $observers = $self->{digital_observer};
         my $pinbase   = $port_number << 3;
         for ( my $i = 0 ; $i < 8 ; $i++ ) {
@@ -147,18 +154,16 @@ sub messages_handle {
           my $observer = $observers->[$pin];
           if ($observer) {
             my $pin_mask = 1 << $i;
-            if ( $changed_state & $pin_mask ) {
-              $observer->{method}(
-                $pin,
-                defined $old_state
-                ? ( $old_state & $pin_mask ) > 0
-                    ? 1
-                    : 0
-                : undef,
-                ( $port_state & $pin_mask ) > 0 ? 1 : 0,
-                $observer->{context}
-              );
-            }
+            $observer->{method}(
+              $pin,
+              defined $old_state
+              ? ( $old_state & $pin_mask ) > 0
+                  ? 1
+                  : 0
+              : undef,
+              ( $port_state & $pin_mask ) > 0 ? 1 : 0,
+              $observer->{context}
+            );
           }
         }
         $self->{ports}[$port_number] = $port_state;
@@ -246,6 +251,9 @@ sub sysex_handle {
       my @shiftpins;
       my @i2cpins;
       my @onewirepins;
+      my @stepperpins;
+      my @encoderpins;
+      
       foreach my $pin (keys %$capabilities) {
         if (defined $capabilities->{$pin}) {
           if ($capabilities->{$pin}->{PIN_INPUT+0}) {
@@ -275,6 +283,14 @@ sub sysex_handle {
           if ($capabilities->{$pin}->{PIN_ONEWIRE+0}) {
             push @onewirepins, $pin;
           }
+          if ($capabilities->{$pin}->{PIN_STEPPER+0}) {
+          	push @stepperpins, $pin;
+            $self->{metadata}{stepper_resolutions}{$pin} = $capabilities->{$pin}->{PIN_STEPPER+0}->{resolution};
+          }
+          if ($capabilities->{$pin}->{PIN_ENCODER+0}) {
+          	push @encoderpins, $pin;
+            $self->{metadata}{encoder_resolutions}{$pin} = $capabilities->{$pin}->{PIN_ENCODER+0}->{resolution};
+          }
         }
       }
       $self->{metadata}{input_pins}   = \@inputpins;
@@ -285,6 +301,8 @@ sub sysex_handle {
       $self->{metadata}{shift_pins}   = \@shiftpins;
       $self->{metadata}{i2c_pins}     = \@i2cpins;
       $self->{metadata}{onewire_pins} = \@onewirepins;
+      $self->{metadata}{stepper_pins} = \@stepperpins;
+      $self->{metadata}{encoder_pins} = \@encoderpins;
       last;
     };
 
@@ -336,7 +354,27 @@ sub sysex_handle {
         $observer->{method}( $data->{string}, $observer->{context} );
       }
       last;
-    }
+    };
+
+    $sysex_message->{command_str} eq 'STEPPER_DATA' and do {
+      my $stepperNum = $data->{stepperNum};
+      my $observer = $self->{stepper_observer}[$stepperNum];
+      if (defined $observer) {
+        $observer->{method}( $stepperNum, $observer->{context} );
+      };
+      last;
+    };
+
+    $sysex_message->{command_str} eq 'ENCODER_DATA' and do {
+      foreach my $encoder_data ( @$data ) {
+        my $encoderNum = $encoder_data->{encoderNum};
+        my $observer = $self->{encoder_observer}[$encoderNum];
+        if (defined $observer) {
+          $observer->{method}( $encoderNum, $encoder_data->{value}, $observer->{context} );
+        }
+      };
+      last;
+    };
   }
 }
 
@@ -404,9 +442,8 @@ sub pin_mode {
     };
 
     $mode == PIN_ANALOG and do {
-      my $port_number = $pin >> 3;
       $self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
-      $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $port_number, 1 ));
+      $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $pin, 1 ));
       last;
     };
 
@@ -744,6 +781,52 @@ sub onewire_command_series {
   return $self->{io}->data_write($self->{protocol}->packet_onewire_request( $pin, $args ));
 }
 
+sub stepper_config {
+  my ( $self, $stepperNum, $interface, $stepsPerRev, $directionPin, $stepPin, $motorPin3, $motorPin4 ) = @_;
+  die "unsupported mode 'STEPPER' for pin '".$directionPin."'" unless $self->is_supported_mode($directionPin,PIN_STEPPER);
+  die "unsupported mode 'STEPPER' for pin '".$stepPin."'" unless $self->is_supported_mode($stepPin,PIN_STEPPER);
+  die "unsupported mode 'STEPPER' for pin '".$motorPin3."'" unless (!(defined $motorPin3) or $self->is_supported_mode($motorPin3,PIN_STEPPER));
+  die "unsupported mode 'STEPPER' for pin '".$motorPin4."'" unless (!(defined $motorPin4) or $self->is_supported_mode($motorPin4,PIN_STEPPER));
+  return $self->{io}->data_write($self->{protocol}->packet_stepper_config( $stepperNum, $interface, $stepsPerRev, $directionPin, $stepPin, $motorPin3, $motorPin4 ));
+}
+
+sub stepper_step {
+  my ( $self, $stepperNum, $direction, $numSteps, $stepSpeed, $accel, $decel ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_stepper_step( $stepperNum, $direction, $numSteps, $stepSpeed, $accel, $decel ));
+}
+
+sub encoder_attach {
+  my ( $self, $encoderNum, $pinA, $pinB ) = @_;
+  die "unsupported mode 'ENCODER' for pin '".$pinA."'" unless $self->is_supported_mode($pinA,PIN_ENCODER);
+  die "unsupported mode 'ENCODER' for pin '".$pinB."'" unless $self->is_supported_mode($pinB,PIN_ENCODER);
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_attach( $encoderNum, $pinA, $pinB ));
+}
+
+sub encoder_report_position {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_position( $encoderNum ));
+}
+
+sub encoder_report_positions {
+  my ( $self ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_positions());
+}
+
+sub encoder_reset_position {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_reset_position( $encoderNum ));
+}
+
+sub encoder_report_auto {
+  my ( $self, $enable ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_report_auto( $enable ));
+}
+
+sub encoder_detach {
+  my ( $self, $encoderNum ) = @_;
+  return $self->{io}->data_write($self->{protocol}->packet_encoder_detach( $encoderNum ));
+}
+
 =head2 poll
 
 Call this function every once in a while to
@@ -769,6 +852,8 @@ sub observe_digital {
       method  => $observer,
       context => $context,
     };
+  my $port_number = $pin >> 3;
+  $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_DIGITAL => $port_number, 1 ));
   return 1;
 }
 
@@ -779,6 +864,7 @@ sub observe_analog {
       method  => $observer,
       context => $context,
     };
+  $self->{io}->data_write($self->{protocol}->message_prepare( REPORT_ANALOG => $pin, 1 ));
   return 1;
 }
 
@@ -805,6 +891,26 @@ sub observe_onewire {
   my ( $self, $pin, $observer, $context ) = @_;
   die "unsupported mode 'ONEWIRE' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_ONEWIRE));
   $self->{onewire_observer}[$pin] =  {
+      method  => $observer,
+      context => $context,
+    };
+  return 1;
+}
+
+sub observe_stepper {
+  my ( $self, $stepperNum, $observer, $context ) = @_;
+#TODO validation?  die "unsupported mode 'STEPPER' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_STEPPER));
+  $self->{stepper_observer}[$stepperNum] = {
+      method  => $observer,
+      context => $context,
+    };
+  return 1;
+}
+
+sub observe_encoder {
+  my ( $self, $encoderNum, $observer, $context ) = @_;
+#TODO validation?  die "unsupported mode 'ENCODER' for pin '".$pin."'" unless ($self->is_supported_mode($pin,PIN_ENCODER));
+  $self->{encoder_observer}[$encoderNum] = {
       method  => $observer,
       context => $context,
     };

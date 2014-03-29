@@ -8,7 +8,7 @@
 #
 # $Id: 70_EFR.pm 3799 2013-08-26 18:15:33Z bentele $
 #
-# Version = 0.8
+# Version = 1.3
 #
 ##############################################################################
 #
@@ -45,33 +45,53 @@ use IO::Socket::INET;
 use Blocking;
 use MIME::Base64;
 
-my @gets = ('lastPower','PowerTotal','Power_L1','Power_L2','Power_L3');
+my @gets = ('xxx');
 
 sub
 EFR_Initialize($)
 {
 my ($hash) = @_;
 
- $hash->{DefFn}    = "energy_Define";
- $hash->{UndefFn}  = "energy_Undef";
- $hash->{GetFn}    = "energy_Get";
- $hash->{StateFn}  = "energy_State";
- $hash->{SetFn}    = "energy_Set";
+ $hash->{DefFn}    = "energy_efr_Define";
+ $hash->{UndefFn}  = "energy_efr_Undef";
+ $hash->{GetFn}    = "energy_efr_Get";
+ $hash->{StateFn}  = "energy_efr_State";
+ $hash->{SetFn}    = "energy_efr_Set";
+ $hash->{AttrFn}   = "energy_efr_Attr";
+ $hash->{AttrList} = "URL FELDER FELDERNAME";
 
 }
+sub
+energy_efr_Attr($@)
+{
+    my (@a) = @_;
+    my $hash = $defs{$a[1]};
+    my $name = $hash->{NAME};
+    if($a[0] eq "set"){
+	Log3 $hash, 3,"set attribute: $name attribute: $a[1] value:$a[2]";
+
+    }
+    elsif($a[0] eq "del")
+    {
+	# delete attribute
+	Log3 $hash, 3,"del attribute: $name attribute: $a[1] value:$a[2]";
+    }
+    return undef;
+
+} # energy_efr_Attr ende
 
 sub
-energy_State($$$$)
+energy_efr_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-	Log3 $hash, 4, "energy_State: time: $tim name: $vt value: $val";
+	Log3 $hash, 4, "energy_efr_State: time: $tim name: $vt value: $val";
   return undef;
 }
 
 sub
-energy_Set($$$$)
+energy_efr_Set($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 	Log3 $hash, 4, "SET device: $tim name: $vt value: $val";
@@ -87,7 +107,7 @@ energy_Set($$$$)
 }
 
 sub
-energy_Define($$)
+energy_efr_Define($$)
 {
  my ($hash, $def) = @_;
 
@@ -95,12 +115,11 @@ energy_Define($$)
 
  if (int(@args) < 3)
  {
-  return "energy_Define: too few arguments. Usage:\n" .
+  return "energy_efr_Define: too few arguments. Usage:\n" .
          "define <name> EFR <host> [<interval> [<timeout>]]";
  }
  my $name = $args[0];
  $hash->{NAME} = $name;
-
  $hash->{Host}     = $args[2];
  $hash->{Port}     = 80;
  $hash->{Interval} = int(@args) >= 4 ? int($args[3]) : 300;
@@ -114,12 +133,6 @@ energy_Define($$)
  
  my $timenow = TimeNow();
 
- for my $get (@gets)
- {
-  $hash->{READINGS}{$get}{VAL}  = -1 ;
-  $hash->{READINGS}{$get}{TIME} = $timenow;
- }
-
  RemoveInternalTimer($hash);
  InternalTimer(gettimeofday()+$hash->{Interval}, "energy_Update", $hash, 0);
 
@@ -132,32 +145,36 @@ energy_Update($)
 {
  my ($hash) = @_;
  my $name = $hash->{NAME};
-
  my $ip = $hash->{Host};
  my $port = $hash->{Port};
  my $interval = $hash->{Interval};
-
-$hash->{helper}{RUNNING_PID} = BlockingCall("energy_DoUpdate", $name."|".$ip."|".$port."|".$interval, "energy_energyDone", 120, "energy_energyAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-
+ 
+ if ( defined($attr{$name}{"URL"}) ){
+  my $url = $attr{$name}{"URL"};
+  $hash->{helper}{RUNNING_PID} = BlockingCall("energy_DoUpdate", $name."|".$ip."|".$port."|".$interval."|".$url, "energy_energyDone", 120, "energy_energyAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+ }else{
+   Log3 $hash, 3, "$hash->{NAME} please define a valid URL as attribute" ; 
+  }
 }
 
 sub
 energy_DoUpdate($){
  
  my ($string) = @_;
- my ($name, $ip, $port,$interval) = split("\\|", $string); 
+ my ($name, $ip, $port,$interval,$url) = split("\\|", $string); 
  my $success  = 0;
  my %readings = ();
  my $timenow  = TimeNow();
  my $timeout = 10;
  my $counts = 0 ;
  my $summary = 0 ;
- my $url="/json.txt?LogName=user\&LogPSWD=user";
+ #my $url="/json.txt?LogName=user\&LogPSWD=user";
  #my $url="/efr/efr.txt";
  my $socket ;
  my $buf ;
  my $message ;
 
+   Log3 $name, 4, "EFR $name ip: $ip port: $port URL: $url" ; 
 $socket = new IO::Socket::INET (
               PeerAddr => $ip,
               PeerPort => $port,
@@ -173,6 +190,7 @@ if (defined ($socket) and $socket and $socket->connected())
 	while ((read $socket, $buf, 1024) > 0)
 	{
       		$message .= $buf;
+			Log3 $name, 5, "buf: $buf";
 	}
 	$socket->close();
 	Log3 $name, 4, "Socket closed";
@@ -202,6 +220,9 @@ energy_energyDone($)
   my @array;
   my $log = "";
   my $timenow = TimeNow();
+  my $name = $hash->{NAME};
+  my $felder = $attr{$name}{"FELDER"};
+  Log3 $name, 4, "name: $name felder: $felder"; 
   
   delete($hash->{helper}{RUNNING_PID});
   
@@ -212,53 +233,77 @@ energy_energyDone($)
   if ($hash->{Interval} > 0) {
    InternalTimer(gettimeofday() + $hash->{Interval}, "energy_Update", $hash, 0);
   }
+my %pair;
+my $out = "";
+my $feldername = "";
+my $f = "";
+if ( $message ne "-1"  ){
+    @array=split(/\{/,$message);
+    if ( $felder ne "" ){  # FELDER zu namen mappen und dann loggen
+	my @field=split(/\|/,$felder); 
+	foreach $f (@field){ 
+	     my $value =$array[$f];
+	     $value =~ m/value":(.*)"unit":/;
+	     if ( $1 ne "" ){
+		$out = $1;
+		$out =~ s/\,//;
+		# felder in namen mappen
+  		my $feldername = $attr{$name}{"FELDERNAME"};
+    		if ( $feldername ne "" ){
+			%pair = map{split /=/, $_}(split /\|/, $feldername);
+		   if ($pair{$f} ne ""){
+              		$hash->{READINGS}{$pair{$f}}{VAL} = $out;
+  			$hash->{READINGS}{$pair{$f}}{TIME} = $timenow;
+     			push @{$hash->{CHANGED}}, "$pair{$f} $out" ;
+			$log .= $pair{$f}.": ". $out;
+     		    	Log3 $hash, 4, "$name feld: $f value: $out hash: $pair{$f} mapped!";
+		   }else{
+              		$hash->{READINGS}{$f}{VAL} = $out;
+  			$hash->{READINGS}{$f}{TIME} = $timenow;
+     			push @{$hash->{CHANGED}}, "$f $out" ;
+			$log .= $f.": ". $out;
+     		    Log3 $hash, 4, "$name feld: $f value: $out ";
 
-if ( $message ne "-1" )
-{
-	@array=split(/\{/,$message);
-	my $powernow = $array[11];
-	$powernow =~ m/value":(.*),"unit":/;
-	$powernow = $1;
+		   }
+		 $log .= " ";
+		}else{
+			$log .= $f.": 0 ";
+		}
+	     }
+	} # for ende
+    }else{
+		my $count = "0";
+		foreach my $f (@array){
+			$count += 1;
+			$f =~ m/value":(.*)"unit":/;
+			$log = "Attribute FELDER not defined please define it with one or more of them:\n";
+			if ( $1 ne "" ){
+				my $out = $1;
+				$out =~ s/\,//;
+				$log .= "FELDER: ".$count.": ".$out ." ";
+			 }
+		}
+	}
+     	Log3 $hash, 5, "$name write log file: $log";
 
-	$hash->{READINGS}{lastPower}{VAL}  = $powernow;
-	$hash->{READINGS}{lastPower}{TIME}  = $timenow;
+	## felder in namen mappen
+  	#my $feldername = $attr{$name}{"FELDERNAME"};
+     	#Log3 $hash, 5, "$name : $feldername";
+    	#if ( $feldername ne "" ){
+	#	my %pair = map{split /=/, $_}(split /\|/, $feldername);
+    	#	while ( my ($key, $value) = each(%pair) ) {
+     	#	Log3 $hash, 5, "$name xx $key => $value";
+	#	$log =~ s/$key:/$value/g;  
+    	#	}
+	#}
 	
-	my $powercounter = $array[10];
-	$powercounter =~ m/value":(.*),"unit":/;
-	$powercounter = $1;
-
-	$hash->{READINGS}{PowerTotal}{VAL}  = $powercounter;
-	$hash->{READINGS}{PowerTotal}{TIME}  = $timenow;
-	
-	my $powerU1 = $array[12];
-	$powerU1 =~ m/value":(.*),"unit":/;
-	$powerU1 = $1;
-
-	$hash->{READINGS}{Power_L1}{VAL}  = $powerU1;
-	$hash->{READINGS}{Power_L1}{TIME}  = $timenow;
-	
-	my $powerU2 = $array[13];
-	$powerU2 =~ m/value":(.*),"unit":/;
-	$powerU2 = $1;
-
-	$hash->{READINGS}{Power_L2}{VAL}  = $powerU2;
-	$hash->{READINGS}{Power_L2}{TIME}  = $timenow;
-	
-	my $powerU3 = $array[14];
-	$powerU3 =~ m/value":(.*),"unit":/;
-	$powerU3 = $1;
-
-	$hash->{READINGS}{Power_L3}{VAL}  = $powerU3;
-	$hash->{READINGS}{Power_L3}{TIME}  = $timenow;
-
-	$log = "PowerTotal: $powercounter lastPower: $powernow Power_L1: $powerU1 Power_L2: $powerU2 Power_L3: $powerU3";
-	
-     	push @{$hash->{CHANGED}}, $log;
+     	#push @{$hash->{CHANGED}}, $log;
      	DoTrigger($hash->{NAME}, undef) if ($init_done);
-     	Log3 $hash, 4, "$hash->{NAME} write log file: $log";
+     	#Log3 $hash, 4, "$hash->{NAME} write log file: $log";
 	if ( $hash->{STATE} eq 'Initializing' || $hash->{STATE} eq 'disconnected' ){
 	 	$hash->{STATE} = 'Connected';
 	}
+	$hash->{STATE} = $log;
 }else{
 	$hash->{STATE} = 'disconnected';
      	Log3 $hash, 3, "$hash->{NAME} can't update - device send a error";
@@ -273,31 +318,48 @@ energy_energyAborted($)
 {
   my ($hash) = @_;
   
-   Log3 $hash, 3, "$hash->{NAME} energy_energyAborted";
-
+  Log3 $hash->{NAME}, 3, "BlockingCall for ". $hash->{NAME} ." was aborted";
+   
+  RemoveInternalTimer($hash);
   delete($hash->{helper}{RUNNING_PID});
 }
 
 sub
-energy_Get($@)
+energy_efr_Get($@)
 {
+  my ($hash, @args) = @_;
 
-my ($hash, @args) = @_;
+  return 'energy_efr_Get needs two arguments' if (@args != 2);
 
- return 'energy_Get needs two arguments' if (@args != 2);
+  energy_Update($hash) unless $hash->{Interval};
 
-energy_Update($hash) unless $hash->{Interval};
+  my $get = $args[1];
+  my $val = -1;
+  my $name = $hash->{NAME};
+  my $felder = $attr{$name}{"FELDER"};
 
- my $get = $args[1];
- my $val = -1;
+  if ( $felder ne "" ){
+	$felder =~ s/\|/ /g;
+  	my $feldername = $attr{$name}{"FELDERNAME"};
+     	Log3 $hash, 4, "felder: $felder $name : $feldername";
+    	if ( $feldername ne "" ){
+	    my %pair = map{split /=/, $_}(split /\|/, $feldername);
+    	    while ( my ($key, $value) = each(%pair) ) {
+     		Log3 $hash, 4, "$name xx $key => $value felder: $felder feldername: $feldername";
+		$felder =~ s/$key/$value/g;
+    	    }
+	}
+  }
 
- if (defined($hash->{READINGS}{$get})) {
-  $val = $hash->{READINGS}{$get}{VAL};
- } else {
- return "energy_Get: no such reading: $get";
- }
- if ( $get eq "?"){
- 	return "Unknown argument ?, choose one of lastPower PowerTotal Power_L1 Power_L2 Power_L3";
+  if (defined($hash->{READINGS}{$get})) {
+	$val = $hash->{READINGS}{$get}{VAL};
+  } else {
+	return "energy_efr_Get: no such reading: $get";
+  }
+  if ( $get eq "?"){
+	 return "Unknown argument ?, choose one of $felder";
+	 my $felder = $attr{$name}{"FELDER"};
+	 Log3 $name, 3, "felder: $felder"; 
  }
  Log3 $hash, 3, "$args[0] $get => $val";
 
@@ -305,7 +367,7 @@ energy_Update($hash) unless $hash->{Interval};
 }
 
 sub
-energy_Undef($$)
+energy_efr_Undef($$)
 {
  my ($hash, $args) = @_;
 
@@ -325,7 +387,7 @@ energy_Undef($$)
 
 <h3>EFR</h3>
 <ul><p>
-This module supports EFR Power Meter.<br>
+This module supports EFR Power Meter. <br>
 The electricity meter will be polled in a defined interval for new values.
 </p>
  <b>Define</b><br>
@@ -345,17 +407,12 @@ The electricity meter will be polled in a defined interval for new values.
   set &lt;name&gt; not implemented <br><br>
 
  <b>Get</b><br>
- get &lt;name&gt; &lt;value&gt; <br>where value is one of:<br>
+ get &lt;name&gt; &lt;value&gt; <br>where value is one of the defined FELDER:<br>
   <ul>
-  <li><code>lastPower  </code></li>
-  <li><code>PowerTotal  </code></li>
-  <li><code>Power_L1  </code></li>
-  <li><code>Power_L2  </code></li>
-  <li><code>Power_L3  </code></li>
-  <li><code>Interval </code> </li>
+  <li><code>11</code></li>
    </ul>
  <br>Example:<br>
-  get &lt;name&gt; lastPower<br><br>
+  get &lt;name&gt; 14<br><br>
   
 </ul>
 

@@ -6,7 +6,7 @@ body     { background-color: #444444; background-image:url(../images/default/fhe
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:75px; left: 0px; right: 0px;}
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
 a { color: #CCCCCC; text-decoration: none;}
 a:hover { color: #ffffff; }
@@ -78,7 +78,7 @@ select {  margin-left:5px; margin-right:5px; }
 .downText,.makeSelect select { margin:0.7em; }
 
 
-svg { height:32px; width:32px; fill:#fff; }
+svg { height:32px; width:32px; fill:#fff; vertical-align:middle; margin:2px 0; }
 g.on { fill:red; }
 
 /* next lines are for remotecontrol */

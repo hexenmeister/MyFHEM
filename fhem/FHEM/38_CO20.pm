@@ -16,6 +16,7 @@ CO20_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "CO20_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "CO20_Notify";
   $hash->{UndefFn}  = "CO20_Undefine";
   #$hash->{SetFn}    = "CO20_Set";
@@ -47,7 +48,6 @@ CO20_Define($$)
   $hash->{NAME} = $name;
 
   if( $init_done ) {
-    delete $modules{CO20}->{NotifyFn};
     CO20_Disconnect($hash);
     CO20_Connect($hash);
   } elsif( $hash->{STATE} ne "???" ) {
@@ -62,14 +62,10 @@ CO20_Notify($$)
 {
   my ($hash,$dev) = @_;
 
-  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
-    delete $modules{CO20}->{NotifyFn};
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-    foreach my $d (keys %defs) {
-      next if($defs{$d}{TYPE} ne "CO20");
-      CO20_Connect($defs{$d});
-    }
-  }
+  CO20_Connect($hash);
 }
 
 my $VENDOR = 0x03eb;
@@ -135,7 +131,7 @@ CO20_Connect($)
       $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 1);
+      InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 0);
 
       my $buf;
       $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, 1000);
@@ -198,7 +194,7 @@ CO20_poll($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 0);
   }
 
   if( $hash->{manufacturer} && $hash->{product} ) {
@@ -289,7 +285,12 @@ CO20_Attr($$$)
 
   Notes:
   <ul>
-    <li>Device::USB hast to be installed on the FHEM host.</li>
+    <li>Device::USB hast to be installed on the FHEM host.<br>
+        It can be installed with '<code>cpan install Device::USB</code>'<br>
+        or on debian with '<code>sudo apt-get install libdevice-usb-perl'</code>'</li>
+    <li>FHEM has to have permissions to open the device. To configure this with udev
+        rules see here: <a href="https://code.google.com/p/usb-sensors-linux/wiki/Install_AirSensor_Linux">Install_AirSensor_Linux
+usb-sensors-linux</a></li>
   </ul><br>
 
   <a name="CO20_Define"></a>

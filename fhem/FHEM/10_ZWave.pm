@@ -15,6 +15,7 @@ sub ZWave_ParseMeter($);
 sub ZWave_SetClasses($$$$);
 
 use vars qw(%zw_func_id);
+use vars qw(%zw_type6);
 
 my @zwave_models = qw(
   Everspring_AN1582 Everspring_AN1583
@@ -62,9 +63,12 @@ my %zwave_class = (
   SENSOR_BINARY            => { id => '30', 
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
-               "033003ff"  => "state:open",  },},
-#053105030129
-
+               "033003ff"  => "state:open", 
+               "043003(..)0c" => '"motion:$1"',  #Philio PHI_PSP01, PSM02-1
+               "043003(..)08" => '"tamper:$1"',  #Philio PHI_PSP01, PSM02-1
+               "043003000a"   => "state:closed", #Philio PSM02-1
+               "043003ff0a"   => "state:open",   #Philio PSM02-1
+               },},
   SENSOR_MULTILEVEL        => { id => '31', 
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
@@ -484,9 +488,12 @@ ZWave_ParseMultilevel($$$)
 
   my $pr = (hex($fl)>>5)&0x07; # precision
   my $sc = (hex($fl)>>3)&0x03; # scale
+  my $bc = (hex($fl)>>0)&0x07; # bytecount
+  my $msb = (hex($arg)>>8*$bc-1); # most significant bit  ( 0 = pos, 1 = neg )
+  my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement   
   my $ml = $ml_tbl{$type};
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
-  return sprintf("%s:%.*f %s", $ml->{n}, $pr, hex($arg)/(10**$pr),
+  return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
        int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
 }
 
@@ -604,6 +611,10 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
       IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+    }
+    if(!$ret) {
+      readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
+      return $hash->{NAME};
     }
     return $ret;
 
@@ -1005,11 +1016,32 @@ s2Hex($)
   <br><br><b>Class SENSOR_BINARY</b>
   <li>state:open</li>
   <li>state:closed</li>
+  <li>motion:00|ff</li>
+  <li>tamper:00|ff   </li>
+
 
   <br><br><b>Class SENSOR_MULTILEVEL</b>
-  <li>temperature:$temp [C|F]</li>
-  <li>humidity:$hum %</li>
-  <li>power:$pow [Btu/h|W]</li>
+  <li>temperature $val [C|F]</li>
+  <li>generalPurpose $val %</li>
+  <li>luminance $val [%|Lux]</li>
+  <li>power $val [W|Btu/h]</li>
+  <li>humidity $val %</li>
+  <li>velocity $val [m/s|mph]</li>
+  <li>direction $val</li>
+  <li>atmosphericPressure $val [kPa|inchHg]</li>
+  <li>barometricPressure $val [kPa|inchHg]</li>
+  <li>solarRadiation $val W/m2</li>
+  <li>dewpoint $val [C|F]</li>
+  <li>rain $val [mm/h|in/h]</li>
+  <li>tideLevel $val [m|feet]</li>
+  <li>weight $val [kg|pound]</li>
+  <li>voltage $val [V|mV]</li>
+  <li>current $val [A|mA]</li>
+  <li>CO2-level $val ppm</li>
+  <li>airFlow $val [m3/h|cfm]</li>
+  <li>tankCapacity $val [l|cbm|usgal]</li>
+  <li>distance $val [m|cm|feet]</li>
+  <li>anglePosition $val [%|relN|relS]</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>

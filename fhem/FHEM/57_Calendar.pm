@@ -816,6 +816,12 @@ sub Calendar_GetUpdate($) {
   $hash->{fhem}{lstUpdtTs}= $t;
   $hash->{fhem}{lastUpdate}= FmtDateTime($t);
   
+  $t+= $hash->{fhem}{interval};
+  $hash->{fhem}{nxtUpdtTs}= $t;
+  $hash->{fhem}{nextUpdate}= FmtDateTime($t);
+
+  $hash->{STATE}= "No data";
+  
   Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Updating...";
   my $type = $hash->{fhem}{type};
   my $url= $hash->{fhem}{url};
@@ -823,7 +829,7 @@ sub Calendar_GetUpdate($) {
   my $ics;
   
   if($type eq "url"){ 
-    $ics= GetFileFromURLQuiet($url) if($type eq "url");
+    $ics= GetFileFromURLQuiet($url,10,undef,0,5) if($type eq "url");
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
@@ -840,7 +846,7 @@ sub Calendar_GetUpdate($) {
   }
     
   
-  if(!defined($ics)) {
+  if(!defined($ics) or ("$ics" eq "")) {
     Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
     return 0;
   }
@@ -896,10 +902,6 @@ sub Calendar_GetUpdate($) {
   readingsBulkUpdate($hash, "stateDeleted", join(";", @deleted));
   readingsBulkUpdate($hash, "stateChanged", join(";", @changed));
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
-
-  $t+= $hash->{fhem}{interval};
-  $hash->{fhem}{nxtUpdtTs}= $t;
-  $hash->{fhem}{nextUpdate}= FmtDateTime($t);
 
   return 1;
 }
@@ -960,7 +962,8 @@ sub Calendar_Get($@) {
     if(defined($a[3])) {
       my $keep= $a[3];
       return "Argument $keep is not a number." unless($keep =~ /\d+/);
-      splice @texts, $keep if($#texts>= 0);  
+      $keep= $#texts+1 if($keep> $#texts);
+      splice @texts, $keep if($keep>= 0);  
     }
     return join("\n", @texts);
     

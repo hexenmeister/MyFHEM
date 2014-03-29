@@ -41,6 +41,7 @@ sub PIFACE_Define($$);
 sub PIFACE_Undefine($$);
 sub PIFACE_Set($@);
 sub PIFACE_Get($@);
+sub PIFACE_Notify(@);
 sub PIFACE_Attr(@);
 
 my $base = 200;
@@ -55,6 +56,7 @@ sub PIFACE_Initialize($){
   $hash->{AttrFn}	= "PIFACE_Attr";
   $hash->{AttrList}	= $readingFnAttributes .
                           " defaultState:0,1,last,off pollInterval:1,2,3,4,5,6,7,8,9,10,off" .
+                          " disable:0,1 disabledForIntervals" .
                           " portMode0:tri,up" .
                           " portMode1:tri,up" .
                           " portMode2:tri,up" .
@@ -69,6 +71,7 @@ sub PIFACE_Initialize($){
 sub PIFACE_Define($$){
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
+  $hash->{NOTIFYDEV} = "global";
   Log3($name, 3, "PIFACE $name active");
   readingsSingleUpdate($hash, "state", "active",1);
   return;
@@ -83,6 +86,10 @@ sub PIFACE_Undefine($$){
 sub PIFACE_Set($@) {
 	my ($hash, @a)	= @_;
 	my $name = $hash->{NAME};
+        if (IsDisabled($name)) {
+          Log3 $name, 4, "PIFACE $name set commands disabled.";  
+          return;
+        }
 	my $port = $a[1];
 	my $val  = $a[2];
 	my ($adr, $cmd, $i, $j, $k);	
@@ -498,21 +505,33 @@ PIFACE_Watchdog($) {
 	<a name="PIFACEattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-          <li><a name="defaultState">defaultState</a> last|off|0|1,
+          <li><a name="PIFACE_defaultState">defaultState</a> last|off|0|1,
             [defaultState] = off is default.<br>
             Restoration of the status of the output port after a Fhem reboot.
           </li>
-          <li><a name="pollInterval">pollInterval</a> off|1,2,...,9,10,
+          <li><a href="#PIFACE_disable">disable</a> 0|1<br>
+            If applied set commands will not be executed.
+          </li>
+          <li><a href="#PIFACE_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
+            Space separated list of HH:MM tupels. If the current time is between
+            the two time specifications, set commands will not be executed. Instead of
+            HH:MM you can also specify HH or HH:MM:SS. To specify an interval
+            spawning midnight, you have to specify two intervals, e.g.:
+            <ul>
+              23:00-24:00 00:00-01:00
+            </ul>
+          </li>
+          <li><a name="PIFACE_pollInterval">pollInterval</a> off|1,2,...,9,10,
             [pollInterval] = off is default.<br>
             Define the polling interval of the input ports in seconds.
           </li>
-          <li><a name="portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
+          <li><a name="PIFACE_portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
             [portMode&lt;0..7&gt;] = tri is default.<br>
             This enables (up) or disables (tri) the internal pull-up resistor on the given input port.
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-          <li><a name="watchdog">watchdog</a> off|on|silent,
+          <li><a name="PIFACE_watchdog">watchdog</a> off|on|silent,
             [watchdog] = off is default.<br>
             The function of the PiFace extension can be monitored periodically.
             The watchdog module checks the function of ports in7 and out7.
@@ -523,7 +542,7 @@ PIFACE_Watchdog($) {
             If the error could not be eliminated, then the Raspberry operating system is restarted.
             If the error is not corrected as well, the monitoring function is disabled and the error is logged.
           </li>
-          <li><a name="watchdogInterval">watchdogInterval</a> 10..65535,
+          <li><a name="PIFACE_watchdogInterval">watchdogInterval</a> 10..65535,
             [watchdogInterval] = 60 is default.<br>
             Interval between two monitoring tests in seconds.
           </li>

@@ -88,6 +88,7 @@ TcpServer_Accept($$)
       SSL_server    => 1, 
       SSL_key_file  => "$mp/certs/server-key.pem",
       SSL_cert_file => "$mp/certs/server-cert.pem",
+      Timeout       => 4,
       });
     if(!$ret && $! ne "Socket is not connected") {
       Log3 $name, 1, "$type SSL/HTTPS error: $!";
@@ -111,6 +112,7 @@ TcpServer_Accept($$)
   $defs{$cname} = \%nhash;
   $selectlist{$nhash{NAME}} = \%nhash;
 
+  my $ret = $clientinfo[0]->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
 
   Log3 $name, 4, "Connection accepted from $nhash{NAME}";
   return \%nhash;

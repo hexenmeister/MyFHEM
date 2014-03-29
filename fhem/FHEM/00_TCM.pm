@@ -59,7 +59,8 @@ TCM_Initialize($)
   $hash->{UndefFn} = "TCM_Undef";
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no";
+  $hash->{AttrFn}  = "TCM_Attr";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no teachMode:always,demand,nearfield";
 }
 
 # Define
@@ -224,7 +225,7 @@ TCM_Read($)
   return "" if(!defined($buf));
 
   my $name = $hash->{NAME};
-  my $blockSenderID = ReadingsVal($name, "blockSenderID", "no");
+  my $blockSenderID = AttrVal($name, "blockSenderID", "own");
   my $baseID = hex $hash->{BaseID};
   my $lastID = hex $hash->{LastID};
 
@@ -269,8 +270,28 @@ TCM_Read($)
 
       } else {
         # Receive Message Telegram (RMT)
-        TCM_Parse120($hash, $net, 0);
-
+        my $msg=TCM_Parse120($hash, $net, 1);
+        if (($msg eq 'OK') && ($net =~ m/^8B(..)(........)(........)(..)/)){
+          my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
+          my $packetType = 1;
+          # Re-translate the ORG to RadioORG / TCM310 equivalent
+          my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
+          if($orgmap{$org}) {
+            $org = $orgmap{$org};
+          } else {
+            #Log 1, "TCM120: unknown ORG mapping for $org";
+            Log3 undef, 1, "TCM unknown ORG mapping for $org";
+          }
+          if ($org ne "A5") {
+            # extract db_0
+            $d1 = substr($d1, 0, 2);
+          }
+          if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
+            Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
+          } else {
+            Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status", undef);
+          }
+         }
       }
       $data = $rest;
     }
@@ -314,16 +335,24 @@ TCM_Read($)
         # packet type RADIO
         $mdata =~ m/^(..)(.*)(........)(..)$/;
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
-
+        my $repeatingCounter = hex substr($status, 1, 1);
         $odata =~ m/^(..)(........)(..)(..)$/;
+        my ($RSSI, $receivingQuality) = (hex($3), "excellent");
+        if ($RSSI > 87) {
+          $receivingQuality = "bad";
+        } elsif ($RSSI > 75) {
+          $receivingQuality = "good";       
+        }
         my %addvals = (
-          PacketType    => $packetType,
-          SubTelNum     => hex($1),
-          DestinationID => $2,
-          RSSI          => -hex($3),
-          SecurityLevel => hex($4),
+          PacketType       => $packetType,
+          SubTelNum        => hex($1),
+          DestinationID    => $2,
+          RSSI             => -$RSSI,
+          ReceivingQuality => $receivingQuality,
+          RepeatingCounter => $repeatingCounter,
+          SecurityLevel    => hex($4),
         );
-        $hash->{RSSI} = -hex($3);
+        $hash->{RSSI} = -$RSSI;
         
         if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
           Log3 $name, 5, "TCM $name Telegram from $id blocked.";        
@@ -387,6 +416,9 @@ TCM_Read($)
 
 # Parse Table TCM 120
 my %parsetbl120 = (
+  "8B05" => { msg=>"OK" },
+  "8B06" => { msg=>"OK" },
+  "8B07" => { msg=>"OK" },
   "8B08" => { msg=>"ERR_SYNTAX_H_SEQ" },
   "8B09" => { msg=>"ERR_SYNTAX_LENGTH" },
   "8B0A" => { msg=>"ERR_SYNTAX_CHKSUM" },
@@ -590,13 +622,13 @@ sub
 TCM_RemovePair($)
 {
   my $hash = shift;
-  delete($hash->{pair});
-  CommandDeleteReading(undef, "$hash->{NAME} pair");
+  delete($hash->{Teach});
 }
 
 # Set commands TCM 120
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
   "pairForSec"   => { cmd => "AB18", arg => "\\d+" },
+  "teach"        => { cmd => "AB18", arg => "\\d+" },
   "idbase"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
   "baseID"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
   "sensitivity"  => { cmd => "AB08", arg => "0[01]" },
@@ -610,6 +642,7 @@ my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
 # Set commands TCM 310
 my %sets310 = (
   "pairForSec"   => { cmd => "AB18", arg=> "\\d+" },
+  "teach"        => { cmd => "AB18", arg=> "\\d+" },
   "sleep"        => { cmd => "01", arg => "00[0-9A-F]{6}" },
   "reset"        => { cmd => "02" },
   "bist"         => { cmd => "06", BIST_Result => "1,1", },
@@ -646,9 +679,8 @@ TCM_Set($@)
     $cmdHex .= $arg;
   }
 
-  if($cmd eq "pairForSec") {
-    $hash->{pair} = 1;
-    readingsSingleUpdate($hash, "pair", 1, 1);
+  if($cmd eq "pairForSec" || $cmd eq "teach") {
+    $hash->{Teach} = 1;
     InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
     return;
   }
@@ -767,6 +799,30 @@ TCM_ReadAnswer($$)
   }
 }
 
+sub
+TCM_Attr(@) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $hash = $defs{$name};
+  
+  if ($attrName eq "blockSenderID") {
+    if (!defined $attrVal) {
+    } elsif ($attrVal !~ m/^(own|no)$/) {
+      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+    
+  } elsif ($attrName eq "teachMode") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(always|demand|nearfield)$/) {
+      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  }
+  return undef;
+}
+
 # Undef
 sub
 TCM_Undef($$)
@@ -817,7 +873,20 @@ TCM_Undef($$)
   of commands depends on the hardware and the firmware version. A firmware update
   is usually not provided.
   <br><br>
-
+  The TCM module enables also a read-only wired connection to Eltako actuators over the 
+  Eltako RS485 bus in the switchboard or distribution box via Eltako FGW14 RS232-RS485
+  gateway modules. These actuators are linked to an associated wireless antenna module
+  (FAM14) on the bus. The FAM14 device frequently polls the actuator status of all 
+  associated devices if the FAM14 operating mode rotary switch is on position 4. 
+  Therefore, actuator states can be retrieved more reliable, even after any fhem downtime,
+  when switch events or actuator confirmations could not have been tracked during the
+  downtime. As all actuators are polled approx. every 1-2 seconds, it should be avoided to
+  use event-on-update-reading. Use instead either event-on-change-reading or 
+  event-min-interval.
+  The Eltako bus uses the EnOcean Serial Protocol version 2 (ESP2) protocol, which is 
+  the same serial protocol used by TCM120 modules. For this reason, a FGW14 can be 
+  configured as a TCM120.<br><br>
+  
   <a name="TCMdefine"></a>
   <b>Define</b>
   <ul>
@@ -828,10 +897,14 @@ TCM_Undef($$)
     <code>device</code> can take the same parameters (@baudrate, @directio,
     TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
     to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
-    TCM310 with 57600 baud.<br>
+    TCM310 with 57600 baud. For Eltako FGW14 devices, type has to be set to 120 and 
+    the baudrate has to be set to 57600 baud if the FGW14 operating mode 
+    rotary switch is on position 6.<br><br>
+    
     Example:
     <ul><code>
       define BscBor TCM 120 /dev/ttyACM0@9600<br>
+      define FGW14 TCM 120 /dev/ttyS3@57600<br>
       define TCM310 TCM 310 /dev/ttyACM0@57600<br>
       define TCM310 TCM 310 COM1@57600 (Windows)<br>
     </code></ul>
@@ -849,11 +922,11 @@ TCM_Undef($$)
       Deactivates TCM modem functionality</li>
     <li>modem_on [0000 ... FFFF]<br>
       Activates TCM modem functionality and sets the modem ID</li>
-    <li>pairForSec &lt;t/s&gt;<br>
-      Set Fhem in teach-in mode.<br>
-      The command is only required to teach-in bidirectional actuators
-      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
-      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>sensitivity [00|01]<br>
@@ -875,11 +948,11 @@ TCM_Undef($$)
     <li>maturity [00|01]<br>
       Waiting till end of maturity time before received radio telegrams will transmit:
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
-    <li>pairForSec &lt;t/s&gt;<br>
-      Set Fhem in teach-in mode.<br>
-      The command is only required to teach-in bidirectional actuators
-      e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator),
-      see <a href="#pairForSec"> Bidirectional Teach-In / Teach-Out</a>.</li>
+    <li>teach &lt;t/s&gt;<br>
+      Set Fhem in learning mode, see <a href="#TCM_teachMode">teachMode</a>.<br>
+      The command is always required for UTE and to teach-in bidirectional actuators
+      e. g. EEP 4BS (RORG A5-20-XX),
+      see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.</li>
     <li>reset<br>
       Reset the device</li>
     <li>repeater [0000|0101|0102]<br>
@@ -930,13 +1003,20 @@ TCM_Undef($$)
   <a name="TCMattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="blockSenderID">blockSenderID</a> &lt;own|no&gt;,
-      [blockSenderID] = no is default.<br>
+    <li><a name="TCM_blockSenderID">blockSenderID</a> &lt;own|no&gt;,
+      [blockSenderID] = own is default.<br>
       Block receiving telegrams with a TCM SenderID sent by repeaters.      
       </li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
+    <li><a name="TCM_teachMode">teachMode</a> &lt;always|demand|nearfield&gt;,
+      [teachMode] = demand is default.<br>
+      Learning method for automatic setup of EnOcean devices:<br>    
+      [teachMode] = always: Teach-In/Teach-Out telegrams always accepted, with the exception of bidirectional devices<br>
+      [teachMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
+      [teachMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
+    </li>
+    <li><a href="#verbose">verbose</a></li>
   </ul>
   <br>
 </ul>

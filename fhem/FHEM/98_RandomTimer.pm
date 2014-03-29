@@ -464,7 +464,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
           </ul>
 
   <!-- -------------------------------------------------------------------------- -->
-  <!-- Set     ------------------------------------------------------------------ -->
+  <!-- Set    ------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
   <a name="RandomTimerSet"></a>
   <h3>Set</h3>
@@ -472,7 +472,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
     N/A
   </ul>
   <!-- -------------------------------------------------------------------------- -->
-  <!-- Get     ------------------------------------------------------------------ -->
+  <!-- Get    ------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
   <a name="RandomTimerGet"></a>
   <h3>Get</h3>
@@ -495,7 +495,9 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         <b>Examples</b>
         <pre>
         attr   ZufallsTimerZ         disableCond      (!isVerreist())
+        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy" eq "notPresent"))        
         </pre>
+    </li>
 
     <li><a name="disableCond">disableCond</a><br>
         The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached.
@@ -505,8 +507,8 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         <pre>
         attr   ZufallsTimerZ         keepDeviceAlive
         </pre>
-
     </li>
+
     <li><a name="onOffCmd">onCmd, offCmd</a><br>
         Setting the on-/offCmd changes the command sent to the device. Standard is: "set &lt;device&gt; on".
         The device can be specified by a @.
@@ -519,6 +521,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         attr   Timer                  offCmd set @ off 12
         </pre>
     </li>
+
     <li><a name="switchmode">switchmode</a><br>
         Setting the switchmode you can influence the behavior of switching on/off.
         The parameter has the Format 999/999 and the default ist 800/200. The values are in "per mill".
@@ -529,6 +532,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         attr   ZufallsTimerZ         switchmode  400/400
         </pre>
     </li>
+
   </ul>
 
 =end html

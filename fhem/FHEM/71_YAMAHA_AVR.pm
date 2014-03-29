@@ -37,6 +37,8 @@ use HttpUtils;
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
 sub YAMAHA_AVR_GetStatus($;$);
+sub YAMAHA_AVR_Attr(@);
+sub YAMAHA_AVR_ResetTimer($;$);
 sub YAMAHA_AVR_Undefine($$);
 
 
@@ -51,9 +53,10 @@ YAMAHA_AVR_Initialize($)
   $hash->{GetFn}     = "YAMAHA_AVR_Get";
   $hash->{SetFn}     = "YAMAHA_AVR_Set";
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
+  $hash->{AttrFn}    = "YAMAHA_AVR_Attr";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -67,27 +70,35 @@ YAMAHA_AVR_GetStatus($;$)
     
     $local = 0 unless(defined($local));
 
-    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{INTERVAL}));
+    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{OFF_INTERVAL}) or !defined($hash->{helper}{ON_INTERVAL}));
 
     my $device = $hash->{helper}{ADDRESS};
 
     # get the model informations and available zones if no informations are available
-    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
-		YAMAHA_AVR_getModel($hash);
+		unless(defined(YAMAHA_AVR_getModel($hash)))
+        {
+            YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+            return;
+        }
     }
 
     # get all available inputs if nothing is available
     if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
-		YAMAHA_AVR_getInputs($hash);
+		unless(defined(YAMAHA_AVR_getInputs($hash)))
+        {
+            YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+            return;
+        }
     }
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     if(not defined($zone))
     {
-		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 		return "No Zone available";
     }
     
@@ -97,8 +108,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($return) or $return eq "")
     {
-		readingsSingleUpdate($hash, "state", "absent", 1);
-		InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+		YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 		return;
     }
     
@@ -163,16 +173,16 @@ YAMAHA_AVR_GetStatus($;$)
 	    
 			if($infos =~ /<Meta_Info>.*?<Artist>(.+?)<\/Artist>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentArtist", $1);
+				readingsBulkUpdate($hash, "currentArtist", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Station>(.+?)<\/Station>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentStation", $1);
+				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
 			}
 			elsif($infos =~ /<Meta_Info>.*?<Program_Service>(.+?)<\/Program_Service>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentStation", $1);
+				readingsBulkUpdate($hash, "currentStation", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
@@ -182,12 +192,12 @@ YAMAHA_AVR_GetStatus($;$)
 			
 			if($infos =~ /<Meta_Info>.*?<Album>(.+?)<\/Album>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentAlbum", $1);
+				readingsBulkUpdate($hash, "currentAlbum", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Meta_Info>.*?<Song>(.+?)<\/Song>.*?<\/Meta_Info>/)
 			{
-				readingsBulkUpdate($hash, "currentTitle", $1);
+				readingsBulkUpdate($hash, "currentTitle", YAMAHA_AVR_html2txt($1));
 			}
 			
 			if($infos =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
@@ -206,7 +216,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
+    YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
     Log3 $name, 4, "YAMAHA_AVR $name: ".$hash->{STATE};
     
@@ -262,6 +272,19 @@ YAMAHA_AVR_Set($@)
     my $result = "";
     my $command;
 	my $target_volume;
+    
+    # get the model informations and available zones if no informations are available
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    {
+		YAMAHA_AVR_getModel($hash);
+    }
+
+    # get all available inputs if nothing is available
+    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
+    {
+		YAMAHA_AVR_getInputs($hash);
+    }
+    
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
@@ -594,7 +617,7 @@ YAMAHA_AVR_Define($$)
     
     if(! @a >= 4)
     {
-	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<statusinterval>]";
+	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<ON-statusinterval>] [<OFF-statusinterval>] ";
 	Log 2, $msg;
 	return $msg;
     }
@@ -618,11 +641,21 @@ YAMAHA_AVR_Define($$)
     # if an update interval was given which is greater than zero, use it.
     if(defined($a[4]) and $a[4] > 0)
     {
-		$hash->{helper}{INTERVAL}=$a[4];
+		$hash->{helper}{OFF_INTERVAL} = $a[4];
     }
     else
     {
-		$hash->{helper}{INTERVAL}=30;
+		$hash->{helper}{OFF_INTERVAL} = 30;
+    }
+    
+       
+    if(defined($a[5]) and $a[5] > 0)
+    {
+		$hash->{helper}{ON_INTERVAL} = $a[5];
+    }
+    else
+    {
+		$hash->{helper}{ON_INTERVAL} = $hash->{helper}{OFF_INTERVAL};
     }
     
     
@@ -656,11 +689,55 @@ YAMAHA_AVR_Define($$)
     }
 
     # start the status update timer
-	RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
+    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
+	YAMAHA_AVR_ResetTimer($hash,2);
   
   return undef;
 }
+
+
+##########################
+sub
+YAMAHA_AVR_Attr(@)
+{
+    my @a = @_;
+    my $hash = $defs{$a[1]};
+
+    if($a[0] eq "set" && $a[2] eq "disable")
+    {
+        if($a[3] eq "0")
+        {
+             $hash->{helper}{DISABLED} = 0;
+             YAMAHA_AVR_GetStatus($hash, 1);
+        }
+        elsif($a[3] eq "1")
+        {
+            $hash->{helper}{DISABLED} = 1;
+        }
+    }
+    elsif($a[0] eq "del" && $a[2] eq "disable")
+    {
+        $hash->{helper}{DISABLED} = 0;
+        YAMAHA_AVR_GetStatus($hash, 1);
+    }
+
+    # Start/Stop Timer according to new disabled-Value
+    YAMAHA_AVR_ResetTimer($hash);
+    
+    return undef;
+}
+
+#############################
+sub
+YAMAHA_AVR_Undefine($$)
+{
+  my($hash, $name) = @_;
+  
+  # Stop the internal GetStatus-Loop and exit
+  RemoveInternalTimer($hash);
+  return undef;
+}
+
 
 #############################################################################################################
 #
@@ -694,7 +771,13 @@ YAMAHA_AVR_SendCommand($$;$)
 		{
 			Log3 $name, 3, "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
 			readingsSingleUpdate($hash, "presence", "absent", 1);
+            readingsSingleUpdate($hash, "state", "absent", 1);
 		}
+        else
+        {
+            Log3 $name, 5, "YAMAHA_AVR: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress. (Device is still absent)";
+        }
+        
     }
     else
     {
@@ -711,16 +794,6 @@ YAMAHA_AVR_SendCommand($$;$)
 
 }
 
-#############################
-sub
-YAMAHA_AVR_Undefine($$)
-{
-  my($hash, $name) = @_;
-  
-  # Stop the internal GetStatus-Loop and exit
-  RemoveInternalTimer($hash);
-  return undef;
-}
 
 
 #############################
@@ -832,7 +905,10 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
 
-    Log3 $name, 3, "YAMAHA_AVR: could not get unit description url from device $name. Please turn on the device or check for correct hostaddress!"  if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1); 
+    if (not defined($response))
+    { 
+        return undef;
+    }
     
     if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
     { 
@@ -845,7 +921,10 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
     
-    Log3 $name, 3, "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    if(not defined($response))
+    {
+        return undef;
+    }
     
 	if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
     {
@@ -936,8 +1015,11 @@ sub YAMAHA_AVR_getInputs($)
     
     my $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
     
-    
-    Log3 $name, 3, "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1)
+    {
+        Log3 $name, 3, "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!";
+        return undef;
+    }
     
     return undef unless (defined($response));
 
@@ -984,8 +1066,50 @@ sub YAMAHA_AVR_getInputs($)
 
 }
 
+#############################
+sub YAMAHA_AVR_ResetTimer($;$)
+{
+    my ($hash, $interval) = @_;
+    
+    RemoveInternalTimer($hash);
+    
+    if($hash->{helper}{DISABLED} == 0)
+    {
+        if(defined($interval))
+        {
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
+        elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
+        else
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+        }
+    }
+}
 
+sub YAMAHA_AVR_html2txt($)
+{
 
+    my ($string) = @_;
+
+    $string =~ s/&nbsp;/ /g;
+    $string =~ s/&amp;/&/g;
+    $string =~ s/(\xe4|&auml;)/ä/g;
+    $string =~ s/(\xc4|&Auml;)/Ä/g;
+    $string =~ s/(\xf6|&ouml;)/ö/g;
+    $string =~ s/(\xd6|&Ouml;)/Ö/g;
+    $string =~ s/(\xfc|&uuml;)/ü/g;
+    $string =~ s/(\xdc|&Uuml;)/Ü/g;
+    $string =~ s/(\xdf|&szlig;)/ß/g;
+    $string =~ s/<.+?>//g;
+    $string =~ s/(^\s+|\s+$)//g;
+
+    return $string;
+
+}
 1;
 
 =pod
@@ -998,7 +1122,11 @@ sub YAMAHA_AVR_getInputs($)
   <a name="YAMAHA_AVRdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]</code>
+    <code>
+    define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]
+    <br><br>
+    define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
+    </code>
     <br><br>
 
     This module controls AV receiver from Yamaha via network connection. You are able
@@ -1008,13 +1136,22 @@ sub YAMAHA_AVR_getInputs($)
     Defining a YAMAHA_AVR device will schedule an internal task (interval can be set
     with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 30
     seconds), which periodically reads the status of the AV receiver (power state, selected
-    input, volume and mute status) and triggers notify/filelog commands.<br><br>
-
+    input, volume and mute status) and triggers notify/filelog commands.
+    <br><br>
+    Different status update intervals depending on the power state can be given also. 
+    If two intervals are given in the define statement, the first interval statement stands for the status update 
+    interval in seconds in case the device is off, absent or any other non-normal state. The second 
+    interval statement is used when the device is on.
+   
     Example:<br><br>
     <ul><code>
        define AV_Receiver YAMAHA_AVR 192.168.0.10
        <br><br>
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # With custom interval of 60 seconds
+       # With custom status interval of 60 seconds<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 
+       <br><br>
+       # With custom "off"-interval of 60 seconds and "on"-interval of 10 seconds<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 10
     </code></ul>
    
   </ul>
@@ -1151,6 +1288,10 @@ sub YAMAHA_AVR_getInputs($)
 	Optional attribute change the response timeout in seconds for all queries to the receiver.
 	<br><br>
 	Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
+    <li><a name="disable">disable</a></li>
+	Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
+	<br><br>
+	Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optional attribute to activate a smooth volume change.
 	<br><br>
@@ -1199,7 +1340,10 @@ sub YAMAHA_AVR_getInputs($)
   <a name="YAMAHA_AVRdefine"></a>
   <b>Definition</b>
   <ul>
-    <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]</code>
+    <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]
+    <br><br>
+    define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Off_Interval&gt;] [&lt;On_Interval&gt;]
+    </code>
     <br><br>
 
     Dieses Modul steuert AV-Receiver des Herstellers Yamaha &uuml;ber die Netzwerkschnittstelle.
@@ -1208,13 +1352,21 @@ sub YAMAHA_AVR_getInputs($)
     <br><br>
     Bei der Definition eines YAMAHA_AVR-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig 
     (einstellbar durch den optionalen Parameter <code>&lt;Status_Interval&gt;</code>; falls nicht gesetzt ist der Standardwert 30 Sekunden)
-    den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert..<br><br>
-
+    den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert.
+    <br><br>
+    Sofern 2 Interval-Argumente &uuml;bergeben werden, wird der erste Parameter <code>&lt;Off_Interval&gt;</code> genutzt
+    sofern der Receiver ausgeschaltet oder nicht erreichbar ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code> 
+    wird verwendet, sofern der Receiver eingeschaltet ist. 
+    <br><br>
     Beispiel:<br><br>
     <ul><code>
-       define AV_Receiver YAMAHA_AVR 192.168.0.10<br><br>
-       
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # Mit modifiziertem Status Interval (60 Sekunden)
+       define AV_Receiver YAMAHA_AVR 192.168.0.10
+       <br><br>
+       # Mit modifiziertem Status Interval (60 Sekunden)<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60
+       <br><br>
+       # Mit gesetztem "Off"-Interval (60 Sekunden) und "On"-Interval (10 Sekunden)<br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 10
     </code></ul><br><br>
   </ul>
   <b>Zonenauswahl</b><br>
@@ -1259,13 +1411,13 @@ sub YAMAHA_AVR_getInputs($)
 <ul>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver ein</li>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
-<li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
+<li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
 <li><b>volume</b> 0...100 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%)</li>
 <li><b>volumeStraight</b> -87...15 &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Dezibel (-80.5 bis 15.5 dB) so wie sie am Receiver auch verwendet wird.</li>
 <li><b>volumeUp</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
 <li><b>volumeDown</b> [0...100] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang) </li>
-<li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
@@ -1344,25 +1496,29 @@ sub YAMAHA_AVR_getInputs($)
 	<li><a name="request-timeout">request-timeout</a></li>
 	Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
 	<br><br>
-	M&ouml;gliche Werte: 1-5 Sekunden. Standartwert ist 4 Sekunden<br><br>
+	M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
+    <li><a name="disable">disable</a></li>
+	Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
+	<br><br>
+	M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
 	<br><br>
 	M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
     <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
 	Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
-	durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte<br><br>
+	durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte<br><br>
 	<li><a name="volumeSteps">volumeSteps</a></li>
-	Optionales Attribut, welches den Standartwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standartwert ist 5%<br>
+	Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%<br>
   <br>
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
   <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
-  <li><b>mute</b> - Der aktuelle Stumm-Status("on" =&gt; Stumm, "off" =&gt; Laut)</li>
-  <li><b>power</b> - Der aktuelle Betriebsstatuse ("on" =&gt; an, "off" =&gt; aus)</li>
-  <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereits, z.B. Stromausfall)</li>
+  <li><b>mute</b> - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
+  <li><b>power</b> - Der aktuelle Betriebsstatus ("on" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
@@ -1371,7 +1527,7 @@ sub YAMAHA_AVR_getInputs($)
   <li><b>currentStation</b> - Name des Radiosenders (nur bei TUNER, NET RADIO und PANDORA)</li>
   <li><b>currentAlbum</b> - Album es aktuell gespielten Titel</li>
   <li><b>currentArtist</b> - Interpret des aktuell gespielten Titel</li>
-  <li><b>cutrentTitle</b> - Name des aktuell gespielten Titel</li>
+  <li><b>currentTitle</b> - Name des aktuell gespielten Titel</li>
   <li><b>playStatus</b> - Wiedergabestatus des Eingangs</li>
   </ul>
 <br>

@@ -57,12 +57,12 @@
 ########################################################################################
 package main;
 
-use vars qw{%attr %defs};
+use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.23";
+my $owx_version="3.34";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -118,11 +118,12 @@ sub OWLCD_Initialize ($) {
   $hash->{UndefFn}  = "OWLCD_Undef";
   $hash->{GetFn}    = "OWLCD_Get";
   $hash->{SetFn}    = "OWLCD_Set";
+  $hash->{AttrFn}   = "OWLCD_Attr";
   my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
                       "";
   $hash->{AttrList} = $attlist; 
 
-  #make sure OWX is loaded so OWX_CRC is available if running with OWServer
+  #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
 
@@ -171,11 +172,8 @@ sub OWLCD_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( (!defined($hash->{IODev}->{NAME})) || (!defined($hash->{IODev})) || (!defined($hash->{IODev}->{PRESENT})) ){
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ) {
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
-  }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWLCD}{defptr}{$id} = $hash;
   
@@ -199,6 +197,33 @@ sub OWLCD_Define ($$) {
   }
   $hash->{STATE} = "Initialized";
   return undef; 
+}
+
+#######################################################################################
+#
+# OWLCD_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWLCD_Attr(@) {
+  my ($do,$name,$key,$value) = @_;
+  
+  my $hash = $defs{$name};
+  my $ret;
+  
+ # if ( $do eq "set") {
+ # 	ARGUMENT_HANDLER: {
+ # 	  #-- empty so far
+ # 	};
+ #} elsif ( $do eq "del" ) {
+ # 	ARGUMENT_HANDLER: {
+ # 	  #-- empty so far
+ # 	}
+ # }
+  return $ret;
 }
 
 ########################################################################################
@@ -669,10 +694,10 @@ sub OWXLCD_GetMemory($$) {
     return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
   }
   
-  #-- process results (10 byes or more have been sent)
+  #-- process results (10 bytes or more have been sent)
   $res2 = substr($res,11,16);
    
-  Log 1," Having received ".length($res)." bytes"; 
+  #Log 1," Having received ".length($res)." bytes"; 
   return $res2;
 }
 

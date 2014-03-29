@@ -41,6 +41,9 @@
 # 0030: Style4 (S300TH) now works with longpoll without loosing its formatting (Dec 24, 2013)
 # 0031: Text "desiredTemperature" will also be eliminated - for MAX devices (Dec 25, 2013)
 # 0032: Ensure URL always contains floorplan-name (redirect if !htmlarg[0]) as basis for fp-specific icon-folder (Jan 06, 2014)
+# 0033: Updated loglevel -> verbose, added fp_roomIcons (Feb 2, 2014)
+# 0034: iOS fullscreen app - navigating to other floorplan doesn't open safari anymore (Feb 15, 2014)
+# 0035: added allowedCommands-Attribute based on FHEMWEB (Feb 20, 2014)
 #
 ################################################################
 #
@@ -150,8 +153,9 @@ FLOORPLAN_Initialize($)
   $hash->{DefFn}        = "FP_define";
   $hash->{GetFn}        = "FP_Get";
   $hash->{FW_detailFn}  = "FP_detailFn";   #floorplan-specific detail-screen
-  $hash->{AttrList}     = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 ".
-                          "stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0 fp_viewport";
+  $hash->{AttrList}     = "refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 ".
+                          "stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0 fp_viewport ".
+						  "fp_roomIcons";
   # CGI
   my $name = "floorplan";
   my $fhem_url = "/" . $name ;
@@ -180,7 +184,8 @@ FP_define(){
   my $name = $hash->{NAME};
   if (AttrVal("global","userattr","") !~ m/fp_$name/) {
 	addToAttrList("fp_$name");                                                  # create userattr fp_<name> if it doesn't exist yet
-	Log 3, "Floorplan - added global userattr fp_$name";
+#	Log 3, "Floorplan - added global userattr fp_$name";
+    Log3 $name, 3, "Floorplan - added global userattr fp_$name";
   }
   return undef;
 }
@@ -255,9 +260,9 @@ FP_CGI(){
   }
   ## process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
-  my $FP_ret = AnalyzeCommand(undef, $commands) if $commands;                      # Execute commands
-  Log 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
-
+  my $FP_ret = AnalyzeCommand(undef, $commands,
+                            AttrVal($FW_wname,"allowedCommands",undef)) if $commands;  #Execute commands
+  Log3 "FLOORPLAN", 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
   #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
   my $tgt = undef;
@@ -619,9 +624,13 @@ FP_menu() {
 	FW_pO "</tr>";
 	foreach my $f (sort keys %defs) {
 		next if ($defs{$f}{TYPE} ne "FLOORPLAN");
-    	FW_pO "<tr><td>";
-		FW_pH "$FW_ME/floorplan/$f", $f, 0;
-    	FW_pO "</td></tr>";
+    	FW_pO "<tr>";
+        my $icoName = "ico$f";
+        map { my ($n,$v) = split(":",$_); $icoName=$v if($f =~ m/$n/); }
+        split(" ", AttrVal($FP_name, "fp_roomIcons", ""));
+        my $icon = FW_iconName($icoName) ?  FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
+        FW_pH "$FW_ME/floorplan/$f", "$icon$f", 1;
+    	FW_pO "</tr>";
 	}
 	FW_pO "</table><br>";
 	FW_pO "</div>\n";
@@ -987,6 +996,14 @@ FP_pOfill($@) {
 	  Default-viewport-value is "width=768".
     </li>
 	
+	<a name="fp_roomIcons"></a>
+    <li>fp_roomIcons<br>
+        Space separated list of floorplan:icon pairs, to assign icons
+        to the floorplan-menu, just like the functionality for rooms
+        in FHEMWEB. Example:<br>
+        attr Grundriss fp_roomIcons Grundriss:control_building_empty Media:audio_eq
+    </li>
+	
     <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>
 	 The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
      <ul>
@@ -998,6 +1015,7 @@ FP_pOfill($@) {
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
 		<a href="#longpoll">longpoll</a><br>
+        <a href="#allowedCommands">allowedCommands</a><br>
      </ul>
     </li><br>
   </ul>
@@ -1147,6 +1165,15 @@ FP_pOfill($@) {
 	Die Default-viewport-Angbe ist "width=768".
 	</li>
 	
+	<a name="fp_roomIcons"></a>
+    <li>fp_roomIcons<br>
+        Mit Leerstellen getrennte Liste von floorplan:icon -Paaren, um 
+        einem Eintrag des floorplan-Menues icons zuzuordnen, genau wie 
+		die entsprechende Funktionalitaet in FHEMWEB. Beispiel:<br>
+        attr Grundriss fp_roomIcons Grundriss:control_building_empty Media:audio_eq
+    </li>
+
+	
     <li><a name="fp_inherited">Vererbt von FHEMWEB</a><br>
 	 Die folgenden Attribute werden von der zugrundliegenden <a href="#FHEMWEB">FHEMWEB</a>-Instanz vererbt:<br>
      <ul>
@@ -1157,7 +1184,8 @@ FP_pOfill($@) {
 		<a href="#plotsize">plotsize</a><br>
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
-		<a href="#longpoll">longpoll</a><br>
+        <a href="#longpoll">longpoll</a><br>
+		<a href="#allowedCommands">allowedCommands</a><br>
      </ul>
     </li><br>
   </ul>

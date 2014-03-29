@@ -95,12 +95,16 @@ FBAHA_Set($@)
     my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
     if($err) {
       Log3 $name, 1, $err;
-      $hash->{STATE} = "???";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "???";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       return $err;
     }
 
     if($data =~ m/^01030010(........)/) {
-      $hash->{STATE} = "Initialized";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "Iniitalized";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       $hash->{HANDLE} = $1;
       Log3 $name, 1,
         "FBAHA $hash->{NAME} registered with handle: $hash->{HANDLE}";
@@ -108,7 +112,9 @@ FBAHA_Set($@)
     } else {
       my $msg = "Got bogus answer for REGISTER request: $data";
       Log3 $name, 1, $msg;
-      $hash->{STATE} = "???";
+      $hash->{STATE} =
+      $hash->{READINGS}{state}{VAL} = "???";
+      $hash->{READINGS}{state}{TIME} = TimeNow();
       return $msg;
 
     }
@@ -336,12 +342,10 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
-  <b>NOTE:</b> As of FRITZ!OS 5.50 this module is known to work on the FB7390,
-  and is known to <b>crash the FB7270</b>.<br><br>
-
   This module connects to the AHA server (AVM Home Automation) on a FRITZ!Box.
   It serves as the "physical" counterpart to the <a href="#FBDECT">FBDECT</a>
-  devices.
+  devices. Note: you have to enable the access to this feature in the FRITZ!Box
+  frontend first.
   <br><br>
   <a name="FBAHAdefine"></a>
   <b>Define</b>
@@ -413,12 +417,10 @@ FBAHA_Ready($)
 <a name="FBAHA"></a>
 <h3>FBAHA</h3>
 <ul>
-  <b>Achtung:</b> Es ist bekannt, da&szlig; dieses Modul mit FRITZ!OS 5.50 auf
-  einem FB7390 funktioniert, aber <b>den FB7270 zum Absurz bringt</b>.<br><br>
-
   Dieses Modul verbindet sich mit dem AHA (AVM Home Automation) Server auf
   einem FRITZ!Box. Es dient als "physikalisches" Gegenst&uuml;ck zum <a
-  href="#FBDECT">FBDECT</a> Modul.
+  href="#FBDECT">FBDECT</a> Modul. Achtung: als erstes muss der Zugang zu
+  diesen Daten in der FRITZ!Box Web-Oberfl&auml;che aktiviert werden.
   <br><br>
   <a name="FBAHAdefine"></a>
   <b>Define</b>
@@ -433,8 +435,8 @@ FBAHA_Ready($)
   wobei &lt;host&gt; die Adresse der FRITZ!Box ist (localhost AUF dem
   FRITZ.BOX) und &lt;port&gt; 2002 ist, oder
   UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, wobei das nur fuer
-  FHEM@FRITZ!BOX zur Verfügung steht. Mit FRITZ!OS 5.50 steht auch der
-  Netzwerkport zur Verfügung, auf manchen Laborvarianten nur das UNIX socket.
+  FHEM@FRITZ!BOX zur Verf&uuml;gung steht. Mit FRITZ!OS 5.50 steht auch der
+  Netzwerkport zur Verf&uuml;gung, auf manchen Laborvarianten nur das UNIX socket.
   <br>
   Beispiel:
   <ul>

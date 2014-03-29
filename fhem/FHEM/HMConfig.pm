@@ -1,6 +1,6 @@
 ##############################################
 # CUL HomeMatic device configuration data
-# $Id: $
+# $Id: $Id$
 
 #####################################################
 # configuration data for CUL_HM -used to split code and configuration
@@ -31,6 +31,7 @@ use vars qw(%culHmChanSets);
 use vars qw(%culHmFunctSets);
 use vars qw(%culHmBits);
 use vars qw(@culHmCmdFlags);
+use vars qw(%culHmTpl);
 use vars qw($K_actDetID);
 
 # ----------------modul globals-----------------------
@@ -78,9 +79,9 @@ my $K_actDetID = '000000'; # id of actionDetector
 #              => list 5 for channel 4 and 5 with peer=00000000
 #
 %culHmModel=(
-  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
-  "0002" => {name=>"HM-LC-SW1-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
-  "0003" => {name=>"HM-LC-SW4-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "0002" => {name=>"HM-LC-SW1-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "0003" => {name=>"HM-LC-SW4-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "0004" => {name=>"HM-LC-SW1-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0005" => {name=>"HM-LC-BL1-FM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0006" => {name=>"HM-LC-BL1-SM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
@@ -92,7 +93,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "000D" => {name=>"ASH550"                  ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "000E" => {name=>"ASH550I"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
   "000F" => {name=>"S550IA"                  ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",},
-  "0011" => {name=>"HM-LC-SW1-PL"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
+  "0011" => {name=>"HM-LC-SW1-PL"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0012" => {name=>"HM-LC-DIM1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0013" => {name=>"HM-LC-DIM1L-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
@@ -109,12 +110,12 @@ my $K_actDetID = '000000'; # id of actionDetector
   "0022" => {name=>"WS888"                   ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "0026" => {name=>"HM-SEC-KEY-S"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
   "0027" => {name=>"HM-SEC-KEY-O"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
-  "0028" => {name=>"HM-SEC-WIN"              ,st=>'winMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Win:1:1,Akku:2:2",},
+  "0028" => {name=>"HM-SEC-WIN"              ,st=>'winMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1:1,3:1p'     ,chn=>"Win:1:1,Akku:2:2",},
   "0029" => {name=>"HM-RC-12"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002A" => {name=>"HM-RC-12-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002B" => {name=>"HM-WS550Tech"            ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",},
   "002C" => {name=>"KS550TECH"               ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
-  "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "002F" => {name=>"HM-SEC-SC"               ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",},# remove wakeup - need retest
   "0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",},# remove wakeup - need retest
@@ -132,15 +133,15 @@ my $K_actDetID = '000000'; # id of actionDetector
   "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
   "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",},
-  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",},
-  "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",},
+  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #:w remark: this device behaves on wakeup
+  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+  "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c'      ,lst=>'p,1'          ,chn=>"",}, #:w  todo should be wakeup, does not react
   "0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,4'          ,chn=>"",},
   "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'      ,lst=>'p'            ,chn=>"",},
   "0043" => {name=>"HM-SEC-TIS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
-  "0044" => {name=>"HM-SEN-EP"               ,st=>'sensor'            ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
+  "0044" => {name=>"HM-SEN-EP"               ,st=>'sensor'            ,cyc=>''      ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"Sen:1:2",},
   "0045" => {name=>"HM-SEC-WDS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
   "0046" => {name=>"HM-SWI-3-FM"             ,st=>'swi'               ,cyc=>''      ,rxt=>'c'      ,lst=>'4'            ,chn=>"Sw:1:3",},
   "0047" => {name=>"KFM-Sensor"              ,st=>'KFM100'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
@@ -167,17 +168,17 @@ my $K_actDetID = '000000'; # id of actionDetector
   "005D" => {name=>"HM-Sen-MDIR-O"           ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "005F" => {name=>"HM-SCI-3-FM"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"Sw:1:3",},
   "0060" => {name=>"HM-PB-4DIS-WM"           ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:20",},
-  "0061" => {name=>"HM-LC-SW4-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0061" => {name=>"HM-LC-SW4-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "0062" => {name=>"HM-LC-SW2-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "0064" => {name=>"DORMA_atent"             ,st=>''                  ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:3",}, # DORMA Remote 3 buttons
   "0065" => {name=>"DORMA_BRC-H"             ,st=>'singleButton'      ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"Btn:1:4",}, # Dorma Remote 4 single buttons
-  "0066" => {name=>"HM-LC-SW4-WM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0066" => {name=>"HM-LC-SW4-WM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
-  "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"",},
+  "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"Led:1:16",},
   "006E" => {name=>"HM-LC-Dim1L-CV-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "006F" => {name=>"HM-LC-Dim1L-Pl-644"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
@@ -226,15 +227,15 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
-  "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:1,BTN_A:4:1",},#only 1 and 2 can be peered???
-  "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:1,BTN_A:4:1",},#only 1 and 2 can be peered???
+  "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armExt:1:1,armInt:2:2,disarm:3:3,light:4:4",},
+  "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"lock:1:1,unlock:2:2,open:3:3,light:4:4",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1p'     ,chn=>"Rain:1:1,Heating:2:2",},#stc:70 THSensor
-  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
+  "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'12:00' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"},
-  "00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2,8:2,9:2'
+  "00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:b'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",},
   "00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",},
   "00B1" => {name=>"HM-SEC-SC-2"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",},
@@ -256,15 +257,26 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00C0" => {name=>"HM-SEC-MDIR-2"           ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "00C8" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00C9" => {name=>"HM-LC-Sw1-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00CA" => {name=>"HM-LC-Sw1-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
+  "00CB" => {name=>"HM-LC-Sw2-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "00CC" => {name=>"HM-LC-Sw2-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "00CD" => {name=>"HM-LC-Sw4-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00CF" => {name=>"HM-LC-Sw4-WM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00D0" => {name=>"HM-LC-Sw4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
+  "00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
-  #263 167                        HM Smoke Detector Schueco
-  #"HM-RC-Key4-2"
-  #"HM-RC-Sec4-2"
 
+  #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
+#################open:---------------------------
+ 
+# rf_s           list 1 ist neu
+# rf_s_644       list 1 ist neu
 );
-
-
 
 ##----------definitions for register settings-----------------
     # definition of Register for all devices
@@ -322,10 +334,10 @@ my $K_actDetID = '000000'; # id of actionDetector
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
-  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"          ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
-  ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED"  ,lit=>{no=>0,short=>1,long=>2}},
+  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"         ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
+  ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED" ,lit=>{no=>0,short=>1,long=>2}},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Number of repetitions"},
-  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},
+  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume"            ,lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},
 # statemachines
   BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from on"      ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from off"     ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
@@ -389,7 +401,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #remote mainly
   backlOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight ontime[s]"     ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5}},
   backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"          ,lit=>{off=>0,auto=>2}},
-  backlOnMode2    =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"          ,lit=>{off=>0,on=>1}},
+  backlOnMode2    =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"          ,lit=>{off=>0,on=>1}},
   ledMode         =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED mode"                ,lit=>{off=>0,on=>1}},
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Language"                ,lit=>{English=>0,German=>1}},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke"  ,lit=>{off=>0,on=>1}},
@@ -397,7 +409,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   backAtCharge    =>{a=> 13.5,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at Charge"     ,lit=>{off=>0,on=>1}},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
-  btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"             ,lit=>{unlock=>0,lock=>1}},
+  btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"             ,lit=>{off=>0,on=>200}},
 
 # keymatic/winmatic secific register
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"           ,lit=>{off=>0,on=>1}},
@@ -429,6 +441,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
 # CC-RT    02:01 16:00
+# TC-IT    02:01 16:00
 # SEC-WDS  02:01 16:01(sabotage) ?
 # 4DIS     02:01 ?
 # HM-SEC-MDIR  02:01 ?
@@ -436,6 +449,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
+# TC-IT 16:00
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
@@ -469,7 +483,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                      ,lit=>{linear=>0,square=>1}},
-  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
+  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                      ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
 #SCD
   msgScdPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,lvlNormal=>1}},
   msgScdPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
@@ -486,7 +500,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 #SC - different literals
   msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
   msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
-# keymatic/winmatic secific register
+# keymatic/winmatic specific register
   holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>''         ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
   holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
   setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
@@ -499,6 +513,13 @@ my $K_actDetID = '000000'; # id of actionDetector
   tiltMax         =>{a=> 30  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"maximum tilt level"},
   ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
+
+  seqPulse1       =>{a=> 36  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse2       =>{a=> 37  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse3       =>{a=> 38  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse4       =>{a=> 39  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqPulse5       =>{a=> 40  ,s=>1  ,l=>1,min=>0  ,max=>4.08    ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence Pulse. 0= unused, otherwise min= 0.032sec"},
+  seqTolerance    =>{a=> 44  ,s=>1  ,l=>1,min=>0.016,max=>4.08  ,c=>''         ,f=>62.5    ,u=>'s'   ,d=>1,t=>"Sequence tolernace"},
 
   waterUppThr     =>{a=>  6.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water upper threshold"},
   waterlowThr     =>{a=>  7.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water lower threshold"},
@@ -516,13 +537,13 @@ my $K_actDetID = '000000'; # id of actionDetector
   txThrCur        =>{a=>127.0,s=>2  ,l=>1,min=>1    ,max=>16000 ,c=>''         ,f=>''      ,u=>'mA'  ,d=>1,t=>"threshold current"},
   txThrVlt        =>{a=>129.0,s=>2  ,l=>1,min=>0.1  ,max=>230   ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"threshold voltage"},
   txThrFrq        =>{a=>131.0,s=>1  ,l=>1,min=>0.01 ,max=>2.55  ,c=>''         ,f=>100     ,u=>'Hz'  ,d=>1,t=>"threshold frequency"},
-                                                                
-  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                ,lit=>{off=>0,on=>1}},
-  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                 ,lit=>{off=>0,on=>1}},
-  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is below threshold",lit=>{off=>0,on=>1}},
-  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if cond is above threshold",lit=>{off=>0,on=>1}},
-  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decision is above"},
-  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"trigger if decision is below"},
+
+  cndTxFalling    =>{a=>132.0,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if falling"                            ,lit=>{off=>0,on=>1}},
+  cndTxRising     =>{a=>132.1,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"trigger if rising"                             ,lit=>{off=>0,on=>1}},
+  cndTxCycBelow   =>{a=>132.2,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is below cndTxCycBelow",lit=>{off=>0,on=>1}},
+  cndTxCycAbove   =>{a=>132.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic trigger if level is above cndTxDecAbove",lit=>{off=>0,on=>1}},
+  cndTxDecAbove   =>{a=>133  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycAbove"},
+  cndTxDecBelow   =>{a=>134  ,s=>1  ,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"level for cndTxCycBelow"},
 
   txThrLoPwr      =>{a=>135.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold low power"},
   txThrHiPwr      =>{a=>139.0,s=>4  ,l=>1,min=>0    ,max=>3680  ,c=>''         ,f=>'100'   ,u=>'W'   ,d=>1,t=>"threshold high power"},
@@ -552,8 +573,8 @@ my $K_actDetID = '000000'; # id of actionDetector
 # others
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable",lit=>{off=>0,on=>1}},
 
-  condTxThrhHi    =>{a=>135  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
-  condTxThrhHi    =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
+  cndTxThrhHi     =>{a=>135  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
+  cndTxThrhLo     =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
 
@@ -563,7 +584,6 @@ my $K_actDetID = '000000'; # id of actionDetector
 # SEC-SC   08:00 ?
 # RC19     08:00 ? RC19 Button 08:08
 # Bl1PBU   08:00 09:00 10:00
-
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #                                                                                                              "inactive=>unused\n".
@@ -650,10 +670,10 @@ my $K_actDetID = '000000'; # id of actionDetector
 
   hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0  ,max=>2       ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"                   ,lit=>{heating=>0,cooling=>1}},
-  weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                         ,lit=>{prog1=>0,prog2=>1,prog1=>2}},
+  weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                         ,lit=>{prog1=>0,prog2=>1,prog3=>2}},
 
-  modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party only by..."            ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
-  modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual only by..."           ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
+  modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party only by..."       ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
+  modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual only by..."      ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
 
   winOpnMode      =>{a=> 19.5,s=>0.3,l=>7,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable internal Windoe open in modes: "      ,lit=>{off=>0,auto=>1,auto_manu=>2,auto_party=>3,on=>4}},
   winOpnDetFall   =>{a=> 19.0,s=>0.5,l=>7,min=>0.5,max=>2.5     ,c=>''         ,f=>'10'    ,u=>'K'   ,d=>1,t=>"detect Window Open if temp falls more then..."},
@@ -689,6 +709,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   blindActuator       =>{ intKeyVisib     =>1
                          ,driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1
                          ,sign            =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,MaxTimeF        =>1
                          ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OffLevel        =>1,OnLevel         =>1
@@ -717,6 +739,8 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,lgMultiExec     =>1
                         },
   switch              =>{ intKeyVisib     =>1,sign            =>1
+                         ,confBtnTime     =>1,localResDis     =>1
+                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
@@ -724,7 +748,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
                          ,lgMultiExec     =>1
                         },
-  winMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1},
+  winMatic            =>{ intKeyVisib     =>1,signal          =>1,signalTone      =>1,keypressSignal  =>1},
   keyMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1
                          ,holdTime        =>1,holdPWM         =>1,setupDir        =>1,setupPosition   =>1
                          ,angelOpen       =>1,angelMax        =>1,angelLocked     =>1
@@ -752,9 +776,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 
 %culHmRegModel = (
   "HM-RC-12"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1
-                         ,lcdSymb         =>1, lcdLvlInterp   =>1
-                        },
+  "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
   "HM-RC-4-2"         =>{ localResDis     =>1},
 
   "HM-LC-Bl1PBU-FM"   =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
@@ -837,6 +859,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,                                        transmitTryMax  =>1},
   "HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1},
   "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
+  "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1},
   "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
   "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -870,6 +893,7 @@ $culHmRegModel{"KS550"}               = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS550TECH"}           = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS550LC"}             = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
+$culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
 $culHmRegModel{"HM-LC-Dim1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
@@ -909,8 +933,6 @@ $culHmRegModel{"HM-LC-Sw1PBU-FM"}     = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
 $culHmRegModel{"HM-RC-Sec4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 
-$culHmRegModel{"HM-LC-SW4-BA-PCB"}    = $culHmRegModel{"HM-LC-SW1-BA-PCB"};
-
 $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
@@ -928,14 +950,15 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
   "HM-RC-1912"        =>{ msgShowTime     =>1, beepAtAlarm    =>1, beepAtService  =>1,beepAtInfo  =>1
                          ,backlAtAlarm    =>1, backlAtService =>1, backlAtInfo    =>1
                          },
+  "HM-RC-1901"        =>{ lcdSymb         =>1, lcdLvlInterp   =>1},
   "HM-OU-CFM-PL01"    =>{ ActTypeLed      =>1},
   "HM-OU-CFM-PL02"    =>{ ActTypeMp3      =>1,Intense         =>1},
   "HM-SEC-WIN01"      =>{ setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
                          ,WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
-                         ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1
-                         ,OnLevelKm       =>1,RampOnSp        =>1,RampOffSp       =>1
+                         ,OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,OnLevelKm       =>1
+                         ,RampOnSp        =>1,RampOffSp       =>1
                          },
   "WDF-solar01"       =>{ WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1
                          ,OffLevel        =>1,OnLevel         =>1
@@ -957,7 +980,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
   "Schueco_263-xxx02" =>{ transmitTryMax  =>1,eventDlyTime    =>1},
   "Schueco_263-xxx03" =>{ ttJtOn          =>1,ttJtOff         =>1},
   "HM-Sen-RD-O01"     =>{ eventFilterTimeB=>1,transmitTryMax  =>1,peerNeedsBurst  =>1,expectAES       =>1
-                         ,condTxThrhHi    =>1,condTxThrhHi    =>1,highHoldTime    =>1,evntRelFltTime  =>1
+                         ,cndTxThrhHi     =>1,cndTxThrhLo     =>1,highHoldTime    =>1,evntRelFltTime  =>1
                          },
   "HM-CC-RT-DN03"     =>{ shCtValLo       =>1
                          ,winOpnTemp      =>1},
@@ -1012,33 +1035,204 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           },
+  "HM-SEN-EP"         =>{ seqPulse1       =>1,seqPulse2       =>1,seqPulse3       =>1,seqPulse4       =>1
+                         ,seqPulse5       =>1,seqTolerance    =>1
+                         ,peerNeedsBurst  =>1
+                        }
   );
 
 #clones - - - - - - - - - - - - - - -
 $culHmRegChan{"HM-RC-19-B12"}         = $culHmRegChan{"HM-RC-1912"};
 $culHmRegChan{"HM-RC-19-SW12"}        = $culHmRegChan{"HM-RC-1912"};
-                                      
-$culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};
-                                      
-$culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegType{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegType{"HM-CC-RT-DN04"};
-$culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegType{"HM-CC-RT-DN06"};
-                                      
-$culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegType{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegType{"HM-CC-RT-DN06"};
+foreach (2..16){
+  my $c = sprintf("%02X",$_);
+  $culHmRegChan{"HM-RC-19$c"}           = $culHmRegChan{"HM-RC-1901"};
+  $culHmRegChan{"HM-RC-19-B$c"}         = $culHmRegChan{"HM-RC-1901"};
+  $culHmRegChan{"HM-RC-19-SW$c"}        = $culHmRegChan{"HM-RC-1901"};
+}
 
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegType{"HM-CC-TC02"};
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
+$culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};      # type hash
 
-##--------------- Conversion routines for register settings
+$culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegChan{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegChan{"HM-CC-RT-DN04"};
+$culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegChan{"HM-CC-RT-DN06"};
+
+$culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU07"}   = $culHmRegType{remote};        # type hash
+
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
+
+##############################---templates---##################################
+#en-block programming of funktions
+%culHmTpl = (
+   autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
+                    ,reg=>{ OnTime          =>"p0"
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"on"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"no"
+                           ,SwJtDlyOff      =>"dlyOn"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwToggle          => {p=>""                 ,t=>"Switch: toggle on trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"dlyOff"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"off"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwOn              => {p=>""                 ,t=>"Switch: on if trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"no"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"dlyOn"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,SwOff             => {p=>""                 ,t=>"Switch: off if trigger"
+                    ,reg=>{ OnTime          =>111600
+                           ,OffTime         =>111600
+                           ,SwJtOn          =>"dlyOff"
+                           ,SwJtOff         =>"no"
+                           ,SwJtDlyOn       =>"dlyOff"
+                           ,SwJtDlyOff      =>"off"
+                           ,ActionType      =>"jmpToTarget"
+                     }}
+  ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer: on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p1"
+                           ,CtRampOn        =>"ltLo"
+                           ,CtRampOff       =>"ltLo"
+                           ,OffTime         =>111600
+                           ,OnTime          =>"p0"
+
+                           ,ActionTypeDim   =>"jmpToTarget"
+                           ,DimJtOn         =>"on"
+                           ,DimJtOff        =>"dlyOn"
+                           ,DimJtDlyOn      =>"rampOn"
+                           ,DimJtDlyOff     =>"dlyOn"
+                           ,DimJtRampOn     =>"on"
+                           ,DimJtRampOff    =>"dlyOn"
+                     }}
+  ,motionOnSw        => {p=>"ontime brightness",t=>"Switch: on for time if MDIR-brightness below level"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p1"
+                           ,OffTime         =>111600
+                           ,OnTime          =>"p0"
+
+                           ,ActionType      =>"jmpToTarget"
+                           ,SwJtOn          =>"on"
+                           ,SwJtOff         =>"dlyOn"
+                           ,SwJtDlyOn       =>"on"
+                           ,SwJtDlyOff      =>"dlyOn"
+                    }}
+  ,SwCondAbove       => {p=>"condition"        ,t=>"Switch: execute only if condition level is above limit"
+                    ,reg=>{ CtDlyOn         =>"geLo"
+                           ,CtDlyOff        =>"geLo"
+                           ,CtOn            =>"geLo"
+                           ,CtOff           =>"geLo"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,SwCondBelow       => {p=>"condition"        ,t=>"Switch: execute only if condition level is below limit"
+                    ,reg=>{ CtDlyOn         =>"ltLo"
+                           ,CtDlyOff        =>"ltLo"
+                           ,CtOn            =>"ltLo"
+                           ,CtOff           =>"ltLo"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,SwOnCond          => {p=>"level cond"       ,t=>"switch: execute only if condition [geLo|ltLo] level is below limit"
+                    ,reg=>{ CtDlyOn         =>"p1"
+                           ,CtDlyOff        =>"p1"
+                           ,CtOn            =>"p1"
+                           ,CtOff           =>"p1"
+                           ,CtValLo         =>"p0"
+                     }}
+  ,BlStopDnLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"rampOff"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+                    }}
+  ,BlStopDnSh        => {p=>""                 ,t=>"Blind: stop drive on any key - for short drive down"
+                    ,reg=>{ ActionType      =>"jmpToTarget"
+                           ,BlJtDlyOff      =>"refOff"
+                           ,BlJtDlyOn       =>"dlyOff"
+                           ,BlJtOff         =>"dlyOff"
+                           ,BlJtOn          =>"dlyOff"
+                           ,BlJtRampOff     =>"off"
+                           ,BlJtRampOn      =>"on"
+                           ,BlJtRefOff      =>"rampOff"
+                           ,BlJtRefOn       =>"on"
+                    }}
+  ,BlStopUpLg        => {p=>""                 ,t=>"Blind: stop drive on any key - for long drive up"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"rampOn"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+                    }}
+  ,BlStopUpSh        => {p=>""                 ,t=>"Blind: stop drive on"
+                    ,reg=>{ ActionType       =>"jmpToTarget"
+                           ,BlJtDlyOff       =>"dlyOn"
+                           ,BlJtDlyOn        =>"refOn"
+                           ,BlJtOff          =>"dlyOn"
+                           ,BlJtOn           =>"dlyOn"
+                           ,BlJtRampOff      =>"off"
+                           ,BlJtRampOn       =>"on"
+                           ,BlJtRefOff       =>"off"
+                           ,BlJtRefOn        =>"rampOn"
+                    }}                   
+  ,wmOpen            => {p=>"speed"            ,t=>"winmatic: open window"     
+                    ,reg=>{ WinJtOn          =>"rampOn"
+                           ,WinJtOff         =>"rampOn"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOnSp         =>"p0"
+                    }}
+  ,wmClose           => {p=>"speed"            ,t=>"winmatic: close window"    
+                    ,reg=>{ WinJtOn          =>"rampOff"
+                           ,WinJtOff         =>"rampOff"
+                           ,WinJtRampOn      =>"on"
+                           ,WinJtRampOff     =>"rampOnFast"
+                           ,RampOffSp        =>"p0"
+                    }}
+  ,wmClosed          => {p=>""                 ,t=>"winmatic: lock window"     
+                    ,reg=>{ OffLevelKm       =>"0"
+                    }}
+  ,wmLock            => {p=>""                 ,t=>"winmatic: lock window"     
+                    ,reg=>{ OffLevelKm       =>"127.5"
+                    }}
+);
 
 ##############################---get---########################################
 #define gets - try use same names as for set
 %culHmGlobalGets = (
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
+  regVal     => "<addr> ... <list> <peer>",
   regList    => "",
-  saveConfig => "<filename>",
+  cmdList    => "",
+  saveConfig => "<filename> ...",
 );
 %culHmSubTypeGets = (
   none4Type  =>{ "test"=>"" },
@@ -1058,6 +1252,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw           => "data ...",
   virtual       =>"<noButtons>",
+  clear         => "[readings|register|rssi|msgEvents]",
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
   raw           => "data ...",
@@ -1090,67 +1285,66 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegType{"HM-CC-TC03"};
   peerBulk      => "<peer1,peer2,...>",
 );
 %culHmSubTypeSets = (# channels of this subtype
-  switch           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-                      ,on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  dimmer           =>{ "on-for-timer"=>"<sec>"
-                      ,"on-till"     =>"<time>"
-                      ,on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,pct           =>"<value> ... [<ontime>] [<ramptime>]"
-                      ,stop          =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  blindActuator    =>{ on            =>""
-                      ,off           =>""
-                      ,toggle        =>""
-                      ,pct           =>"[<value>] ... [<ontime>]"
-                      ,stop          =>""
-                      ,press         =>"[long|short] [on|off] ..."
-                      ,up            =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,down          =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  remote           =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
-  threeStateSensor =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
-#                     ,statusRequest =>""
+  switch           =>{ "on-for-timer" =>"<ontime>"
+                      ,"on-till"      =>"<time>"
+                      ,on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                     },
+  dimmer           =>{ "on-for-timer" =>"<ontime> [<ramptime>]..."
+                      ,"on-till"      =>"<time> [<ramptime>]..."
+                      ,on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
+                      ,stop           =>""
+                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                     },
+  blindActuator    =>{ on             =>""
+                      ,off            =>""
+                      ,toggle         =>""
+                      ,pct            =>"[<value>] ... [<ontime>]"
+                      ,stop           =>""
+                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""
+                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
                       },
-  THSensor         =>{ peerChan      =>" 0 <actChn> ... single [set|unset] [actor|remote|both]"},
-  virtual          =>{ peerChan      =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
-                      ,press         =>"[long|short]..."
-                      ,postEvent     =>"<condition>"
-                      ,postWeather   =>"<off| -80..80 degree>"
+  remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"},
+  threeStateSensor =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+#                     ,statusRequest  =>""
                       },
-  smokeDetector    =>{ peerChan      =>"<btnNumber> <actChn> ... single [set|unset] actor"},
-  winMatic         =>{ matic         =>"<btn>"
-                      ,keydef        =>"<btn> <txt1> <txt2>"
-                      ,create        =>"<txt>"
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  keyMatic         =>{ lock          =>""
-                      ,unlock        =>"[<sec>] ..."
-                      ,open          =>"[<sec>] ..."
-                      ,inhibit       =>"[on|off]"
-                      ,statusRequest =>""},
-  repeater         =>{ setRepeat     => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
-                      ,inhibit       => "[on|off]"
-                      ,statusRequest =>""},
-  outputUnit       =>{ statusRequest =>""},
+  THSensor         =>{ peerChan       =>"0 <actChn> ... single [set|unset] [actor|remote|both]"},
+  virtual          =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual] [set|unset] [actor|remote|both]"
+                      ,press          =>"[long|short] [noBurst] ..."
+                      ,postEvent      =>"<condition>"},
+  smokeDetector    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] actor"},
+  winMatic         =>{ statusRequest  =>""},
+  keyMatic         =>{ lock           =>""
+                      ,unlock         =>"[<sec>] ..."
+                      ,open           =>"[<sec>] ..."
+                      ,inhibit        =>"[on|off]"
+                      ,statusRequest  =>""},
+  repeater         =>{ setRepeat      => "[no1..36] <sendName> <recName> [bdcast-yes|no]"
+                      ,inhibit        => "[on|off]"
+                      ,statusRequest  =>""},
+  outputUnit       =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
 
-$culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
@@ -1159,35 +1353,37 @@ $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
-#  "HM-CC-VD"       =>{ valvePos       => "position"},
-  "HM-RC-19"       =>{ service        => "<count>"
-                      ,alarm          => "<count>"
-                      ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-PB-4DIS-WM"  =>{ text           => "<txt1> <txt2>..."
-                        #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
-                     },
-  "HM-OU-LED16"    =>{ led            => "[off|red|green|orange]"
-                      ,ilum           => "[0-15] [0-127]"},
-  "HM-OU-CFM-PL"   =>{ "on-for-timer" =>"<sec>"
-                      ,"on-till"      =>"<time>"
-                      ,on             =>""
-                      ,off            =>""
-                      ,toggle         =>""
-                      ,press          =>"[long|short] [on|off] ..."
-                      ,inhibit        =>"[on|off]"},
-  "HM-CC-TC"       =>{ burstXmit      =>""},
-  "HM-CC-RT-DN"    =>{ burstXmit      =>""
-                      ,inhibit        =>"[on|off]"},
-  "HM-CC-RT-DN-BoM"=>{ statusRequest  =>""
-                      ,inhibit        =>"[on|off]"},
-  "HM-SEC-SD"      =>{ statusRequest  =>""},
+  "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"},
+  "HM-RC-19"         =>{ service        => "<count>"
+                        ,alarm          => "<count>"
+                        ,display        => "<text> [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
+  "HM-PB-4DIS-WM"    =>{ text           => "<txt1> <txt2>..."
+                          #text         => "<btn> [on|off] <txt1> <txt2>...", old style will not be offered anymore
+                       },
+  "HM-OU-LED16"      =>{ led            => "[off|red|green|orange]"
+                        ,ilum           => "[0-15] [0-127]"},
+  "HM-OU-CFM-PL"     =>{ "on-for-timer" =>"<sec>"
+                        ,"on-till"      =>"<time>"
+                        ,on             =>""
+                        ,off            =>""
+                        ,toggle         =>""
+                        ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                        ,inhibit        =>"[on|off]"},
+  "HM-CC-TC"         =>{ burstXmit      =>""},
+  "HM-CC-RT-DN"      =>{ burstXmit      =>""
+                        ,inhibit        =>"[on|off]"},
+  "HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"},
+  "HM-SEC-SD"        =>{ statusRequest  =>""},
 );
 # clones- - - - - - - - - - - - - - - - -
+$culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
+
 $culHmModelSets{"HM-RC-19-B"}          = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
+
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
-
+$culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
@@ -1212,18 +1408,24 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,controlMode    =>"[auto|manual|central|party]"
                          ,statusRequest  =>""
                          ,sysTime        =>""},
-  "HM-SEC-WIN01"      =>{ stop           =>"",
-                          level          =>"<level> <relockDly> <speed>..."},
   "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"<MP3No>[,<MP3No>...] [<repeat>]"},
-                      
+  "HM-SEC-WIN01"      =>{ stop           =>"",
+                         ,level          =>"<level> <relockDly> <speed>..."
+                         ,keydef         =>"<btn> <txt1> <txt2>"
+                         ,inhibit        =>"[on|off]"
+                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                        },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""},
-  "HM-CC-RT-DN00"     =>{ sysTime        =>""},
-  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|boost|day|night]"
+  "HM-CC-RT-DN00"     =>{ sysTime        =>""
+                         ,fwUpdate       =>"<filename>"
+                        },
+  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manu|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
                          ,tempListSat    =>"[prep|exec] HH:MM temp ..."
@@ -1236,12 +1438,27 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
+  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manu|boost|day|night]"
+                         ,controlManu    =>"[on|off|5.0..30.0]"
+                         ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
+                         ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListTue    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListThu    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                         ,"desired-temp" =>"[on|off|5.0..30.0]"
+                         ,peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
+                        },
+  "HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
+  "HM-TC-IT-WM-W-EU07"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
   "HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""
-                         ,press          =>"[long|short] [on|off] ..."
+                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 );
@@ -1251,15 +1468,16 @@ $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
-                                        
+
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
-                                        
+
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};
+$culHmChanSets{"HM-TC-IT-WM-W-EU00"}    = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
 $culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
 $culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
-                                        
+
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
@@ -1272,12 +1490,11 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                          ,alarmOff      =>""
                          ,teamCall      =>""
                         },
-  vdCtrl              =>{ valvePos      =>"<position>"
-                        }
+  vdCtrl              =>{ valvePos      =>"[off|0.0..99.0]"},
+  virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]",
+                          virtHum       =>"[off|0.0..99.0]"}
 );
 
-                      
-                      
 
 # RC send BCAST to specific address. Is the meaning understood?
 @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -1301,7 +1518,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      PEER_CHANNEL_A => "28,2",
                      PEER_CHANNEL_B => "30,2",
                      UNKNOWN        => "32,2", }},
-                    
+
   "01;p11=01"   => { txt => "CONFIG_PEER_ADD", params => {
                      CHANNEL        => "00,2",
                      PEER_ADDRESS   => "04,6",
@@ -1348,17 +1565,14 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
                      RSSI           => '08,02,$val=(-1)*(hex($val))', }},
   "02;p01=02"   => { txt => "ACK2"}, # smokeDetector pairing only?
-  "02;p01=04"   => { txt => "ACK-proc",  params => {# connected to AES??
+  "02;p01=04"   => { txt => "AES_req",  params => {#
                      Para1          => "02,4",
                      Para2          => "06,4",
                      Para3          => "10,4",
-                     Para4          => "14,2",}}, # remote?
+                     keyNo          => "14,2",}},
   "02;p01=80"   => { txt => "NACK"},
   "02;p01=84"   => { txt => "NACK_TARGET_INVALID"},
   "02"          => { txt => "ACK/NACK_UNKNOWN   "},
-
-  "02"          => { txt => "Request AES", params => {  #todo check data
-                     DATA =>  "0," } },
 
   "03"          => { txt => "AES reply",   params => { # send 'old' AES key to actor
                      DATA =>  "0," } },
@@ -1368,7 +1582,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      TYPE    => "02,2" } },                         #00: old key? 01: new key?
   "04"          => { txt => "To-Actor:send AES key" ,   params => { # HMLAN sends AES key to actor ??
                      CODE    => "00" } },
-                    
+
   "10;p01=00"   => { txt => "INFO_SERIAL", params => {
                      SERIALNO => '02,20,$val=pack("H*",$val)'},},
   "10;p01=01"   => { txt => "INFO_PEER_LIST", params => {
@@ -1412,15 +1626,25 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
   "11;p02=8100" => { txt => "LEDall"      , params => {
                      Led1To16 => '04,8,$val= join(":",sprintf("%b",hex($val))=~ /(.{2})/g)',
                      } },
-  "11;p01=81"   => { txt => "LEVEL"       , params => {
+  "11;p01=81"   => { txt => "LEVEL"       , params => {#ALARM_COUNT/HANDLE_LOCK/LEVEL_SET/MANU_MODE_SET/SET_ALL_CHANNELS
                      CHANNEL  => "02,2",
                      TIME     => '04,2,$val=hex($val)',
                      SPEED    => '06,2,$val=hex($val)',
                      } },
-  "11;p01=82"   => { txt => "Sleepmode"   , params => {#only LED16?
+  "11;p01=82"   => { txt => "Sleepmode"   , params => {#SET_WINTER_MODE/SET_LED_SLEEP_MODE/SERVICE_COUNT/PARTY_MODE_SET
                      CHANNEL  => "02,2",
                      MODE     => '04,2,$val=hex($val)',
                      } },
+  "11;p01=83"   => { txt => "EnterBootLoader"   },#BOOST_MODE_SET/SET_HANDLE_LED_MODE
+#  "11;p01=84"   => { txt => ""   },#SET_SHEV_POS/COMFORT_MODE_SET
+#  "11;p01=85"   => { txt => ""   },#LOWERING_MODE_SET/SET_RELEASE_TURN
+  "11;p01=86"   => { txt => "SetTemp"     , params => {
+                     B1     => "02,2",
+                     B2     => '04,2',
+                     } },
+  "11;p01=87"   => { txt => "AdaptionDriveSet"  },
+  "11;p01=CA"   => { txt => "EnterBootLoader"   },#download? at the end?
+
   "12"          => { txt => "HAVE_DATA"},
   "3E"          => { txt => "SWITCH"      , params => {
                      DST      => "00,6",
@@ -1441,6 +1665,10 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      NBR      => '02,2,$val=(hex($val))',
                      VALUE    => '04,2,$val=(hex($val))',} },
+  "42"          => { txt => "SwitchLevel" , params => {
+                     BUTTON   => '00,2,$val=(hex($val)&0x3F)',
+                     NBR      => '02,2,$val=(hex($val))',
+                     LEVEL    => '04,2,$val=(hex($val))',} },
   "53"          => { txt => "SensorData"  , params => {
                      CMD => "00,2",
                      Fld1=> "02,2",
@@ -1458,19 +1686,23 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      CMD      => "00,2",
                      desTemp  => '02,2,$val=((hex($val)>>2) /2)',
                      mode     => '02,2,$val=(hex($val) & 0x3)',} },
-  "5E"          => { txt => "powerEvntCyc" , params => {
-                     energy   => '00,3,$val=((hex($val)) /10)',
-                     power    => '00,3,$val=((hex($val)) /100)',
-                     current  => '00,3,$val=((hex($val)) /1)',
-                     voltage  => '00,3,$val=((hex($val)) /10)',
-                     frequency=> '00,3,$val=((hex($val)) /100+50)',
+  "5A"          => { txt => "ThermCtrl"   , params => {
+                     setTemp  => '00,2,$val=(((hex($val)>>2)&0x3f) /2)',
+                     actTemp  => '00,4,$val=((hex($val)>>6) /10)',
+                     hum      => '04,2,$val=(hex($val) & 0x3)',} },
+  "5E"          => { txt => "powerEvntCyc", params => {
+                     energy   => '00,6,$val=((hex($val)) /10)',
+                     power    => '06,6,$val=((hex($val)) /100)',
+                     current  => '12,4,$val=((hex($val)) /1)',
+                     voltage  => '16,4,$val=((hex($val)) /10)',
+                     frequency=> '20,2,$val=((hex($val)) /100+50)',
                      } },
-  "5F"          => { txt => "powerEvnt" , params => {
-                     energy   => '00,3,$val=((hex($val)) /10)',
-                     power    => '00,3,$val=((hex($val)) /100)',
-                     current  => '00,3,$val=((hex($val)) /1)',
-                     voltage  => '00,3,$val=((hex($val)) /10)',
-                     frequency=> '00,3,$val=((hex($val)) /100+50)',
+  "5F"          => { txt => "powerEvnt"   , params => {
+                     energy   => '00,6,$val=((hex($val)) /10)',
+                     power    => '06,6,$val=((hex($val)) /100)',
+                     current  => '12,4,$val=((hex($val)) /1)',
+                     voltage  => '16,4,$val=((hex($val)) /10)',
+                     frequency=> '20,2,$val=((hex($val)) /100+50)',
                      } },
   "70"          => { txt => "WeatherEvent", params => {
                      TEMP     => '00,4,$val=((hex($val)&0x3FFF)/10)*((hex($val)&0x4000)?-1:1)',

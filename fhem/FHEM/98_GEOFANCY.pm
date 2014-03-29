@@ -25,9 +25,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.2
+# Version: 1.1.0
 #
 # Major Version History:
+# - 1.1.0 - 2014-02-06
+# -- Support for both apps: Geofency and Geofancy
+#
 # - 1.0.0 - 2014-01-09
 # -- First release
 #
@@ -39,6 +42,7 @@ use strict;
 use warnings;
 use vars qw(%data);
 use HttpUtils;
+use Time::Local;
 use Data::Dumper;
 
 sub GEOFANCY_Set($@);
@@ -159,7 +163,11 @@ sub GEOFANCY_Set($@) {
 ###################################
 sub GEOFANCY_CGI() {
 
- # /$infix?device=UUID&id=UUID&latitude=xx.x&longitude=xx.x&trigger=(enter|exit)
+# Geofancy
+# /$infix?device=UUIDdev&id=UUIDloc&latitude=xx.x&longitude=xx.x&trigger=(enter|exit)
+#
+# Geofency
+# /$infix?id=UUIDloc&name=locName&entry=(1|0)&date=DATE&latitude=xx.x&longitude=xx.x&device=UUIDdev
     my ($request) = @_;
 
     my $hash;
@@ -170,8 +178,11 @@ sub GEOFANCY_CGI() {
     my $id;
     my $lat;
     my $long;
-    my $trigger;
+    my $entry;
     my $msg;
+    my $date;
+    my $time;
+    my $locName;
 
     # data received
     if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
@@ -197,27 +208,35 @@ sub GEOFANCY_CGI() {
             $webArgs->{$p} = $v;
         }
 
-        if (   !defined( $webArgs->{device} )
+        if (
+               !defined( $webArgs->{device} )
             || !defined( $webArgs->{id} )
-            || !defined( $webArgs->{latitude} )
-            || !defined( $webArgs->{longitude} )
-            || !defined( $webArgs->{trigger} )
+            || (
+                !(
+                    defined( $webArgs->{trigger} && $webArgs->{trigger} ne "" )
+                )
+                && !( defined( $webArgs->{entry} ) && $webArgs->{entry} ne "" )
+            )
             || $webArgs->{device} eq ""
             || $webArgs->{id} eq ""
-            || $webArgs->{latitude} eq ""
-            || $webArgs->{longitude} eq ""
-            || $webArgs->{trigger} eq "" )
+          )
         {
-            $msg = "device=";
-            $msg .= $webArgs->{device}    if ( $webArgs->{device} );
-            $msg .= " id=";
+            $msg = " id=";
             $msg .= $webArgs->{id}        if ( $webArgs->{id} );
+            $msg .= " name=";
+            $msg .= $webArgs->{name}      if ( $webArgs->{name} );
+            $msg .= " entry=";
+            $msg .= $webArgs->{entry}     if ( $webArgs->{entry} );
+            $msg .= " trigger=";
+            $msg .= $webArgs->{trigger}   if ( $webArgs->{trigger} );
+            $msg .= " date=";
+            $msg .= $webArgs->{date}      if ( $webArgs->{date} );
             $msg .= " latitude=";
             $msg .= $webArgs->{latitude}  if ( $webArgs->{latitude} );
             $msg .= " longitude=";
             $msg .= $webArgs->{longitude} if ( $webArgs->{longitude} );
-            $msg .= " trigger=";
-            $msg .= $webArgs->{trigger}   if ( $webArgs->{trigger} );
+            $msg .= " device=";
+            $msg .= $webArgs->{device}    if ( $webArgs->{device} );
 
             Log3 $name, 3,
               "GEOFANCY: Insufficient data received for webhook $link:\n"
@@ -227,27 +246,44 @@ sub GEOFANCY_CGI() {
                 "NOK\nInsufficient data received for webhook $link:\n" . $msg );
         }
 
-        $device  = $webArgs->{device};
-        $id      = $webArgs->{id};
-        $lat     = $webArgs->{latitude};
-        $long    = $webArgs->{longitude};
-        $trigger = $webArgs->{trigger};
+        # Geofancy.app
+        if ( defined $webArgs->{trigger} ) {
+            $id     = $webArgs->{id};
+            $entry  = $webArgs->{trigger};
+            $lat    = $webArgs->{latitude};
+            $long   = $webArgs->{longitude};
+            $device = $webArgs->{device};
+        }
+
+        # Geofency.app
+        elsif ( defined $webArgs->{entry} ) {
+            $id      = $webArgs->{id};
+            $locName = $webArgs->{name};
+            $entry   = $webArgs->{entry};
+            $date    = $webArgs->{date};
+            $lat     = $webArgs->{latitude};
+            $long    = $webArgs->{longitude};
+            $device  = $webArgs->{device};
+        }
+        else {
+            return "fatal error";
+        }
     }
 
     # no data received
     else {
-        Log3 undef, 3,
-"GEOFANCY: No data received, see API information on http://wiki.geofancy.com";
+        Log3 undef, 3, "GEOFANCY: No data received";
 
-        return (
-            "text/plain; charset=utf-8",
-"NOK No data received, see API information on http://wiki.geofancy.com"
-        );
+        return ( "text/plain; charset=utf-8", "NOK No data received" );
     }
 
     # return error if unknown trigger
-    return ( "text/plain; charset=utf-8", "$trigger NOK" )
-      if ( $trigger ne "enter" && $trigger ne "exit" && $trigger ne "test" );
+    return ( "text/plain; charset=utf-8", "$entry NOK" )
+      if ( $entry ne "enter"
+        && $entry ne "1"
+        && $entry ne "exit"
+        && $entry ne "0"
+        && $entry ne "test" );
 
     $hash = $defs{$name};
 
@@ -276,30 +312,36 @@ sub GEOFANCY_CGI() {
       if $hash->{helper}{device_aliases}{$device};
 
     Log3 $name, 4,
-        "GEOFANCY $name: "
-      . $device . ": id="
-      . $id
-      . " latitude="
-      . $lat
-      . " longitude="
-      . $long
-      . " trigger="
-      . $trigger;
+"GEOFANCY $name: id=$id name=$locName entry=$entry date=$date lat=$lat long=$long dev=$device";
 
     readingsBeginUpdate($hash);
 
+    # use time from device
+    if ( defined $date && $date ne "" ) {
+        $hash->{".updateTime"}      = GEOFANCY_ISO8601UTCtoLocal($date);
+        $hash->{".updateTimestamp"} = FmtDateTime( $hash->{".updateTime"} );
+        $time                       = $hash->{".updateTimestamp"};
+    }
+
+    # use local FHEM time
+    else {
+        $time = TimeNow();
+    }
+
     # General readings
     readingsBulkUpdate( $hash, "state",
-        "dev:$device trig:$trigger id:$id lat:$lat long:$long" );
+"id:$id name:$locName trig:$entry date:$date lat:$lat long:$long dev:$device"
+    );
+
+    $id = $locName if ( defined($locName) && $locName ne "" );
+
     readingsBulkUpdate( $hash, "lastDevice", $device );
     readingsBulkUpdate( $hash, "lastArr",    $device . " " . $id )
-      if $trigger eq "enter";
+      if ( $entry eq "enter" || $entry eq "1" );
     readingsBulkUpdate( $hash, "lastDep", $device . " " . $id )
-      if $trigger eq "exit";
+      if ( $entry eq "exit" || $entry eq "0" );
 
-    my $time = TimeNow();
-
-    if ( $trigger eq "enter" || $trigger eq "test" ) {
+    if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" ) {
         Log3 $name, 3, "GEOFANCY $name: $device arrived at $id";
         readingsBulkUpdate( $hash, $device,                  "arrived " . $id );
         readingsBulkUpdate( $hash, "currLoc_" . $device,     $id );
@@ -307,7 +349,7 @@ sub GEOFANCY_CGI() {
         readingsBulkUpdate( $hash, "currLocLong_" . $device, $long );
         readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
     }
-    if ( $trigger eq "exit" ) {
+    if ( $entry eq "exit" || $entry eq "0" ) {
         my $currReading;
         my $lastReading;
 
@@ -343,73 +385,123 @@ sub GEOFANCY_CGI() {
 
     readingsEndUpdate( $hash, 1 );
 
-    $msg = "$trigger OK";
-    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trigger=$trigger"
-      if ( $trigger eq "test" );
+    $msg = "$entry OK";
+    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trigger=$entry"
+      if ( $entry eq "test" );
 
     return ( "text/plain; charset=utf-8", $msg );
+}
+
+sub GEOFANCY_ISO8601UTCtoLocal ($) {
+    my ($datetime) = @_;
+    $datetime =~ s/T/ /g if ( defined( $datetime && $datetime ne "" ) );
+    $datetime =~ s/Z//g  if ( defined( $datetime && $datetime ne "" ) );
+
+    my (
+        $date, $time, $y,     $m,       $d,       $hour,
+        $min,  $sec,  $hours, $minutes, $seconds, $timestamp
+    );
+
+    ( $date, $time ) = split( ' ', $datetime );
+    ( $y,    $m,   $d )   = split( '-', $date );
+    ( $hour, $min, $sec ) = split( ':', $time );
+    $m -= 01;
+    $timestamp = timegm( $sec, $min, $hour, $d, $m, $y );
+    ( $sec, $min, $hour, $d, $m, $y ) = localtime($timestamp);
+    $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
+
+    return $timestamp;
 }
 
 1;
 
 =pod
+
 =begin html
 
-<a name="GEOFANCY"></a>
-<h3>GEOFANCY</h3>
-<ul>
-  Provides webhook receiver for geofencing from geofancy.com.<p>
-
-  GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.</p>
-
-  <a name="GEOFANCYdefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; &lt;infix&gt;</code><br><br>
-
-    Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
-    <code>http://hostname:8083/fhem</code>)
-
-    Example:
+    <p>
+      <a name="GEOFANCY" id="GEOFANCY"></a>
+    </p>
+    <h3>
+      GEOFANCY
+    </h3>
     <ul>
-      <code>define geofancy GEOFANCY geo</code><br>
+      <li>Provides webhook receiver for geofencing via the following iOS apps:<br>
+        <br>
+      </li>
+      <li>
+        <a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&amp;mt=8">Geofency</a>
+      </li>
+      <li>
+        <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy</a>
+      </li>
+      <li>
+        <p>
+          Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
+        </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
+        <div style="margin-left: 2em">
+          <code>define &lt;name&gt; &lt;infix&gt;</code><br>
+          <br>
+          Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually <code>http://hostname:8083/fhem</code>)<br>
+          <br>
+          Example:
+          <div style="margin-left: 2em">
+            <code>define geofancy GEOFANCY geo</code><br>
+          </div><br>
+          The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
+          <br>
+        </div><a name="GEOFANCYset" id="GEOFANCYset"></a> <b>Set</b>
+        <ul>
+          <li>
+            <b>clear</b> &nbsp;&nbsp;readings&nbsp;&nbsp; can be used to cleanup auto-created readings from deprecated devices.
+          </li>
+        </ul><br>
+        <br>
+        <a name="GEOFANCYattr" id="GEOFANCYattr"></a> <b>Attributes</b><br>
+        <br>
+        <ul>
+          <li>devAlias: can be used to rename device names in the format DEVICEUUID:Aliasname. Separate using blank to rename multiple devices.
+          </li>
+        </ul><br>
+        <br>
+        <b>Usage information</b><br>
+        <br>
+        <div style="margin-left: 2em">
+          Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
+          It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible to specific subdirectories like /fhem/geo.<br>
+          You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.<br>
+          Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)<br>
+          <br>
+          To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
+          <br>
+          The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation and depends on your own skills.
+        </div><br>
+        <br>
+        <b>Integration with Home Automation</b><br>
+        <br>
+        <div style="margin-left: 2em">
+          You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of GEOFANCY events.
+        </div>
+      </li>
     </ul>
-    The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
-    <br>
-  </ul>
-
-  <a name="GEOFANCYset"></a>
-  <b>Set</b>
-  <ul>
-      <li><b>clear</b> &nbsp;&nbsp;readings&nbsp;&nbsp; can be used to cleanup auto-created readings from deprecated devices.</li>
-  </ul>
-  <br><br>
-
-  <a name="GEOFANCYattr"></a>
-  <b>Attributes</b>
-  <br><br>
-  <ul>
-    <li>devAlias: can be used to rename device names in the format DEVICEUUID:Aliasname. Separate using blank to rename multiple devices.</li>
-  </ul>
-  <br><br>
-
-  <b>Usage information</b>
-  <br><br>
-  <ul>
-    Likely your FHEM installation is not reachable directly from the internet (good idea!).
-    It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible
-    to specific subdirectories like /fhem/geo.
-    You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.
-    Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality
-    (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)
-    <br>
-    To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.
-    <br>
-    The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation
-    and depends on your own skills.
-  </ul>
-  <br><br>
-</ul>
 
 =end html
+
+=begin html_DE
+
+    <p>
+      <a name="GEOFANCY" id="GEOFANCY"></a>
+    </p>
+    <h3>
+      GEOFANCY
+    </h3>
+    <div style="margin-left: 2em">
+      Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
+    </div>
+    <div style="margin-left: 2em">
+      <a href='http://fhem.de/commandref.html#GEOFANCY'>GEOFANCY</a>
+    </div>
+
+=end html_DE
+
 =cut

@@ -171,20 +171,35 @@ HttpUtils_Connect2($)
     return "$hash->{displayurl}: Can't connect to $hash->{addr}: $@"; 
   }
 
+  my $data;
+  if(defined($hash->{data})) {
+    if( ref($hash->{data}) eq 'HASH' ) {
+      foreach my $key (keys %{$hash->{data}}) {
+        $data .= "&" if( $data );
+        $data .= "$key=". urlEncode($hash->{data}{$key});
+      }
+    } else {
+      $data = $hash->{data};
+    }
+  }
+
   $hash->{host} =~ s/:.*//;
-  my $hdr = ($hash->{data} ? "POST" : "GET")." $hash->{path} HTTP/1.0\r\n";
+  my $method = $hash->{method};
+  $method = ($data ? "POST" : "GET") if( !$method );
+
+  my $hdr = "$method $hash->{path} HTTP/1.0\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
-  if(defined($hash->{data})) {
-    $hdr .= "Content-Length: ".length($hash->{data})."\r\n";
+  if(defined($data)) {
+    $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
                 if ($hdr !~ "Content-Type:");
   }
   $hdr .= "\r\n";
   syswrite $hash->{conn}, $hdr;
-  syswrite $hash->{conn}, $hash->{data} if(defined($hash->{data}));
-  shutdown $hash->{conn}, 1 if(!$hash->{noshutdown});
+  syswrite $hash->{conn}, $data if(defined($data));
+  shutdown $hash->{conn}, 1 if(!$hash->{noshutdown} && $hash->{protocol} ne "https");
 
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
@@ -192,7 +207,8 @@ HttpUtils_Connect2($)
     $hash->{directReadFn} = sub() {
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
-      if(!defined($len) || $len <= 0) { # EOF
+      $hash->{buf} .= $buf if(defined($len) && $len > 0);
+      if(!defined($len) || $len <= 0 || HttpUtils_DataComplete($hash->{buf})) {
         delete($hash->{FD});
         delete($hash->{directReadFn});
         delete($selectlist{$hash});
@@ -200,7 +216,6 @@ HttpUtils_Connect2($)
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
         return;
       }
-      $hash->{buf} .= $buf;
     };
     $selectlist{$hash} = $hash;
     InternalTimer(gettimeofday()+$hash->{timeout},
@@ -209,6 +224,18 @@ HttpUtils_Connect2($)
   }
 
   return undef;
+}
+
+sub
+HttpUtils_DataComplete($)
+{
+  my ($ret) = @_;
+  return 0 if($ret !~ m/^(.*?)\r\n\r\n(.*)$/s);
+  my $hdr = $1;
+  my $data = $2;
+  return 0 if($hdr !~ m/Content-Length:\s*(\d+)/s);
+  return 0 if(length($data) < $1);
+  return 1;
 }
 
 sub
@@ -271,7 +298,8 @@ HttpUtils_ParseAnswer($$)
 #  mandatory:
 #    url, callback
 #  optional(default):
-#    hideurl(0),timeout(4),data(""),noshutdown(0),loglevel(4),header("")
+#    hideurl(0),timeout(4),data(""),noshutdown(0),loglevel(4),header(""),
+#    method($data ? "POST" : "GET")
 # Example:
 #   HttpUtils_NonblockingGet({
 #     url=>"http://192.168.178.112:8888/fhem",
@@ -310,6 +338,7 @@ HttpUtils_BlockingGet($)
     my $len = sysread($hash->{conn},$buf,65536);
     last if(!defined($len) || $len <= 0);
     $ret .= $buf;
+    last if(HttpUtils_DataComplete($ret));
   }
   return HttpUtils_ParseAnswer($hash, $ret);
 }

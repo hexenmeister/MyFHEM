@@ -3,6 +3,7 @@
 /*
 Edit: fhainz
 */
+
 body     { background: #e5e5e5;
            font-family:Helvetica; font-weight:300; font-size:16px; }
 
@@ -12,23 +13,56 @@ input[type="text"] { background: #fff; 1px solid #cbcbcb; }
 
 select   { font-family:Helvetica; font-weight:300; font-size:16px; }
 
-#menuScrollArea {  } 
+#menuScrollArea { } 
 
 #menu    { margin: 20px 0 20px 12px; width:200px; left: 20px; }
 #menu a { color: #151515; }
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
-#hdr     { position:absolute; top:20px; left:250px; }
 
-#content { position:absolute; top:50px; left:250px; bottom:20px; right:10px; }
-
-#connect_err { background-color: #e5e5e5; color: #151515; text-align: center; padding-top: 25%; font-size: 350%; font-weight: bold;
-               position:fixed; top:0px; left:0px; z-index: 10; width:100%; height: 100%; opacity: 0.7;
+#errmsg { background-color: #e5e5e5; color: #151515; text-align: center; font-weight: bold;
+               position:fixed; top:0px; left:0px; z-index: 10; width:100%; padding-top: 2px;
 }
 
-#bla {
--moz-transition: all 3s 3s;
-    -webkit-transition: all 3s 3s;
-   transition: all 3s 3s; 
+.maininput { font-family: monospace; outline: none; }
+
+#hdr     { position:absolute; top:20px; left:250px; }
+
+/* hdr alternate */
+/* to reactive old hdr delete the last 2 chars --> */
+#hdr {
+  background: none repeat scroll 0 0 #e5e5e5;
+  left: 0;
+  padding: 10px 250px;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 99;
+}
+
+.room.roomBlock1 {
+  padding: 10px;
+  position: fixed;
+  top: 5px;
+  z-index: 999;
+}
+.room.roomBlock2 {
+  margin-top: 30px;
+}
+
+.maininput { 
+  width: 74%;
+  padding-right: 20px; 
+}
+
+#errmsg { 
+  top:0px; 
+  left:0px; 
+  z-index: 99999;
+  padding: 17px;
+}
+/*hdr alternate end */
+
+#content { position:absolute; top:50px; left:250px; bottom:20px; right:20px;				 
 }
 
 .devType { padding-top:20px; }
@@ -40,9 +74,9 @@ img {  border-style: none; }
 
 .wide { width: 100%; } 
 
-table { border-radius:2px; margin: 0; padding: 0px; border-spacing: 0px; border-collapse:collapse; }
+table { border-radius:2px; margin: 0; padding: 0px; border-spacing: 0px; border-collapse:collapse; width: 100%; }
 
-table.room { width:210px; margin-bottom:15px; }
+table.room { width:210px; margin-bottom:10px; }
 table.room tr { background:#fff; border-bottom: 1px solid #cbcbcb;}
 table.room tr:last-child { border: 0; }
 table.room tr.sel { background: #d9d9d9; }
@@ -52,26 +86,27 @@ table.room td:hover { background: #d9d9d9; }
 table.roomBlock1 tr { border: 0; }
 
 table.room a { display: block; padding: 6px 0 6px 50px; }
-table.block a { display: block; width: 100%; height: 100%; }
+table.block a { width: 100%; height: 100%; }
 
-table.block { width:790px; background: #fff; }
+table.block { width:100%; background: #fff; }
 table.block a { color: #151515; }
-table.block tr { width: 100%; border-bottom: 1px solid #cbcbcb; }
+table.block tr { width: 100%; border-bottom: 1px solid #cbcbcb;  }
 table.block tr:last-child { border: 0; }
-table.block tr.odd { background: #fff; }
+table.block tr.odd { background: #fff;}
 table.block tr.sel { background: #d9d9d9; }
 table.block td { padding:3px; }
 
-/* Bugfix fuer readingsGroup */
-table.block table.block {
+/* Bugfix fuer readingsGroup, Spalten Link überall klickbar */
+table.block table.block, table.fileList table.fileList, table table {
 width: 100%;
 }
 
 table.assoc a { color: #147bff; }
 
-table.fileList { width:790px; }
+table.fileList { width:100% }
 table.fileList td { padding:5px; padding-left: 7px; } 
 table.fileList td:hover { background: #d9d9d9; }
+table.fileList a { width:100%; height:100%; display:block; }
 
 table.FileLog td { border: none; }
 
@@ -120,7 +155,7 @@ pre { white-space: pre-wrap; }
 
 /* ==============     SVG      ============== */ 
 
-svg      { height:32px; width:32px; fill:#1c7efb; }
+svg      { height:32px; width:32px; fill:#1c7efb; vertical-align:middle; margin:2px 0; }
 table.room svg.icon { margin-left: -43px; margin-right:20px; }
 
 svg.icon { margin-left: 7px; margin-right:20px; }
@@ -129,3 +164,14 @@ g.on { fill:#53d769; }
 
 table.room svg      { height:20px; width:20px; fill:#147bff; }
 table.room svg.it_raspberry_logo { height: 26px; width: 26px; }
+
+
+/*--------------     Samsung Remote Control     -------------------*/
+table#TYPE_remotecontrol { width: 250px; }
+table#TYPE_remotecontrol tr { border: 0; }
+table#TYPE_remotecontrol td { padding: 5px 7px; }
+.rc_body { border-style: solid; border-color: black; border-width: 1px; padding: 5px;
+                background: #e5e5e5; font-size:6px;}
+.rc_button            { padding: 5px 7px;}
+.rc_button img        { border-style: solid; border-width: 1px; border-color: transparent; }
+.rc_button img:active { border-color: gray; }

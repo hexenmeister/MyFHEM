@@ -27,8 +27,7 @@ use warnings;
 use POSIX;
 
 ##################################### 
-sub
-WeekdayTimer_Initialize($)
+sub WeekdayTimer_Initialize($)
 {
   my ($hash) = @_;
 
@@ -46,14 +45,12 @@ WeekdayTimer_Initialize($)
                         $readingFnAttributes;
 }
 
-sub
-WeekdayTimer_Get($@) {
+sub WeekdayTimer_Get($@) {
    return Heating_Control_Get($@);
 }
 
 
-sub
-WeekdayTimer_Define($$){
+sub WeekdayTimer_Define($$){
   my ($hash, $def) = @_;
 
   my $ret = Heating_Control_Define($hash, $def);
@@ -61,22 +58,18 @@ WeekdayTimer_Define($$){
   return $ret;
 }
 
-sub
-WeekdayTimer_Undef($$){
+sub WeekdayTimer_Undef($$){
   my ($hash, $arg) = @_;
   return Heating_Control_Undef($hash, $arg);
 }
 
-sub
-WeekdayTimer_UpdatePerlTime($)
-{
+sub WeekdayTimer_UpdatePerlTime($) {
     my ($hash) = @_;
 
-    Heating_Control_Define($hash, $hash->{NAME} . " " . $hash->{TYPE} . " " . $hash->{DEF} );
+    Heating_Control_UpdatePerlTime($hash);
 }
 
-sub
-WeekdayTimer_Update($){
+sub WeekdayTimer_Update($){
 my ($hash) = @_;
   return Heating_Control_Update($hash);
 }
@@ -111,7 +104,7 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
   <a name="weekdayTimer_define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weekdayTimer &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
+    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
     to set a weekly profile for &lt;device&gt;<br><br>
@@ -169,7 +162,7 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
 
         If you want to have set all WeekdayTimer their current value (after a phase of exception),
         you can call the function <b> WeekdayTimer_SetAllParms ()</b>.
-        This call can be automatically coupled to a dummy by notify:       
+        This call can be automatically coupled to a dummy by notify:
         <code>define WDStatus2 notify Dummy:. * {WeekdayTimer_SetAllParms ()}</code>
 
     </ul>

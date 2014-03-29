@@ -1,5 +1,5 @@
 ##############################################
-# $Id$
+# $Id: 98_PID.pm 4930 2014-02-15 03:59:16Z betateilchen $
 # This module is derived from the contrib/99_PID by Alexander Titzel.
 
 package main;
@@ -45,7 +45,7 @@ PID_Define($$$)
   $pid->{sensor} = $sensor;
   if(!$regexp) {
     my $t = $defs{$sensor}{TYPE};
-    if($t eq "HMS" || $t eq "CUL_WS") {
+    if($t eq "HMS" || $t eq "CUL_WS" || $t eq "CUL_HM" ) {
       $reading = "temperature";
       $regexp = '([\\d\\.]*)';
     } else {
@@ -234,6 +234,7 @@ PID_setValue($)
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="PID"></a>

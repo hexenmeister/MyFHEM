@@ -58,6 +58,12 @@
 #
 #	2013-12-08	fixed:	first try to remove duplicate processing
 #
+#	2014-02-04	added:	shutdownFn
+#
+#	2014-02-14	modi:	changed Loglevel from 3 to 4 where possible
+#
+#	2014-03-22	added:	added set command 'clear'
+#
 
 package main;
 
@@ -73,14 +79,6 @@ my	$ua = LWP::UserAgent->new;	# test
 	$ua->timeout(10);				# test
 	$ua->env_proxy;					# test
 
-sub OWO_Set($@);
-sub OWO_Get($@);
-sub OWO_Attr(@);
-sub OWO_Notify($$);
-sub OWO_Define($$);
-sub OWO_GetStatus($;$);
-sub OWO_Undefine($$);
-
 sub OWO_abs2rel($$$);
 sub OWO_isday($$);
 
@@ -94,6 +92,7 @@ sub openweathermap_Initialize($) {
 	$hash->{UndefFn}	=	"OWO_Undefine";
 	$hash->{NotifyFn}	=	"OWO_Notify";
 	$hash->{AttrFn}		=	"OWO_Attr";
+	$hash->{ShutdownFn}	=	"OWO_Shutdown";
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
@@ -106,10 +105,18 @@ sub openweathermap_Initialize($) {
 							$readingFnAttributes;
 }
 
+
+sub OWO_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"owo $name: shutdown requested");
+	return undef;
+}
+
 sub OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of stationById stationByGeo stationByName send:noArg";
+	my $usage		= "Unknown argument, choose one of clear:noArg stationById stationByGeo stationByName send:noArg";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
@@ -122,6 +129,13 @@ sub OWO_Set($@){
 	given($cmd){
 		when("?")		{ return $usage; }
 		
+		when("clear"){
+			CommandDeleteReading(undef, "$name _.*");
+			CommandDeleteReading(undef, "$name c_.*");
+			CommandDeleteReading(undef, "$name g_.*");
+			return;
+		}
+
 		when("send"){
 			OWO_GetStatus($hash,1);
 			return;
@@ -286,7 +300,7 @@ sub OWO_GetStatus($;$){
 				$o = 0 if(!defined($o));
 				$v = ReadingsVal($s, $v, "?") + $o;
 				$dataString = $dataString."&$p=$v";
-				Log3($name, 3, "owo $name: reading: $paraName $p $s $v");
+				Log3($name, 4, "owo $name: reading: $paraName $p $s $v");
 				readingsSingleUpdate($hash, "my_".$p, $v, 1);
 			}
 		}
@@ -295,7 +309,7 @@ sub OWO_GetStatus($;$){
 
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
-			Log3($name, 3, "owo $name: sending: $dataString");
+			Log3($name, 4, "owo $name: sending: $dataString");
 			$htmlDummy = $ua->post($sendString);
 			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy->status_line);
 		} else {
@@ -327,7 +341,7 @@ sub OWO_GetStatus($;$){
 	my $cId = ReadingsVal($name,"c_stationId", undef);
 	if(defined($cId)){
 		my $cName = ReadingsVal($name,"stationName", "");
-		Log3($name, 3, "owo $name: retrievingStationData: Id: $cId Name: $cName");
+		Log3($name, 4, "owo $name: retrievingStationData: Id: $cId Name: $cName");
 		fhem("set $name stationById $cId");
 	}
 
@@ -361,7 +375,7 @@ sub OWO_Define($$){
 #	readingsSingleUpdate($hash, "state","defined",1);
 #	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "OWO_GetStatus", $hash, 0);
 
-	Log3($name, 3, "owo $name: created");
+	Log3($name, 4, "owo $name: created");
 
 	return;
 }
@@ -393,10 +407,10 @@ sub UpdateReadings($$$){
 
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 3, "owo $name: response:\n".$response->decoded_content);
+			Log3($name, 4, "owo $name: response:\n".$response->decoded_content);
 		}
 	} else {
-		Log3($name, 3, "owo $name: error: no response from server");
+		Log3($name, 4, "owo $name: error: no response from server");
 		return;
 	}
 
@@ -404,7 +418,7 @@ sub UpdateReadings($$$){
 	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->status_line, 1);
 
 	if($xmlMode eq "1" && $response->is_success){
-		Log3($name, 3, "owo $name: decoding XML");
+		Log3($name, 4, "owo $name: decoding XML");
 		my $xml			= new XML::Simple;
 		$jsonWeather	= undef;
 		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => 'current' );
@@ -438,12 +452,12 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "owo $name error: update not possible!"); 
+			Log3($name, 2, "owo $name error: update not possible!"); 
 		}
 	}
 	
 	if($xmlMode ne "1" && $response->is_success){
-		Log3($name, 3, "owo $name: decoding JSON");
+		Log3($name, 4, "owo $name: decoding JSON");
 		my $json = JSON->new->allow_nonref;
 		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
 
@@ -482,7 +496,7 @@ sub UpdateReadings($$$){
 			readingsBulkUpdate($hash, "state", "active");
 			readingsEndUpdate($hash, 1);
 		} else { 
-			Log3($name, 3, "owo $name error: update not possible!"); 
+			Log3($name, 2, "owo $name error: update not possible!"); 
 		}
 	}
 	return;
@@ -549,6 +563,7 @@ sub OWO_isday($$){
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="openweathermap"></a>
@@ -646,6 +661,10 @@ sub OWO_isday($$){
 	<b>Set-Commands</b><br/>
 	<ul>
 		<br/>
+		<code>set &lt;name&gt; clear</code><br/>
+		<br/>
+		<ul>Delete all readings for cleanup</ul>
+		<br/><br/>
 		<code>set &lt;name&gt; send</code><br/>
 		<br/>
 		<ul>start an update cycle manually:
@@ -734,5 +753,13 @@ sub OWO_isday($$){
 </ul>
 
 =end html
+=begin html_DE
 
+<a name="openweathermap"></a>
+<h3>openweathermap</h3>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#openweathermap'>openweathermap</a><br/>
+</ul>
+=end html_DE
 =cut

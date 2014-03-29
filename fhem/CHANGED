@@ -1,6 +1,119 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
 - SVN
+  - feature: cloneDummy: new attribut cloneIgnore
+  - feature: cloneDummy: new optional parameter [reading] 
+  - bugfix:  Dashboard: dashboard_showfullsize not applied in room "all"
+  - feature: new module 98_PID20.pm added (John / betateilchen)
+  - feature: new module 00_RPII2C.pm, 52_I2C_PCA9532.pm, 52_I2C_PCF8574.pm,
+             52_I2C_SHT21.pm added (klausw)
+  - change:  module 71_LISTENLIVE.pm moved to contrib
+             module 23_WEBTHERM.pm   moved to contrib
+  - change:  module 98_PID.pm        moved to contrib as preparation for
+             next major replace. Replaced by 98_PID20.pm (John/betateilchen)
+  - change:  openweathermap: added set command „clear“ 
+  - change:  MAX: interpret SetTemperature command from WT to HT
+  - feature: MAX: retry packets 3 times if missing an ack
+  - feature: new module 98_cloneDummy.pm added (Joachim)
+  - feature: STACKABLE_CC (busware.de device for the RPi) added
+  - feature: configdb export/import added for data security (betateilchen)
+  - feature: new module 38_netatmo.pm added (justme1968)
+  - change:  09_CUL_FHTTK.pm: clean up code to avoid "Use of uninitialized 
+             value in concatenation.."
+  - change:  09_CUL_FHTTK.pm: extend module list to FHT80TF and FHT80TF-2
+             and update of documentation (matscher)
+  - feature: disabledForIntervals attribute added for at/notify/watchdog
+  - feature: jsonlist2 added, jsonlist is deprecated.
+  - feature: DbLog: Added new function : ReadingsVal/ReadingsTimestamp
+  - feature: Text2Speech: added new attribute TTS_VolumeAdjust
+  - feature: new module 70_PHTV.pm (loredo)
+  - feature: JSONMETER: added statistic functions
+  - feature: LightScene: added scene editor from UliM
+  - feature: SYSMON: New method: SYSMON_ShowValuesText
+  - feature: configDB.pm use sql database instead of fhem.cfg (betateilchen)
+  - feature: new module 98_geodata collect location based data (betateilchen)
+  - feature: 98_pilight: Added support for Elso protocol
+  - feature: readingsGroup: added sortDevices attribute
+  - feature: ENIGMA2: new reading 'recordings', new command record
+  - change:  ENIGMA2: rewrite for NonBlocking
+  - feature: SYSMOM: new Plot + Doc
+  - feature: Dashboard: Custom CSS Attribute. Max. 7 Tabs.
+  - bugfix:  Dashboard: Change Groupcontent sorting. Fix Bug that affect
+             new Groups.
+  - feature: 10_EnOcean: UTE protocol implemented
+  - feature: 00_TCM: new command teach
+  - bugfix:  SYSMOM: uninitialized value warning on FritzBox
+  - added:   09_CUL_FHTTK.pm: german module documentation (matscher)
+  - feature: readingsGroup: allow FHEMWEB slider and dropdown menus as commands
+  - feature  FB_CALLMONITOR: new attribute "disable" to 
+             disable FB_CALLMONITOR
+  - feature: YAMAHA_BD: new attribute "disable" to disable cyclic status
+             updates of player
+  - change:  09_CUL_FHTTK.pm: added event-on...readings and event-min-interval
+             updated to reading update mechanism (matscher)
+  - feature: Dashboard: Groupstitel now can show icons,
+             Backbutton in Fullsize-Mode
+  - deleted: 51_BBB_WATCHDOG.pm - not really needed
+  - bugfix:  DbLog: adding ShutdownFunction
+  - feature: YAMAHA_AVR: new attribute "disable" to disable cyclic status 
+             updates of receiver
+  - feature: LightScene: added attribute switchingOrder
+  - added:   new module 00_THZ.pm (immiimmi)
+  - added:   new module 98_HTTPMOD.pm (stefanstrobel)
+  - added:   new module 51_BBB_WATCHDOG.pm (betateilchen)
+  - bugfix:  SYSMON: Fix: uninitialized variable
+  - feature: new modul 73_MPD added (Wzut) 
+  - bugfix:  SYSMON: Fix: root fs with /dev/mapper
+  - feature: Dashboard: The display of the dashboard can be limited to a 
+             defined FHEMWEB. Change view of readingroups
+  - feature: new module 70_JSONMETER to read obis compatible data in json
+             format from so called smart meters for electricity, gas or heat 
+  - feature: new modules 10_RESIDENTS, 20_ROOMMATE and 20_GUEST added (loredo)
+  - feature: LUXTRONIK2: attribute 'doStatistics' calculates boiler gradients
+  - feature: GEOFANCY: support both apps, Geofency.app and Geofancy.app
+  - feature: LightScene: added attribute lightSceneRestoreOnlyIfChanged
+  - bugfix:  SYSMON: Fix: CPUTemp & BogoMIPS for utilite-Box.
+  - bugfix:  PRESENCE: fix present-check-interval to be equal with normal 
+             check-interval if not set in define statement and not 30 sec.
+  - feature: DASHBOARD: Tabs can show an icon.
+  - bugfix:  DASHBOARD: dashboard_showfullsize only in DashboardRoom.
+             Fix showhelper Bug on lock/unlock. The error that after a trigger 
+			 action the curren tab is changed to the "old" activetab tab has 
+			 been fixed.
+  - bugfix:  SYSMON: Filesystems (absent medium)
+  - feature: FLOORPLAN-menu-items can get icons attached by new 
+             attribute fp_roomIcons
+  - feature: FLOORPLAN-specific icons can now be assigned by just
+             creating a folder under fhem/images with the flooplan-name  
+  - feature: DASHBOARD:  Tabs can set on top, bottom or hidden. 
+  - bugfix:  SYSMON: another format for ifconfig output
+  - feature: DASHBOARD: Use longpoll to update content.
+			 rowcentercolwidth can now be defined per column.
+			 Dashboard can hide FHEMWEB Roomliste and Header => Fullsizemode.
+  - bugfix:  SYSMON: null reading for absent mount points
+  - feature: DbLog: jokers "%" in device/reading definition are now possible
+  - feature: SYSMON: new CPU Statistics and Plots
+  - feature: changed 10_OWServer.pm and 11_OWDevice.pm to use
+             NOTIFYDEV (justme1968)
+  - feature: LightScene: added setcmd command
+  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group 
+			 positioning.
+  - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
+  - feature: LUXTRONIK2: Setting of controller parameter and internal clock
+  - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
+             players over network.
+  - bugfix:  DbLog: fix for plotfork
+  - bugfix:  SYSMON: filesystems may be wrong on some systems
+  - feature: new module 98_pilight.pm added (andreas-fey)
+  - change:  LUXTRONIK2 - made compatible with current developer guidelines
+             (Blocking.pm, reading update mechanism)
+  - feature: readingsGroup: added icons and links/commands
+  - feature: new module 98_Text2Speech.pm added (Tobias Faust)
+             Google Translator Engine or ESpeak can be used
+  - feature: YAMAHA_AVR: define separate on and off status intervals for
+             cyclic status updates
+  - feature: Visualizations (Plots) for SYSMON added
+  - feature: new module 42_SYSMON.pm added (hexenmeister)
   - feature: YAMAHA_AVR: new readings for radio stations, current title
              and more. see commandref for more details.
   - feature: new module 32_withings.pm added (justme1968)
@@ -15,7 +128,7 @@
              the Room Dashboard.
   - bugfix:  VIERA: fixed bug related to set command remoteControl
   - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
-  	     Webif versions
+  	         Webif versions
   - feature: readingsGroup: process events only if visible in browser,
              allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
@@ -68,7 +181,7 @@
   - bugfix:  PRESENCE: fixing not working re-initialization when
              disabled attribute is set to 0 in lan-bluetooth mode
   - feature: LightScene: added attribute lightSceneParamsToSave for
-             device specific configuration of reading/command pairs
+             device specific configuration of </command pairs
              used to save/restore device state
   - feature: cmdalias added
   - feature: rain Module by baumrasen

@@ -537,3 +537,27 @@
 - Fri Jul 26 2013 (A. Vogt alias baumrasen)
   - Added new module "WWO"
   
+- Mon Jan 13 2014 (A. Schulz alias hexenmeister)
+  - Added new module "SYSMON"
+
+- Fri Jan 16 2014 (andreas-fey)
+  - Added new module "pilight"
+
+- Sat Jan 18 2014 (tobiasfaust)
+  - Added new Module "Text2Speech" 
+
+- Sat Feb 16 2014 (immiimmi)
+  - Added new Module "THZ" 
+ 
+- Wed Feb 25 2014 (andreas-fey)
+  - Update on pilight module for more protocols 
+
+- Fri Mar 07 2014 (betateilchen)
+  - First officiel release of configDB via update process 
+
+- Mon Mar 24 2014 (betateilchen)
+  - old module 98_PID.pm moved to contrib
+    will be replaced by 98_PID20.pm in next major release
+
+- Wed Mar 26 2014 (John / betateilchen)
+  - added new module 98_PID20.pm as announced replacement for old 98_PID.pm

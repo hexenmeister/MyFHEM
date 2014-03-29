@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 
+use Encode qw(encode);
 use JSON;
 use LWP::Simple;
 use HTTP::Request;
@@ -39,6 +40,7 @@ withings_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "withings_Define";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "withings_Notify";
   $hash->{UndefFn}  = "withings_Undefine";
   #$hash->{SetFn}    = "withings_Set";
@@ -116,7 +118,6 @@ withings_Define($$)
   $hash->{STATE} = "Initialized";
 
   if( $init_done ) {
-    delete $modules{withings}->{NotifyFn};
     withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
     withings_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
     withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
@@ -133,14 +134,9 @@ withings_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  delete $modules{$hash->{TYPE}}->{NotifyFn};
-
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne $hash->{TYPE});
-    withings_initUser($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "USER" );
-    withings_connect($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "ACCOUNT" );
-    withings_initDevice($defs{$d}) if( $defs{$d}->{SUBTYPE} eq "DEVICE" );
-  }
+  withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
+  withings_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
+  withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
 }
 
 sub
@@ -174,7 +170,9 @@ withings_getToken($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
+
   my $once = $json->{body}{once};
 
   $hash->{Token} = $once;
@@ -213,7 +211,9 @@ withings_getSessionKey($)
     my $request = HTTP::Request->new('GET', $URL, $header);
     my $response = $agent->request($request);
 
-    my $json = decode_json($response->content);
+    my $json = ();
+    $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
+
     foreach my $account (@{$json->{body}{account}}) {
         next if( !defined($account->{id}) );
         $hash->{AccountID} = $account->{id} if($account->{email} eq $hash->{Login});
@@ -309,8 +309,8 @@ withings_initDevice($)
   $hash->{fw} = $device->{fw};
   $hash->{DeviceType} = $device->{type};
   $hash->{DeviceType} = $device_types{$device->{type}} if( defined($device_types{$device->{type}}) );
-  $hash->{Model} = $device->{model};
-  $hash->{Model} = $device_models{$device->{type}}->{$device->{model}}
+  $hash->{model} = $device->{model};
+  $hash->{model} = $device_models{$device->{type}}->{$device->{model}}
                    if( defined($device_models{$device->{type}}) && defined($device_models{$device->{type}}->{$device->{model}}) );
 
   if( !defined( $attr{$name}{stateFormat} ) ) {
@@ -360,7 +360,8 @@ withings_getUsers($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
 
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
@@ -384,7 +385,8 @@ withings_getDevices($)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );;
 
   my @devices = ();
   foreach my $association (@{$json->{body}{associations}}) {
@@ -410,7 +412,8 @@ withings_getDeviceDetail($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
 
   return $json->{body};
 }
@@ -435,19 +438,8 @@ withings_getDeviceReadings($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
-
-  if(open(FH, "</tmp/getmeashf.txt")) {
-    my $content;
-    while (my $line = <FH>) {
-      chomp $line;
-      next if($line =~ m/^#.*$/);
-      $content .= $line;
-    }
-    close(FH);
-
-    $json = decode_json($content);
-  }
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
 
   return $json;
 }
@@ -464,7 +456,8 @@ withings_getUserDetail($$)
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
 
-  my $json = decode_json($response->content);
+  my $json = ();
+  $json = JSON->new->utf8(0)->decode($response->content) if( $response->content =~ m/^{.*}$/ );
 
   return $json->{body}{users}[0];
 }
@@ -483,7 +476,7 @@ withings_poll($)
     withings_pollUser($hash);
   }
 
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "withings_poll", $hash, 1);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "withings_poll", $hash, 0);
 }
 
 sub
@@ -560,7 +553,9 @@ withings_pollUser($)
   $url .= "&userid=$hash->{User}&publickey=$hash->{Key}";
   $url .= "&lastupdate=$lastupdate" if( $lastupdate );
   my $ret = get($url);
-  my $json = decode_json($ret);
+  #my $json = JSON->new->utf8(0)->decode($ret);
+  my $json = ();
+  $json = JSON->new->utf8->decode(encode('UTF-8', $ret)) if( $ret =~ m/^{.*}$/ );
 
   $hash->{status} = $json->{status};
   if( $hash->{status} == 0 ) {
@@ -711,7 +706,7 @@ withings_Attr($$$)
     <br>
 
     Defines a withings device.<br><br>
-    If a withing device of the account type is created all fhem devices for users and devices are automaticaly created.
+    If a withings device of the account type is created all fhem devices for users and devices are automaticaly created.
     <br>
 
     Examples:

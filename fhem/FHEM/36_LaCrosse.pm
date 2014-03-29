@@ -146,12 +146,12 @@ LaCrosse_Set($@)
   if( $cmd eq "replaceBatteryForSec" ) {
     foreach my $d (sort keys %defs) {
       next if (!defined($defs{$d}) );
-      next if ($defs{$d} ne $hash->{TYPE} );
+      next if ($defs{$d}->{TYPE} ne "LaCrosse" );
       LaCrosse_RemoveReplaceBattery{$defs{$d}};
     }
     return "Usage: set $name replaceBatteryForSec <seconds_active> [ignore_battery]" if(!$arg || $arg !~ m/^\d+$/ || ($arg2 && $arg2 ne "ignore_battery"));
     $hash->{replaceBattery} = $arg2?2:1;
-    InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 1);
+    InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 0);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -189,8 +189,9 @@ LaCrosse_Parse($$)
 
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
     foreach my $d (sort keys %defs) {
-      next if (!defined($defs{$d}) );
-      next if ($defs{$d}->{TYPE} ne "LaCrosse" );
+      next if( !defined($defs{$d}) );
+      next if( !defined($defs{$d}->{TYPE}) );
+      next if( $defs{$d}->{TYPE} ne "LaCrosse" );
       next if( !$defs{$d}->{replaceBattery} );
       if( $battery_new ||  $defs{$d}->{replaceBattery} == 2 ) {
         $rhash = $defs{$d};
@@ -321,7 +322,8 @@ LaCrosse_Attr(@)
   <ul>
     <li>replaceBatteryForSec &lt;sec&gt; [ignore_battery]<br>
     sets the device for &lt;sec&gt; seconds into replace battery mode. the first unknown address that is
-    received will replace the current device address;
+    received will replace the current device address. this can be partly automated with a readings group configured
+    to show the battery state of all LaCrosse devices and a link/command to set replaceBatteryForSec on klick.
     </li>
   </ul><br>
 

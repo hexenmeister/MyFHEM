@@ -5,35 +5,66 @@ var FW_widgets = new Object(); // to be filled by fhemweb_*.js
 var FW_leaving;
 
 function
+log(txt)
+{
+  if(typeof window.console != "undefined") // IE
+    console.log(txt);
+}
+
+function
 FW_cmd(arg)     /* see also FW_devState */
 {
   var req = new XMLHttpRequest();
   req.open("GET", arg, true);
   req.send(null);
+  req.onreadystatechange = function(){
+    if(req.readyState == 4)
+      FW_errmsg(req.responseText, 5000);
+  }
+}
+
+function
+FW_errmsg(txt, timeout)
+{
+  var errmsg = document.getElementById("errmsg");
+  if(!errmsg) {
+    if(txt == "")
+      return;
+    errmsg = document.createElement('div');
+    errmsg.setAttribute("id","errmsg");
+    document.body.appendChild(errmsg);
+  }
+  if(txt == "") {
+    document.body.removeChild(errmsg);
+    return;
+  }
+  errmsg.innerHTML = txt;
+  if(timeout)
+    setTimeout("FW_errmsg('')", timeout);
 }
 
 function
 FW_doUpdate()
 {
   if(FW_pollConn.readyState == 4 && !FW_leaving) {
-    var errdiv = document.createElement('div');
-    errdiv.innerHTML = "Connection lost, reconnecting in 5 seconds...";
-    errdiv.setAttribute("id","connect_err");
-    document.body.appendChild(errdiv);
-    setTimeout("FW_longpoll()", 5000);
+    FW_errmsg("Connection lost, trying a reconnect every 5 seconds.", 4900);
+    setTimeout(FW_longpoll, 5000);
     return; // some problem connecting
   }
 
   if(FW_pollConn.readyState != 3)
     return;
+
   var lines = FW_pollConn.responseText.split("\n");
   //Pop the last (maybe empty) line after the last "\n"
   //We wait until it is complete, i.e. terminated by "\n"
   lines.pop();
   var devs = new Array();
   for(var i=FW_curLine; i < lines.length; i++) {
-    var d = lines[i].split("<<", 3);    // Complete arg
-    console.log("Got "+lines[i]);
+    var l = lines[i];
+    log("Longpoll: "+(l.length>132 ? l.substring(0,132)+"...("+l.length+")":l));
+    var d = l.split("<<", 3);    // Complete arg
+
     if(d.length != 3)
       continue;
     var elArr = document.querySelectorAll("[informId='"+d[0]+"']");
@@ -76,22 +107,22 @@ FW_doUpdate()
 function
 FW_longpoll()
 {
-  var errdiv = document.getElementById("connect_err");
-  if(errdiv)
-    document.body.removeChild(errdiv);
-
   FW_curLine = 0;
-
   FW_pollConn = new XMLHttpRequest();
 
-  var filter="", embArr = document.getElementsByTagName("embed");
-  for(var i = 0; i < embArr.length; i++) {
-    var svg = embArr[i].getSVGDocument();
-    if(svg &&
-       svg.firstChild &&
-       svg.firstChild.nextSibling &&
-       svg.firstChild.nextSibling.getAttribute("flog"))
-      filter=".*";
+  var filter = document.body.getAttribute("longpollfilter");
+  if(filter == null)
+    filter = "";
+  if(filter == "") {
+    var embArr = document.getElementsByTagName("embed");
+    for(var i = 0; i < embArr.length; i++) {
+      var svg = embArr[i].getSVGDocument();
+      if(svg &&
+         svg.firstChild &&
+         svg.firstChild.nextSibling &&
+         svg.firstChild.nextSibling.getAttribute("flog"))
+        filter=".*";
+    }
   }
   if(filter == "") {
     var sa = document.location.search.substring(1).split("&");
@@ -107,6 +138,18 @@ FW_longpoll()
     name = name.substring(0,name.length-5);
     filter=".*;iconPath="+name;
   }
+  if(filter == "") {
+    var content = document.getElementById("content");
+    if(content) {
+      var room = content.getAttribute("room");
+      if(room)
+        filter="room="+room;
+    }
+  }
+
+  var iP = document.body.getAttribute("iconPath");
+  if(iP != null)
+    filter = filter +";iconPath="+iP;
 
   var query = document.location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
@@ -117,9 +160,25 @@ FW_longpoll()
 }
 
 function
+FW_replaceLinks()
+{
+  var elArr = document.querySelectorAll("a[href]");
+  for(var i1=0; i1< elArr.length; i1++) {
+    var a = elArr[i1];
+    var ma = a.getAttribute("href").match(/^(.*\?)(cmd[^=]*=.*)$/);
+    if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/))
+      continue;
+    a.removeAttribute("href");
+    a.setAttribute("onclick", "FW_cmd('"+ma[1]+"XHR=1&"+ma[2]+"')");
+    a.setAttribute("style", "cursor:pointer");
+  }
+}
+
+function
 FW_delayedStart()
 {
   setTimeout("FW_longpoll()", 100);
+  FW_replaceLinks();
 }
 /*************** LONGPOLL END **************/
 
@@ -205,6 +264,7 @@ FW_queryValue(cmd, qFn, qArg)
     if(qConn.readyState != 3)
       return;
     var qResp = qConn.responseText.replace(/[\r\n]/g, "")
+                                  .replace(/\\/g, "\\\\")
                                   .replace(/"/g, "\\\"");
     eval(qFn.replace("%", qResp));
     delete qConn;

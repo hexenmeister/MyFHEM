@@ -14,7 +14,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1 forwardReturnValue:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showTriggerTime:0,1";
 }
 
 
@@ -39,6 +39,7 @@ notify_Define($$)
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
   $hash->{STATE} = "active";
+  notifyRegexpChanged($hash, $re);
 
   return undef;
 }
@@ -50,7 +51,7 @@ notify_Exec($$)
   my ($ntfy, $dev) = @_;
 
   my $ln = $ntfy->{NAME};
-  return "" if($attr{$ln} && $attr{$ln}{disable});
+  return "" if(IsDisabled($ln));
 
   my $n = $dev->{NAME};
   my $re = $ntfy->{REGEXP};
@@ -68,6 +69,9 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
+      $ntfy->{STATE} =
+        AttrVal($ln,'showTriggerTime',0) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+  
       Log3 $ln, 5, "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
@@ -78,6 +82,7 @@ notify_Exec($$)
       );
       $exec= EvalSpecials($exec, %specials);
 
+      Log3 $ln, 4, "$ln exec $exec";
       my $r = AnalyzeCommandChain(undef, $exec);
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
@@ -219,6 +224,8 @@ notify_Attr(@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+
     <a name="forwardReturnValue"></a>
     <li>forwardReturnValue<br>
         Forward the return value of the executed command to the caller,
@@ -226,6 +233,9 @@ notify_Attr(@)
         triggers this notify will also return this value. This can cause e.g
         FHEMWEB to display this value, when clicking "on" or "off", which is
         often not intended.</li>
+
+    <li>showTriggerTime<br/>
+        Replace STATE content 'active' by timestamp of last execution.</li>
   </ul>
   <br>
 

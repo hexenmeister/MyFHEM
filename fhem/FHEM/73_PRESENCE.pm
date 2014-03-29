@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use Time::HiRes qw(gettimeofday sleep);
+use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
 
@@ -62,7 +62,7 @@ PRESENCE_Define($$)
     my ($hash, $def) = @_;
     my @a = split("[ \t]+", $def);
     my $dev;
-    my $username = (getpwuid($<))[0];
+    my $username =  getlogin || getpwuid($<) || "[unknown]";
 
     if(defined($a[2]) and defined($a[3]))
     {
@@ -78,7 +78,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "local-bluetooth";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
             
         }
         elsif($a[2] eq "fritzbox")
@@ -101,7 +101,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "fritzbox";
             $hash->{ADDRESS} = $a[3];    
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
 
         }
         elsif($a[2] eq "lan-ping")
@@ -116,7 +116,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "lan-ping";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[4]) ? $a[4] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[5]) ? $a[5] : $hash->{TIMEOUT_NORMAL});
      
         }
         elsif($a[2] =~ /(shellscript|function)/)
@@ -127,7 +127,7 @@ PRESENCE_Define($$)
                 $hash->{MODE} = $2;
                 $hash->{helper}{call} = $3;
                 $hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
-                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : 30);
+                $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : $hash->{TIMEOUT_NORMAL});
 
                 if($hash->{helper}{call} =~ /\|/)
                 {
@@ -160,7 +160,7 @@ PRESENCE_Define($$)
             $hash->{MODE} = "lan-bluetooth";
             $hash->{ADDRESS} = $a[3];
             $hash->{TIMEOUT_NORMAL} = (defined($a[5]) ? $a[5] : 30);
-            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : 30);
+            $hash->{TIMEOUT_PRESENT} = (defined($a[6]) ? $a[6] : $hash->{TIMEOUT_NORMAL});
 
             $dev = $a[4];
             $dev .= ":5222" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
@@ -264,6 +264,7 @@ PRESENCE_Set($@)
     {
         if($hash->{MODE} ne "lan-bluetooth")
         {
+            Log3  $hash->{NAME}, 5, "PRESENCE (".$hash->{NAME}.") - starting local scan";
             PRESENCE_StartLocalScan($hash, 1);
             return undef;
         }
@@ -467,31 +468,48 @@ PRESENCE_Ready($)
 sub PRESENCE_StartLocalScan($;$)
 {
     my ($hash, $local) = @_;
-
+    my $name = $hash->{NAME};
+    my $mode = $hash->{MODE};
+    
     $local = 0 unless(defined($local));
+     
+    if(not (exists($hash->{ADDRESS}) or exists($hash->{helper}{call})))
+    {
+         return;
+    }
 
     $hash->{STATE} = "active" if($hash->{STATE} eq "???");
 
+    if(not $local)
+    {
+        Log3 $name, 5, "PRESENCE ($name) - resetting Timer";
+        RemoveInternalTimer($hash);
+    }
 
-    if($hash->{MODE} eq "local-bluetooth")
+    if($mode eq "local-bluetooth")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode local-bluetooth";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "lan-ping")
+    elsif($mode eq "lan-ping")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode lan-ping";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "fritzbox")
+    elsif($mode eq "fritzbox")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode fritzbox";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "shellscript")
+    elsif($mode eq "shellscript")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode shellscript";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
-    elsif($hash->{MODE} eq "function")
+    elsif($mode eq "function")
     {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $hash->{NAME}."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode function";
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
 }
 
@@ -556,7 +574,8 @@ PRESENCE_ExecuteFritzBoxCMD($$)
     {  
         $wait = int(rand(4))+2;
         Log3 $name, 5, "PRESENCE_ExecuteFritzBoxCMD: ($name) - ctlmgr_ctl is locked. waiting $wait seconds...";
-        sleep $wait;
+        $wait = 1000000*$wait;
+        usleep $wait;
     }
 
     unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
@@ -564,7 +583,7 @@ PRESENCE_ExecuteFritzBoxCMD($$)
     qx(touch /var/tmp/fhem-PRESENCE-cmd-lock.tmp);
 
     $status = qx($cmd);
-
+    usleep 200000;
     unlink("/var/tmp/fhem-PRESENCE-cmd-lock.tmp") if(-e "/var/tmp/fhem-PRESENCE-cmd-lock.tmp");
 
     return $status;
@@ -650,7 +669,7 @@ PRESENCE_DoLocalFritzBoxScan($)
         }
 
         $number++;
-        sleep 0.2;
+       
     }
 
     return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");

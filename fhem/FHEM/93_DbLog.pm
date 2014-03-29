@@ -1,4 +1,3 @@
-
 ##############################################
 # $Id$
 #
@@ -6,7 +5,7 @@
 # written by Dr. Boris Neubert 2007-12-30
 # e-mail: omega at online dot de
 #
-# modified by Tobias Faust 2012-06-26
+# modified and maintained by Tobias Faust since 2012-06-26
 # e-mail: tobias dot faust at online dot de
 #
 ##############################################
@@ -16,28 +15,39 @@ use strict;
 use warnings;
 use DBI;
 use Data::Dumper;
+use feature qw/say switch/;
 
-sub DbLog($$$);
+my %columns = ("DEVICE"  => 64,
+               "TYPE"    => 64,
+               "EVENT"   => 512,
+               "READING" => 64,
+               "VALUE"   => 128,
+               "UNIT"    => 32
+          );
+
+sub dbReadings($@);
 
 ################################################################
-sub
-DbLog_Initialize($)
+sub DbLog_Initialize($)
 {
   my ($hash) = @_;
 
   $hash->{DefFn}    = "DbLog_Define";
   $hash->{UndefFn}  = "DbLog_Undef";
   $hash->{NotifyFn} = "DbLog_Log";
+  $hash->{SetFn}    = "DbLog_Set";
   $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
-  $hash->{AttrList} = "disable:0,1 DbLogType:Current,History,Current/History";
+  $hash->{ShutdownFn} = "DbLog_Shutdown";
+  $hash->{AttrList} = "disable:0,1 ".
+           "DbLogType:Current,History,Current/History ".
+           "shutdownWait";
 
   addToAttrList("DbLogExclude");
 }
 
 ###############################################################
-sub
-DbLog_Define($@)
+sub DbLog_Define($@)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -53,16 +63,19 @@ DbLog_Define($@)
 
   $hash->{CONFIGURATION}= $a[2];
 
+  #remember PID for plotfork
+  $hash->{PID} = $$;
+
   return "Can't connect to database." if(!DbLog_Connect($hash));
 
-  $hash->{STATE} = "active";
+#  $hash->{STATE} = "active";
+  readingsSingleUpdate($hash, 'state', 'active', 1);
 
   return undef;
 }
 
 #####################################
-sub
-DbLog_Undef($$)
+sub DbLog_Undef($$)
 {
   my ($hash, $name) = @_;
   my $dbh= $hash->{DBH};
@@ -70,14 +83,25 @@ DbLog_Undef($$)
   return undef;
 }
 
+#####################################
+sub DbLog_Shutdown($)
+{  my ($hash) = @_;
+ my $name = $hash->{NAME};
+ my $shutdownWait = AttrVal($name,"shutdownWait",undef);
+ if(defined($shutdownWait)) {
+   Log3($name, 2, "DbLog $name waiting for shutdown");
+   sleep($shutdownWait);
+ }
+ return undef; }
+
+
 ################################################################
 #
 # Wird bei jeder Aenderung eines Attributes dieser
 # DbLog-Instanz aufgerufen
 #
 ################################################################
-sub
-DbLog_Attr(@)
+sub DbLog_Attr(@)
 {
   my @a = @_;
   my $do = 0;
@@ -98,8 +122,7 @@ DbLog_Attr(@)
 # Parsefunktion, abhaengig vom Devicetyp
 #
 ################################################################
-sub
-DbLog_ParseEvent($$$)
+sub DbLog_ParseEvent($$$)
 {
   my ($device, $type, $event)= @_;
   my @result;
@@ -118,6 +141,10 @@ DbLog_ParseEvent($$$)
     $reading= "state";
     $value= $event;
   }
+
+  #TODO: globales abfangen von 
+  # - temperature
+  # - humidity
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -154,6 +181,14 @@ DbLog_ParseEvent($$$)
         @parts = split(/\|/, AttrVal($device, $reading."Unit", ""));
         $unit = $parts[1] if($parts[1]);
       }
+  }
+
+  # FBDECT
+  elsif (($type eq "FBDECT")) {
+    if ( $value=~/([\.\d]+)\s([a-z])/i ) {
+     $value = $1;
+     $unit  = $2;
+    }
   }
 
   # MAX
@@ -207,7 +242,7 @@ DbLog_ParseEvent($$$)
           $value=~ s/%//; $value= $value*1.; $unit= "%";
         }
       }
-      elsif($value eq "synctime") {
+      elsif($value =~ m(^synctime)) {
         $reading= "actuator-synctime";
         undef $value;
       }
@@ -285,6 +320,8 @@ DbLog_ParseEvent($$$)
   elsif($type eq "TRX_WEATHER") {
     if($reading eq "energy_current") { $value=~ s/ W//; }
     elsif($reading eq "energy_total") { $value=~ s/ kWh//; }
+#    elsif($reading eq "temperature") {TODO}
+#    elsif($reading eq "temperature")  {TODO
     elsif($reading eq "battery") {
       if ($value=~ m/(\d+)\%/) { 
         $value= $1; 
@@ -336,6 +373,71 @@ DbLog_ParseEvent($$$)
   return @result;
 }
 
+################################################################
+#
+# param1: hash
+# param2: DbLogType -> Current oder History oder Current/History
+# param4: Timestamp
+# param5: Device
+# param6: Type
+# param7: Event
+# param8: Reading
+# param9: Value
+# param10: Unit
+#
+################################################################
+sub DbLog_Push(@) {
+  my ($hash, $DbLogType, $timestamp, $device, $type, $event, $reading, $value, $unit) = @_;
+  my $dbh= $hash->{DBH};
+  
+  # Daten auf maximale laenge beschneiden
+  $device   = substr($device,0, $columns{DEVICE});
+  $type     = substr($type,0, $columns{TYPE});
+  $event    = substr($event,0, $columns{EVENT});
+  $reading  = substr($reading,0, $columns{READING});
+  $value    = substr($value,0, $columns{VALUE});
+  $unit     = substr($unit,0, $columns{UNIT});
+
+  $dbh->{RaiseError} = 1;
+  
+  $dbh->begin_work();
+  
+  my $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(history) );
+  my $sth_ic = $dbh->prepare_cached("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if (lc($DbLogType) =~ m(current) );
+  my $sth_uc = $dbh->prepare_cached("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)") if (lc($DbLogType) =~ m(current) );
+
+  Log3 $hash->{NAME}, 5, "DbLog: logging of Device: $device , Type: $type , Event: $event , Reading: $reading , Value: $value , Unit: $unit";
+
+  eval {
+    # insert into history
+    if (lc($DbLogType) =~ m(history) ) {
+      my $rv_ih = $sth_ih->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
+    }
+
+    # update or insert current
+    if (lc($DbLogType) =~ m(current) ) {
+      my $rv_uc = $sth_uc->execute(($timestamp, $type, $event, $value, $unit, $device, $reading));
+      if ($rv_uc == 0) {
+        my $rv_ic = $sth_ic->execute(($timestamp, $device, $type, $event, $reading, $value, $unit));
+      }
+    }
+  };
+
+  
+  if ($@) {
+    Log3 $hash->{NAME}, 2, "DbLog: Failed to insert new readings into database: $@";
+    $dbh->rollback();
+    # reconnect
+    $dbh->disconnect();  
+    DbLog_Connect($hash);
+  }
+  else {
+    $dbh->commit();
+    $dbh->{RaiseError} = 0;  
+  }
+
+  return $dbh->{RaiseError};
+}
 
 ################################################################
 #
@@ -343,13 +445,11 @@ DbLog_ParseEvent($$$)
 # aufgerufen
 #
 ################################################################
-sub
-DbLog_Log($$)
-{
+sub DbLog_Log($$) {
   # Log is my entry, Dev is the entry of the changed device
-  my ($log, $dev) = @_;
+  my ($hash, $dev) = @_;
 
-  return undef if($log->{STATE} eq "disabled");
+  return undef if($hash->{STATE} eq "disabled");
 
   # name and type required for parsing
   my $n= $dev->{NAME};
@@ -359,25 +459,15 @@ DbLog_Log($$)
   #my ($sec,$min,$hr,$day,$mon,$yr,$wday,$yday,$isdst)= localtime(time);
   #my $ts= sprintf("%04d-%02d-%02d %02d:%02d:%02d", $yr+1900,$mon+1,$day,$hr,$min,$sec);
 
-  my $re = $log->{REGEXP};
+  my $re = $hash->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
   my $ts_0 = TimeNow();
   my $now = gettimeofday(); # get timestamp in seconds since epoch
   my $DbLogExclude = AttrVal($dev->{NAME}, "DbLogExclude", undef);
-  
-  my $dbh= $log->{DBH};
-  $dbh->{RaiseError} = 1;
-  
-  my $DbLogType = AttrVal($log->{NAME}, "DbLogType", "Current/History");
+  my $DbLogType = AttrVal($hash->{NAME}, "DbLogType", "Current/History");
       
   #one Transaction
-  eval {
-    $dbh->begin_work();
-    
-    my $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if ($DbLogType =~ m(History) );
-    my $sth_uc = $dbh->prepare_cached("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)") if ($DbLogType =~ m(Current) );
-    my $sth_ic = $dbh->prepare_cached("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if ($DbLogType =~ m(Current) );
-    
+  eval {    
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
       $s = "" if(!defined($s));
@@ -406,8 +496,8 @@ DbLog_Log($$)
             $DoIt = 0 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
             if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
               #Regexp matcht und MinIntervall ist angegeben
-              my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{TIME};
-              my $lv = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{VALUE};
+              my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
+              my $lv = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
               $lt = 0 if(!$lt);
               $lv = "" if(!$lv);
 
@@ -420,39 +510,14 @@ DbLog_Log($$)
         }
         next if($DoIt == 0);
 
-        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{TIME}  = $now;
-        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$log->{NAME}}{VALUE} = $value;
+        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
+        $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
 
-        my @is= ($ts, $n, $t, $s, $reading, $value, $unit);
-
-        # insert into history
-        if ($DbLogType =~ m(History) ) {
-          my $rv_ih = $sth_ih->execute(@is);
-        }
-
-        if ($DbLogType =~ m(Current) ) {
-          # update or insert current
-          my $rv_uc = $sth_uc->execute(($ts, $t, $s, $value, $unit, $n, $reading));
-          if ($rv_uc == 0) {
-            my $rv_ic = $sth_ic->execute(@is);
-          }
-        }
+        DbLog_Push($hash, $DbLogType, $ts, $n, $t, $s, $reading, $value, $unit)
 
       }
     } 
-    $dbh->commit();
   };
-  if ($@) {
-    Log3 $dev->{NAME}, 2, "DbLog: Failed to insert new readings into database: $@";
-    $dbh->{RaiseError} = 0;  
-    $dbh->rollback();
-    # reconnect
-    $dbh->disconnect();  
-    DbLog_Connect($log);
-  }
-  else {
-    $dbh->{RaiseError} = 0;  
-  }
   
   return "";
 }
@@ -464,8 +529,7 @@ DbLog_Log($$)
 # uebergebenes SQL-Format: YYYY-MM-DD HH24:MI:SS
 #
 ################################################################
-sub
-DbLog_explode_datetime($%) {
+sub DbLog_explode_datetime($%) {
   my ($t, %def) = @_;
   my %retv;
 
@@ -486,20 +550,19 @@ DbLog_explode_datetime($%) {
   return %retv
 }
 
-sub
-DbLog_implode_datetime($$$$$$) {
+sub DbLog_implode_datetime($$$$$$) {
   my ($year, $month, $day, $hour, $minute, $second) = @_;
   my $retv = $year."-".$month."-".$day." ".$hour.":".$minute.":".$second;
 
   return $retv;
 }
+
 ################################################################
 #
 # Verbindung zur DB aufbauen
 #
 ################################################################
-sub
-DbLog_Connect($)
+sub DbLog_Connect($)
 {
   my ($hash)= @_;
 
@@ -539,7 +602,7 @@ DbLog_Connect($)
     Log3 $hash->{NAME}, 2, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
-  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established";
+  Log3 $hash->{NAME}, 3, "Connection to db $dbconn established for pid $$";
   $hash->{DBH}= $dbh;
   
   if ($hash->{DBMODEL} eq "SQLITE") {
@@ -547,10 +610,13 @@ DbLog_Connect($)
     $dbh->do("PRAGMA synchronous=NORMAL");
     $dbh->do("PRAGMA journal_mode=WAL");
     $dbh->do("PRAGMA cache_size=4000");
-    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
-    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
+    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(64), TYPE varchar(64), EVENT varchar(512), READING varchar(64), VALUE varchar(128), UNIT varchar(32))");
     $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
   }
+
+  # no webfrontend connection for plotfork
+  return 1 if( $hash->{PID} != $$ );
   
   # creating an own connection for the webfrontend, saved as DBHF in Hash
   # this makes sure that the connection doesnt get lost due to other modules
@@ -569,6 +635,9 @@ DbLog_Connect($)
 #
 # Prozeduren zum Ausfuehren des SQLs
 #
+# param1: hash
+# param2: pointer : DBFilehandle
+# param3: string  : SQL
 ################################################################
 sub
 DbLog_ExecSQL1($$$)
@@ -612,12 +681,16 @@ DbLog_ExecSQL($$)
 #
 # GET Funktion
 # wird zb. zur Generierung der Plots implizit aufgerufen
+# infile : [-|current|history]
+# outfile: [-|ALL|INT|WEBCHART]
 #
 ################################################################
 sub
 DbLog_Get($@)
 {
   my ($hash, @a) = @_;
+
+  return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
      "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
@@ -626,16 +699,27 @@ DbLog_Get($@)
      "  <out> is a prefix, - means stdout\n"
     if(int(@a) < 5);
   shift @a;
-  my $inf  = shift @a;
-  my $outf = shift @a;
+  my $inf  = lc(shift @a);
+  my $outf = lc(shift @a);
   my $from = shift @a;
   my $to   = shift @a; # Now @a contains the list of column_specs
   my ($internal, @fld);
 
-  if($outf eq "INT") {
+  if($inf eq "-") {
+    $inf = "history";
+  }
+
+  if($outf eq "int" && $inf eq "current") {
+    $inf = "history";
+    Log3 $hash->{NAME}, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
+  }
+
+  if($outf eq "int") {
     $outf = "-";
     $internal = 1;
-  } elsif (uc($outf) eq "WEBCHART") {
+  } elsif($outf eq "array"){
+
+  } elsif(lc($outf) eq "webchart") {
     # redirect the get request to the chartQuery function
     return chartQuery($hash, @_);
   }
@@ -653,7 +737,8 @@ DbLog_Get($@)
   $to = $to_datetime{datetime};
 
 
-  my ($retval,$sql_timestamp,$sql_value, $type, $event, $unit) = "";
+  my ($retval,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
+  my @ReturnArray;
   my $writeout = 0;
   my (@min, @max, @sum, @cnt, @lastv, @lastd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval); #fuer delta-h/d Berechnung
@@ -666,6 +751,14 @@ DbLog_Get($@)
     $readings[$i][2] = $fld[2]; # Default
     $readings[$i][3] = $fld[3]; # function
     $readings[$i][4] = $fld[4]; # regexp
+
+    $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
+  }
+
+  #create new connection for plotfork
+  if( $hash->{PID} != $$ ) {
+    $hash->{DBH}->disconnect();
+    return "Can't connect to database." if(!DbLog_Connect($hash));
   }
 
   my $dbh= $hash->{DBH};
@@ -675,7 +768,7 @@ DbLog_Get($@)
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
+    #$sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
   } elsif ($hash->{DBMODEL} eq "ORACLE") {
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
@@ -694,7 +787,7 @@ DbLog_Get($@)
     $sqlspec{to_timestamp}   = "'$to'";
   }
 
-  if(uc($outf) eq "ALL") {
+  if($outf =~ m/(all|array)/) {
     $sqlspec{all}  = ",TYPE,EVENT,UNIT";
   } else {
     $sqlspec{all}  = "";
@@ -712,33 +805,46 @@ DbLog_Get($@)
     $minval    =  999999;
     $maxval    = -999999;
 
-    my $stm= "SELECT
-          $sqlspec{get_timestamp},
-          VALUE
-          $sqlspec{all}
-        FROM history
-        WHERE
-          DEVICE  = '".$readings[$i]->[0]."'
-          AND READING = '".$readings[$i]->[1]."'
-          AND TIMESTAMP > $sqlspec{from_timestamp}
-          AND TIMESTAMP < $sqlspec{to_timestamp}
-        ORDER BY TIMESTAMP";
+    my $stm;
+    $stm =  "SELECT
+              $sqlspec{get_timestamp},
+              DEVICE,
+              READING,
+              VALUE
+              $sqlspec{all} ";
 
-    Log3 $hash->{NAME}, 5, "Executing $stm";
+    $stm .= "FROM current " if($inf eq "current");
+    $stm .= "FROM history " if($inf eq "history");
+
+    $stm .= "WHERE 1=1 ";
+    
+    $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
+    $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+    $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+    $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+
+    $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp}
+             AND TIMESTAMP < $sqlspec{to_timestamp}
+             ORDER BY TIMESTAMP";
+
+    Log3 $hash->{NAME}, 4, "Processing Statement: $stm";
 
     my $sth= $dbh->prepare($stm) ||
       return "Cannot prepare statement $stm: $DBI::errstr";
     my $rc= $sth->execute() ||
       return "Cannot execute statement $stm: $DBI::errstr";
 
-    if(uc($outf) eq "ALL") {
-        $sth->bind_columns(undef, \$sql_timestamp, \$sql_value, \$type, \$event, \$unit);
-        
-        $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
-        $retval .= "=====================================================\n";
+    if($outf =~ m/(all|array)/) {
+      $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
     }
     else {
-        $sth->bind_columns(undef, \$sql_timestamp, \$sql_value);
+      $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
+    }
+
+    if ($outf =~ m/(all)/) {
+      $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
+      $retval .= "=====================================================\n";
     }
 
     while($sth->fetch()) {
@@ -798,7 +904,7 @@ DbLog_Get($@)
         }
         if("$tstamp{hour}" ne "$lasttstamp{hour}") {
           # Aenderung der stunde, Berechne Delta
-          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_value = sprintf("%g", $maxval - $minval);
           $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
           $minval =  999999;
           $maxval = -999999;
@@ -814,7 +920,7 @@ DbLog_Get($@)
         }
         if("$tstamp{day}" ne "$lasttstamp{day}") {
           # Aenderung des Tages, Berechne Delta
-          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_value = sprintf("%g", $maxval - $minval);
           $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00");
           $minval =  999999;
           $maxval = -999999;
@@ -828,8 +934,13 @@ DbLog_Get($@)
 
       ###################### Ausgabe ###########################
       if($writeout) {
-          if(uc($outf) eq "ALL") {
-            $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $readings[$i]->[0], $type, $event, $readings[$i]->[1], $out_value, $unit);
+          if ($outf =~ m/(all)/) {
+            # Timestamp: Device, Type, Event, Reading, Value, Unit
+            $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+          
+          } elsif ($outf =~ m/(array)/) {
+            push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+            
           } else {
             $out_tstamp =~ s/\ /_/g; #needed by generating plots
             $retval .= "$out_tstamp $out_value\n";
@@ -858,15 +969,20 @@ DbLog_Get($@)
 
     ######## den letzten Abschlusssatz rausschreiben ##########
     if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-      $out_value = sprintf("%0.1f", $maxval - $minval);
+      $out_value = sprintf("%g", $maxval - $minval);
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
-      if(uc($outf) eq "ALL") {
-        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $readings[$i]->[0], $type, $event, $readings[$i]->[1], $out_value, $unit);
-        } else {
-          $out_tstamp =~ s/\ /_/g; #needed by generating plots
-          $retval .= "$out_tstamp $out_value\n";
-        }
+      
+      if($outf =~ m/(all)/) {
+        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+      
+      } elsif ($outf =~ m/(array)/) {
+        push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+          
+      } else {
+        $out_tstamp =~ s/\ /_/g; #needed by generating plots
+        $retval .= "$out_tstamp $out_value\n";
+      }
     }
     # DatenTrenner setzen
     $retval .= "#$readings[$i]->[0]";
@@ -893,11 +1009,85 @@ DbLog_Get($@)
     $data{"currdate$k"} = $lastd[$j];
   }
 
+  #cleanup plotfork connection
+  $dbh->disconnect() if( $hash->{PID} != $$ );
+
   if($internal) {
     $internal_data = \$retval;
     return undef;
+
+  } elsif($outf =~ m/(array)/) {
+    return @ReturnArray;
+  
+  } else {
+    return $retval;
   }
-  return $retval;
+}
+
+sub DbLog_Set($@) {
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $usage = "Unknown argument, choose one of reopen:noArg count:noArg deleteOldDays userCommand";
+	return $usage if(int(@a) < 2);
+	my $dbh = $hash->{DBH};
+	my $ret;
+
+	given ($a[1]) {
+
+		when ('reopen') {
+			Log3($name, 4, "DbLog $name: Reopen requested.");
+			$dbh->commit();
+			$dbh->disconnect();
+			DbLog_Connect($hash);
+			$ret = "Reopen executed.";
+		}
+
+		when ('count') {
+			Log3($name, 4, "DbLog $name: Records count requested.");
+			my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
+			readingsSingleUpdate($hash, 'countHistory', $c ,1);
+			$c = $dbh->selectrow_array('SELECT count(*) FROM current');
+			readingsSingleUpdate($hash, 'countCurrent', $c ,1);
+		}
+
+		when ('deleteOldDays') {
+			Log3($name, 4, "DbLog $name: Deletion of old records requested.");
+			my ($c, $cmd);
+			my $dbModel = InternalVal($name, 'DBMODEL', 'unknown');
+			$cmd = "delete from history where TIMESTAMP < ";
+			given ($dbModel) {
+				when ('SQLITE')			{ $cmd .= "datetime('now', '-$a[2] days')"; }
+				when ('MYSQL')			{ $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+				when ('POSTGRESQL')	{ $cmd .= "NOW() - INTERVAL '$a[2] DAY"; }
+				default {
+					$cmd = undef;
+					$ret = 'Unkwon database type. Maybe you can try userCommand anyway.';
+				}
+			}
+
+			if(defined($cmd)) {
+				$c = $dbh->do($cmd);
+				readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
+			}
+		}
+
+		when ('userCommand') {
+			Log3($name, 4, "DbLog $name: userCommand execution requested.");
+			my ($c, @cmd, $sql);
+			@cmd = @a;
+			shift(@cmd); shift(@cmd);
+			$sql = join(" ",@cmd);
+			readingsSingleUpdate($hash, 'userCommand', $sql, 1);
+			$c = $dbh->selectrow_array($sql);
+			readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+		}
+
+		default { $ret = $usage; }
+
+	}
+
+	return $ret;
+
 }
 
 ################################################################
@@ -1188,6 +1378,25 @@ sub chartQuery($@) {
     return $jsonstring;
 }
 
+#
+# provide new functions:
+# get <dbLog> ReadingsVal       <device> <reading> <default>
+# get <dbLog> ReadingsTimestamp <device> <reading> <default>
+#
+sub dbReadings($@) {
+	my($hash,@a) = @_;
+	my $dbhf= $hash->{DBHF};
+	return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
+	my $query = "select VALUE,TIMESTAMP from current where DEVICE= '$a[2]' and READING= '$a[3]'";
+#	my $query = "select VALUE,TIMESTAMP from history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
+	my ($reading,$timestamp) = $dbhf->selectrow_array($query);
+	$reading = (defined($reading)) ? $reading : $a[4];
+	$timestamp = (defined($timestamp)) ? $timestamp : $a[4];
+	return $reading   if $a[1] eq 'ReadingsVal';
+	return $timestamp if $a[1] eq 'ReadingsTimestamp';
+	return "Syntax error: $a[1]";
+}
+
 1;
 
 =pod
@@ -1225,18 +1434,17 @@ sub chartQuery($@) {
     contains the last event for any given reading and device.
     The columns have the following meaning:
     <ol>
+      <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
+      <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
+      <li>TYPE: device type, e.g. <code>KS300</code></li>
+      <li>EVENT: event specification as full string,
+                                          e.g. <code>humidity: 71 (%)</code></li>
+      <li>READING: name of reading extracted from event,
+                      e.g. <code>humidity</code></li>
 
-    <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
-    <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
-    <li>TYPE: device type, e.g. <code>KS300</code></li>
-    <li>EVENT: event specification as full string,
-                                        e.g. <code>humidity: 71 (%)</code></li>
-    <li>READING: name of reading extracted from event,
-                    e.g. <code>humidity</code></li>
-
-    <li>VALUE: actual reading extracted from event,
-                    e.g. <code>71</code></li>
-    <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
+      <li>VALUE: actual reading extracted from event,
+                      e.g. <code>71</code></li>
+      <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
     </ol>
     The content of VALUE is optimized for automated post-processing, e.g.
     <code>yes</code> is translated to <code>1</code>
@@ -1253,13 +1461,37 @@ sub chartQuery($@) {
         <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
     </ul>
   </ul>
-
+  <br/><br/>
 
   <a name="DbLogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  <ul>
+    <code>set &lt;name&gt; reopen </code><br/><br/>
+      <ul>Perform a database disconnect and immediate reconnect to clear cache and flush journal file.</ul><br/>
+
+    <code>set &lt;name&gt; count </code><br/><br/>
+      <ul>Count records in tables current and history and write results into readings countCurrent and countHistory.</ul><br/>
+
+    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
+      <ul>Delete records from history older than &lt;n&gt; days. Number of deleted record will be written into reading lastRowsDeleted.</ul><br/>
+
+    <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
+      <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
+          Perform any (!!!) sql statement on connected database. Useercommand and result will be written into corresponding readings.<br/>
+      </ul><br/>
+
+  </ul><br>
 
   <a name="DbLogget"></a>
   <b>Get</b>
+  <ul>
+  <code>get &lt;name&gt; ReadingsVal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <code>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <br/>
+  Retrieve one single value, use and syntax are similar to ReadingsVal() and ReadingsTimestamp() functions.<br/>
+  </ul>
+  <br/>
+  <br/>
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;column_spec&gt; </code>
@@ -1269,11 +1501,25 @@ sub chartQuery($@) {
 
     <ul>
       <li>&lt;in&gt;<br>
-        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+        A dummy parameter for FileLog compatibility. Sessing by defaultto <code>-</code><br>
+        <ul>
+          <li>current: reading actual readings from table "current"</li>
+          <li>history: reading history readings from table "history"</li>
+          <li>-: identical to "history"</li>
+        </ul> 
+      </li>
       <li>&lt;out&gt;<br>
-        A dummy parameter for FileLog compatibility. Set it to <code>-</code>
-        to check the output for plot-computing.<br>Set it to the special keyword
-        <code>all</code> to get all columns from Database.</li>
+        A dummy parameter for FileLog compatibility. Setting by default to <code>-</code>
+        to check the output for plot-computing.<br>
+        Set it to the special keyword
+        <code>all</code> to get all columns from Database.
+        <ul>
+          <li>ALL: get all colums from table, including a header</li>
+          <li>Array: get the columns as array of hashes</li>
+          <li>INT: internally used by generating plots</li>
+          <li>-: default</li>
+        </ul>
+      </li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Used to select the data. Please use the following timeformat or
         an initial substring of it:<br>
@@ -1284,9 +1530,9 @@ sub chartQuery($@) {
         Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt;<br>
         <ul>
           <li>&lt;device&gt;<br>
-            The name of the device. Case sensitive</li>
+            The name of the device. Case sensitive. Using a the joker "%" is supported.</li>
           <li>&lt;reading&gt;<br>
-            The reading of the given device to select. Case sensitive.
+            The reading of the given device to select. Case sensitive. Using a the joker "%" is supported.
             </li>
           <li>&lt;default&gt;<br>
             no implemented yet
@@ -1329,6 +1575,9 @@ sub chartQuery($@) {
     Examples:
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
+        <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
+            you will get all actual readings "temperature" from all logged devices. 
+            Be carful by using "history" as inputfile because a long execution time will be expected!
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            like from 10am until 08pm at 10.11.2012</li>
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
@@ -1418,6 +1667,11 @@ sub chartQuery($@) {
   </ul>
   <a name="DbLogattr"></a>
   <b>Attributes</b> 
+  <ul><b>shutdownWait</b>
+    <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
+      causes fhem shutdown to wait n seconds for pending database commit<br/>
+    </ul>
+  </ul><br/>
   <ul><b>DbLogExclude</b>
     <br>
     <ul>
@@ -1457,13 +1711,13 @@ sub chartQuery($@) {
     definiert in <code>&lt;configfilename&gt;</code>. (Vergleiche
     Beipspielkonfigurationsdatei in <code>contrib/dblog/db.conf</code>).<br>
     Die Konfiguration ist in einer sparaten Datei abgelegt um das Datenbankpasswort
-    nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu müssen.
-    Ansonsten wäre es mittels des <a href="../docs/commandref.html#list">list</a>
+    nicht in Klartext in der FHEM-Haupt-Konfigurationsdatei speichern zu m&ouml;ssen.
+    Ansonsten w&auml;re es mittels des <a href="../docs/commandref.html#list">list</a>
     Befehls einfach auslesbar.
     <br><br>
 
     Die Perl-Module <code>DBI</code> and <code>DBD::&lt;dbtype&gt;</code>
-    müssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
+    m&ouml;ssen installiert werden (use <code>cpan -i &lt;module&gt;</code>
     falls die eigene Distribution diese nicht schon mitbringt).
     <br><br>
 
@@ -1472,28 +1726,28 @@ sub chartQuery($@) {
     Ein Beispielcode zum Erstellen einer MySQL/PostGreSQL Datenbak ist in
     <code>contrib/dblog/&lt;DBType&gt;_create.sql</code> zu finden.
     Die Datenbank beinhaltet 2 Tabellen: <code>current</code> und
-    <code>history</code>. Die Tabelle <code>current</code> enthält den letzten Stand
+    <code>history</code>. Die Tabelle <code>current</code> enth&auml;lt den letzten Stand
     pro Device und Reading. In der Tabelle <code>history</code> sind alle
     Events historisch gespeichert.
 
     Die Tabellenspalten haben folgende Bedeutung:
     <ol>
-    <li>TIMESTAMP: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code></li>
-    <li>DEVICE: name des Devices, z.B. <code>Wetterstation</code></li>
-    <li>TYPE: Type des Devices, z.B. <code>KS300</code></li>
-    <li>EVENT: das auftretende Event als volle Zeichenkette
-                                        z.B. <code>humidity: 71 (%)</code></li>
-    <li>READING: Name des Readings, ermittelt aus dem Event,
-                    z.B. <code>humidity</code></li>
+      <li>TIMESTAMP: Zeitpunkt des Events, z.B. <code>2007-12-30 21:45:22</code></li>
+      <li>DEVICE: name des Devices, z.B. <code>Wetterstation</code></li>
+      <li>TYPE: Type des Devices, z.B. <code>KS300</code></li>
+      <li>EVENT: das auftretende Event als volle Zeichenkette
+                                          z.B. <code>humidity: 71 (%)</code></li>
+      <li>READING: Name des Readings, ermittelt aus dem Event,
+                      z.B. <code>humidity</code></li>
 
-    <li>VALUE: aktueller Wert des Readings, ermittelt aus dem Event,
-                    z.B. <code>71</code></li>
-    <li>UNIT: Einheit, ermittelt aus dem Event, z.B. <code>%</code></li>
+      <li>VALUE: aktueller Wert des Readings, ermittelt aus dem Event,
+                      z.B. <code>71</code></li>
+      <li>UNIT: Einheit, ermittelt aus dem Event, z.B. <code>%</code></li>
     </ol>
-    Der Wert des Rreadings ist optimiert für eine automatisierte Nachverarbeitung
+    Der Wert des Rreadings ist optimiert f&ouml;r eine automatisierte Nachverarbeitung
     z.B. <code>yes</code> ist transformiert nach <code>1</code>
     <br><br>
-    Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
+    Die gespeicherten Werte k&ouml;nnen mittels GET Funktion angezeigt werden:
     <ul>
       <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature</code>
     </ul>
@@ -1501,52 +1755,89 @@ sub chartQuery($@) {
     <b>Beispiel:</b>
     <ul>
         <code>Speichert alles in der Datenbank</code><br>
-
         <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
     </ul>
   </ul>
 
 
   <a name="DbLogset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  <ul>
+    <code>set &lt;name&gt; reopen </code><br/><br/>
+      <ul>Schlie&szlig;t die Datenbank und &ouml;ffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+	  Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.</ul><br/>
+
+    <code>set &lt;name&gt; count </code><br/><br/>
+      <ul>Z&auml;hlt die Datens&auml;tze in den Tabellen current und history und schreibt die Ergebnisse in die Readings countCurrent und countHistory.</ul><br/>
+
+    <code>set &lt;name&gt; deleteOldDays &lt;n&gt;</code><br/><br/>
+      <ul>L&ouml;scht Datens&auml;tze, die &auml;lter sind als &lt;n&gt; Tage. Die Anzahl der gel&ouml;schten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.</ul><br/>
+
+    <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
+      <ul><b>BENUTZE DIESE FUNKTION NUR, WENN DU WIRKLICH (WIRKLICH!) WEISST, WAS DU TUST!!!</b><br/><br/>
+          F&uuml;hrt einen beliebigen (!!!) sql Befehl in der Datenbank aus. Der Befehl und ein zur&uuml;ckgeliefertes Ergebnis werden in entsprechende Readings geschrieben.<br/>
+      </ul><br/>
+
+  </ul><br>
+
 
   <a name="DbLogget"></a>
   <b>Get</b>
   <ul>
+  <code>get &lt;name&gt; ReadingsVal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <code>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt;</code><br/>
+  <br/>
+  Liest einen einzelnen Wert aus der Datenbank, Benutzung und Syntax sind weitgehend identisch zu ReadingsVal() und ReadingsTimestamp().<br/>
+  </ul>
+  <br/>
+  <br/>
+  <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;column_spec&gt; </code>
     <br><br>
-    Ließt Daten aus der Datenbank. Wird durch die Frontends benutzt um Plots
-    zu generieren ohne selbst auf die Datenank zugreifen zu müssen.
+    Liesst Daten aus der Datenbank. Wird durch die Frontends benutzt um Plots
+    zu generieren ohne selbst auf die Datenank zugreifen zu m&ouml;ssen.
     <br>
-
     <ul>
       <li>&lt;in&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
-        Dieser Parameter ist immer auf <code>-</code> zu setzen.
+        Ein Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
+        Dieser Parameter ist per default immer auf <code>-</code> zu setzen.<br>
+        Folgende Auspr&auml;gungen sind zugelassen:<br>
+        <ul>
+          <li>current: die aktuellen Werte aus der Tabelle "current" werden gelesen.</li>
+          <li>history: die historischen Werte aus der Tabelle "history" werden gelesen.</li>
+          <li>-: identisch wie "history"</li>
+        </ul> 
       </li>
       <li>&lt;out&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
-        Dieser Parameter ist immer auf <code>-</code> zu setzen um die
-        Ermittlung der Daten aus der Datenbank für die Plotgenerierung zu prüfen.<br>
-        Durchd ie Angabe des Schlüsselworts <code>all</code> werden alle
-        Spalten der Datenbank ausgegeben.
-          </li>
+        Ein Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
+        Dieser Parameter ist per default immer auf <code>-</code> zu setzen um die
+        Ermittlung der Daten aus der Datenbank f&ouml;r die Plotgenerierung zu pr&ouml;fen.<br>
+        Folgende Auspr&auml;gungen sind zugelassen:<br>
+        <ul>
+          <li>ALL: Es werden alle Spalten der Datenbank ausgegeben. Inclusive einer &Uuml;berschrift.</li>
+          <li>Array: Es werden alle Spalten der Datenbank als Hash ausgegeben. Alle Datens&auml;tze als Array zusammengefasst.</li>
+          <li>INT: intern zur Plotgenerierung verwendet</li>
+          <li>-: default</li>
+        </ul>
+      </li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat oder ein Teilstring davon zu benutzen:<br>
         <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
       <li>&lt;column_spec&gt;<br>
-        Für jede column_spec Gruppe wird ein Datenset zurückgegeben welches
-        durch einen Kommentar getrennt wird. Dieser Kommentar repräsentiert
+        F&ouml;r jede column_spec Gruppe wird ein Datenset zur&ouml;ckgegeben welches
+        durch einen Kommentar getrennt wird. Dieser Kommentar repr&auml;sentiert
         die column_spec.<br>
         Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;:&lt;regexp&gt;<br>
         <ul>
           <li>&lt;device&gt;<br>
-            Der Name des Devices. Achtung: Groß/Kleinschreibung beachten!</li>
+            Der Name des Devices. Achtung: Gross/Kleinschreibung beachten!<br>
+            Es kann ein % als Jokerzeichen angegeben werden.</li>
           <li>&lt;reading&gt;<br>
-            Das REading des angegebenen Devices zur Datenselektion.
-            Achtung: Groß/Kleinschreibung beachten!
+            Das Reading des angegebenen Devices zur Datenselektion.<br>
+            Es kann ein % als Jokerzeichen angegeben werden.<br>
+            Achtung: Gross/Kleinschreibung beachten!
           </li>
           <li>&lt;default&gt;<br>
             Zur Zeit noch nicht implementiert.
@@ -1556,17 +1847,17 @@ sub chartQuery($@) {
             <ul>
               <li>int<br>
                 Ermittelt den Zahlenwert ab dem Anfang der Zeichenkette aus der
-                Spalte "VALUE". Benutzt z.B. für Ausprägungen wie 10%.
+                Spalte "VALUE". Benutzt z.B. f&ouml;r Auspr&auml;gungen wie 10%.
               </li>
               <li>int&lt;digit&gt;<br>
                 Ermittelt den Zahlenwert ab dem Anfang der Zeichenkette aus der
                 Spalte "VALUE", inclusive negativen Vorzeichen und Dezimaltrenner.
-                Benutzt z.B. für Ausprägungen wie -5.7&deg;C.
+                Benutzt z.B. f&ouml;r Auspr&auml;gungen wie -5.7&deg;C.
               </li>
               <li>delta-h / delta-d<br>
-                Ermittelt die relative Veränderung eines Zahlenwertes pro Stunde
-                oder pro Tag. Wird benutzt z.B. für Spalten die einen
-                hochlaufenden Zähler enthalten wie im Falle für ein KS300 Regenzähler
+                Ermittelt die relative Ver&auml;nderung eines Zahlenwertes pro Stunde
+                oder pro Tag. Wird benutzt z.B. f&ouml;r Spalten die einen
+                hochlaufenden Z&auml;hler enthalten wie im Falle f&ouml;r ein KS300 Regenz&auml;hler
                 oder dem 1-wire Modul OWCOUNT.
               </li>
               <li>delta-ts<br>
@@ -1575,19 +1866,19 @@ sub chartQuery($@) {
               </li>
             </ul></li>
             <li>&lt;regexp&gt;<br>
-              Diese Zeichenkette wird als Perl Befehl ausgewertet. Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgeführt.
+              Diese Zeichenkette wird als Perl Befehl ausgewertet. Die regexp wird vor dem angegebenen &lt;fn&gt; Parameter ausgef&ouml;hrt.
               <br>
               Bitte zur Beachtung: Diese Zeichenkette darf keine Leerzeichen
               enthalten da diese sonst als &lt;column_spec&gt; Trennung
               interpretiert werden und alles nach dem Leerzeichen als neue
               &lt;column_spec&gt; gesehen wird.<br>
-              <b>Schlüsselwörter</b>
-              <li>$val ist der aktuelle Wert die die Datenbank für ein Device/Reading ausgibt.</li>
+              <b>Schl&ouml;sselw&ouml;rter</b>
+              <li>$val ist der aktuelle Wert die die Datenbank f&ouml;r ein Device/Reading ausgibt.</li>
               <li>$ts ist der aktuelle Timestamp des Logeintrages.</li>
-              <li>Wird als $val das Schlüsselwort "hide" zurückgegeben, so wird dieser Logeintrag nicht
-                  ausgegeben, trotzdem aber für die Zeitraumberechnung verwendet.</li>
-              <li>Wird als $val das Schlüsselwort "ignore" zurückgegeben, so wird dieser Logeintrag
-                  nicht für eine Folgeberechnung verwendet.</li>
+              <li>Wird als $val das Schl&ouml;sselwort "hide" zur&ouml;ckgegeben, so wird dieser Logeintrag nicht
+                  ausgegeben, trotzdem aber f&ouml;r die Zeitraumberechnung verwendet.</li>
+              <li>Wird als $val das Schl&ouml;sselwort "ignore" zur&ouml;ckgegeben, so wird dieser Logeintrag
+                  nicht f&ouml;r eine Folgeberechnung verwendet.</li>
             </li>
         </ul></li>
       </ul>
@@ -1595,39 +1886,42 @@ sub chartQuery($@) {
     <b>Beispiele:</b>
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature</code></li>
+        <li><code>get myDbLog current ALL - - %:temperature</code></li><br>
+            Damit erh�lt man alle aktuellen Readings "temperature" von allen in der DB geloggten Devices.
+            Achtung: bei Nutzung von Jokerzeichen auf die historyTabelle kann man sein FHEM aufgrund langer Laufzeit lahmlegen!
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            gibt Daten aus von 10Uhr bis 20Uhr am 10.11.2012</li>
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-           gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*</li>
+           gibt 1 zur&ouml;ck f&ouml;r alle Auspr&auml;gungen von on* (on|on-for-timer etc) und 0 f&ouml;r alle off*</li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
            Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-           und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
+           und die Ausgabe ist f&ouml;r das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
         <li><code>get DbLog - - 2013-05-26 2013-05-28 Pumpe:data::delta-ts:$val=~s/on/hide/</code><br>
-           Realisierung eines Betriebsstundenzählers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
-           einträgen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
-           entsprechen würden.</li>
+           Realisierung eines Betriebsstundenz&auml;hlers.Durch delta-ts wird die Zeit in Sek zwischen den Log-
+           eintr&auml;gen ermittelt. Die Zeiten werden bei den on-Meldungen nicht ausgegeben welche einer Abschaltzeit 
+           entsprechen w&ouml;rden.</li>
       </ul>
     <br><br>
   </ul>
 
-  <b>Get</b> für die Nutzung von webcharts
+  <b>Get</b> f&ouml;r die Nutzung von webcharts
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </code>
     <br><br>
-    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt
+    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird f&ouml;r das Charting Frontend genutzt
     <br>
 
     <ul>
       <li>&lt;name&gt;<br>
         Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde.</li>
       <li>&lt;in&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
+        Ein Dummy Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen.
         Dieser Parameter ist immer auf <code>-</code> zu setzen.</li>
       <li>&lt;out&gt;<br>
-        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen. 
+        Ein Dummy Parameter um eine Kompatibilit&auml;t zum Filelog herzustellen. 
         Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
       </li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
@@ -1637,32 +1931,32 @@ sub chartQuery($@) {
       <li>&lt;device&gt;<br>
         Ein String, der das abzufragende Device darstellt.</li>
       <li>&lt;querytype&gt;<br>
-        Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterstützte Werte sind: <br>
-          <code>getreadings</code> um für ein bestimmtes device alle Readings zu erhalten<br>
-          <code>getdevices</code> um alle verfügbaren devices zu erhalten<br>
-          <code>timerange</code> um Chart-Daten abzufragen. Es werden die Parameter 'xaxis', 'yaxis', 'device', 'to' und 'from' benötigt<br>
-          <code>savechart</code> um einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration abzuspeichern<br>
-          <code>deletechart</code> um einen zuvor gespeicherten Chart unter Angabe einer id zu löschen<br>
+        Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterst&ouml;tzte Werte sind: <br>
+          <code>getreadings</code> um f&ouml;r ein bestimmtes device alle Readings zu erhalten<br>
+          <code>getdevices</code> um alle verf&ouml;gbaren devices zu erhalten<br>
+          <code>timerange</code> um Chart-Daten abzufragen. Es werden die Parameter 'xaxis', 'yaxis', 'device', 'to' und 'from' ben&ouml;tigt<br>
+          <code>savechart</code> um einen Chart unter Angabe eines 'savename' und seiner zugeh&ouml;rigen Konfiguration abzuspeichern<br>
+          <code>deletechart</code> um einen zuvor gespeicherten Chart unter Angabe einer id zu l&ouml;schen<br>
           <code>getcharts</code> um eine Liste aller gespeicherten Charts zu bekommen.<br>
-          <code>getTableData</code> um Daten aus der Datenbank abzufragen und in einer Tabelle darzustellen. Benötigt paging Parameter wie start und limit.<br>
-          <code>hourstats</code> um Statistiken für einen Wert (yaxis) für eine Stunde abzufragen.<br>
-          <code>daystats</code> um Statistiken für einen Wert (yaxis) für einen Tag abzufragen.<br>
-          <code>weekstats</code> um Statistiken für einen Wert (yaxis) für eine Woche abzufragen.<br>
-          <code>monthstats</code> um Statistiken für einen Wert (yaxis) für einen Monat abzufragen.<br>
-          <code>yearstats</code> um Statistiken für einen Wert (yaxis) für ein Jahr abzufragen.<br>
+          <code>getTableData</code> um Daten aus der Datenbank abzufragen und in einer Tabelle darzustellen. Ben&ouml;tigt paging Parameter wie start und limit.<br>
+          <code>hourstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r eine Stunde abzufragen.<br>
+          <code>daystats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r einen Tag abzufragen.<br>
+          <code>weekstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r eine Woche abzufragen.<br>
+          <code>monthstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r einen Monat abzufragen.<br>
+          <code>yearstats</code> um Statistiken f&ouml;r einen Wert (yaxis) f&ouml;r ein Jahr abzufragen.<br>
       </li>
       <li>&lt;xaxis&gt;<br>
-        Ein String, der die X-Achse repräsentiert</li>
+        Ein String, der die X-Achse repr&auml;sentiert</li>
       <li>&lt;yaxis&gt;<br>
-         Ein String, der die Y-Achse repräsentiert</li>
+         Ein String, der die Y-Achse repr&auml;sentiert</li>
       <li>&lt;savename&gt;<br>
          Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
       <li>&lt;chartconfig&gt;<br>
-         Ein jsonstring der den zu speichernden Chart repräsentiert</li>
+         Ein jsonstring der den zu speichernden Chart repr&auml;sentiert</li>
       <li>&lt;pagingstart&gt;<br>
-         Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Startwert f&ouml;r die Abfrage 'getTableData' festzulegen</li>
       <li>&lt;paginglimit&gt;<br>
-         Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen</li>
+         Ein Integer um den Limitwert f&ouml;r die Abfrage 'getTableData' festzulegen</li>
       </ul>
     <br><br>
     Beispiele:
@@ -1670,22 +1964,27 @@ sub chartQuery($@) {
         <li><code>get logdb - webchart "" "" "" getcharts</code><br>
             Liefert alle gespeicherten Charts aus der Datenbank</li>
         <li><code>get logdb - webchart "" "" "" getdevices</code><br>
-            Liefert alle verfügbaren Devices aus der Datenbank</li>
+            Liefert alle verf&ouml;gbaren Devices aus der Datenbank</li>
         <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
-            Liefert alle verfügbaren Readings aus der Datenbank unter Angabe eines Gerätes</li>
+            Liefert alle verf&ouml;gbaren Readings aus der Datenbank unter Angabe eines Ger&auml;tes</li>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
             Liefert Chart-Daten, die auf folgenden Parametern basieren: 'xaxis', 'yaxis', 'device', 'to' und 'from'<br>
             Die Ausgabe erfolgt als JSON, z.B.: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
         <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
-            Speichert einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration</li>
+            Speichert einen Chart unter Angabe eines 'savename' und seiner zugeh&ouml;rigen Konfiguration</li>
         <li><code>get logdb - webchart "" "" "" deletechart "" "" 7</code><br>
-            Löscht einen zuvor gespeicherten Chart unter Angabe einer id</li>
+            L&ouml;scht einen zuvor gespeicherten Chart unter Angabe einer id</li>
       </ul>
     <br><br>
   </ul>
 
   <a name="DbLogattr"></a>
   <b>Attribute</b>
+  <ul><b>shutdownWait</b>
+     <ul><code>attr &lt;device&gt; shutdownWait <n></code><br/>
+      fhem wartet waehrend des shutdowns fuer n Sekunden, um die Datenbank korrekt zu beenden<br/>
+    </ul>
+  </ul><br/>
   <ul><b>DbLogExclude</b>
     <ul>
       <code>
@@ -1694,11 +1993,11 @@ sub chartQuery($@) {
     </ul>
     <br>
     Wenn DbLog genutzt wird, wird in alle Devices das Attribut <i>DbLogExclude</i>
-    propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schließt die 
+    propagiert. Der Wert des Attributes wird als Regexp ausgewertet und schliesst die 
     damit matchenden Readings von einem Logging aus. Einzelne Regexp werden durch 
     Kommata getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
     dann nicht geloggt, wenn das Intervall noch nicht erreicht und der Wert des 
-    Readings sich nicht verändert hat.
+    Readings sich nicht ver&auml;ndert hat.
     <br>
     <b>Beispiele</b>
     <ul>

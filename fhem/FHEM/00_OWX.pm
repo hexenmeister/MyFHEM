@@ -83,7 +83,7 @@ if( $^O =~ /Win/ ) {
 use Time::HiRes qw(gettimeofday);
 
 require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
-sub Log($$);
+sub Log3($$$);
 
 use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 # 1-Wire devices 
@@ -126,7 +126,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version=4.5;
+$owx_version=4.6;
 #-- Debugging 0,1,2,3
 $owx_debug=0;
 
@@ -152,10 +152,11 @@ sub OWX_Initialize ($) {
   $hash->{UndefFn} = "OWX_Undef";
   $hash->{GetFn}   = "OWX_Get";
   $hash->{SetFn}   = "OWX_Set";
+  $hash->{NotifyFn} = "OWX_Notify";  
   $hash->{ReadFn}  = "OWX_Poll";
   $hash->{ReadyFn} = "OWX_Ready";
   $hash->{InitFn}  = "OWX_Init";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 dokick:0,1 async:0,1 IODev";
+  $hash->{AttrList}= "dokick:0,1 async:0,1 IODev";
 }
 
 ########################################################################################
@@ -173,8 +174,10 @@ sub OWX_Define ($$) {
 	#-- check syntax
    	return "OWX: Syntax error - must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>" if(int(@a) < 3);
 
-	Log (GetLogLevel($hash->{NAME},2),"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>") if( int(@a)>3 );
+	Log3 ($hash->{NAME},2,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>") if( int(@a)>3 );
 	my $dev = $a[2];
+  
+  $hash->{NOTIFYDEV} = "global";
   
 	#-- Dummy 1-Wire ROM identifier, empty device lists
 	$hash->{ROM_ID}      = "FF";
@@ -207,9 +210,22 @@ sub OWX_Define ($$) {
   $hash->{INTERFACE} = $owx->{interface};
 
   $hash->{STATE} = "Defined";
-  
-  main::InternalTimer(gettimeofday()+5, "OWX_Init", $hash,0);
+
+  if ($main::init_done) {
+    return OWX_Init($hash);
+  }
 	return undef;
+}
+
+sub OWX_Notify {
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+  	OWX_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
 }
 
 sub OWX_Ready ($) {
@@ -217,7 +233,7 @@ sub OWX_Ready ($) {
   unless ( $hash->{STATE} eq "Active" ) {
     my $ret = OWX_Init($hash);
     if ($ret) {
-      Log (GetLogLevel($hash->{NAME},2),"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
+      Log3 ($hash->{NAME},2,"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
       return undef;
     }
   }
@@ -234,7 +250,7 @@ sub OWX_Poll ($) {
 sub OWX_Disconnect($) {
 	my ($hash) = @_;
 	my $async = $hash->{ASYNC};
-	Log (GetLogLevel($hash->{NAME},3), "OWX_Disconnect");
+	Log3 ($hash->{NAME},3, "OWX_Disconnect");
 	if (defined $async) {
 		$async->exit($hash);
 	};
@@ -249,7 +265,7 @@ sub OWX_Disconnect($) {
 
 sub OWX_Disconnected($) {
 	my ($hash) = @_;
-	Log (GetLogLevel($hash->{NAME},4), "OWX_Disconnected");
+	Log3 ($hash->{NAME},4, "OWX_Disconnected");
 	if ($hash->{ASYNC} and $hash->{ASYNC} != $hash->{OWX}) {
 		delete $hash->{ASYNC};
 	};
@@ -423,8 +439,7 @@ sub OWX_Complex ($$$$) {
 				$result .= $readdata;
  			};
 		};
-		my $loglevel = main::GetLogLevel($hash->{NAME},6);
-		main::Log($loglevel <6 ? $loglevel : 6,"OWX_Complex: $result");
+		Log3 ($hash->{NAME},5,"OWX_Complex: $result");
 		return $result;
 	};
 	return 0;
@@ -634,7 +649,7 @@ sub OWX_Search($) {
 		if( !defined($owx_interface) ) {
 			return undef;
 		} else {
-			Log (GetLogLevel($hash->{NAME},3),"OWX: Search called with unknown interface $owx_interface");
+			Log3 ($hash->{NAME},3,"OWX: Search called with unknown interface $owx_interface");
 			return undef;
 		} 
 	}
@@ -727,7 +742,7 @@ sub OWX_AutoCreate($$) {
     foreach my $owx_dev  (@{$owx_devs}) {
       #-- ignore those which do not have the proper pattern
       if( !($owx_dev =~ m/[0-9A-F]{2}\.[0-9A-F]{12}\.[0-9A-F]{2}/) ){
-        Log (GetLogLevel($hash->{NAME},3),"OWX: Invalid 1-Wire device ID $owx_dev, ignoring it");
+        Log3 ($hash->{NAME},3,"OWX: Invalid 1-Wire device ID $owx_dev, ignoring it");
         next;
       }
     
@@ -755,7 +770,7 @@ sub OWX_AutoCreate($$) {
         if( substr($id_fhem,3,12) eq substr($id_owx,3,12) ) {
           #-- warn if improper family id
           if( substr($id_fhem,0,2) ne substr($id_owx,0,2) ){
-            Log (GetLogLevel($hash->{NAME},3), "OWX: Warning, $fhem_dev is defined with improper family id ".substr($id_fhem,0,2). 
+            Log3 ($hash->{NAME},3, "OWX: Warning, $fhem_dev is defined with improper family id ".substr($id_fhem,0,2). 
              ", must enter correct model in configuration");
              #$main::defs{$fhem_dev}{OW_FAMILY} = substr($id_owx,0,2);
           }
@@ -775,7 +790,7 @@ sub OWX_AutoCreate($$) {
         $chip     = $owg_family{$owx_f}[0];
         $acstring = $owg_family{$owx_f}[1];
       }else{  
-        Log (GetLogLevel($hash->{NAME},3), "OWX: Unknown family code '$owx_f' found");
+        Log3 ($hash->{NAME},3, "OWX: Unknown family code '$owx_f' found");
         #-- All unknown families are ID only
         $chip     = "unknown";
         $acstring = "OWID $owx_f";  
@@ -832,12 +847,12 @@ sub OWX_AutoCreate($$) {
     if ( $main::defs{$fhem_dev}{IODev} ){
       next if( $main::defs{$fhem_dev}{IODev}{NAME} ne $hash->{NAME} );
     }
-    Log (GetLogLevel($hash->{NAME},3), "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}");
+    Log3 ($hash->{NAME},3, "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}");
     CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
     #Log 1, "present= ".$main::defs{$fhem_dev}{PRESENT}." iodev=".$main::defs{$fhem_dev}{IODev}{NAME};
   }
   #-- Log the discovered devices
-  Log (GetLogLevel($hash->{NAME},2), "OWX: 1-Wire devices found on bus $name (".join(",",@owx_names).")");
+  Log3 ($hash->{NAME},2, "OWX: 1-Wire devices found on bus $name (".join(",",@owx_names).")");
   #-- tabular view as return value
   return "OWX: 1-Wire devices found on bus $name \n".$ret;
 }   
@@ -926,13 +941,10 @@ sub OWX_Init ($) {
   $hash->{ALARMED}      = "no";
   
   #-- InternalTimer blocks if init_done is not true
-  my $oid = $main::init_done;
   $hash->{PRESENT} = 1;
   #readingsSingleUpdate($hash,"state","defined",1);
-  $main::init_done = 1;
   #-- Intiate first alarm detection and eventually conversion in a minute or so
-  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
-  $main::init_done     = $oid;
+  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,0);
   $hash->{STATE} = "Active";
   return undef;
 }
@@ -953,14 +965,14 @@ sub OWX_Kick($) {
   my $ret;
 
   #-- Call us in n seconds again.
-  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
+  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,0);
 
   #-- Only if we have the dokick attribute set to 1
   if (main::AttrVal($hash->{NAME},"dokick",0)) {
     #-- issue the skip ROM command \xCC followed by start conversion command \x44 
     $ret = OWX_Execute($hash,"kick",1,undef,"\xCC\x44",0,undef);
     if( !$ret ){
-      Log (GetLogLevel($hash->{NAME},3), "OWX: Failure in temperature conversion\n");
+      Log3 ($hash->{NAME},3, "OWX: Failure in temperature conversion\n");
       return 0;
     }
   }
@@ -1011,7 +1023,7 @@ sub OWX_Reset ($) {
 		if( !(defined($owx_interface))){
 			return 0;
 		} else {
-			Log (GetLogLevel($hash->{NAME},3),"OWX: Reset called with unknown interface $owx_interface");
+			Log3 ($hash->{NAME},3,"OWX: Reset called with unknown interface $owx_interface");
 			return 0;
 		}
 	}
@@ -1032,7 +1044,7 @@ sub OWX_Set($@) {
 
   #-- First we need to find the ROM ID corresponding to the device name
   my $owx_romid =  $hash->{ROM_ID};
-  Log (GetLogLevel($hash->{NAME},6), "OWX_Set request $name $owx_romid ".join(" ",@a));
+  Log3 ($hash->{NAME},5, "OWX_Set request $name $owx_romid ".join(" ",@a));
 
   #-- for the selector: which values are possible
   return join(" ", sort keys %sets) if(@a != 2);
@@ -1064,7 +1076,7 @@ sub OWX_Set($@) {
   	}
     
   }
-  Log (GetLogLevel($name,3), "OWX_Set $name ".join(" ",@a)." => $res");  
+  Log3 ($name,3, "OWX_Set $name ".join(" ",@a)." => $res");  
   DoTrigger($name, undef) if($init_done);
   return "OWX_Set => $name ".join(" ",@a)." => $res";
 }
@@ -1197,17 +1209,14 @@ sub OWX_AwaitExecuteResponse($$$) {
 sub OWX_AfterExecute($$$$$$$$) {
 	my ( $master, $context, $success, $reset, $owx_dev, $data, $numread, $readdata ) = @_;
 
-	my $loglevel = GetLogLevel($master->{NAME},6);
-	if ($loglevel < 6) {
-		main::Log($loglevel,"AfterExecute:".
-		" context: ".(defined $context ? $context : "undef").
-		", success: ".(defined $success ? $success : "undef").
-		", reset: ".(defined $reset ? $reset : "undef").
-		", owx_dev: ".(defined $owx_dev ? $owx_dev : "undef").
-		", data: ".(defined $data ? $data : "undef").
-		", numread: ".(defined $numread ? $numread : "undef").
-		", readdata: ".(defined $readdata ? $readdata : "undef"));
-	}
+	Log3 ($master->{NAME},5,"AfterExecute:".
+	" context: ".(defined $context ? $context : "undef").
+	", success: ".(defined $success ? $success : "undef").
+	", reset: ".(defined $reset ? $reset : "undef").
+	", owx_dev: ".(defined $owx_dev ? $owx_dev : "undef").
+	", data: ".(defined $data ? $data : "undef").
+	", numread: ".(defined $numread ? $numread : "undef").
+	", readdata: ".(defined $readdata ? $readdata : "undef"));
 
 	if (defined $owx_dev) {
 		foreach my $d ( sort keys %main::defs ) {
@@ -1218,7 +1227,7 @@ sub OWX_AfterExecute($$$$$$$$) {
 				  && $hash->{ROM_ID} eq $owx_dev ) {
 				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
 				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $data, $numread, $readdata);
-				    main::Log($loglevel < 6 ? $loglevel : 4,"OWX_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
+				    Log3 ($master->{NAME},4,"OWX_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
 				    if ($success) {
 				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
 				    } else {
@@ -1327,7 +1336,7 @@ sub OWX_AfterExecute($$$$$$$$) {
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
-                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    >room</a>, <a href="#eventMap">eventMap</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
 

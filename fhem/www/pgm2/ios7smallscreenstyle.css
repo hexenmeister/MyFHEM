@@ -15,7 +15,7 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px;}
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
+#errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
 .devType { padding-top:10px; font-size:16px;}
 a {  color: #151515; }
@@ -75,5 +75,5 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 
-svg { height:32px; width:32px; fill:#1c7efb; }
+svg { height:32px; width:32px; fill:#1c7efb; vertical-align:middle; margin:2px 0; }
 g.on { fill:red; }

@@ -38,13 +38,6 @@ use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
 
-sub GDS_Define($$$);
-sub GDS_Undef($$);
-sub GDS_Set($@);
-sub GDS_Get($@);
-sub GDS_Attr(@);
-
-
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
 
@@ -66,10 +59,11 @@ sub GDS_Initialize($) {
 	$hash->{UndefFn}	=	"GDS_Undef";
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
+	$hash->{ShutdownFn}	=	"GDS_Shutdown";
 	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
 							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
-							"gdsSetCond ".
+							"gdsSetCond gdsPassiveFtp:0,1 ".
 							$readingFnAttributes;
 
 	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
@@ -113,7 +107,9 @@ sub GDS_Define($$$) {
 
 	$dummy = "gds_web_".$name;
 	CommandDefine(undef, $dummy." HTTPSRV ".$name." ".$tempDir." GDS ".$name." Files");
-	$attr{$dummy}{"directoryindex"} = $name.".html";
+	$defs{$dummy}{TEMPORARY} = 1;
+	$attr{$dummy}{directoryindex} = $name.".html";
+	$attr{$dummy}{room} = 'hidden';
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 	createIndexFile($hash);
@@ -140,6 +136,13 @@ sub GDS_Undef($$) {
 	my $name = $hash->{NAME};
 	CommandDelete(undef, "gds_web_".$name);
 	RemoveInternalTimer($hash);
+	return undef;
+}
+
+sub GDS_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"GDS $name: shutdown requested");
 	return undef;
 }
 
@@ -692,14 +695,23 @@ sub retrieveFile($$;$$$){
 	my $pass		= $hash->{helper}{PASS};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
 	my $debug		= AttrVal($name, "gdsDebug",0);
 
 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
 	
 	my $urlString =	"ftp://$user:$pass\@ftp-outgoing2.dwd.de/";
-	my $ua = LWP::UserAgent->new;	# test
-	$ua->timeout(10);				# test
-	$ua->env_proxy;					# test
+	my $ua;
+	eval { $ua = LWP::UserAgent->new; };
+
+	if(!defined($ua)) {
+		Log3($name, 1, "GDS $name: LWP not available!");
+		readingsSingleUpdate($hash, 'LWP error', 'LWP not available!',1);
+		return;
+	}
+
+	$ua->timeout(10);
+	$ua->env_proxy;
 
 	given($request){
 
@@ -777,15 +789,18 @@ sub retrieveFile($$;$$$){
 	eval {
 		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de",
 								Debug => 0,
-								Timeout => 360,
+								Timeout => 10,
+								Passive => $passive,
 								FirewallType => $proxyType,
 								Firewall => $proxyName);
+		Log3($name, 4, "GDS $name: ftp connection established.");
 		if(defined($ftp)){
 			$ftp->login($user, $pass);
 			$ftp->cwd("$dir");
 			@files = undef;
 			@files = $ftp->ls($dwd);
 			if(@files){
+				Log3($name, 4, "GDS $name: filelist found.");
 				@files = sort(@files);
 				$dataFile = $files[-1];
 				$urlString .= $dataFile;
@@ -799,10 +814,12 @@ sub retrieveFile($$;$$$){
 				}
 				$found = 1;
 			} else { 
+				Log3($name, 4, "GDS $name: filelist not found.");
 				$found = 0;
 			}
 			$ftp->quit;
 		}
+		Log3($name, 4, "GDS $name: updating readings.");
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "_dataSource",		"Quelle: Deutscher Wetterdienst");
 		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
@@ -1082,6 +1099,11 @@ sub initDropdownLists($){
 #
 #	2013-11-03	added	error handling for malformed XML files from GDS
 #
+#	2014-02-04	added	ShutdownFn
+#				changed	FTP Timeout
+#
+#	2014-02-26	added	attribute gdsPassiveFtp
+#
 ####################################################################################################
 #
 # Further informations
@@ -1256,6 +1278,7 @@ sub initDropdownLists($){
 		<li><b>gdsLong</b> - show long text fields "description" and "instruction" from alert message in readings</li>
 		<li><b>gdsPolygon</b> - show polygon data from alert message in a reading</li>
 		<br/>
+		<li><b>gdsPassiveFtp</b> - set to 1 to use passive FTP transfer</li>
 		<li><b>gdsFwName</b> - define firewall hostname in format &lt;hostname&gt;:&lt;port&gt;</li>
 		<li><b>gdsFwType</b> - define firewall type in a value 0..7 please refer to <a href="http://search.cpan.org/~gbarr/libnet-1.22/Net/Config.pm#NetConfig_VALUES">cpan documentation</a> for further informations regarding firewall settings.</li>
 	</ul>
@@ -1285,4 +1308,13 @@ sub initDropdownLists($){
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="GDS"></a>
+<h3>GDS</h3>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#GDS'>GDS</a><br/>
+</ul>
+=end html_DE
 =cut

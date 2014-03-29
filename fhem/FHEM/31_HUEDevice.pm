@@ -185,6 +185,7 @@ sub HUEDevice_Define($$)
 
     $hash->{helper}{percent} = -1;
 
+    $hash->{helper}{RGB} = '';
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
   } else {
@@ -399,7 +400,7 @@ HUEDevice_Set($@)
     } elsif( $defs{$name}->{helper}->{update_timeout}
         && !$hash->{helper}->{group} ) {
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 1);
+      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 0);
     } else {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate( $hash );
@@ -608,14 +609,16 @@ HUEDevice_GetUpdate($)
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0);
   }
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = $result->{'error'}->{'description'};
     return;
   }
@@ -698,11 +701,6 @@ HUEDevice_GetUpdate($)
 
   $s = 'off' if( !$reachable );
 
-  if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
-  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
-
-  CommandTrigger( "", "$name RGB: ".CommandGet("","$name rgb") );
-
   $hash->{helper}{on} = $on;
   $hash->{helper}{reachable} = $reachable;
   $hash->{helper}{colormode} = $colormode;
@@ -715,6 +713,13 @@ HUEDevice_GetUpdate($)
   $hash->{helper}{effect} = $effect;
 
   $hash->{helper}{percent} = $percent;
+
+  if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
+  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
+
+  my $RGB = CommandGet("","$name rgb");
+  CommandTrigger( "", "$name RGB: $RGB" ) if( $RGB ne $hash->{helper}{RGB} );
+  $hash->{helper}{RGB} = $RGB;
 }
 
 1;

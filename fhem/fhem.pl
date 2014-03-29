@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2013
+#  (c) 2005-2014
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -40,8 +40,8 @@ use Time::HiRes qw(gettimeofday);
 # Forward declarations
 #
 sub AddDuplicate($$);
-sub AnalyzeCommand($$);
-sub AnalyzeCommandChain($$);
+sub AnalyzeCommand($$;$);
+sub AnalyzeCommandChain($$;$);
 sub AnalyzeInput($);
 sub AnalyzePerlCommand($$);
 sub AssignIoPort($;$);
@@ -49,6 +49,8 @@ sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
 sub CommandChain($$);
+sub Debug($);
+sub DoSet(@);
 sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
@@ -61,14 +63,20 @@ sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
+sub InternalVal($$$);
 sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
+sub IsIoDummy($);
 sub LoadModule($);
 sub Log($$);
 sub Log3($$$);
+sub OldTimestamp($);
+sub OldValue($);
 sub OpenLogfile($);
 sub PrintHash($$);
+sub ReadingsNum($$$);
+sub ReadingsTimestamp($$$);
 sub ReadingsVal($$$);
 sub RemoveInternalTimer($);
 sub ReplaceEventMap($$$);
@@ -76,20 +84,38 @@ sub ResolveDateWildcards($@);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
+sub Value($);
+sub WakeUpFn($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
 sub addToAttrList($);
+sub addToWritebuffer($$);
 sub attrSplit($);
+sub computeClientArray($$);
+sub concatc($$$);
 sub createInterfaceDefinitions();
+sub createNtfyHash();
 sub devspec2array($);
 sub doGlobalDef($);
+sub escapeLogLine($);
 sub evalStateFormat($);
 sub fhem($@);
-sub fhz($);
+sub fhemTimeGm($$$$$$);
+sub fhemTimeLocal($$$$$$);
+sub fhemTzOffset($);
+sub getAllAttr($);
 sub getAllGets($);
 sub getAllSets($);
+sub getGetters($);
+sub getGettersForInterface($);
+sub getInterfaces($);
+sub getReadingsForInterface($);
+sub getSetters($);
+sub getSettersForInterface($);
 sub latin1ToUtf8($);
+sub myrename($$);
+sub notifyRegexpChanged($$);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
@@ -105,6 +131,8 @@ sub CommandDefaultAttr($$);
 sub CommandDefine($$);
 sub CommandDelete($$);
 sub CommandDeleteAttr($$);
+sub CommandDeleteReading($$);
+sub CommandDisplayAttr($$);
 sub CommandGet($$);
 sub CommandHelp($$);
 sub CommandIOWrite($$);
@@ -118,10 +146,20 @@ sub CommandRename($$);
 sub CommandRereadCfg($$);
 sub CommandSave($$);
 sub CommandSet($$);
+sub CommandSetReading($$);
 sub CommandSetstate($$);
 sub CommandShutdown($$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
+sub CommandVersion($$);
+
+# configDB special
+sub cfgDB_Init;
+sub cfgDB_ReadAll($);
+sub cfgDB_SaveState;
+sub cfgDB_SaveCfg;
+sub cfgDB_GlobalAttr;
+sub cfgDB_svnId;
 
 ##################################################
 # Variables:
@@ -151,28 +189,29 @@ sub CommandTrigger($$);
 # IODev   - attached to io device
 # CHANGED - Currently changed attributes of this device. Used by NotifyFn
 # VOLATILE- Set if the definition should be saved to the "statefile"
+# NOTIFYDEV - if set, the notifyFn will only be called for this device
 
-use vars qw(%modules);		# List of loaded modules (device/log/etc)
-use vars qw(%defs);		# FHEM device/button definitions
-use vars qw(%attr);		# Attributes
-use vars qw(%interfaces);       # Global interface definitions, see createInterfaceDefinitions below
-use vars qw(%selectlist);	# devices which want a "select"
-use vars qw(%readyfnlist);	# devices which want a "readyfn"
-use vars qw($readytimeout);	# Polling interval. UNIX: device search only
+use vars qw(%modules);          # List of loaded modules (device/log/etc)
+use vars qw(%defs);             # FHEM device/button definitions
+use vars qw(%attr);             # Attributes
+use vars qw(%interfaces);       # see createInterfaceDefinitions below
+use vars qw(%selectlist);       # devices which want a "select"
+use vars qw(%readyfnlist);      # devices which want a "readyfn"
+use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
-use vars qw(%value);		# Current values, see commandref.html
-use vars qw(%oldvalue);		# Old values, see commandref.html
+use vars qw(%value);            # Current values, see commandref.html
+use vars qw(%oldvalue);         # Old values, see commandref.html
 use vars qw($init_done);        #
-use vars qw($internal_data);    #
-use vars qw(%cmds);             # Global command name hash. To be expanded
-use vars qw(%data);		# Hash for user data
-use vars qw($devcount);	        # To sort the devices
-use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
-use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
-use vars qw(%inform);	        # Used by telnet_ActivateInform
-use vars qw(%intAt);		# Internal at timer hash, global for benchmark
+use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
+use vars qw(%cmds);             # Global command name hash.
+use vars qw(%data);             # Hash for user data
+use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
+use vars qw(%inform);           # Used by telnet_ActivateInform
+use vars qw(%intAt);            # Internal at timer hash, global for benchmark
 use vars qw($nextat);           # Time when next timer will be triggered.
+use vars qw(%ntfyHash);         # hash of devices needed to be notified.
 
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
@@ -181,7 +220,6 @@ my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
 
 my %comments;			# Comments from the include files
-my $ipv6;			# Using IPV6
 my $currlogfile;		# logfile, without wildcards
 my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
@@ -192,12 +230,7 @@ my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
 my $readingsUpdateDelayTrigger; # needed internally
 my $cvsid = '$Id$';
-my $namedef =
-  "where <name> is either:\n" .
-  "- a single device name\n" .
-  "- a list separated by komma (,)\n" .
-  "- a regexp, if it contains one of the following characters: *[]^\$\n" .
-  "- a range separated by dash (-)\n";
+my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
 my $wbName = ".WRITEBUFFER";
@@ -370,6 +403,13 @@ $winService ||= {};
 # Server initialization
 doGlobalDef($ARGV[0]);
 
+if($attr{global}{configfile} eq 'configDB') {
+  eval "use configDB";
+  Log 1, $@ if($@);
+  cfgDB_Init();
+}
+
+
 # As newer Linux versions reset serial parameters after fork, we parse the
 # config file after the fork. But we need some global attr parameters before, so we
 # read them here.
@@ -394,12 +434,18 @@ while(time() < 2*3600) {
   sleep(5);
 }
 
-my $ret = CommandInclude(undef, $attr{global}{configfile});
-Log 1, "configfile: $ret" if($ret);
+if($attr{global}{configfile} eq 'configDB') {
+  my $ret = cfgDB_ReadAll(undef);
+  Log 1, "configDB: $ret" if($ret);
 
-if($attr{global}{statefile} && -r $attr{global}{statefile}) {
-  $ret = CommandInclude(undef, $attr{global}{statefile});
-  Log 1, "statefile: $ret" if($ret);
+} else {
+  my $ret = CommandInclude(undef, $attr{global}{configfile});
+  Log 1, "configfile: $ret" if($ret);
+
+  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+    $ret = CommandInclude(undef, $attr{global}{statefile});
+    Log 1, "statefile: $ret" if($ret);
+  }
 }
 
 SignalHandling();
@@ -427,6 +473,12 @@ $attr{global}{motd} = "$sc_text\n\n"
         if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^$sc_text/);
 
 $init_done = 1;
+foreach my $d (keys %defs) {
+  if($defs{$d}{IODevMissing}) {
+    Log 3, "No I/O device found for $defs{$d}{NAME}";
+    delete $defs{$d}{IODevMissing};
+  }
+}
 DoTrigger("global", "INITIALIZED", 1);
 
 $attr{global}{motd} .= "Running with root privileges."
@@ -481,7 +533,7 @@ while (1) {
 
   if($nfound < 0) {
     my $err = int($!);
-    next if ($err == 0);
+    next if($err==0 || $err==4); # 4==EINTR
 
     Log 1, "ERROR: Select error $nfound ($err), error count= $errcount";
     $errcount++;
@@ -595,12 +647,20 @@ sub
 IsDisabled($)
 {
   my $devname = shift;
-  if($devname &&
-     defined($attr{$devname}) &&
-     defined($attr{$devname}{disable})) {
-    Log 4, "Disabled $devname";
-    return 1;
+  return 0 if(!$devname || !defined($attr{$devname}));
+
+  return 1 if($attr{$devname}{disable});
+
+  my $dfi = $attr{$devname}{disabledForIntervals};
+  if(defined($dfi)) {
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
+    foreach my $ft (split(" ", $dfi)) {
+      my ($from, $to) = split("-", $ft);
+      return 1 if($from && $to && $from le $hms && $hms le $to);
+    }
   }
+
   return 0;
 }
 
@@ -733,9 +793,9 @@ CommandIOWrite($$)
 #####################################
 # i.e. split a line by ; (escape ;;), and execute each
 sub
-AnalyzeCommandChain($$)
+AnalyzeCommandChain($$;$)
 {
-  my ($c, $cmd) = @_;
+  my ($c, $cmd, $allowed) = @_;
   my @ret;
 
   if($cmd =~ m/^[ \t]*(#.*)?$/) {      # Save comments
@@ -758,7 +818,7 @@ AnalyzeCommandChain($$)
   my $subcmd;
   while(defined($subcmd = shift @cmdList)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
-    my $lret = AnalyzeCommand($c, $subcmd);
+    my $lret = AnalyzeCommand($c, $subcmd, $allowed);
     push(@ret, $lret) if(defined($lret));
   }
   @cmdList = @saveCmdList;
@@ -808,9 +868,9 @@ AnalyzePerlCommand($$)
 }
 
 sub
-AnalyzeCommand($$)
+AnalyzeCommand($$;$)
 {
-  my ($cl, $cmd) = @_;
+  my ($cl, $cmd, $allowed) = @_;
 
   $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
@@ -819,10 +879,12 @@ AnalyzeCommand($$)
   return undef if(!$cmd);
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
+    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bperl\b/);
     return AnalyzePerlCommand($cl, $cmd);
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
+    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bshell\b/);
     if($evalSpecials) {
       map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
     }
@@ -853,6 +915,8 @@ AnalyzeCommand($$)
   }
   $fn = $cmds{$fn}{ReplacedBy}
                 if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
+
+  return "Forbidden command $fn." if($allowed && $allowed !~ m/\b$fn\b/);
 
   #############
   # autoload commands.
@@ -890,6 +954,12 @@ devspec2array($)
 
   my (@ret, $isAttr);
   foreach my $l (split(",", $name)) {   # List of elements
+
+    if(defined($defs{$l})) {
+      push @ret, $l;
+      next;
+    }
+
     my @names = sort keys %defs;
     my @res;
     foreach my $dName (split(":FILTER=", $l)) {
@@ -920,12 +990,15 @@ devspec2array($)
           $val = $attr{$d}{$n} if($attr{$d});
         }
         $val="" if(!defined($val));
+
+        my $lre = ($n eq "room" ? "(^|,)($re)(,|\$)" : "^($re)\$");
         eval { # a bad regexp is deadly
-          if(($op eq  "=" && $val =~ m/\b$re\b/) ||
-             ($op eq "!=" && $val !~ m/\b$re\b/)) {
+          if(($op eq  "=" && $val =~ m/$lre/s) ||
+             ($op eq "!=" && $val !~ m/$lre/s)) {
             push @res, $d 
           }
         };
+
         if($@) {
           Log 1, "devspec2array $name: $@";
           return $name;
@@ -1060,7 +1133,8 @@ CommandRereadCfg($$)
   my ($cl, $param) = @_;
   my $name = ($cl ? $cl->{NAME} : "__anonymous__");
   my $cfgfile = ($param ? $param : $attr{global}{configfile});
-  return "Cannot open $cfgfile: $!" if(! -f $cfgfile);
+  return "Cannot open $cfgfile: $!"
+        if(! -f $cfgfile && $attr{global}{configfile} ne 'configDB');
 
   $attr{global}{configfile} = $cfgfile;
   WriteStatefile();
@@ -1083,13 +1157,21 @@ CommandRereadCfg($$)
   %inform = ();
 
   doGlobalDef($cfgfile);
-  setGlobalAttrBeforeFork($cfgfile);
+  my $ret;
+  
+  if($attr{global}{configfile} eq 'configDB') {
+    $ret = cfgDB_ReadAll($cl);
 
-  my $ret = CommandInclude($cl, $cfgfile);
-  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
-    my $ret2 = CommandInclude($cl, $attr{global}{statefile});
-    $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
+  } else {
+    setGlobalAttrBeforeFork($cfgfile);
+
+    $ret = CommandInclude($cl, $cfgfile);
+    if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+      my $ret2 = CommandInclude($cl, $attr{global}{statefile});
+      $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
+    }
   }
+
   DoTrigger("global", "REREADCFG", 1);
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
 
@@ -1117,6 +1199,11 @@ CommandQuit($$)
 sub
 WriteStatefile()
 {
+  if($attr{global}{configfile} eq 'configDB') {
+    cfgDB_SaveState();
+    return "";
+  }
+
   return "No statefile specified" if(!$attr{global}{statefile});
   if(!open(SFH, ">$attr{global}{statefile}")) {
     my $msg = "WriteStateFile: Cannot open $attr{global}{statefile}: $!";
@@ -1180,6 +1267,11 @@ CommandSave($$)
   DoTrigger("global", "SAVE", 1);
 
   WriteStatefile();
+
+  if($attr{global}{configfile} eq 'configDB') {
+    $ret = cfgDB_SaveCfg();
+    return ($ret ? $ret : "Saved configuration to the DB");
+  }
 
   $param = $attr{global}{configfile} if(!$param);
   return "No configfile attribute set and no argument specified" if(!$param);
@@ -1249,7 +1341,7 @@ CommandSave($$)
   foreach my $fh (values %fh) {
     close($fh) if($fh ne "1");
   }
-  return ($ret ? $ret : undef);
+  return ($ret ? $ret : "Wrote configuration to $param");
 }
 
 #####################################
@@ -1403,6 +1495,7 @@ CommandDefine($$)
   return "Invalid characters in name (not A-Za-z0-9.:_): $name"
                         if($name !~ m/^[a-z0-9.:_]*$/i);
 
+  %ntfyHash = ();
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
     foreach my $i (keys %modules) {
@@ -1439,7 +1532,7 @@ CommandDefine($$)
 
   my $ret = CallFn($name, "DefFn", \%hash, $def);
   if($ret) {
-    Log 1, "define: $ret";
+    Log 1, "define $name $def: $ret";
     delete $defs{$name};                            # Veto
     delete $attr{$name};
 
@@ -1447,12 +1540,11 @@ CommandDefine($$)
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
-    DoTrigger("global", "DEFINED $name", 1) if($init_done);
-
     if($modules{$m}{NotifyFn} && !$hash{NTFY_ORDER}) {
       $hash{NTFY_ORDER} = ($modules{$m}{NotifyOrderPrefix} ?
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
+    DoTrigger("global", "DEFINED $name", 1) if($init_done);
 
   }
   return $ret;
@@ -1470,6 +1562,7 @@ CommandModify($$)
 
   # Return a list of modules
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
+  %ntfyHash = ();
   my $hash = $defs{$a[0]};
 
   $hash->{OLDDEF} = $hash->{DEF};
@@ -1487,10 +1580,18 @@ sub
 AssignIoPort($;$)
 {
   my ($hash, $proposed) = @_;
+  my $ht = $hash->{TYPE};
+  my $hn = $hash->{NAME};
+  my $hasIODevAttr = ($ht &&
+                      $modules{$ht}{AttrList} &&
+                      $modules{$ht}{AttrList} =~ m/IODev/);
 
+  $proposed = $attr{$hn}{IODev}
+        if(!$proposed && $attr{$hn} && $attr{$hn}{IODev});
+  
   if($proposed && $defs{$proposed}) {
     $hash->{IODev} = $defs{$proposed};
-    $attr{$hash->{NAME}}{IODev} = $proposed;
+    $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
     delete($defs{$proposed}{".clientArray"});
     return;
   }
@@ -1500,7 +1601,7 @@ AssignIoPort($;$)
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
-    if($cl && $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
+    if($cl && $defs{$p}{NAME} ne $hn) {      # e.g. RFR
       my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
       if(@fnd) {
         $hash->{IODev} = $defs{$p};
@@ -1509,7 +1610,19 @@ AssignIoPort($;$)
       }
     }
   }
-  Log 3, "No I/O device found for $hash->{NAME}" if(!$hash->{IODev});
+  if($hash->{IODev}) {
+    # See CUL_WS_Attr() for details
+    $attr{$hn}{IODev} = $hash->{IODev}{NAME}
+      if($hasIODevAttr && $hash->{TYPE} ne "CUL_WS");
+
+  } else {
+    if($init_done) {
+      Log 3, "No I/O device found for $hn";
+    } else {
+      $hash->{IODevMissing} = 1;
+    }
+  }
+  return undef;
 }
 
 
@@ -1581,7 +1694,7 @@ CommandDeleteAttr($$)
       delete($defs{$sdev}{'.userReadings'});
     }
 
-    $ret = CallFn($sdev, "AttrFn", "del", @a);
+    my $ret = CallFn($sdev, "AttrFn", "del", @a);
     if($ret) {
       push @rets, $ret;
       next;
@@ -1643,6 +1756,7 @@ CommandDeleteReading($$)
   my @a = split(" ", $def, 2);
   return "Usage: deletereading <name> <reading>\n$namedef" if(@a != 2);
 
+  %ntfyHash = ();
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
@@ -1661,7 +1775,6 @@ CommandDeleteReading($$)
     }
     
   }
-
   return join("\n", @rets);
 }
 
@@ -1865,6 +1978,7 @@ CommandRename($$)
                         if($new !~ m/^[a-z0-9.:_]*$/i);
   return "Cannot rename global" if($old eq "global");
 
+  %ntfyHash = ();
   $defs{$new} = $defs{$old};
   $defs{$new}{NAME} = $new;
   delete($defs{$old});          # The new pointer will preserve the hash
@@ -2032,8 +2146,8 @@ CommandAttr($$)
          }
       }
       if(!$found) {
-        push @rets, "$sdev: unknown attribute $a[1], ".
-                        "choose one of $list or use attr global userattr $a[1]";
+        push @rets, "$sdev: unknown attribute $a[1]. ".
+                        "Type 'attr $a[0] ?' for a detailed list.";
         next;
       }
     }
@@ -2279,6 +2393,7 @@ CommandVersion($$)
   my ($cl, $param) = @_;
 
   my @ret = ("# $cvsid");
+  push @ret, cfgDB_svnId if $attr{global}{configfile} eq 'configDB';
   foreach my $m (sort keys %modules) {
     next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
     my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
@@ -2324,7 +2439,7 @@ HandleTimeout()
       delete($intAt{$i});
     } else {
       $nextat = $tim if(!$nextat || $nextat > $tim);
-	}
+    }
   }
 
   return undef if(!$nextat);
@@ -2570,11 +2685,11 @@ DoTrigger($$@)
   # the inner loop.
   if($max && !defined($hash->{INTRIGGER})) {
     $hash->{INTRIGGER}=1;
-    my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
-                   grep { $defs{$_}{NTFY_ORDER} } keys %defs;
     Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
+    createNtfyHash() if(!%ntfyHash);
     $hash->{NTFY_TRIGGERTIME} = TimeNow(); # Optimize FileLog
-    foreach my $n (@ntfyList) {
+    my $ntfyLst = (defined($ntfyHash{$dev}) ? $ntfyHash{$dev} : $ntfyHash{"*"});
+    foreach my $n (@{$ntfyLst}) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
       $ret .= $r if($r);
@@ -3026,6 +3141,12 @@ sub
 setGlobalAttrBeforeFork($)
 {
   my ($f) = @_;
+
+  if($f eq 'configDB') {
+    cfgDB_GlobalAttr();
+    return;
+  }
+
   open(FH, $f) || die("Cant open $f: $!\n");
   while(my $l = <FH>) {
     $l =~ s/[\r\n]//g;
@@ -3064,6 +3185,13 @@ ReadingsVal($$$)
      return $defs{$d}{READINGS}{$n}{VAL};
   }
   return $default;
+}
+
+sub
+ReadingsNum($$$)
+{ 
+  my ($d,$n,$default) = @_;
+  return ReadingsVal($d,$n,$default)+0;
 }
 
 sub
@@ -3609,6 +3737,29 @@ utf8ToLatin1($)
   return $s;
 }
 
+# replaces some common control chars by escape sequences
+# in order to make logs more readable
+sub escapeLogLine($) {
+  my ($s)= @_;
+  
+  # http://perldoc.perl.org/perlrebackslash.html
+  my %escSequences = (
+      '\a' => "\\a",
+      '\e' => "\\e",
+      '\f' => "\\f",
+      '\n' => "\\n",
+      '\r' => "\\r",
+      '\t' => "\\t",
+      );
+  
+  $s =~ s/\\/\\\\/g;
+  foreach my $regex (keys %escSequences) {
+    $s =~ s/$regex/$escSequences{$regex}/g;
+  }
+  $s =~ s/([\000-\037])/sprintf("\\%03o", ord($1))/eg;
+  return $s;
+}
+
 sub
 Debug($) {
   my $msg= shift;
@@ -3626,5 +3777,45 @@ addToWritebuffer($$)
     $hash->{$wbName} .= $txt;
   }
 }
+
+sub
+createNtfyHash()
+{
+  my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
+                 grep { $defs{$_}{NTFY_ORDER} } keys %defs;
+  foreach my $d (@ntfyList) {
+    my $nd = $defs{$d}{NOTIFYDEV};
+    #Log 1, "Created notify class for $nd / $d" if($nd);
+    $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
+  }
+  $ntfyHash{"*"} = [];
+  foreach my $d (@ntfyList) {
+    my $nd = $defs{$d}{NOTIFYDEV};
+    if($nd) {
+      push @{$ntfyHash{$nd}}, $d;
+
+    } else {
+      foreach $nd (keys %ntfyHash) {
+        push @{$ntfyHash{$nd}}, $d;
+      }
+    }
+  }
+}
+
+sub
+notifyRegexpChanged($$)
+{
+  my ($hash, $re) = @_;
+
+  my $dev;
+  $dev = $1 if(($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/));
+
+  if($dev && defined($defs{$dev}) && $re !~ m/\|/) {
+    $hash->{NOTIFYDEV} = $dev;
+  } else {
+    delete($hash->{NOTIFYDEV}); # when called by modify
+  }
+}
+
 
 1;

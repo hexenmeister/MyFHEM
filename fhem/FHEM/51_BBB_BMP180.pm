@@ -33,11 +33,6 @@ use warnings;
 use feature qw/say switch/;
 use Time::HiRes qw(gettimeofday);
 
-sub BBB_BMP180_Define($$);
-sub BBB_BMP180_Undefine($$);
-sub BBB_BMP180_Get($@);
-sub BBB_BMP180_Notify($$);
-
 sub BBB_BMP180_Initialize($){
 	my ($hash) = @_;
 	$hash->{DefFn}		=	"BBB_BMP180_Define";
@@ -45,6 +40,7 @@ sub BBB_BMP180_Initialize($){
 	$hash->{GetFn}		=	"BBB_BMP180_Get";
 	$hash->{AttrFn}		=	"BBB_BMP180_Attr";
 	$hash->{NotifyFn}	=	"BBB_BMP180_Notify";
+	$hash->{ShutdownFn}	=	"BBB_BMP180_Shutdown";
 	$hash->{AttrList}	=	"bbbRoundPressure:0,1 ".
 							"bbbRoundTemperature:0,1 ".
 							"bbbInterval ".
@@ -81,6 +77,13 @@ sub BBB_BMP180_Undefine($$){
 	my($hash, $name) = @_;
 	RemoveInternalTimer($hash);
 	return;
+}
+
+sub BBB_BMP180_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"BBB_BMP180 $name: shutdown requested");
+	return undef;
 }
 
 sub BBB_BMP180_Get($@){
@@ -235,6 +238,7 @@ sub bbb_relDruck($$){
 1;
 
 =pod
+not to be translated
 =begin html
 
 <a name="BBB_BMP180"></a>
@@ -317,4 +321,13 @@ sub bbb_relDruck($$){
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="BBB_BMP180"></a>
+<h3>BBB_BMP180</h3>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#BBB_BMP180'>BBB_BMP180</a><br/>
+</ul>
+=end html_DE
 =cut

@@ -57,6 +57,8 @@
 # able for any alerting uses (unless a delay of said
 # amount of time doesn't matter, of course ;)).
 #
+# in charge of code: Matscher 
+#
 # $Id$
 ##############################################
 package main;
@@ -93,6 +95,13 @@ my %fhttfk_translatedcodes = (
     "91" => "11",
     "92" => "12");
 
+# set
+my %fhttfk_c2b;	# command->button hash
+my %canset = (
+	"01" => "Open",
+	"02" => "Closed",
+	"0c" => "Syncing");
+
 # -wusel, 2009-11-06
 #
 # Parse messages from FHT80TK, normally interpreted only by FHT80
@@ -108,17 +117,74 @@ sub
 CUL_FHTTK_Initialize($)
 {
   my ($hash) = @_;
+  
+  foreach my $k (keys %canset) {
+	my $v = $canset{$k};
+	$fhttfk_c2b{$v} = $k;
+  }
 
-  $hash->{Match}     = "^T[A-F0-9]{8}",
+  $hash->{Match}     = "^T[A-F0-9]{8}";
+  $hash->{SetFn}     = "CUL_FHTTK_Set";
   $hash->{DefFn}     = "CUL_FHTTK_Define";
   $hash->{UndefFn}   = "CUL_FHTTK_Undef";
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
-                        "model:FHT80TF loglevel:0,1,2,3,4,5,6";
+                        "model:FHT80TF,FHT80TF-2,dummy ".
+						$readingFnAttributes;
   $hash->{AutoCreate}=
      { "CUL_FHTTK.*" => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" } };
+
 }
 
+#############################
+
+sub
+CUL_FHTTK_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $ret = "";
+  
+  return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
+  
+  my $name = shift(@a);
+  
+  # suppress SET option
+  if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
+	if($attr{$name}{"model"} ne "dummy") {
+		return $ret
+	}
+  }
+  else {
+	return $ret;
+  }  
+  
+  my $opt = shift @a;
+  my $value = join("", @a);
+  
+  Log3 $name, 5, "$name option: $opt and value: $value";
+  
+  if(!defined($fhttfk_c2b{$opt})) {
+		my @cList = keys %fhttfk_c2b;
+		return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
+	}
+  
+  # add T as prefix, because of protocol like TCCCCCXX
+  my $arg = "T" . $hash->{CODE};
+    
+  # fhttfk_c2b
+  $arg .= $fhttfk_c2b{$opt};
+  Log3 $name, 5, "$name $opt message with option code: $arg";
+  
+  # write msg to CUL/CUNO
+  CUL_SimpleWrite($hash, $arg);
+  Log3 $name, 2, "CUL_FHTTK set $name $opt";
+  
+  # update new state 
+  readingsSingleUpdate($hash, "state", $opt, 1);
+  readingsSingleUpdate($hash, "Window", $opt, 1);
+   
+  return $ret;
+}
 
 #############################
 sub
@@ -136,11 +202,9 @@ CUL_FHTTK_Define($$)
        return "wrong sensor specification $sensor, need a 6 digit hex number";
   }
 
-#  $hash->{SENSOR}= "$sensor";
   $hash->{CODE} = $sensor;
   $modules{CUL_FHTTK}{defptr}{$sensor} = $hash;
-#  $defs{$hash}{READINGS}{PREV}{STATE}="00";
-#  $defs{$hash}{READINGS}{PREV}{TIMESTAMP} = localtime();
+
   AssignIoPort($hash);
   return undef;
 }
@@ -165,19 +229,20 @@ CUL_FHTTK_Parse($$)
   my $sensor= lc(substr($msg, 1, 6));
   my $def   = $modules{CUL_FHTTK}{defptr}{$sensor};
   if(!$def) {
-    Log 3, "FHTTK Unknown device $sensor, please define it";
+    Log3 $hash, 1, "FHTTK Unknown device $sensor, please define it";
     return "UNDEFINED CUL_FHTTK_$sensor CUL_FHTTK $sensor";
   }
 
-  my $self  = $def->{NAME};
+  my $name  = $def->{NAME};
   my $state = lc(substr($msg, 7, 2));
 
-  return "" if(IsIgnored($self));
+  return "" if(IsIgnored($name));
 
   if(!defined($fhttfk_translatedcodes{$state})) {
-      Log 3, sprintf("FHTTK $def Unknown state $state");
-      $defs{$self}{READINGS}{"Unknown"}{VAL} = $state;
-      $defs{$self}{READINGS}{"Unknown"}{TIME} = TimeNow();
+        Log3 $name, 1, sprintf("FHTTK $def Unknown state $state");
+#      Log 3, sprintf("FHTTK $def Unknown state $state");
+      $defs{$name}{READINGS}{"Unknown"}{VAL} = $state;
+      $defs{$name}{READINGS}{"Unknown"}{TIME} = TimeNow();
       return "";
   }
 
@@ -185,71 +250,73 @@ CUL_FHTTK_Parse($$)
   # PREVIOUS
   # FIXME: Message regarded as similar if last char is identical;
   # sure that's always the differentiator? -wusel, 2009-11-09
-  if(defined($defs{$self}{PREV}{TIMESTAMP})) {
-      if($defs{$self}{PREV}{TIMESTAMP} > time()-5) {
-         if(defined($defs{$self}{PREV}{STATE})) {
-             if($defs{$self}{PREV}{STATE} eq $state) {
-                 Log GetLogLevel($def->{NAME},4), sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%d) secs ago", $defs{$self}{PREV}{STATE}, time()-$defs{$self}{PREV}{TIMESTAMP});
+  if(defined($defs{$name}{PREV}{TIMESTAMP})) {
+      if($defs{$name}{PREV}{TIMESTAMP} > time()-5) {
+         if(defined($defs{$name}{PREV}{STATE})) {
+             if($defs{$name}{PREV}{STATE} eq $state) {
+                 Log3 $name, 4, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%d) secs ago", $defs{$name}{PREV}{STATE}, time()-$defs{$name}{PREV}{TIMESTAMP});
                  return "";
              }
          }
       }
   }
   
-  if (! defined($defs{$self}{READINGS}{"Previous"})) {
-    $defs{$self}{READINGS}{"Previous"}{VAL} = "";
-    $defs{$self}{READINGS}{"Previous"}{TIME} = "";
+  if (! defined($defs{$name}{READINGS}{"Previous"})) {
+    $defs{$name}{READINGS}{"Previous"}{VAL} = "";
+    $defs{$name}{READINGS}{"Previous"}{TIME} = "";
   }
   
-  if (defined($defs{$self}{PREV}{STATE}) && $defs{$self}{PREV}{STATE} ne $state) {
-    my $prevState = $defs{$self}{PREV}{STATE};
+  if (defined($defs{$name}{PREV}{STATE}) && $defs{$name}{PREV}{STATE} != $state) {
+    my $prevState = $defs{$name}{PREV}{STATE};
     my ($windowReading,$windowState) = split(/:/, $fhttfk_codes{$prevState});
-    $defs{$self}{READINGS}{"Previous"}{VAL} = $windowState if defined($windowState) && $windowState ne "";
-    $defs{$self}{READINGS}{"Previous"}{TIME} = TimeNow();
+    $defs{$name}{READINGS}{"Previous"}{VAL} = $windowState if defined($windowState) && $windowState ne "";
+    $defs{$name}{READINGS}{"Previous"}{TIME} = TimeNow();
   }
  
-  $def->{PREVTIMESTAMP} = defined($defs{$self}{PREV}{TIMESTAMP})?$defs{$self}{PREV}{TIMESTAMP}:time();
+  $def->{PREVTIMESTAMP} = defined($defs{$name}{PREV}{TIMESTAMP})?$defs{$name}{PREV}{TIMESTAMP}:time();
   $def->{PREVSTATE} = defined($def->{STATE})?$def->{STATE}:"Unknown";
-  $defs{$self}{PREV}{STATE}=$state;
+  $defs{$name}{PREV}{STATE}=$state;
   
-
+  #
+  # from here readings are effectively updated
+  #
+  readingsBeginUpdate($def);
   
   #READINGS
   my ($reading,$val) = split(/:/, $fhttfk_codes{$state});
-  $defs{$self}{READINGS}{$reading}{VAL} = $val;
-  $defs{$self}{READINGS}{$reading}{TIME} = TimeNow();
-  $defs{$self}{PREV}{TIMESTAMP} = time();
+  readingsBulkUpdate($def, $reading, $val);
+
+  $defs{$name}{PREV}{TIMESTAMP} = time();
   # -wusel, 2009-11-09: According to http://fhz4linux.info/tiki-index.php?page=FHT+protocol,
   #                     FHT80TF usually transmitts between 60 and 240 seconds. (255-256 sec in
   #                     my experience ...) If we got no fresh data for over 5 minutes (300 sec),
   #                     flag this.
-  if($defs{$self}{PREV}{TIMESTAMP}+720 < time()) {
-      $defs{$self}{READINGS}{"Reliability"}{VAL} = "dead";
-      $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
-  } elsif($defs{$self}{PREV}{TIMESTAMP}+600 < time()) {
-      $defs{$self}{READINGS}{"Reliability"}{VAL} = "low";
-      $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
-  } elsif($defs{$self}{PREV}{TIMESTAMP}+300 < time()) {
-      $defs{$self}{READINGS}{"Reliability"}{VAL} = "medium";
-      $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
+  if($defs{$name}{PREV}{TIMESTAMP}+720 < time()) {
+      readingsBulkUpdate($def, "Reliability", "dead");
+  } elsif($defs{$name}{PREV}{TIMESTAMP}+600 < time()) {
+      readingsBulkUpdate($def, "Reliability", "low");
+  } elsif($defs{$name}{PREV}{TIMESTAMP}+300 < time()) {
+      readingsBulkUpdate($def, "Reliability", "medium");
   } else {
-      $defs{$self}{READINGS}{"Reliability"}{VAL} = "ok";
-      $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
+      readingsBulkUpdate($def, "Reliability", "ok");
   }
   # Flag the battery warning separately
   if($state eq "11" || $state eq "12") {
-      $defs{$self}{READINGS}{"Battery"}{VAL} = "Low";
-      $defs{$self}{READINGS}{"Battery"}{TIME} = TimeNow();
+	  readingsBulkUpdate($def, "Battery", "Low");
   } else {
-      $defs{$self}{READINGS}{"Battery"}{VAL} = "ok";
-      $defs{$self}{READINGS}{"Battery"}{TIME} = TimeNow();
+      readingsBulkUpdate($def, "Battery", "ok");
   }
   #CHANGED
-  $defs{$self}{CHANGED}[0] = $reading . ": " . $val;
-  $def->{STATE} = $val;
-  $def->{OPEN} = lc($val) eq "open" ? 1 : 0;
-  Log GetLogLevel($def->{NAME},4), "FHTTK Device $self ($reading: $val)";
+  readingsBulkUpdate($def, "state", $val);
 
+  $def->{OPEN} = lc($val) eq "open" ? 1 : 0;
+  Log3 $name, 4, "FHTTK Device $name ($reading: $val)";
+
+  #
+  # now we are done with updating readings
+  #
+  readingsEndUpdate($def, 1);
+  
   return $def->{NAME};
 }
 
@@ -303,16 +370,75 @@ CUL_FHTTK_Parse($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
+	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="CUL_FHTTK"></a>
+<h3>CUL_FHTTK</h3>
+<ul>
+  Dieses Modul hantiert die empfangen Daten von FHT80 TF "Fenster-T&uuml;r-Kontakt" Sensoren, welche 
+  normalerweise nur mit den <a href="#FHT">FHT80B</a> Geräten kommunizieren. Mit diesen Modul k&ouml;nnen 
+  FHT80 TFs in eingeschr&auml;nkter Weise &auml;hnlich wie HMS TFK Sensoren benutzt werden (weitere 
+  Informationen sind unter <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a> zu lesen).
+  Der name des FHEM Moduls wurde so gewählt, weil a) nur der CUL die Daten empfangen kann und b) "TF" normalerweise
+  Temperatur- und Feuchtigkeitssensoren suggeriert. (Keine Ahnung, warum ELV diesen Sensor nicht TFK genannt hat, 
+  wie die Sensoren von FS20 und HMS).
+  <br><br>
+  <a href="#CUL">CUL</a> device muss vorhr definiert sein.<br><br>
+
+  <a name="CUL_FHTTKdefine"></a>
+  <b>D</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_FHTTK &lt;devicecode&gt;</code>
+    <br><br>
+
+    <code>&lt;devicecode&gt;</code> Ist eine sechstellige Hexadezimalzahl, welche zum Zeitpunkt der Produktion 
+	des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr änderbar und bleibt auch nach einem Batteriewechsel 
+	erhalten.<br>
+
+    Examples:
+    <ul>
+      <code>define TK_TEST CUL_FHTTK 965AB0</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="CUL_FHTTKset"></a>
+  <b>Set </b>
+    <ul> N/A </ul>
+  <br>
+
+  <b>Get</b>
+	<ul> N/A </ul>
+  <br>
+
+  <a name="CUL_FHTTKattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html_DE
 =cut

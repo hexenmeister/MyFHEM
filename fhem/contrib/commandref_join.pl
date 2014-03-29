@@ -8,7 +8,7 @@ use strict;
 use warnings;
 
 # $Id$
-use constant TAGS => qw{ul li code};
+use constant TAGS => qw{ul li code b};
 my %mods;
 my @modDir = ("FHEM");
 foreach my $modDir (@modDir) {
@@ -21,6 +21,7 @@ foreach my $modDir (@modDir) {
     $mods{$l} = "$modDir/$of";
   }
 }
+$mods{configDB} = "configDB.pm";
 
 
 my @lang = ("EN", "DE");
@@ -88,7 +89,7 @@ foreach my $lang (@lang) {
       } elsif(!$skip) {
         print OUT $l;
         $docCount++;
-        $hasLink = ($l =~ m/<a name="$mod">/) if(!$hasLink);
+        $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
@@ -103,6 +104,18 @@ foreach my $lang (@lang) {
         if($dosMode);
     print "*** $lang $mods{$mod}: No document text found\n"
         if(!$suffix && !$docCount && !$dosMode);
+    if($suffix && !$docCount && !$dosMode) {
+      if($lang eq "DE") {
+        print OUT << "EOF";
+<a name="$mod"></a>
+<h3>$mod</h3>
+<ul>
+  Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es
+  hier: <a href='commandref.html#$mod'>$mod</a><br/>
+</ul>
+EOF
+      }
+    }
     print "$lang $mods{$mod}: No <a name=\"$mod\"> link\n"
         if(!$suffix && $docCount && !$hasLink);
 
