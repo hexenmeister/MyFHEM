@@ -132,7 +132,7 @@ sub OWTHERM_Initialize ($) {
                      "stateAL stateAH ".
                      "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
-                     "resolution:9,10,11,12 interval ".
+                     "resolution:9,10,11,12 interval async ".
                      $readingFnAttributes;                
   #-- ASYNC this function is needed for asynchronous execution of the device reads 
   $hash->{AfterExecuteFn} = "OWXTHERM_BinValues";
@@ -289,7 +289,19 @@ sub OWTHERM_Attr(@) {
        return undef
          if( $hash->{READINGS}{"state"}{VAL} eq "defined" ); 
        $ret = OWTHERM_Set($hash,($name,$key,$value));
-       };
+       last;
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;
