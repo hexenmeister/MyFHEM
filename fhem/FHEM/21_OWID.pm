@@ -93,7 +93,7 @@ sub OWID_Initialize ($) {
   $hash->{SetFn}    = "OWID_Set";
   $hash->{AttrFn}   = "OWID_Attr";
   $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
-                      "interval ".
+                      "interval async ".
                       $readingFnAttributes;
 
   #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
@@ -240,7 +240,18 @@ sub OWID_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;

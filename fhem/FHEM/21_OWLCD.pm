@@ -120,7 +120,7 @@ sub OWLCD_Initialize ($) {
   $hash->{SetFn}    = "OWLCD_Set";
   $hash->{AttrFn}   = "OWLCD_Attr";
   my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
-                      "";
+                      "async";
   $hash->{AttrList} = $attlist; 
 
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
@@ -214,15 +214,21 @@ sub OWLCD_Attr(@) {
   my $hash = $defs{$name};
   my $ret;
   
- # if ( $do eq "set") {
- # 	ARGUMENT_HANDLER: {
- # 	  #-- empty so far
- # 	};
- #} elsif ( $do eq "del" ) {
- # 	ARGUMENT_HANDLER: {
- # 	  #-- empty so far
- # 	}
- # }
+  if ( $do eq "set") {
+  	ARGUMENT_HANDLER: {
+       $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
+    }
+  }
   return $ret;
 }
 

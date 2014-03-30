@@ -134,7 +134,7 @@ sub OWSWITCH_Initialize ($) {
   $hash->{AttrFn}  = "OWSWITCH_Attr";
   
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406,DS2408 loglevel:0,1,2,3,4,5 ".
-    "stateS interval ".
+    "stateS interval async ".
     $readingFnAttributes;
  
   #-- initial list of attributes
@@ -290,7 +290,18 @@ sub OWSWITCH_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;

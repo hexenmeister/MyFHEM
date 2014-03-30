@@ -147,7 +147,7 @@ sub OWAD_Initialize ($) {
  
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
                 "stateAL0 stateAL1 stateAH0 stateAH1 ".
-                "interval ".
+                "interval async ".
                 $readingFnAttributes;
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
@@ -307,14 +307,22 @@ sub OWAD_Attr(@) {
           if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
         $ret = OWAD_Set($hash,($name,$key,$value));
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
     }
   } elsif ( $do eq "del" ) {
     ARGUMENT_HANDLER: {
       #-- should remove alarm setting, but does nothing so far
       $key =~ m/(.*)(Alarm)/ and do {
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;

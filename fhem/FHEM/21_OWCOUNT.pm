@@ -141,7 +141,7 @@ sub OWCOUNT_Initialize ($) {
   $hash->{AttrFn}  = "OWCOUNT_Attr";
   #-- see header for attributes
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold loglevel:0,1,2,3,4,5 LogM LogY ".
-                "nomemory:1,0 interval ".
+                "nomemory:1,0 interval async ".
                 $readingFnAttributes;
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
@@ -288,7 +288,18 @@ sub OWCOUNT_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;

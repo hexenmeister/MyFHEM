@@ -126,7 +126,7 @@ sub OWMULTI_Initialize ($) {
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 loglevel:0,1,2,3,4,5 ".
                      "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin ".
                      "VName VUnit VFunction ".
-                     "interval ".
+                     "interval async ".
                      $readingFnAttributes;
                      
   #-- temperature and voltage globals - always the raw values from the device
@@ -168,7 +168,18 @@ sub OWMULTI_Attr(@) {
           InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 1);
         }
         last;
-      }
+      };
+      $key eq "async" and do {
+        $hash->{ASYNC} = $value;
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    ARGUMENT_HANDLER: {
+      $key eq "async" and do {
+        $hash->{ASYNC} = 0;
+        last;
+      };
     }
   }
   return $ret;
