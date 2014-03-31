@@ -147,7 +147,7 @@ sub OWAD_Initialize ($) {
  
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
                 "stateAL0 stateAL1 stateAH0 stateAH1 ".
-                "interval async ".
+                "interval ".
                 $readingFnAttributes;
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
@@ -250,13 +250,15 @@ sub OWAD_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
-  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
-  AssignIoPort($hash); 
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
+  AssignIoPort($hash);
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWAD: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
+
   $main::modules{OWAD}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -308,8 +310,11 @@ sub OWAD_Attr(@) {
         $ret = OWAD_Set($hash,($name,$key,$value));
         last;
       };
-      $key eq "async" and do {
-        $hash->{ASYNC} = $value;
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
         last;
       };
     }
@@ -318,11 +323,7 @@ sub OWAD_Attr(@) {
       #-- should remove alarm setting, but does nothing so far
       $key =~ m/(.*)(Alarm)/ and do {
         last;
-      };
-      $key eq "async" and do {
-        $hash->{ASYNC} = 0;
-        last;
-      };
+      }
     }
   }
   return $ret;
@@ -574,7 +575,7 @@ sub OWAD_Get($@) {
   #-- get reading according to interface type
   if($a[1] eq "reading") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_GetPage($hash,"reading",1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -598,7 +599,7 @@ sub OWAD_Get($@) {
   #-- get alarm values according to interface type
   if($a[1] eq "alarm") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_GetPage($hash,"alarm",1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -630,7 +631,7 @@ sub OWAD_Get($@) {
    #-- get status values according to interface type
   if($a[1] eq "status") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_GetPage($hash,"status",1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -715,7 +716,7 @@ sub OWAD_GetValues($) {
   InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
    
   #-- Get readings, alarms and stati according to interface type
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     #-- max 3 tries
     #for(my $try=0; $try<3; $try++){
       $ret1 = OWXAD_GetPage($hash,"reading",0);
@@ -926,7 +927,7 @@ sub OWAD_Set($@) {
     }    
    
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_SetPage($hash,"status");
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -972,7 +973,7 @@ sub OWAD_Set($@) {
     }
   
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_SetPage($hash,"alarm");
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){

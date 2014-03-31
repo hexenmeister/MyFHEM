@@ -141,7 +141,7 @@ sub OWCOUNT_Initialize ($) {
   $hash->{AttrFn}  = "OWCOUNT_Attr";
   #-- see header for attributes
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold loglevel:0,1,2,3,4,5 LogM LogY ".
-                "nomemory:1,0 interval async ".
+                "nomemory:1,0 interval ".
                 $readingFnAttributes;
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
@@ -239,14 +239,13 @@ sub OWCOUNT_Define ($$) {
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
-  $hash->{IODev}=$attr{$name}{"IODev"} 
-    if( defined($attr{$name}{"IODev"}) );
   AssignIoPort($hash);
-  if( (!defined($hash->{IODev}->{NAME})) || (!defined($hash->{IODev}))  ){
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
+    return "OWCOUNT: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $modules{OWCOUNT}{defptr}{$id} = $hash;
@@ -289,15 +288,11 @@ sub OWCOUNT_Attr(@) {
         }
         last;
       };
-      $key eq "async" and do {
-        $hash->{ASYNC} = $value;
-        last;
-      };
-    }
-  } elsif ( $do eq "del" ) {
-    ARGUMENT_HANDLER: {
-      $key eq "async" and do {
-        $hash->{ASYNC} = 0;
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
         last;
       };
     }
@@ -803,7 +798,7 @@ sub OWCOUNT_GetPage ($$$) {
   if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
 
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXCOUNT_GetPage($hash,$page,$final);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -1113,7 +1108,7 @@ sub OWCOUNT_InitializeDevice($) {
   #   the same family ID although the DS2423emu does not fully support the DS2423 commands.
   #   Model attribute will be modified now after checking for memory
   #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     $ret = OWXCOUNT_GetPage($hash,14,0);
     $olddata = $hash->{owg_str}->[14];
     $ret  = OWXCOUNT_SetPage($hash,14,$newdata);
@@ -1134,7 +1129,7 @@ sub OWCOUNT_InitializeDevice($) {
   #Log 1,"FIRST CHECK: written $newdata, read ".substr($hash->{owg_str}->[14],0,length($newdata));
   my $nomid = ( substr($hash->{owg_str}->[14],0,length($newdata)) ne $newdata );
    #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     $ret = OWXCOUNT_GetPage($hash,0,0);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWXCOUNT_SetPage($hash,0,$newdata);
@@ -1323,7 +1318,7 @@ sub OWCOUNT_SetPage ($$$) {
     
   if( $nomemory==0 ){
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){

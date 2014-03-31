@@ -93,7 +93,7 @@ sub OWID_Initialize ($) {
   $hash->{SetFn}    = "OWID_Set";
   $hash->{AttrFn}   = "OWID_Attr";
   $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
-                      "interval async ".
+                      "interval ".
                       $readingFnAttributes;
 
   #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
@@ -188,9 +188,12 @@ sub OWID_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWID: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
+
   $modules{OWID}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","Defined",1);
@@ -241,15 +244,11 @@ sub OWID_Attr(@) {
         }
         last;
       };
-      $key eq "async" and do {
-        $hash->{ASYNC} = $value;
-        last;
-      };
-    }
-  } elsif ( $do eq "del" ) {
-    ARGUMENT_HANDLER: {
-      $key eq "async" and do {
-        $hash->{ASYNC} = 0;
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
         last;
       };
     }
