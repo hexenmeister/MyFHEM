@@ -979,16 +979,16 @@ sub OWX_AwaitExecuteResponse($$$) {
 ########################################################################################
 
 sub OWX_AfterExecute($$$$$$$$) {
-	my ( $master, $context, $success, $reset, $owx_dev, $data, $numread, $readdata ) = @_;
+	my ( $master, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata ) = @_;
 
 	Log3 ($master->{NAME},5,"AfterExecute:".
 	" context: ".(defined $context ? $context : "undef").
 	", success: ".(defined $success ? $success : "undef").
 	", reset: ".(defined $reset ? $reset : "undef").
 	", owx_dev: ".(defined $owx_dev ? $owx_dev : "undef").
-	", data: ".(defined $data ? $data : "undef").
+	", writedata: ".(defined $writedata ? unpack ("H*",$writedata) : "undef").
 	", numread: ".(defined $numread ? $numread : "undef").
-	", readdata: ".(defined $readdata ? $readdata : "undef"));
+	", readdata: ".(defined $readdata ? unpack ("H*",$readdata) : "undef"));
 
 	if (defined $owx_dev) {
 		foreach my $d ( sort keys %main::defs ) {
@@ -998,7 +998,7 @@ sub OWX_AfterExecute($$$$$$$$) {
 				  && $hash->{IODev} == $master
 				  && $hash->{ROM_ID} eq $owx_dev ) {
 				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
-				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $data, $numread, $readdata);
+				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata);
 				    Log3 ($master->{NAME},4,"OWX_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
 				    if ($success) {
 				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
