@@ -60,6 +60,7 @@ package main;
 
 use strict;
 use warnings;
+use GPUtils qw(:all);
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
 BEGIN {
@@ -920,10 +921,10 @@ sub OWX_Init ($) {
 	eval {
 	  $ret = $owx->initialize($hash);
 	};
-	if ($@) {
+	if (my $err = GP_Catch($@)) {
 	  $hash->{PRESENT} = 0;
-	  $hash->{STATE} = "Init Failed: $@";
-	  return "OWX_Init failed: $@";
+	  $hash->{STATE} = "Init Failed: $err";
+	  return "OWX_Init failed: $err";
 	};
 	$hash->{ASYNC} = $ret;
    	$hash->{INTERFACE} = $owx->{interface};
