@@ -1564,24 +1564,30 @@ sub OWFSCOUNT_SetPage($$$) {
 ########################################################################################
 
 sub OWXCOUNT_BinValues($$$$$$$$) {
-  my ($hash, $page, $success, $reset, $owx_dev, $data, $final, $res) = @_;
+  my ($hash, $context, $success, $reset, $owx_dev, $select, $numread, $res) = @_;
   
   #-- unused are success, reset, data
   
-  return undef unless (defined $page and $page ne "convert");
+  return undef unless (defined $context and $context =~ /^getpage\.([\d]+)(\.final|)$/);
   
+  my $page = $1;
+  my $final = $2;
   my $name   = $hash->{NAME};
-  my ($i,$j,$k,@data,$strval,$value);
+  
+  Log3 ($name,5,"OWXCount_BinValues context: $context, page: ".(defined $page ? $page : "undef").", final: ".(defined $final ? $final : "undef"));
+  
+  my ($i,$j,$k,@data,@writedata,$strval,$value);
   my $change = 0;
   
   #-- process results
   @data=split(//,$res);
-  return "invalid data length, ".int(@data)." instead of 45 bytes in three steps"
-    if( int(@data) < 45);
+  @writedata = split(//,$select);
+  return "invalid data length, ".int(@data)." instead of 42 bytes in three steps"
+    if( int(@data) < 42);
   #return "invalid data"
   #  if (ord($data[17])<=0); 
-  Log 1,"invalid CRC, ".ord($data[43])." ".ord($data[44])
-    if (OWX_CRC16(substr($res,0,43),$data[43],$data[44]) == 0);
+  Log 1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
+    if (OWX_CRC16($select.substr($res,0,40),$data[40],$data[41]) == 0);
     
   #-- first 3 command, next 32 are memory
   #my $res2 = "OWCOUNT FIRST 10 BYTES for device $owx_dev ARE ";
@@ -1596,13 +1602,13 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
   if( $nomemory==0 ){
     #-- memory part, treated as string
-    $strval=substr($res,3,32);
+    $strval=substr($res,0,32);
     $hash->{owg_str}->[$page]=$strval;
     #Log 1," retrieved on device $owx_dev for page $page STRING $strval";
   }
   #-- counter part
   if( ($page == 14) || ($page == 15) ){
-    @data=split(//,substr($res,35));
+    @data=split(//,substr($res,32));
     if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
       #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
       return "device $owx_dev returns invalid data";
@@ -1626,7 +1632,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   }
   #-- and now from raw to formatted values 
   $hash->{PRESENT}  = 1;
-  if( $final==1) {
+  if( $final ) {
     my $value = OWCOUNT_FormatValues($hash);
     Log 5, $value;
   }
@@ -1671,10 +1677,10 @@ sub OWXCOUNT_GetPage($$$) {
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
     #TODO: Parameters possibly wrong
-    if (!OWX_Execute( $master, "getpage", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
+    if (!OWX_Execute( $master, "getpage.".$page.($final ? ".final" : ""), 1, $owx_dev, $select, 42, 20 )) {
       return "not accessible for reading";
     }
-    return OWX_AwaitExecuteResponse( $master, "getpage", $owx_dev );
+    return undef;
   #-- synchronous mode
   } else {
     #-- reset the bus
@@ -1703,7 +1709,7 @@ sub OWXCOUNT_GetPage($$$) {
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=54);
-    OWXCOUNT_BinValues($hash,$page,undef,undef,$owx_dev,undef,$final,substr($res,9));
+    OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),undef,undef,$owx_dev,$select,42,substr($res,12));
   }
   return undef;
 }
