@@ -274,7 +274,12 @@ sub OWLCD_Get($@) {
   if($a[1] eq "present") {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
-    $value           = OWX_Verify($master,$hash->{ROM_ID});
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+    } else {
+      $value = OWX_Verify($master,$hash->{ROM_ID});
+    }
     $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
@@ -299,7 +304,7 @@ sub OWLCD_Get($@) {
   
   #-- get EEPROM content
   if($a[1] eq "memory") {
-   my $page  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
+   my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
    Log 1,"Calling GetMemory with page $page";
     $value = OWXLCD_GetMemory($hash,$page);
     return "$name $reading $page => $value";
@@ -645,7 +650,7 @@ sub OWXLCD_Get($$) {
   $select2 = "\xBE";
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "get.".$cmd, 1, $owx_dev, $select2, $len, 0 )) {
+    if (!OWX_Execute( $master, "get.".$cmd, 1, $owx_dev, $select2, $len, 0 ) or !OWX_AwaitExecuteResponse($master,"get.".$cmd,$owx_dev)) {
       return "OWLCD: Device $owx_dev not accessible for reading in 2nd step";
     }
   #-- synchronous mode
@@ -657,9 +662,9 @@ sub OWXLCD_Get($$) {
     if( $res eq 0 ){
       return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
     }
-    return OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, $select2, $len, substr($res,10));
+    OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, $select2, $len, substr($res,10));
   }
-  return undef;
+  return main::ReadingsVal($hash->{NAME},$cmd,"");
 }
 
 ########################################################################################
@@ -714,7 +719,7 @@ sub OWXLCD_GetMemory($$) {
   $select = "\xBE";
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    if (!OWX_Execute( $master, "get.memory", 1, $owx_dev, $select,16, 0 )) {
+    if (!OWX_Execute( $master, "get.memory.$page", 1, $owx_dev, $select,16, 0 ) or !OWX_AwaitExecuteResponse($master,"get.memory.$page",$owx_dev)) {
       return "OWLCD: Device $owx_dev not accessible for reading in 2nd step";
     }
   #-- synchronous mode
@@ -726,11 +731,12 @@ sub OWXLCD_GetMemory($$) {
     if( $res eq 0 ){
       return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
     }
-    return OWXLCD_BinValues($hash, "get.memory", 1, 1, $owx_dev, $select, 16, substr($res,11,16));
+    OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $select, 16, substr($res,11,16));
     #-- process results (10 bytes or more have been sent)
     #$res2 = substr($res,11,16);
     #return $res2;
   }
+  return main::ReadingsVal($hash->{NAME},"memory$page","");
 }
 
 ########################################################################################
@@ -1220,10 +1226,11 @@ sub OWXLCD_BinValues($$$$$$$$) {
     readingsSingleUpdate($hash,"counter",$ret,1); 
   #=============== version ===============================
   }elsif ( $cmd eq "get.version" ) {
+    #TODO format version, raw value is unreadable
     readingsSingleUpdate($hash,"version",$res,1);
     return $res;
-  }elsif ( $cmd eq "get.memory" ) {
-    readingsSingleUpdate($hash,"memory",$ret,1);
+  }elsif ( $cmd =~ /^get\.memory\.([\d]+)$/ ) {
+    readingsSingleUpdate($hash,"memory$1",unpack("H*",$res),1);
     return $ret;
   }
 }
