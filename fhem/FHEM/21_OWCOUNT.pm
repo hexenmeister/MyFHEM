@@ -2004,7 +2004,7 @@ sub OWXCOUNT_SetPage($$$) {
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a
                     href="#stateFormat">stateFormat</a>, <a href="#room"
-                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#verbose">verbose</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
         

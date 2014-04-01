@@ -60,7 +60,7 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-sub Log($$);
+sub Log3($$$);
 
 my $owx_version="3.35";
 #-- controller may be HD44780 or KS0073 
@@ -119,7 +119,7 @@ sub OWLCD_Initialize ($) {
   $hash->{GetFn}    = "OWLCD_Get";
   $hash->{SetFn}    = "OWLCD_Set";
   $hash->{AttrFn}   = "OWLCD_Attr";
-  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
+  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 ".
                       "";
   $hash->{AttrList} = $attlist; 
 
@@ -183,7 +183,7 @@ sub OWLCD_Define ($$) {
   $modules{OWLCD}{defptr}{$id} = $hash;
   
   $hash->{STATE} = "Defined";
-  Log 3, "OWLCD:   Device $name defined."; 
+  Log3 $name,3, "OWLCD:   Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -305,7 +305,7 @@ sub OWLCD_Get($@) {
   #-- get EEPROM content
   if($a[1] eq "memory") {
    my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
-   Log 1,"Calling GetMemory with page $page";
+   Log3 $name,1,"Calling GetMemory with page $page";
     $value = OWXLCD_GetMemory($hash,$page);
     return "$name $reading $page => $value";
   }  
@@ -480,7 +480,7 @@ sub OWLCD_Set($@) {
     return "OWLCD: Wrong line length, must be <=16 " 
       if( length($value) > 16 );
     #-- check value and write to device   
-     Log 1,"Calling SetMemory with page $line";
+     Log3 $name,1,"Calling SetMemory with page $line";
      OWXLCD_SetMemory($hash,$line,$value);
      return undef;
   }
@@ -1326,8 +1326,8 @@ sub OWXLCD_BinValues($$$$$$$$) {
         <h4>Attributes</h4>
         <ul>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
-                    href="#room">room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel"
-                    >loglevel</a>, <a href="#webCmd">webCmd</a></li>
+                    href="#room">room</a>, <a href="#eventMap">eventMap</a>, <a href="#verbose"
+                    >verbose</a>, <a href="#webCmd">webCmd</a></li>
         </ul>
         
 =end html
