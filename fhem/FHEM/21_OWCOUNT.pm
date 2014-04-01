@@ -807,7 +807,7 @@ sub OWCOUNT_GetPage ($$$@) {
       $ret = OWXCOUNT_GetPage($hash,$page,$final,$sync);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
-      $ret = OWFSCOUNT_GetPage($hash,$page,$final,$sync);
+      $ret = OWFSCOUNT_GetPage($hash,$page,$final);
     #-- Unknown interface
     }else{
       return "OWCOUNT: GetPage with wrong IODev type $interface";
