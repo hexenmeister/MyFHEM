@@ -62,7 +62,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="3.34";
+my $owx_version="3.35";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps

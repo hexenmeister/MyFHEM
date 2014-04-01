@@ -84,9 +84,9 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-sub Log($$);
+sub Log3($$$);
 
-my $owx_version="5.11";
+my $owx_version="5.12";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -140,7 +140,7 @@ sub OWCOUNT_Initialize ($) {
   $hash->{SetFn}   = "OWCOUNT_Set";
   $hash->{AttrFn}  = "OWCOUNT_Attr";
   #-- see header for attributes
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold loglevel:0,1,2,3,4,5 LogM LogY ".
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold LogM LogY ".
                 "nomemory:1,0 interval ".
                 $readingFnAttributes;
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
@@ -251,7 +251,7 @@ sub OWCOUNT_Define ($$) {
   $modules{OWCOUNT}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
-  Log 3, "OWCOUNT: Device $name defined."; 
+  Log3 $name, 3, "OWCOUNT: Device $name defined."; 
   
   #-- Start timer for updates
   InternalTimer(time()+10, "OWCOUNT_GetValues", $hash, 0);
@@ -284,7 +284,7 @@ sub OWCOUNT_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
         }
         last;
       };
@@ -321,7 +321,7 @@ sub OWCOUNT_ChannelNames($) {
     $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|event";
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log 1, "OWCOUNT: Incomplete channel name specification $cname. Better use $cname|<type of data>"
+      Log3 $name,1, "OWCOUNT: Incomplete channel name specification $cname. Better use $cname|<type of data>"
         if( $state eq "defined");
       push(@cnama,"unknown");
     }
@@ -329,7 +329,7 @@ sub OWCOUNT_ChannelNames($) {
     $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "counts|cts";
     @unarr= split(/\|/,$unit);
     if( int(@unarr)!=2 ){
-      Log 1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
+      Log3 $name,1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
         if( $state eq "defined");
       push(@unarr,"");  
     }
@@ -348,7 +348,7 @@ sub OWCOUNT_ChannelNames($) {
     $cname = defined($attr{$name}{$owg_fixed[$i]."Rate"})  ? $attr{$name}{$owg_fixed[$i]."Rate"} : $cnama[0]."_rate|".$cnama[1]."_rate";
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log 1, "OWCOUNT: Incomplete rate name specification $cname. Better use $cname|<type of data>"
+      Log3 $name,1, "OWCOUNT: Incomplete rate name specification $cname. Better use $cname|<type of data>"
         if( $state eq "defined");
       push(@cnama,"unknown");
     }
@@ -545,7 +545,7 @@ sub OWCOUNT_FormatValues($) {
       $total0 = $monthv[0]->[1];
       $total1 = $monthv[1]->[1];
     }else{
-      Log 3,"OWCOUNT: No monthly summary possible, ".$monthv[0];
+      Log3 $name,3,"OWCOUNT: No monthly summary possible, ".$monthv[0];
       $total0 = "";
       $total1 = "";
     };
@@ -553,7 +553,7 @@ sub OWCOUNT_FormatValues($) {
       $total2 = $yearv[0]->[1];
       $total3 = $yearv[1]->[1];
     }else{
-      Log 3,"OWCOUNT: No yearly summary possible, ".$yearv[0];
+      Log3 $name,3,"OWCOUNT: No yearly summary possible, ".$yearv[0];
       $total2 = "";
       $total3 = "";
     };
@@ -613,7 +613,12 @@ sub OWCOUNT_Get($@) {
   if($a[1] eq "present") {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
-    $value           = OWX_Verify($master,$hash->{ROM_ID});
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+    } else {
+      $value = OWX_Verify($master,$hash->{ROM_ID});
+    }
     $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
@@ -702,7 +707,7 @@ sub OWCOUNT_Get($@) {
     if( ($page<0) || ($page>13) ){
       return "OWXCOUNT: Wrong memory page requested";
     }
-    $ret = OWCOUNT_GetPage($hash,$page,1);  
+    $ret = OWCOUNT_GetPage($hash,$page,1,1);  
     #-- when we have a return code, we have an error
     if( $ret ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
@@ -721,7 +726,7 @@ sub OWCOUNT_Get($@) {
     } else {
       return "OWCOUNT: Invalid midnight counter address, must be A, B or defined channel name"
     }
-    $ret = OWCOUNT_GetPage($hash,$page,1);  
+    $ret = OWCOUNT_GetPage($hash,$page,1,1);  
     #-- when we have a return code, we have an error
     if( $ret ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
@@ -742,7 +747,7 @@ sub OWCOUNT_Get($@) {
     } else {
       return "OWCOUNT: Invalid counter address, must be A, B or defined channel name"
     }
-    $ret = OWCOUNT_GetPage($hash,$page,1);
+    $ret = OWCOUNT_GetPage($hash,$page,1,1);
     #-- when we have a return code, we have an error
     if( $ret  ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
@@ -755,7 +760,7 @@ sub OWCOUNT_Get($@) {
     return "OWCOUNT: Get needs no parameter when reading counters"
       if( int(@a)==1 );
     $ret1 = OWCOUNT_GetPage($hash,14,0);
-    $ret2 = OWCOUNT_GetPage($hash,15,1);
+    $ret2 = OWCOUNT_GetPage($hash,15,1,1);
   
     #-- process results
     $ret .= $ret1
@@ -780,8 +785,8 @@ sub OWCOUNT_Get($@) {
 #
 ########################################################################################
 
-sub OWCOUNT_GetPage ($$$) {
-  my ($hash, $page,$final) = @_;
+sub OWCOUNT_GetPage ($$$@) {
+  my ($hash, $page,$final,$sync) = @_;
   
   #-- get memory page/counter according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -799,10 +804,10 @@ sub OWCOUNT_GetPage ($$$) {
 
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      $ret = OWXCOUNT_GetPage($hash,$page,$final);
+      $ret = OWXCOUNT_GetPage($hash,$page,$final,$sync);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
-      $ret = OWFSCOUNT_GetPage($hash,$page,$final);
+      $ret = OWFSCOUNT_GetPage($hash,$page,$final,$sync);
     #-- Unknown interface
     }else{
       return "OWCOUNT: GetPage with wrong IODev type $interface";
@@ -830,7 +835,7 @@ sub OWCOUNT_GetPage ($$$) {
     $hash->{owg_midnight}->[$page-14] = $strval;
   }
   OWCOUNT_FormatValues($hash)
-    if($oldfinal==1);
+    if($oldfinal==1 and $final==0);
     
   return undef 
 }
@@ -1058,7 +1063,7 @@ sub OWCOUNT_GetValues($) {
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
   
   #-- Get readings 
   $ret1 = OWCOUNT_GetPage($hash,14,0);
@@ -1151,11 +1156,11 @@ sub OWCOUNT_InitializeDevice($) {
   my $nomem = ( substr($hash->{owg_str}->[0],0,length($newdata)) ne $newdata );
   #-- Here we test if writing the memory is ok.
   if( !$nomid && $nomem ){
-     Log 1,"OWCOUNT: model attribute of $name set to DS2423enew";
+     Log3 $name,1,"OWCOUNT: model attribute of $name set to DS2423enew";
      CommandAttr (undef,"$name model DS2423enew"); 
      CommandAttr (undef,"$name nomemory 0"); 
   } elsif( $nomid && $nomem ){
-     Log 1,"OWCOUNT: model attribute of $name set to DS2423eold because no memory found";
+     Log3 $name,1,"OWCOUNT: model attribute of $name set to DS2423eold because no memory found";
      CommandAttr (undef,"$name model DS2423eold"); 
      CommandAttr (undef,"$name nomemory 1"); 
   }
@@ -1237,7 +1242,7 @@ sub OWCOUNT_Set($@) {
       $data.=" ".$a[$i];
     }
     if( length($data) > 32 ){
-      Log 1,"OWXCOUNT: Memory data truncated to 32 characters";
+      Log3 $name,1,"OWXCOUNT: Memory data truncated to 32 characters";
       $data=substr($data,0,32);
     }elsif( length($data) < 32 ){
       for(my $i=length($data)-1;$i<32;$i++){
@@ -1292,7 +1297,7 @@ sub OWCOUNT_Set($@) {
   } 
 
   OWCOUNT_GetValues($hash);  
-  Log 5, "OWCOUNT: Set $hash->{NAME} $key $value";
+  Log3 $name,5, "OWCOUNT: Set $hash->{NAME} $key $value";
 }
 
 #######################################################################################
@@ -1359,10 +1364,10 @@ sub OWCOUNT_store($$$) {
   my $ret  = open(OWXFILE, "> $mp/FHEM/$filename" );
   if( $ret) {
     print OWXFILE $data;
-    Log 1, "OWCOUNT_store: $name $data";
+    Log3 $name,1, "OWCOUNT_store: $name $data";
     close(OWXFILE);         
   } else {
-    Log 1,"OWCOUNT_store: Cannot open $filename for writing!"; 
+    Log3 $name,1,"OWCOUNT_store: Cannot open $filename for writing!"; 
   }
   return undef;                   
 }
@@ -1387,7 +1392,7 @@ sub OWCOUNT_recall($$) {
     close(OWXFILE);    
     return $line;
   }
-  Log 1, "OWCOUNT_recall: Cannot open $filename for reading!";
+  Log3 $name,1, "OWCOUNT_recall: Cannot open $filename for reading!";
   return undef;;                
 }
 
@@ -1502,7 +1507,7 @@ sub OWFSCOUNT_GetPage($$$) {
   $hash->{PRESENT}  = 1;
   if($final==1){
     my $value = OWCOUNT_FormatValues($hash);
-    Log 5, $value;
+    Log3 $name,5, $value;
   }
   return undef;
 }
@@ -1586,7 +1591,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
     if( int(@data) < 42);
   #return "invalid data"
   #  if (ord($data[17])<=0); 
-  Log 1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
+  Log3 $name,1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
     if (OWX_CRC16($select.substr($res,0,40),$data[40],$data[41]) == 0);
     
   #-- first 3 command, next 32 are memory
@@ -1634,7 +1639,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   $hash->{PRESENT}  = 1;
   if( $final ) {
     my $value = OWCOUNT_FormatValues($hash);
-    Log 5, $value;
+    Log3 $name,5, $value;
   }
   return undef;
 }
@@ -1649,8 +1654,8 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXCOUNT_GetPage($$$) {
-  my ($hash,$page,$final) = @_;
+sub OWXCOUNT_GetPage($$$@) {
+  my ($hash,$page,$final,$sync) = @_;
   
   my ($select, $res, $res2, $res3, @data);
   
@@ -1674,10 +1679,10 @@ sub OWXCOUNT_GetPage($$$) {
   my $ta1 = ($page*32) & 255;
   $select=sprintf("\xA5%c%c",$ta1,$ta2);   
   
+  my $context = "getpage.".$page.($final ? ".final" : "");
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    #TODO: Parameters possibly wrong
-    if (!OWX_Execute( $master, "getpage.".$page.($final ? ".final" : ""), 1, $owx_dev, $select, 42, 20 )) {
+    if (!OWX_Execute( $master, $context, 1, $owx_dev, $select, 42, 20 ) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
       return "not accessible for reading";
     }
     return undef;
@@ -1709,7 +1714,7 @@ sub OWXCOUNT_GetPage($$$) {
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=54);
-    OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),undef,undef,$owx_dev,$select,42,substr($res,12));
+    OWXCOUNT_BinValues($hash,$context,undef,undef,$owx_dev,$select,42,substr($res,12));
   }
   return undef;
 }
