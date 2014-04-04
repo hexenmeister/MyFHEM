@@ -91,11 +91,13 @@ sub write($$) {
 }
 
 sub new($$$$) {
-	my ( $class, $lcd_Addr, $lcd_cols, $lcd_rows ) = @_;
+	my ( $class, $lcd_Addr, $lcd_cols, $lcd_rows, $lcd_mapping ) = @_;
+	#print STDOUT "test fuer LCD Bibo: $lcd_mapping->{P0}\n";
 	return bless {
 		Addr         => $lcd_Addr,
 		cols         => $lcd_cols,
 		rows         => $lcd_rows,
+		mapping			 => $lcd_mapping,
 		backlightval => LCD_NOBACKLIGHT,
 	}, $class;
 }
@@ -359,7 +361,29 @@ sub write4bits($$) {
 
 sub expanderWrite($$) {
 	my ( $self, $data ) = @_;
-
+	
+	my %omapping = (
+  'RS'  => 0,
+  'RW'  => 1,
+  'E'   => 2,
+  'LED' => 3,
+  'D4'  => 4,
+  'D5'  => 5,
+  'D6'  => 6,
+  'D7'  => 7,
+  );
+	#print STDOUT "test fuer LCD Bibo: Data: $data\n";
+	my @odata;
+	foreach (0..7) {					#einzelne Bits in Array speichern
+	  $odata[$_] = ($data & 1 << $_) >> $_;
+		#print STDOUT "test fuer LCD Bibo: Data: $data, $_ = $odata[$_]\n";
+	}
+	$data = 0;
+	foreach (0..7) {
+		$data |= $odata[$omapping{$self->{mapping}->{"P".$_}} ] << $_;
+	#	print STDOUT "test fuer LCD fe2: $tesst\n";
+	}
+	#print STDOUT "test fuer LCD Bibo: umsort: $data\n";
 	$self->{I2CDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
 }
 
