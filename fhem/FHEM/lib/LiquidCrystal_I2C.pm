@@ -372,7 +372,9 @@ sub expanderWrite($$) {
   'D6'  => 6,
   'D7'  => 7,
   );
-	#print STDOUT "test fuer LCD Bibo: Data: $data\n";
+	$data |= $self->{backlightval};
+	#my $ein = sprintf '<%#b>',  $data; 
+	#print STDOUT "$ein test fuer LCD Bibo: Data: $data\n";
 	my @odata;
 	foreach (0..7) {					#einzelne Bits in Array speichern
 	  $odata[$_] = ($data & 1 << $_) >> $_;
@@ -383,8 +385,10 @@ sub expanderWrite($$) {
 		$data |= $odata[$omapping{$self->{mapping}->{"P".$_}} ] << $_;
 	#	print STDOUT "test fuer LCD fe2: $tesst\n";
 	}
-	#print STDOUT "test fuer LCD Bibo: umsort: $data\n";
-	$self->{I2CDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
+	#my $aus = sprintf '<%#b>',  $data; 
+	#print STDOUT "von: $ein nach: $aus test fuer LCD Bibo: umsort: $data\n";
+	$self->{I2CDevice}->i2c_write($self->{Addr},$data);
+	#$self->{I2CDevice}->i2c_write($self->{Addr},($data) | $self->{backlightval});
 }
 
 sub pulseEnable($$) {
