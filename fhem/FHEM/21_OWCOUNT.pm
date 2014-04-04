@@ -1573,73 +1573,99 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   
   #-- unused are success, reset, data
   
-  return undef unless (defined $context and $context =~ /^getpage\.([\d]+)(\.final|)$/);
+  return undef unless (defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
   
-  my $page = $1;
-  my $final = $2;
+  my $cmd = $1;
+  my $page = $2;
+  my $final = $3;
   my $name   = $hash->{NAME};
   
-  Log3 ($name,5,"OWXCount_BinValues context: $context, page: ".(defined $page ? $page : "undef").", final: ".(defined $final ? $final : "undef"));
+  Log3 ($name,5,"OWXCount_BinValues context: $context, $cmd page: $page, final: ".(defined $final ? $final : "undef"));
   
-  my ($i,$j,$k,@data,@writedata,$strval,$value);
-  my $change = 0;
-  
-  #-- process results
-  @data=split(//,$res);
-  @writedata = split(//,$select);
-  return "invalid data length, ".int(@data)." instead of 42 bytes in three steps"
-    if( int(@data) < 42);
-  #return "invalid data"
-  #  if (ord($data[17])<=0); 
-  Log3 $name,1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
-    if (OWX_CRC16($select.substr($res,0,40),$data[40],$data[41]) == 0);
+  if ($cmd eq "get") {
+    my ($i,$j,$k,@data,@writedata,$strval,$value);
+    my $change = 0;
     
-  #-- first 3 command, next 32 are memory
-  #my $res2 = "OWCOUNT FIRST 10 BYTES for device $owx_dev ARE ";
-  #for($i=0;$i<10;$i++){  
-  #  $j=int(ord(substr($res,$i,1))/16);
-  #  $k=ord(substr($res,$i,1))%16;
-  #	$res2.=sprintf "0x%1x%1x ",$j,$k;
-  #}
-  #main::Log(1, $res2);
-  
-  #-- 
-  my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  if( $nomemory==0 ){
-    #-- memory part, treated as string
-    $strval=substr($res,0,32);
-    $hash->{owg_str}->[$page]=$strval;
-    #Log 1," retrieved on device $owx_dev for page $page STRING $strval";
-  }
-  #-- counter part
-  if( ($page == 14) || ($page == 15) ){
-    @data=split(//,substr($res,32));
-    if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
-      #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
-      return "device $owx_dev returns invalid data";
+    #-- process results
+    @data=split(//,$res);
+    @writedata = split(//,$select);
+    return "invalid data length, ".int(@data)." instead of 42 bytes in three steps"
+      if( int(@data) < 42);
+    #return "invalid data"
+    #  if (ord($data[17])<=0); 
+    Log3 $name,1,"invalid CRC, ".ord($data[40])." ".ord($data[41])
+      if (OWX_CRC16($select.substr($res,0,40),$data[40],$data[41]) == 0);
+      
+    #-- first 3 command, next 32 are memory
+    #my $res2 = "OWCOUNT FIRST 10 BYTES for device $owx_dev ARE ";
+    #for($i=0;$i<10;$i++){  
+    #  $j=int(ord(substr($res,$i,1))/16);
+    #  $k=ord(substr($res,$i,1))%16;
+    #	$res2.=sprintf "0x%1x%1x ",$j,$k;
+    #}
+    #main::Log(1, $res2);
+    
+    #-- 
+    my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
+    if( $nomemory==0 ){
+      #-- memory part, treated as string
+      $strval=substr($res,0,32);
+      $hash->{owg_str}->[$page]=$strval;
+      #Log 1," retrieved on device $owx_dev for page $page STRING $strval";
     }
-    #-- counter value
-    $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
-    $hash->{owg_val}->[$page-14] = $value;
-    #-- midnight value
-    if( $nomemory==0 ){ 
-      #-- new format
-      if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-        @data=split(' ',$strval);
-        $strval = $data[2];
-      } 
-      #-- parse float from midnight
-      $strval =~ s/[^\d\.]+//g;
-      $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-      $strval = int($strval*100)/100;
-      $hash->{owg_midnight}->[$page-14] = $strval;
+    #-- counter part
+    if( ($page == 14) || ($page == 15) ){
+      @data=split(//,substr($res,32));
+      if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
+        #Log 1, "device $owx_dev returns invalid data ".ord($data[4])." ".ord($data[5])." ".ord($data[6])." ".ord($data[7]);
+        return "device $owx_dev returns invalid data";
+      }
+      #-- counter value
+      $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
+      $hash->{owg_val}->[$page-14] = $value;
+      #-- midnight value
+      if( $nomemory==0 ){ 
+        #-- new format
+        if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
+          @data=split(' ',$strval);
+          $strval = $data[2];
+        } 
+        #-- parse float from midnight
+        $strval =~ s/[^\d\.]+//g;
+        $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
+        $strval = int($strval*100)/100;
+        $hash->{owg_midnight}->[$page-14] = $strval;
+      }
     }
-  }
-  #-- and now from raw to formatted values 
-  $hash->{PRESENT}  = 1;
-  if( $final ) {
-    my $value = OWCOUNT_FormatValues($hash);
-    Log3 $name,5, $value;
+    #-- and now from raw to formatted values 
+    $hash->{PRESENT}  = 1;
+    if( $final ) {
+      my $value = OWCOUNT_FormatValues($hash);
+      Log3 $name,5, $value;
+    }
+  } elsif ($cmd eq "set") {
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      if ($page eq 1) {
+        #-- issue the match ROM command \x55 and the read scratchpad command
+        #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
+        $select = "\xAA";
+        if (OWX_Execute( $hash, "setpage.2", 1, $owx_dev, $select, 28, undef )) {
+          return undef;
+	      } else {
+          return "device $owx_dev not accessible in reading scratchpad"; 
+        }
+      } elsif ($page eq 2) {
+        #-- issue the match ROM command \x55 and the copy scratchpad command
+        #   \x5A followed by 3 byte authentication code obtained in previous read
+        $select="\x5A".substr($res,10,3);
+        if (OWX_Execute( $hash, "setpage.3", 1, $owx_dev, $select, 6, undef )) {
+          return undef;
+        } else {
+          return "device $owx_dev not accessible for copying scratchpad"; 
+        }
+      }
+    }
   }
   return undef;
 }
@@ -1778,10 +1804,11 @@ sub OWXCOUNT_SetPage($$$) {
   
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    if (OWX_Execute( $master, "setpage", 1, $owx_dev, $select, 0, undef )) {
-		return undef;
-	} else {
-    return "device $owx_dev not accessible in writing scratchpad"; 
+    if (OWX_Execute( $master, "setpage.1", 1, $owx_dev, $select, 0, undef )) {
+      return undef;
+      #the followup-calls to OWX_Execute (setpage.2 and setpage.3) are located in OWX_Binvalues!
+    } else {
+      return "device $owx_dev not accessible in writing scratchpad"; 
     }
   #-- synchronous mode
   } else {
@@ -1791,23 +1818,15 @@ sub OWXCOUNT_SetPage($$$) {
     if( $res eq 0 ){
       return "device $owx_dev not accessible in writing scratchpad"; 
     } 
-  }
-  #-- issue the match ROM command \x55 and the read scratchpad command
-  #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-    if (OWX_Execute( $master, "setpage", 1, $owx_dev, "\xAA", 0, undef )) {
-		return undef;
-	} else {
-    return "device $owx_dev not accessible in reading scratchpad"; 
-    }
-  #-- synchronous mode
-  } else {
+
+    #-- issue the match ROM command \x55 and the read scratchpad command
+    #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
+    $select = "\xAA";
     #-- reset the bus
     OWX_Reset($master);
     #-- reading 9 + 3 + up to 32 bytes
     # TODO: sometimes much less than 28
-    $res=OWX_Complex($master,$owx_dev,"\xAA",28);
+    $res=OWX_Complex($master,$owx_dev,$select,28);
     if( length($res) < 13 ){
       return "device $owx_dev not accessible in reading scratchpad"; 
     } 
@@ -1821,28 +1840,18 @@ sub OWXCOUNT_SetPage($$$) {
     #  $res2.=sprintf "0x%1x%1x ",$j,$k;
     #}
     #main::Log(1, $res2);
-  }
-  #-- issue the match ROM command \x55 and the copy scratchpad command
-  #   \x5A followed by 3 byte authentication code obtained in previous read
-  $select="\x5A".substr($res,10,3);
-  #-- first command, next 2 are address, then data
-  #$res2 = "OWCOUNT SET PAGE 3 device $owx_dev ";
-  #for($i=0;$i<10;$i++){  
-  #  $j=int(ord(substr($select,$i,1))/16);
-  #  $k=ord(substr($select,$i,1))%16;
-  #  $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #}
-  #main::Log(1, $res2);
-  #-- asynchronous mode
-  if( $hash->{ASYNC} ){
-  # THIS IS WRONG !!
-    if (OWX_Execute( $master, "setpage", 1, $owx_dev, "\xAA", 0, undef )) {
-		return undef;
-	} else {
-    return "device $owx_dev not accessible for copying scratchpad"; 
-    }
-  #-- synchronous mode
-  } else {
+    #-- issue the match ROM command \x55 and the copy scratchpad command
+    #   \x5A followed by 3 byte authentication code obtained in previous read
+    $select="\x5A".substr($res,10,3);
+    #-- first command, next 2 are address, then data
+    #$res2 = "OWCOUNT SET PAGE 3 device $owx_dev ";
+    #for($i=0;$i<10;$i++){  
+    #  $j=int(ord(substr($select,$i,1))/16);
+    #  $k=ord(substr($select,$i,1))%16;
+    #  $res2.=sprintf "0x%1x%1x ",$j,$k;
+    #}
+    #main::Log(1, $res2);
+
     #-- reset the bus
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,$select,6);
