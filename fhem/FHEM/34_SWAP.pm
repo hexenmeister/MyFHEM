@@ -487,7 +487,16 @@ SWAP_Set($@)
           return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
         }
       } else {
-        my $len = $register->{endpoints}->[0]->{size};
+        my $len = 0;
+        foreach my $endpoint ( @{$register->{endpoints}} ) {
+          if( !defined($endpoint->{position}) ) {
+            $len = $endpoint->{size};
+            last;
+          }
+
+          $len += $endpoint->{size};
+        }
+
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
       }
     }
@@ -807,6 +816,7 @@ SWAP_updateReadings($$$)
         for( my $i = 0; $i < length($value)-6; $i+=2 ) {
           $v .= sprintf( "%c", hex(substr($value, $i, 2)) );
         }
+        Log3 $name, 4, "$endpoint->{name}: $v";
         #$value = $v;
         readingsBulkUpdate($hash, lc($endpoint->{name}), $v);
       }

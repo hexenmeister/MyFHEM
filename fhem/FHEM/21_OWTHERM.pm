@@ -75,7 +75,7 @@ use warnings;
 sub Log($$);
 sub AttrVal($$$);
 
-my $owx_version="5.12";
+my $owx_version="5.13";
 
 my %gets = (
   "id"          => "",
@@ -500,7 +500,7 @@ sub OWTHERM_GetValues($@) {
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
