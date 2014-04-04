@@ -76,6 +76,7 @@ sub poll($) {
 	my ( $self,$hash ) = @_;
 	$self->read();
 	$self->{worker}->PT_SCHEDULE($hash);
+	$self->{worker}->scheduleNext($hash);
 }
 
 # start of worker code
@@ -112,7 +113,7 @@ sub pt_main($) {
 	my ( $self, $hash ) = @_;
     my $item = $self->{item};
     PT_BEGIN($self);
-	PT_YIELD_UNTIL($item = $self->nextItem());
+	PT_YIELD_UNTIL($item = $self->nextItem($hash));
 	$self->{item} = $item;
 		
 	REQUEST_HANDLER: {
@@ -122,7 +123,7 @@ sub pt_main($) {
 			PT_WAIT_THREAD($self->{owx}->{pt_discover},$self->{owx});
 			my $devices = $self->{owx}->{pt_discover}->PT_RETVAL();
 			if (defined $devices) {
-				main::OWX_AfterSearch($hash,$devices);
+				main::OWX_ASYNC_AfterSearch($hash,$devices);
 			}
 			PT_EXIT;
 		};
@@ -131,7 +132,7 @@ sub pt_main($) {
 			PT_WAIT_THREAD($self->{owx}->{pt_alarms},$self->{owx});
 			my $devices = $self->{owx}->{pt_alarms}->PT_RETVAL();
 			if (defined $devices) {
-				main::OWX_AfterAlarms($hash,$devices);
+				main::OWX_ASYNC_AfterAlarms($hash,$devices);
 			}
 			PT_EXIT;
 		};
@@ -140,7 +141,7 @@ sub pt_main($) {
 			PT_WAIT_THREAD($self->{owx}->{pt_verify},$self->{owx},$item->{address});
 			my $devices = $self->{owx}->{pt_verify}->PT_RETVAL();
 			if (defined $devices) {
-				main::OWX_AfterVerify($hash,$devices);
+				main::OWX_ASYNC_AfterVerify($hash,$devices);
 			}
 			PT_EXIT;
 		};
@@ -149,28 +150,30 @@ sub pt_main($) {
 		    PT_WAIT_THREAD($self->{owx}->{pt_execute},$self->{owx},$hash,$item->{context},$item->{reset},$item->{address},$item->{writedata},$item->{numread});
 		    my $res = $self->{owx}->{pt_execute}->PT_RETVAL();
 		    unless (defined $res) {
-		      main::OWX_AfterExecute($hash,$item->{context},undef,$item->{reset},$item->{address},$item->{writedata},$item->{numread},undef);
+		      main::OWX_ASYNC_AfterExecute($hash,$item->{context},undef,$item->{reset},$item->{address},$item->{writedata},$item->{numread},undef);
 		      PT_EXIT;
 		    }
        		my $writelen = defined $item->{writedata} ? split (//,$item->{writedata}) : 0;
        		my @result = split (//, $res);
        		my $readdata = 9+$writelen < @result ? substr($res,9+$writelen) : ""; 
-       		main::OWX_AfterExecute($hash,$item->{context},1,$item->{reset},$item->{address},$item->{writedata},$item->{numread},$readdata);
+       		main::OWX_ASYNC_AfterExecute($hash,$item->{context},1,$item->{reset},$item->{address},$item->{writedata},$item->{numread},$readdata);
         	if (my $delay = $item->{delay}) {
        			my ($seconds,$micros) = gettimeofday;
        			my $len = length ($delay); #delay is millis, tv_address works with [sec,micros]
        			if ($len>3) {
        				$seconds += substr($delay,0,$len-3);
-       				$micros += (substr ($delay,$len-8).000);
+       				$micros += (substr ($delay,-3)*1000);
        			} else {
-       				$micros += ($delay.000);
+       				$micros += ($delay*1000);
        			}
+       			
         		if (my $address = $item->{address}) {
         			my $delayed = $self->{delayed};
         			unless ($delayed->{$address}) {
         				$delayed->{$address} = { items => [] };
         			}
         			$delayed->{$address}->{'until'} = [$seconds,$micros];
+        			main::Log3 $hash->{NAME},5,"delay after $item->{context} until: $seconds,$micros"
         		} else {
         		  $self->{execute_delayed} = [$seconds,$micros];
         		  PT_YIELD_UNTIL(tv_interval($self->{execute_delayed})>=0);
@@ -180,7 +183,7 @@ sub pt_main($) {
 		};
 		
 		$command eq OWX_Executor::EXIT and do {
-			main::OWX_Disconnected($hash);
+			main::OWX_ASYNC_Disconnected($hash);
 			PT_EXIT;
 		};
 		main::Log3($hash->{NAME},3,"OWX_Executor: unexpected command: "+$command);
@@ -188,15 +191,15 @@ sub pt_main($) {
 	PT_END;
 };
 
-sub nextItem() {
-	my ( $self ) = @_;
-	my $item = undef;
+sub nextItem($) {
+	my ( $self,$hash ) = @_;
+	my ($item,$nexttime,$nextaddress);
 	my $delayed = $self->{delayed};
 	foreach my $address (keys %$delayed) {
 		next if (tv_interval($delayed->{$address}->{'until'}) < 0);
-		my @delayed_items = @{$delayed->{$address}->{'items'}}; 
-		$item = shift @delayed_items;
-		delete $delayed->{$address} unless scalar(@delayed_items);# or $item->{delay};
+		my $delayed_items = $delayed->{$address}->{'items'}; 
+		$item = shift @$delayed_items;
+		delete $delayed->{$address} unless @$delayed_items;
 		last;
 	};
 	unless ($item) {
@@ -208,7 +211,30 @@ sub nextItem() {
 			};
 		};
 	};
+	if ($item) {
+	  if($item->{context}) {
+	    main::Log3 $hash->{NAME},5,"OWX_Executor: item $item->{context} for $item->{address} eligible to run";
+	  } else {
+	    main::Log3 $hash->{NAME},5,"OWX_Executor: command $item->{command} eligible to run";
+	  }
+	}
 	return $item;
+}
+
+sub scheduleNext($) {
+  my ($self,$hash) = @_;
+  my $delayed = $self->{delayed};
+  my $nexttime;
+	foreach my $address (keys %$delayed) {
+		if (my $until = $delayed->{$address}->{'until'}) {
+			$nexttime = $until unless ($nexttime and tv_interval($nexttime,$until) < 0);
+		}
+	};
+	if ($nexttime) {
+		main::RemoveInternalTimer($hash);
+		main::Log3 $hash->{NAME},5,"schedule next item at $nexttime->[0].$nexttime->[1] ".tv_interval($nexttime);
+		main::InternalTimer( "$nexttime->[0].$nexttime->[1]", "OWX_ASYNC_Poll", $hash, 0 );
+	}
 }
 
 1;

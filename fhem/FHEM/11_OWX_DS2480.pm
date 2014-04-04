@@ -29,23 +29,11 @@ use strict;
 use warnings;
 use Time::HiRes qw( gettimeofday tv_interval usleep );
 
-use constant {
-  QUERY_TIMEOUT => 1.0
-};
-
 use vars qw/@ISA/;
 @ISA='OWX_SER';
 
-use ProtoThreads;
-no warnings 'deprecated';
-
 sub new($) {
   my ($class,$serial) = @_;
-  
-  $serial->{pt_reset} = PT_THREAD(\&pt_reset);
-  $serial->{pt_query} = PT_THREAD(\&pt_query);
-  $serial->{pt_block} = PT_THREAD(\&pt_block);
-  $serial->{pt_search} = PT_THREAD(\&pt_search);
   
   return bless $serial,$class;
 }
@@ -65,18 +53,18 @@ sub new($) {
 #
 ########################################################################################
 
-sub pt_block ($) {
-  my ($thread,$serial,$data) =@_;
-  PT_BEGIN($thread);
+sub block ($) {
+  my ($serial,$data) =@_;
   my $data2="";
-  my $retlen = length($data);
-   
+  
+  my $len = length($data);
+  
   #-- if necessary, prepend E1 character for data mode
   if( substr($data,0,1) ne '\xE1') {
     $data2 = "\xE1";
   }
   #-- all E3 characters have to be duplicated
-  for(my $i=0;$i<length($data);$i++){
+  for(my $i=0;$i<$len;$i++){
     my $newchar = substr($data,$i,1);
     $data2=$data2.$newchar;
     if( $newchar eq '\xE3'){
@@ -84,11 +72,7 @@ sub pt_block ($) {
     }
   }
   #-- write 1-Wire bus as a single string
-  $thread->{data2} = $data2;
-  $thread->{retlen} = $retlen;
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$thread->{data2},$thread->{retlen});
-  PT_EXIT($serial->{pt_query}->PT_RETVAL());
-  PT_END;
+  $serial->query($data2,$len);
 }
 
 ########################################################################################
@@ -101,50 +85,28 @@ sub pt_block ($) {
 #
 ########################################################################################
 
-sub pt_query ($$$) {
+sub query ($$$) {
 	
-  my ($thread,$serial,$cmd,$retlen) = @_;
+  my ($serial,$cmd,$retlen) = @_;
   my ($i,$j,$k,$l,$m,$n);
   
-  PT_BEGIN($thread);
   #-- get hardware device
   my $hwdevice = $serial->{hwdevice};
   
-  PT_EXIT unless (defined $hwdevice);
+  die "OWX_DS2480: query with no hwdevice" unless (defined $hwdevice);
   
   $hwdevice->baudrate($serial->{baud});
   $hwdevice->write_settings;
 
   if( $main::owx_debug > 2){
-    my $res = "OWX_SER::Query_2480 Sending out        ";
-    for($i=0;$i<length($cmd);$i++){  
-      $j=int(ord(substr($cmd,$i,1))/16);
-      $k=ord(substr($cmd,$i,1))%16;
-  	$res.=sprintf "0x%1x%1x ",$j,$k;
-    }
-    main::Log3($serial->{name},3, $res);
+    main::Log3($serial->{name},3, "OWX_DS2480.query sending out: ".unpack ("H*",$cmd));
   }
-  
-  #read and discard any outstanding data from previous commands:
-  PT_WAIT_WHILE($serial->read());
   
   my $count_out = $hwdevice->write($cmd);
 
-  if( !($count_out)){
-    main::Log3($serial->{name},3,"OWX_SER::Query_2480: No return value after writing") if( $main::owx_debug > 0);
-  } else {
-    main::Log3($serial->{name},3, "OWX_SER::Query_2480: Write incomplete $count_out ne ".(length($cmd))."") if ( ($count_out != length($cmd)) & ($main::owx_debug > 0));
-  }
-  if ($count_out and ($count_out eq length($cmd))) {  
-    $serial->{string_in} = "";
-    $serial->{num_reads} = 0;
-    $serial->{retlen} = $retlen;
-    $serial->{retcount} = 0;
-    $serial->{query_start} = [gettimeofday];
-    PT_WAIT_UNTIL(($serial->{retcount} >= $serial->{retlen}) or (($serial->{num_reads} > 1) and (tv_interval($serial->{query_start}) > QUERY_TIMEOUT)));
-    PT_EXIT($serial->{string_in});
-  } 
-  PT_END;
+  die "OWX_DS2480: Write incomplete ".(defined $count_out ? $count_out : "undefined")." not equal ".(length($cmd))."" if (!(defined $count_out) or ($count_out ne length($cmd)));
+
+  $serial->{retlen} += $retlen;
 }
 
 ########################################################################################
@@ -173,18 +135,31 @@ sub read() {
   $serial->{retcount} += $count_in;		
   $serial->{num_reads}++;
   if( $main::owx_debug > 2){
-    main::Log3($serial->{name},3, "OWX_SER::Query_2480: Loop no. $serial->{num_reads}");
+    main::Log3($serial->{name},3, "OWX_DS2480 read: Loop no. $serial->{num_reads}");
   }
   if( $main::owx_debug > 2){	
-    my $res = "OWX_SER::Query_2480 Receiving in loop no. $serial->{num_reads} ";
-    for($i=0;$i<$count_in;$i++){ 
-      $j=int(ord(substr($string_part,$i,1))/16);
-      $k=ord(substr($string_part,$i,1))%16;
-      $res.=sprintf "0x%1x%1x ",$j,$k;
-    }
-    main::Log3($serial->{name},3, $res);
+    main::Log3($serial->{name},3, "OWX_DS2480 read: Receiving in loop no. $serial->{num_reads} ".unpack("H*",$string_part));
   }
   return $count_in > 0 ? 1 : undef;
+}
+
+sub response_ready() {
+  my ($serial) = @_;
+  return 1 if ($serial->{retcount} >= $serial->{retlen});
+  die "OWX_DS2480 read timeout, bytes read: $serial->{retcount}, expected: $serial->{retlen}" if (($serial->{num_reads} > 1) and (tv_interval($serial->{starttime}) > $serial->{timeout}));
+  return 0;
+}
+
+sub start_query() {
+  my ($serial) = @_;
+  #read and discard any outstanding data from previous commands:
+  while($serial->read()) {};
+
+  $serial->{string_in} = "";
+  $serial->{num_reads} = 0;
+  $serial->{retlen} = 0;
+  $serial->{retcount} = 0;
+  $serial->{starttime} = [gettimeofday];
 }
 
 ########################################################################################
@@ -198,48 +173,40 @@ sub read() {
 #
 ########################################################################################
 
-sub pt_reset () {
+sub reset() {
 
-  my ($thread,$serial)=@_;
+  my ($serial) = @_;
+  my ($res,$r1,$r2);
+  my $name = $serial->{name};
+  $serial->start_query();
 
+  #-- if necessary, prepend \xE3 character for command mode
+  #-- Reset command \xC5
+  #-- write 1-Wire bus
+  $serial->query("\xE3\xC5",1);
+  #-- sleeping for some time (value of 0.07 taken from original OWX_Query_DS2480)
+  select(undef,undef,undef,0.07);
+}
+
+sub reset_response() {
+  my ($serial) = @_;
+
+  my $res = ord(substr($serial->{string_in},0,1));
   my $name = $serial->{name};
   
-  my ($res,$r1,$r2);
-  #-- if necessary, prepend \xE3 character for command mode
-  my $cmd = "\xE3";
-  
-  #-- Reset command \xC5
-  $cmd  = $cmd."\xC5";
-  PT_BEGIN($thread);
-  #-- write 1-Wire bus
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$cmd,1);
-  $res = $serial->{pt_query}->PT_RETVAL();
-  PT_EXIT unless $res;
-  #-- if not ok, try for max. a second time
-  $r1  = ord(substr($res,0,1)) & 192;
-  if( $r1 != 192){
-    #Log(1, "Trying second reset";
-    PT_WAIT_THREAD($serial->{pt_query},$serial,$cmd,1);
-    $res = $serial->{pt_query}->PT_RETVAL();
-    PT_EXIT unless $res;
+  if( !($res & 192) ) {
+    main::Log3($name,3, "OWX_DS2480 reset failure on bus $name");
+    return 0;
   }
-
-  #-- process result
-  $r1  = ord(substr($res,0,1)) & 192;
-  if( $r1 != 192){
-    main::Log3($serial->{name},3, "OWX_SER::Reset_2480 failure on bus $name");
-    PT_EXIT;
-  }
-  $serial->{ALARMED} = "no";
   
-  $r2 = ord(substr($res,0,1)) & 3;
-  
-  if( $r2 ==2 ){
-    main::Log3($serial->{name},1, "OWX_SER::Reset_2480 Alarm presence detected on bus $name");
+  if( ($res & 3) == 2 ) {
+    main::Log3($name,1, "OWX_DS2480 reset Alarm presence detected on bus $name");
     $serial->{ALARMED} = "yes";
+  } else {
+    $serial->{ALARMED} = "no";
   }
-  PT_EXIT(1);
-  PT_END;
+  $serial->{string_in} = substr($serial->{string_in},1);
+  return 1;
 }
 
 ########################################################################################
@@ -255,12 +222,11 @@ sub pt_reset () {
 #
 ########################################################################################
 
-sub pt_search ($) {
-  my ($thread,$serial,$mode)=@_;
+sub search ($) {
+  my ($serial,$mode)=@_;
   
-  my ($response,$search_direction,$id_bit_number);
-  
-  PT_BEGIN($thread); 
+  my ($sp1,$sp2,$search_direction,$id_bit_number);
+    
   #-- Response search data parsing operates bytewise
   $id_bit_number = 1;
   
@@ -281,7 +247,7 @@ sub pt_search ($) {
     if( $id_bit_number <= $serial->{LastDiscrepancy}){
       #-- first use the ROM ID bit to set the search direction  
       if( $id_bit_number < $serial->{LastDiscrepancy} ) {
-        $search_direction = (@{$serial->{ROM_ID}}[$newcpos2]>>$newimsk2) & 1;
+        $search_direction = ($serial->{ROM_ID}->[$newcpos2]>>$newimsk2) & 1;
         #-- at the last discrepancy search into 1 direction anyhow
       } else {
         $search_direction = 1;
@@ -295,28 +261,33 @@ sub pt_search ($) {
   #-- issue data mode \xE1, the normal search command \xF0 or the alarm search command \xEC 
   #   and the command mode \xE3 / start accelerator \xB5 
   if( $mode ne "alarm" ){
-    $thread->{sp1} = "\xE1\xF0\xE3\xB5";
+    $sp1 = "\xE1\xF0\xE3\xB5";
   } else {
-    $thread->{sp1} = "\xE1\xEC\xE3\xB5";
+    $sp1 = "\xE1\xEC\xE3\xB5";
   }
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$thread->{sp1},1);
-  PT_EXIT unless $serial->{pt_query}->PT_RETVAL();
   #-- issue data mode \xE1, device ID, command mode \xE3 / end accelerator \xA5
-  $thread->{sp2}=sprintf("\xE1%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\xE3\xA5",@{$serial->{search}});
-  PT_WAIT_THREAD($serial->{pt_query},$serial,$thread->{sp2},16);
-  $response = $serial->{pt_query}->PT_RETVAL();
-  PT_EXIT unless $response;
-     
+  $sp2=sprintf("\xE1%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\xE3\xA5",@{$serial->{search}});
+  $serial->reset();
+  $serial->query($sp1,1);
+  $serial->query($sp2,16);
+}
+
+sub search_response($) {
+  my ($serial) = @_;
+  
+  return undef unless $serial->reset_response();
+  
+  my $response = substr($serial->{string_in},1);
   #-- interpret the return data
   if( length($response)!=16 ) {
-    main::Log3($serial->{name},3, "OWX_SER::Search_2480 2nd return has wrong parameter with length = ".length($response)."");
-    PT_EXIT;
+    main::Log3($serial->{name},3, "OWX_DS2480: Search 2nd return has wrong parameter with length = ".(length($response).""));
+    return 0;
   }
   #-- Response search data parsing (Fig. 11 of Maxim AN192)
   #   operates on a 16 byte search response = 64 pairs of two bits
-  $id_bit_number = 1;
+  my $id_bit_number = 1;
   #-- clear 8 byte of device id for current search
-  @{$serial->{ROM_ID}} =(0,0,0,0 ,0,0,0,0); 
+  $serial->{ROM_ID} = [0,0,0,0 ,0,0,0,0]; 
 
   while ( $id_bit_number <= 64) {
     #-- adress single bits in a 16 byte string
@@ -342,13 +313,12 @@ sub pt_search ($) {
         }
     } 
     #-- fill into device data; one char per 8 bits
-    @{$serial->{ROM_ID}}[int(($id_bit_number-1)/8)]+=$newibit<<(($id_bit_number-1)%8);
+    $serial->{ROM_ID}->[int(($id_bit_number-1)/8)]+=$newibit<<(($id_bit_number-1)%8);
   
     #-- increment number
     $id_bit_number++;
   }
-  PT_EXIT(1);
-  PT_END;
+  return 1;
 }
 
 ########################################################################################

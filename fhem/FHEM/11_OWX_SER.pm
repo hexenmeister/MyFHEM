@@ -65,8 +65,9 @@ sub new() {
 	$self->{pt_discover} = PT_THREAD(\&pt_discover);
 	$self->{pt_verify} = PT_THREAD(\&pt_verify);
 	$self->{pt_execute} = PT_THREAD(\&pt_execute);
-	$self->{pt_next} = PT_THREAD(\&pt_next);
 	
+	$self->{timeout} = [1,0]; #default timeout 1 sec.
+
 	return bless $self,$class;	
 }
 
@@ -122,14 +123,15 @@ sub pt_alarms () {
   $self->{alarmdevs} = [];
   #-- Discover all alarmed devices on the 1-Wire bus
   $self->first("alarm");
-  PT_WAIT_THREAD($self->{pt_next},$self,"alarm");
-  while( $self->{LastDeviceFlag}==0 and $self->{pt_next}->PT_RETVAL()) {
-    PT_WAIT_THREAD($self->{pt_next},$self,"alarm");
-  }
+  do {
+    $self->next("alarm");
+    PT_WAIT_UNTIL($self->response_ready());
+    PT_EXIT unless $self->next_response("alarm");
+  } while( $self->{LastDeviceFlag}==0 );
   main::Log3($self->{name},1, " Alarms = ".join(' ',@{$self->{alarmdevs}}));
   PT_EXIT($self->{alarmdevs});
   PT_END;
-} 
+}
 
 ########################################################################################
 # 
@@ -155,21 +157,13 @@ sub pt_execute($$$$$$$) {
   my $hwdevice  = $self->{hwdevice};
 
   PT_EXIT unless (defined $hwdevice);
-  
-  if (defined $reset) {
-    PT_WAIT_THREAD($self->{pt_reset},$self);
-    unless ($self->{pt_reset}->PT_RETVAL()) {
-      PT_EXIT;
-    };
-  };
 
-# my $res = $self->{owx}->Complex($address,$item->{writedata},$item->{numread});
+  $self->reset() if ($reset);
 
   my $dev = $address;
   my $data = $writedata;
   
   my $select;
-  my $res  = "";
   my $res2 = "";
   my ($i,$j,$k);
   
@@ -209,29 +203,20 @@ sub pt_execute($$$$$$$) {
   
   #-- for debugging
   if( $main::owx_debug > 1){
-    $res2 = "OWX_SER::Execute: Sending out ";
-    for($i=0;$i<length($select);$i++){  
-      $j=int(ord(substr($select,$i,1))/16);
-      $k=ord(substr($select,$i,1))%16;
-      $res2.=sprintf "0x%1x%1x ",$j,$k;
-    }
-    main::Log3($self->{name},3, $res2);
+    main::Log3($self->{name},3,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
   }
-  $self->{select} = $select;
-  PT_WAIT_THREAD($self->{pt_block},$self,$self->{select});
-  $res = $self->{pt_block}->PT_RETVAL();
-  PT_EXIT unless defined $res;
+  $self->block($select);
   
+  PT_WAIT_UNTIL($self->response_ready());
+  
+  PT_EXIT if ($reset and !$self->reset_response());
+
+  my $res = $self->{string_in};
   #-- for debugging
   if( $main::owx_debug > 1){
-    $res2 = "OWX_SER::Execute: Receiving   ";
-    for($i=0;$i<length($res);$i++){  
-      $j=int(ord(substr($res,$i,1))/16);
-      $k=ord(substr($res,$i,1))%16;
-      $res2.=sprintf "0x%1x%1x ",$j,$k;
-    }
-    main::Log3($self->{name},3, $res2);
+    main::Log3($self->{name},3,"OWX_SER::Execute: Receiving ".unpack ("H*",$res));
   }
+
   PT_EXIT($res);
   PT_END;
 }
@@ -251,10 +236,11 @@ sub pt_discover($) {
   PT_BEGIN($thread);
   #-- Discover all alarmed devices on the 1-Wire bus
   $self->first("discover");
-  PT_WAIT_THREAD($self->{pt_next},$self,"discover");
-  while( $self->{LastDeviceFlag}==0 and $self->{pt_next}->PT_RETVAL()) {
-    PT_WAIT_THREAD($self->{pt_next},$self,"discover"); 
-  }
+  do {
+    $self->next("discover");
+    PT_WAIT_UNTIL($self->response_ready());
+    PT_EXIT unless $self->next_response("discover");
+  } while( $self->{LastDeviceFlag}==0 );
   PT_EXIT($self->{devs});
   PT_END;
 }
@@ -304,17 +290,21 @@ sub initialize($) {
   my $ds2480 = OWX_DS2480->new($self);
   
   #-- timing byte for DS2480
-  while(PT_SCHEDULE($ds2480->{pt_query},$ds2480,"\xC1",1)) {
+  $ds2480->start_query();
+  $ds2480->query("\xC1",1);
+  do {
     $ds2480->read();
-  };
+  } while (!$ds2480->response_ready());
     
   #-- Max 4 tries to detect an interface
   for($l=0;$l<100;$l++) {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
-    while(PT_SCHEDULE($ds2480->{pt_query},$ds2480,"\x17\x45\x5B\x0F\x91",5)) {
+    $ds2480->start_query();
+    $ds2480->query("\x17\x45\x5B\x0F\x91",5);
+    do {
       $ds2480->read();
-    };
-    $res = $ds2480->{pt_query}->PT_RETVAL();
+    } while (!$ds2480->response_ready());
+    $res = $ds2480->{string_in};
     #-- process 4/5-byte string for detection
     if( !defined($res)){
       $res="";
@@ -372,7 +362,7 @@ sub Disconnect($) {
 	main::DevIo_Disconnected($hash);
 	delete $self->{hwdevice};
 	$self->{interface} = "serial";
-}	
+}
 
 ########################################################################################
 #
@@ -398,9 +388,13 @@ sub pt_verify ($) {
   #-- reset the search state
   $self->{LastDiscrepancy} = 64;
   $self->{LastDeviceFlag} = 0;
+  
+  $self->reset();
   #-- now do the search
-  PT_WAIT_THREAD($self->{pt_search},$self,"verify");
-  PT_EXIT unless ($self->{pt_search}->PT_RETVAL());
+  $self->next("verify");
+  PT_WAIT_UNTIL($self->response_ready());
+  PT_EXIT unless $self->next_response("verify");
+  
   my $dev2=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$self->{ROM_ID}});
   #-- reset the search state
   $self->{LastDiscrepancy} = 0;
@@ -429,8 +423,8 @@ sub pt_verify ($) {
 #
 ########################################################################################
 
-sub first ($) {
-  my ($self,$mode) = @_;
+sub first($) {
+  my ($self) = @_;
   
   #-- clear 16 byte of search data
   @{$self->{search}} = (0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0);
@@ -453,48 +447,36 @@ sub first ($) {
 #
 ########################################################################################
 
-sub pt_next ($) {
-  my ($thread,$self,$mode)=@_;
+sub next($) {
+  my ($self,$mode)=@_;
   
-  my @owx_fams=();
-  
-  PT_BEGIN($thread);
   #-- if the last call was the last one, no search 
-  if ($self->{LastDeviceFlag}==1){
-    PT_EXIT(0);
-  }
-  #-- 1-Wire reset
-  
-#  unless ($self) {
-#    main::Log3($self->{name},1,"OWX_SER::Search called with unknown interface ".$self->{interface});
-#    PT_EXIT(0);
-#  }
+  return undef if ( $self->{LastDeviceFlag} == 1 );
     
-  PT_WAIT_THREAD($self->{pt_reset},$self);
-  unless ($self->{pt_reset}->PT_RETVAL()) {
-    #-- reset the search
-    main::Log3($self->{name},1, "OWX_SER::Search reset failed");
-    $self->{LastDiscrepancy} = 0;
-    $self->{LastDeviceFlag} = 0;
-    $self->{LastFamilyDiscrepancy} = 0;
-    PT_EXIT;
-  }
+  #-- now do the search
+  $self->search($mode);
+}
+
+sub next_response($) {
+  my ($self,$mode) = @_;
   
-  #-- Here we call the device dependent part
-  PT_WAIT_THREAD($self->{pt_search},$self,$mode);
-  PT_EXIT unless ($self->{pt_search}->PT_RETVAL());
-  #--check if we really found a device
-  if( main::OWX_CRC($self->{ROM_ID})!= 0){
-  #-- reset the search
-    main::Log3($self->{name},1, "OWX_SER::Search CRC failed ");
-    $self->{LastDiscrepancy} = 0;
-    $self->{LastDeviceFlag} = 0;
-    $self->{LastFamilyDiscrepancy} = 0;
-    PT_EXIT;
-  }
-    
+  #TODO find out where contents of @owx_fams come from:
+  my @owx_fams=();
+
+  return undef unless $self->search_response();
+
   #-- character version of device ROM_ID, first byte = family 
   my $dev=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$self->{ROM_ID}});
+
+  #--check if we really found a device
+  if( main::OWX_CRC($self->{ROM_ID})!= 0){
+    #-- reset the search
+    main::Log3($self->{name},1, "OWX_SER::Search CRC failed : $dev");
+    $self->{LastDiscrepancy} = 0;
+    $self->{LastDeviceFlag} = 0;
+    $self->{LastFamilyDiscrepancy} = 0;
+    die "OWX_SER::Search CRC failed : $dev";
+  }
   
   #-- for some reason this does not work - replaced by another test, see below
   #if( $self->{LastDiscrepancy}==0 ){
@@ -508,9 +490,8 @@ sub pt_next ($) {
   #-- mode was to verify presence of a device
   if ($mode eq "verify") {
     main::Log3($self->{name},5, "OWX_SER::Search: device verified $dev");
-    PT_EXIT(1);
   #-- mode was to discover devices
-  } elsif( $mode eq "discover" ){
+  } elsif( $mode eq "discover" ) {
     #-- check families
     my $famfnd=0;
     foreach (@owx_fams){
@@ -533,8 +514,6 @@ sub pt_next ($) {
       push(@{$self->{devs}},$dev);
       main::Log3($self->{name},5, "OWX_SER::Search: new device found $dev");
     }
-    PT_EXIT(1);  
-    
   #-- mode was to discover alarm devices 
   } else {
     for(my $i=0;$i<@{$self->{alarmdevs}};$i++){
@@ -549,9 +528,8 @@ sub pt_next ($) {
       push(@{$self->{alarmdevs}},$dev);
       main::Log3($self->{name},5, "OWX_SER::Search: new alarm device found $dev");
     }
-    PT_EXIT(1);  
   }
-  PT_END;
+  return 1;
 }
 
 1;
