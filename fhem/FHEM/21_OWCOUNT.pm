@@ -86,7 +86,7 @@ use strict;
 use warnings;
 sub Log3($$$);
 
-my $owx_version="5.12";
+my $owx_version="5.13";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -796,8 +796,6 @@ sub OWCOUNT_GetPage ($$$@) {
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  $final=0
-    if($nomemory==1);
   
   #-- even if memory usage has been disabled, we need to read the page because it contains the counter values
   if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
@@ -808,6 +806,10 @@ sub OWCOUNT_GetPage ($$$@) {
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page,$final);
+      unless (defined $ret) {
+        OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
+        OWCOUNT_FormatValues($hash) if ($final);
+      }
     #-- Unknown interface
     }else{
       return "OWCOUNT: GetPage with wrong IODev type $interface";
@@ -818,10 +820,17 @@ sub OWCOUNT_GetPage ($$$@) {
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     } 
   }
-  if( ($page==14)||($page==15) ){
-    #-- when we are here, we need to read the files
-    my $strval = OWCOUNT_recall($hash,"OWCOUNT_".$name."_".$page.".dat");
+    
+  return undef 
+}
 
+sub OWCOUNT_recallPage($$) {
+  my ($hash,$page) = @_;
+
+  #-- when we are here, we need to read the files
+  my $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
+
+  if (defined $strval) {
     #-- midnight value
     #-- new format
     if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
@@ -830,14 +839,12 @@ sub OWCOUNT_GetPage ($$$@) {
     } 
     #-- parse float from midnight
     $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
+    $strval = 0.0 if($strval !~ /^\d+\.\d*$/);
     $strval = int($strval*100)/100;
-    $hash->{owg_midnight}->[$page-14] = $strval;
+  } else {
+    $strval = 0.0;
   }
-  OWCOUNT_FormatValues($hash)
-    if($oldfinal==1 and $final==0);
-    
-  return undef 
+  $hash->{owg_midnight}->[$page-14] = $strval;
 }
 
 ########################################################################################
@@ -1114,10 +1121,10 @@ sub OWCOUNT_InitializeDevice($) {
   #   Model attribute will be modified now after checking for memory
   #-- OWX interface
   if( $interface =~ /^OWX/ ){
-    $ret = OWXCOUNT_GetPage($hash,14,0);
+    $ret = OWXCOUNT_GetPage($hash,14,0,1);
     $olddata = $hash->{owg_str}->[14];
     $ret  = OWXCOUNT_SetPage($hash,14,$newdata);
-    $ret  = OWXCOUNT_GetPage($hash,14,0);
+    $ret  = OWXCOUNT_GetPage($hash,14,0,1);
     $ret  = OWXCOUNT_SetPage($hash,14,$olddata); 
 
   #-- OWFS interface
@@ -1135,10 +1142,10 @@ sub OWCOUNT_InitializeDevice($) {
   my $nomid = ( substr($hash->{owg_str}->[14],0,length($newdata)) ne $newdata );
    #-- OWX interface
   if( $interface =~ /^OWX/ ){
-    $ret = OWXCOUNT_GetPage($hash,0,0);
+    $ret = OWXCOUNT_GetPage($hash,0,0,1);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWXCOUNT_SetPage($hash,0,$newdata);
-    $ret  = OWXCOUNT_GetPage($hash,0,0);
+    $ret  = OWXCOUNT_GetPage($hash,0,0,1);
     $ret  = OWXCOUNT_SetPage($hash,0,$olddata); 
 
   #-- OWFS interface
@@ -1639,6 +1646,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
     }
     #-- and now from raw to formatted values 
     $hash->{PRESENT}  = 1;
+    OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
     if( $final ) {
       my $value = OWCOUNT_FormatValues($hash);
       Log3 $name,5, $value;
@@ -1646,24 +1654,29 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   } elsif ($cmd eq "set") {
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      if ($page eq 1) {
+      if ($page == 1) {
         #-- issue the match ROM command \x55 and the read scratchpad command
         #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
         $select = "\xAA";
-        if (OWX_Execute( $hash, "setpage.2", 1, $owx_dev, $select, 28, undef )) {
-          return undef;
-	      } else {
-          return "device $owx_dev not accessible in reading scratchpad"; 
-        }
-      } elsif ($page eq 2) {
-        #-- issue the match ROM command \x55 and the copy scratchpad command
-        #   \x5A followed by 3 byte authentication code obtained in previous read
-        $select="\x5A".substr($res,10,3);
-        if (OWX_Execute( $hash, "setpage.3", 1, $owx_dev, $select, 6, undef )) {
+        if (OWX_Execute( $hash->{IODev}, "setpage.2", 1, $owx_dev, $select, 28, undef )) {
           return undef;
         } else {
-          return "device $owx_dev not accessible for copying scratchpad"; 
+          Log3 $name,3,"OWCOUNT: device $owx_dev not accessible in reading scratchpad";
+          return "device $owx_dev not accessible in reading scratchpad";
         }
+      } elsif ($page == 2) {
+        #-- issue the match ROM command \x55 and the copy scratchpad command
+        #   \x5A followed by 3 byte authentication code obtained in previous read
+        $select="\x5A".substr($res,0,3);
+        if (OWX_Execute( $hash->{IODev}, "setpage.3", 1, $owx_dev, $select, 6, undef )) {
+          return undef;
+        } else {
+          Log3 $name,3,"OWCOUNT: device $owx_dev not accessible for copying scratchpad"; 
+          return "device $owx_dev not accessible for copying scratchpad";
+        }
+      } elsif ($page == 3 and $res eq 0) {
+        Log3 $name,3,"OWCOUNT: device $owx_dev not accessible for copying scratchpad, return: $res";
+        return "device $owx_dev not accessible for copying scratchpad, return: $res";
       }
     }
   }
@@ -1804,11 +1817,9 @@ sub OWXCOUNT_SetPage($$$) {
   
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
-    if (OWX_Execute( $master, "setpage.1", 1, $owx_dev, $select, 0, undef )) {
-      return undef;
-      #the followup-calls to OWX_Execute (setpage.2 and setpage.3) are located in OWX_Binvalues!
-    } else {
-      return "device $owx_dev not accessible in writing scratchpad"; 
+    #the followup-call to OWX_Execute (setpage.3) is located in OWX_Binvalues!
+    if (!OWX_Execute( $master, "setpage.1", 1, $owx_dev, $select, 0, undef ) or (!OWX_AwaitExecuteResponse($master,"setpage.3",$owx_dev))) {
+      return "device $owx_dev not accessible in writing scratchpad";
     }
   #-- synchronous mode
   } else {
@@ -1817,7 +1828,7 @@ sub OWXCOUNT_SetPage($$$) {
     $res=OWX_Complex($master,$owx_dev,$select,0);
     if( $res eq 0 ){
       return "device $owx_dev not accessible in writing scratchpad"; 
-    } 
+    }
 
     #-- issue the match ROM command \x55 and the read scratchpad command
     #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
