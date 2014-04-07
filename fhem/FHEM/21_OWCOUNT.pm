@@ -86,7 +86,7 @@ use strict;
 use warnings;
 sub Log3($$$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -792,7 +792,6 @@ sub OWCOUNT_GetPage ($$$@) {
   my $interface= $hash->{IODev}->{TYPE};
   my $name    = $hash->{NAME};
   my $ret; 
-  my $oldfinal= $final;
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
@@ -806,10 +805,6 @@ sub OWCOUNT_GetPage ($$$@) {
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page,$final);
-      unless (defined $ret) {
-        OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
-        OWCOUNT_FormatValues($hash) if ($final);
-      }
     #-- Unknown interface
     }else{
       return "OWCOUNT: GetPage with wrong IODev type $interface";
@@ -819,8 +814,9 @@ sub OWCOUNT_GetPage ($$$@) {
     if( defined($ret)  ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     } 
+  } else {
+    OWCOUNT_FormatValues($hash) if ($final);
   }
-    
   return undef 
 }
 
@@ -1512,6 +1508,7 @@ sub OWFSCOUNT_GetPage($$$) {
   }
   #-- and now from raw to formatted values 
   $hash->{PRESENT}  = 1;
+  OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
   if($final==1){
     my $value = OWCOUNT_FormatValues($hash);
     Log3 $name,5, $value;
