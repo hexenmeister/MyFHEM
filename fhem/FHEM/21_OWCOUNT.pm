@@ -86,7 +86,7 @@ use strict;
 use warnings;
 sub Log3($$$);
 
-my $owx_version="5.14";
+my $owx_version="5.15";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -814,17 +814,12 @@ sub OWCOUNT_GetPage ($$$@) {
     if( defined($ret)  ){
       return "OWCOUNT: Could not get values from device $name, reason: ".$ret;
     } 
-  } else {
-    OWCOUNT_FormatValues($hash) if ($final);
   }
   return undef 
 }
 
-sub OWCOUNT_recallPage($$) {
-  my ($hash,$page) = @_;
-
-  #-- when we are here, we need to read the files
-  my $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
+sub OWCOUNT_parseMidnight($$$) {
+  my ($hash,$strval,$channel) = @_;
 
   if (defined $strval) {
     #-- midnight value
@@ -840,7 +835,7 @@ sub OWCOUNT_recallPage($$) {
   } else {
     $strval = 0.0;
   }
-  $hash->{owg_midnight}->[$page-14] = $strval;
+  $hash->{owg_midnight}->[$channel] = $strval;
 }
 
 ########################################################################################
@@ -1450,54 +1445,25 @@ sub OWFSCOUNT_GetPage($$$) {
   #=============== wrong value requested ===============================
   if( ($page<0) || ($page>15) ){
     return "wrong memory page requested";
-  }     
+  }
+  my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;    
   #-- get values - or shoud we rather get the uncached ones ?
-  if( $page == 14) {
-    $vval    = OWServer_Read($master,"/$owx_add/counters.A");
-    $strval  = OWServer_Read($master,"/$owx_add/pages/page.14");
+  if( $page == 14 || $page == 15 ) {
+    $vval    = OWServer_Read($master,"/$owx_add/counters.$owg_channel[$page-14]");
+    return "no return from OWServer for counter.$owg_channel[$page-14]" unless defined $vval;
+    return "empty return from OWServer for counter.$owg_channel[$page-14]" if($vval eq "");
+    if ($nomemory == 0) {
+      $strval  = OWServer_Read($master,"/$owx_add/pages/page.$page");
+      return "no return from OWServer for page.$page" unless defined $strval;
+      return "empty return from OWServer for page.$page" if($strval eq "");
+    } else {
+      $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
+    }
     
-    return "no return from OWServer"
-    if( (!defined($vval)) || (!defined($strval)) );
-    
-    return "empty return from OWServer"
-    if( ($vval eq "") || ($strval eq "") );
-    
-    $hash->{owg_val}->[0]      = $vval;
-    $hash->{owg_str}->[14]     = $strval;
+    $hash->{owg_val}->[$page-14]      = $vval;
+    $hash->{owg_str}->[$page]     = defined $strval ? $strval : "";
     #-- midnight value
-    #-- new format
-    if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-      my @data=split(' ',$strval);
-      $strval = $data[2];
-    } 
-    #-- parse float from midnight
-    $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.?\d*$/);
-    $strval = int($strval*100)/100;
-    $hash->{owg_midnight}->[0] = $strval;
-    
-  }elsif( $page == 15) {
-    $vval    = OWServer_Read($master,"/$owx_add/counters.B");
-    $strval  = OWServer_Read($master,"/$owx_add/pages/page.15");
-    return "no return from OWServer"
-      if( (!defined($vval)) || (!defined($strval)) );  
-    return "empty return from OWServer"
-      if( ($vval eq "") || ($strval eq "") );
-    
-    $hash->{owg_val}->[1]      = $vval;
-    $hash->{owg_str}->[15]     = $strval;
-    
-    #-- midnight value
-    #-- new format
-    if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-      my @data=split(' ',$strval);
-      $strval = $data[2];
-    } 
-    #-- parse float from midnight
-    $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-    $strval = int($strval*100)/100;
-    $hash->{owg_midnight}->[1] = $strval;
+    OWCOUNT_parseMidnight($hash,$strval,$page-14);
   }else {
     $strval = OWServer_Read($master,"/$owx_add/pages/page.".$page);
     return "no return from OWServer"
@@ -1508,7 +1474,6 @@ sub OWFSCOUNT_GetPage($$$) {
   }
   #-- and now from raw to formatted values 
   $hash->{PRESENT}  = 1;
-  OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
   if($final==1){
     my $value = OWCOUNT_FormatValues($hash);
     Log3 $name,5, $value;
@@ -1616,7 +1581,9 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
       $strval=substr($res,0,32);
       $hash->{owg_str}->[$page]=$strval;
       #Log 1," retrieved on device $owx_dev for page $page STRING $strval";
-    }
+    } else {
+      $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
+    }      
     #-- counter part
     if( ($page == 14) || ($page == 15) ){
       @data=split(//,substr($res,32));
@@ -1628,22 +1595,10 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
       $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
       $hash->{owg_val}->[$page-14] = $value;
       #-- midnight value
-      if( $nomemory==0 ){ 
-        #-- new format
-        if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-          @data=split(' ',$strval);
-          $strval = $data[2];
-        } 
-        #-- parse float from midnight
-        $strval =~ s/[^\d\.]+//g;
-        $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-        $strval = int($strval*100)/100;
-        $hash->{owg_midnight}->[$page-14] = $strval;
-      }
+      OWCOUNT_parseMidnight($hash,$strval,$page-14);
     }
     #-- and now from raw to formatted values 
     $hash->{PRESENT}  = 1;
-    OWCOUNT_recallPage($hash,$page) if ($page==14 or $page==15);
     if( $final ) {
       my $value = OWCOUNT_FormatValues($hash);
       Log3 $name,5, $value;
