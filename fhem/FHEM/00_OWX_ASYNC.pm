@@ -232,16 +232,18 @@ sub OWX_ASYNC_Notify {
 
 sub OWX_ASYNC_Ready ($) {
   my $hash = shift;
-  unless ( $hash->{STATE} eq "Active" ) {
-    my $ret = OWX_ASYNC_Init($hash);
-    if ($ret) {
-      Log3 ($hash->{NAME},2,"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
-      return undef;
-    }
-  }
-	return 1;
-};
-
+	
+	return DevIo_OpenDev($hash, 1, "OWX_ASYNC_Init") if($hash->{STATE} eq "disconnected");
+	
+	# This is relevant for windows/USB only
+	my $po = $hash->{USBDev};
+	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+	if($po) {
+		($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+	}
+	return ($InBytes && $InBytes>0);  
+}
+  
 sub OWX_ASYNC_Poll ($) {
 	my $hash = shift;
 	if (defined $hash->{ASYNC}) {

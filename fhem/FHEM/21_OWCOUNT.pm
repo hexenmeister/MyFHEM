@@ -705,7 +705,7 @@ sub OWCOUNT_Get($@) {
       if( int(@a)<2 );
     $page=int($a[2]);
     if( ($page<0) || ($page>13) ){
-      return "OWXCOUNT: Wrong memory page requested";
+      return "OWCOUNT: Wrong memory page requested";
     }
     $ret = OWCOUNT_GetPage($hash,$page,1,1);  
     #-- when we have a return code, we have an error
@@ -819,15 +819,15 @@ sub OWCOUNT_GetPage ($$$@) {
 }
 
 sub OWCOUNT_parseMidnight($$$) {
-  my ($hash,$strval,$channel) = @_;
+  my ($hash,$strval,$page) = @_;
 
-  if (defined $strval) {
-    #-- midnight value
-    #-- new format
-    if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-      my @data=split(' ',$strval);
-      $strval = $data[2];
-    } 
+  #-- midnight value
+  #-- new format
+  if ( defined $strval and $strval =~ /^\d\d\d\d-\d\d-\d\d.*/ ) {
+    my @data=split(' ',$strval);
+    $strval = $data[2];
+  }
+  if ( defined $strval ) {
     #-- parse float from midnight
     $strval =~ s/[^\d\.]+//g;
     $strval = 0.0 if($strval !~ /^\d+\.\d*$/);
@@ -835,7 +835,7 @@ sub OWCOUNT_parseMidnight($$$) {
   } else {
     $strval = 0.0;
   }
-  $hash->{owg_midnight}->[$channel] = $strval;
+  $hash->{owg_midnight}->[$page-14] = $strval;
 }
 
 ########################################################################################
@@ -1463,7 +1463,7 @@ sub OWFSCOUNT_GetPage($$$) {
     $hash->{owg_val}->[$page-14]      = $vval;
     $hash->{owg_str}->[$page]     = defined $strval ? $strval : "";
     #-- midnight value
-    OWCOUNT_parseMidnight($hash,$strval,$page-14);
+    OWCOUNT_parseMidnight($hash,$strval,$page);
   }else {
     $strval = OWServer_Read($master,"/$owx_add/pages/page.".$page);
     return "no return from OWServer"
@@ -1542,7 +1542,7 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
   
   #-- unused are success, reset, data
   
-  return undef unless (defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
+  return undef unless ($success and defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
   
   my $cmd = $1;
   my $page = $2;
@@ -1579,11 +1579,11 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
     if( $nomemory==0 ){
       #-- memory part, treated as string
       $strval=substr($res,0,32);
-      $hash->{owg_str}->[$page]=$strval;
       #Log 1," retrieved on device $owx_dev for page $page STRING $strval";
     } else {
       $strval = OWCOUNT_recall($hash,"OWCOUNT_".$hash->{NAME}."_".$page.".dat");
     }      
+    $hash->{owg_str}->[$page]= defined $strval ? $strval : "";
     #-- counter part
     if( ($page == 14) || ($page == 15) ){
       @data=split(//,substr($res,32));
@@ -1595,13 +1595,14 @@ sub OWXCOUNT_BinValues($$$$$$$$) {
       $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
       $hash->{owg_val}->[$page-14] = $value;
       #-- midnight value
-      OWCOUNT_parseMidnight($hash,$strval,$page-14);
+      Log3 $name,5, "OWCOUNT_BinValues parseMidnight: ".(defined $strval ? $strval : "undef");
+      OWCOUNT_parseMidnight($hash,$strval,$page);
     }
     #-- and now from raw to formatted values 
     $hash->{PRESENT}  = 1;
     if( $final ) {
       my $value = OWCOUNT_FormatValues($hash);
-      Log3 $name,5, $value;
+      Log3 $name,5, "OWCOUNT_BinValues->FormatValues returns: ".(defined $value ? $value : "undef");
     }
   } elsif ($cmd eq "set") {
     #-- asynchronous mode
@@ -1705,7 +1706,7 @@ sub OWXCOUNT_GetPage($$$@) {
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=54);
-    OWXCOUNT_BinValues($hash,$context,undef,undef,$owx_dev,$select,42,substr($res,12));
+    return OWXCOUNT_BinValues($hash,$context,1,1,$owx_dev,$select,42,substr($res,12));
   }
   return undef;
 }
@@ -1737,18 +1738,7 @@ sub OWXCOUNT_SetPage($$$) {
   } 
   #=============== midnight value =====================================
   if( ($page==14) || ($page==15) ){
-    my $strval=$data;
-    #-- midnight value
-    #-- new format
-    if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-      my @datan=split(' ',$strval);
-      $strval = $datan[2];
-    } 
-    #-- parse float from midnight
-    $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-    $strval = int($strval*100)/100;
-    $hash->{owg_midnight}->[$page-14] = $strval;
+    OWCOUNT_parseMidnight($hash,$data,$page);
   }
   #=============== set memory =========================================
   #-- issue the match ROM command \x55 and the write scratchpad command
