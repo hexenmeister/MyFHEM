@@ -66,6 +66,13 @@ I2C_LCD_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   $hash->{STATE}="defined";
+
+  my @keyvalue = ();
+  while (my ($key, $value) = each %mapping) {
+    push @keyvalue,"$key=$value";
+  };
+  $main::attr{$a[0]}{"pinMapping"} = join (',',sort @keyvalue);
+  $hash->{mapping} = \%mapping;
   
   if ($main::init_done) {
     eval {
@@ -73,12 +80,7 @@ I2C_LCD_Define($$)
     };
     return I2C_LCD_Catch($@) if $@;
   }
-  
-  my @keyvalue = ();
-  while (my ($key, $value) = each %mapping) {
-    push @keyvalue,"$key=$value";
-  };
-  $main::attr{$a[0]}{"pinMapping"} = join (',',sort @keyvalue);;
+
   return undef;
 }
 
@@ -100,8 +102,9 @@ I2C_LCD_Init($$)
   if (defined $hash->{I2C_Address}) {
     eval {
       main::AssignIoPort($hash,AttrVal($hash->{NAME},"IODev",undef));
-      require LiquidCrystal_I2C;
-      my $lcd = LiquidCrystal_I2C->new($hash->{I2C_Address},$hash->{sizex},$hash->{sizey},\%mapping);
+      require LiquidCrystal;
+      my $lcd = LiquidCrystal->new($hash->{sizex},$hash->{sizey});
+      $lcd->setMapping($hash->{mapping});
       $lcd->attach(I2C_LCD_IO->new($hash));
       $lcd->init();
       $hash->{lcd} = $lcd;
@@ -141,13 +144,16 @@ I2C_LCD_Attr($$$$) {
           last;
         };
         $attribute eq "pinMapping" and do {
+          my %newMapping = ();
           foreach my $keyvalue (split (/,/,$value)) {
             my ($key,$value) = split (/=/,$keyvalue);
             #Log3 ($name,5,"pinMapping, token: $key=$value, current mapping: $mapping{$key}");
             die "unknown token $key in attribute pinMapping, valid tokens are ".join (',',keys %mapping) unless (defined $mapping{$key});
             die "undefined or invalid value for token $key in attribute pinMapping, valid LED-Pins are ".join (',',@LEDPINS) unless $value and grep (/$value/,@LEDPINS);
-            $mapping{$key} = $value; 
+            $newMapping{$key} = $value; 
           }
+          $hash->{mapping} = \%newMapping;
+          I2C_LCD_Init($hash,split (' ',$hash->{DEF})) if ($main::init_done);
           last;
         };
         $main::attr{$name}{$attribute}=$value;
@@ -354,7 +360,7 @@ sub new {
 	}, $class;
 }
 
-sub i2c_write {
+sub write {
 	my ( $self, $address, @data ) = @_;
 	my $hash = $self->{hash};
 	if (defined (my $iodev = $hash->{IODev})) {
