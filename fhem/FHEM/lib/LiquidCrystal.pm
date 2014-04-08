@@ -112,11 +112,13 @@ sub write($$) {
 sub new($$$$@) {
 	my ( $class, $lcd_cols, $lcd_rows ) = @_;
 
-	return bless {
+  my $lcd = bless {
 		cols         => $lcd_cols,
 		rows         => $lcd_rows,
 		backlightval => LCD_NOBACKLIGHT,
 	}, $class;
+	lcd->setMapping();
+	return $lcd;
 }
 
 #  $lcd_mapping = {
@@ -130,7 +132,7 @@ sub new($$$$@) {
 #  'P7' => 'D7',
 #};
 
-sub setMapping {
+sub setMapping(@) {
   my ( $self, $lcd_mapping ) = @_;
 
   my %mapping;
