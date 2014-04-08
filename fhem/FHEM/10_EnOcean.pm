@@ -219,6 +219,7 @@ my %EnO_subType = (
   "D2.01.07" => "actuator.01",
   "D2.01.08" => "actuator.01",
   "D2.01.09" => "actuator.01",
+  "D2.01.0A" => "actuator.01",
   "D2.01.10" => "actuator.01",
   "D2.01.11" => "actuator.01",
   "D5.00.01" => "contact",
@@ -321,11 +322,13 @@ EnOcean_Get ($@)
   my $name = $hash->{NAME};
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
-  if (!defined $destinationID || $destinationID eq "multicast") {
+  if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
+    $destinationID = $hash->{DEF};
+  } elsif (!defined $destinationID || $destinationID eq "multicast") {
     $destinationID = "FFFFFFFF";
   } elsif ($destinationID eq "unicast") {
     $destinationID = $hash->{DEF};
-  } elsif ($destinationID !~ m/^[\dA-F]{8}$/) {
+  } elsif ($destinationID !~ m/^[\dA-Fa-f]{8}$/) {
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
   $destinationID = uc($destinationID);
@@ -353,27 +356,29 @@ EnOcean_Get ($@)
       my $channel = shift(@a);
       if (!defined $channel || $channel eq "all") {
         $channel = 30;     
-      } elsif ($channel >= 0 || $channel <= 29) {
-      
       } elsif ($channel eq "input") {
         $channel = 31;
+      } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
+      
       } else {
         return "$cmd <channel> wrong, choose 0...29|all|input.";
       }
       
       if ($cmd eq "state") {
         $cmdID = 3;      
+        Log3 $name, 3, "EnOcean $name get $cmdID $channel.";  
         $data = sprintf "%02X%02X", $cmdID, $channel;
         
       } elsif ($cmd eq "measurement") {
         $cmdID = 6;
         my $query = shift(@a);
+        Log3 $name, 3, "EnOcean $name get $cmdID $channel $query.";  
         if ($query eq "energy") {
           $query = 0;
         } elsif ($query eq "power") {
           $query = 1;
         } else {
-          return "$cmd <query> wrong, choose energy|power.";
+          return "$cmd <channel> <query> wrong, choose 0...30|all|input energy|power.";
         }
         $data = sprintf "%02X%02X", $cmdID, $query << 5 | $channel;
         
@@ -406,7 +411,9 @@ EnOcean_Set($@)
   }
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
-  if (!defined $destinationID || $destinationID eq "multicast") {
+  if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
+    $destinationID = $hash->{DEF};
+  } elsif (!defined $destinationID || $destinationID eq "multicast") {
     $destinationID = "FFFFFFFF";
   } elsif ($destinationID eq "unicast") {
     $destinationID = $hash->{DEF};
@@ -1523,7 +1530,7 @@ EnOcean_Set($@)
           readingsSingleUpdate($hash, "channelInput", "on", 1);
           readingsSingleUpdate($hash, "dimInput", $outputVal, 1);
           $channel = 31;
-        } elsif ($channel >= 0 && $channel <= 29) {
+        } elsif ($channel + 0 >= 0 && $channel + 0 <= 29) {
           readingsSingleUpdate($hash, "channel" . $channel, "on", 1);
           readingsSingleUpdate($hash, "dim" . $channel, $outputVal, 1);
         } else {
@@ -2109,24 +2116,39 @@ EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
   my (undef, $packetType, $rorg, $data, $id, $status, $odata) = split(":", $msg);
+  $odata =~ m/^(..)(........)(..)(..)$/;
+  my ($subTelNum, $destinationID, $RSSI, $securityLevel) = (hex($1), $2, hex($3), hex($4));  
   my $rorgname = $EnO_rorgname{$rorg};
   if (!$rorgname) {
-    Log3 undef, 2, "EnOcean RORG ($rorg) received from $id unknown.";
+    Log3 undef, 1, "EnOcean RORG ($rorg) received from $id unknown.";
     return "";
   }
   my $hash = $modules{EnOcean}{defptr}{$id};
   if (!$hash) {
-    if ($rorgname eq "UTE") {
-      if ($iohash->{Teach}) {
-        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
-        return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
-      } else {
-        Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, set transceiver in teach mode.";
-        return "";
-      }
-    } else {
-      Log3 undef, 3, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+    # SenderID unknown, created new device
+    my $learningMode = AttrVal($iohash->{NAME}, "learningMode", "demand");
+    if ($learningMode eq "demand" && $iohash->{Teach}) {
+      Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
       return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+    } elsif ($learningMode eq "nearfield" && $iohash->{Teach} && $RSSI <= 60) {
+      Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+      return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+    } elsif ($learningMode eq "always") {    
+      if ($rorgname eq "UTE") {
+        if ($iohash->{Teach}) {
+          Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+          return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+        } else {
+          Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
+          return "";
+        }
+      } else {
+        Log3 undef, 1, "EnOcean Unknown device with ID $id and RORG $rorgname, please define it.";
+        return "UNDEFINED EnO_${rorgname}_$id EnOcean $id $msg";
+      }    
+    } else {
+      Log3 undef, 4, "EnOcean Unknown device with ID $id and RORG $rorgname, activate learning mode.";
+      return "";
     }
   }
   my $name = $hash->{NAME};
@@ -2234,47 +2256,47 @@ EnOcean_Parse($$)
         $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
         $msg .= "," . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
         $msg .= " released" if (!($db[0] & 0x10));
+        push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
+        if ($msg =~ m/A0$/) {
+          push @event, "3:channelA:A0";
+        } elsif ($msg =~ m/AI$/) {
+          push @event, "3:channelA:AI";
+        } elsif ($msg =~ m/B0$/) {
+          push @event, "3:channelB:B0";
+        } elsif ($msg =~ m/BI$/) {
+          push @event, "3:channelB:BI";
+        } elsif ($msg =~ m/C0$/) {
+          push @event, "3:channelC:C0";
+        } elsif ($msg =~ m/CI$/) {
+          push @event, "3:channelC:CI";
+        } elsif ($msg =~ m/D0$/) {
+          push @event, "3:channelD:D0";
+        } elsif ($msg =~ m/DI$/) {
+          push @event, "3:channelD:DI";
+        }
 
       } else {
         if ($db[0] == 112) {
           # Key Card, not tested
-          $msg = "keycard inserted";
+          $msg = "keycard_inserted";
   
         } elsif ($db[0] & 0xC0) {
           # Only a Mechanical Handle is setting these bits when nu=0
           $msg = "closed"           if ($db[0] == 0xF0);
           $msg = "open"             if ($db[0] == 0xE0);
           $msg = "tilted"           if ($db[0] == 0xD0);
-          $msg = "open from tilted" if ($db[0] == 0xC0);
+          $msg = "open_from_tilted" if ($db[0] == 0xC0);
 
         } else {
           if($st eq "keycard") {
-            $msg = "keycard removed";
+            $msg = "keycard_removed";
           }
           else {
             $msg = (($db[0] & 0x10) ? "pressed" : "released");
           }
         }
       }
-      push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
     
-      if ($msg =~ m/A0$/) {
-        push @event, "3:channelA:A0";
-      } elsif ($msg =~ m/AI$/) {
-        push @event, "3:channelA:AI";
-      } elsif ($msg =~ m/B0$/) {
-        push @event, "3:channelB:B0";
-      } elsif ($msg =~ m/BI$/) {
-        push @event, "3:channelB:BI";
-      } elsif ($msg =~ m/C0$/) {
-        push @event, "3:channelC:C0";
-      } elsif ($msg =~ m/CI$/) {
-        push @event, "3:channelC:CI";
-      } elsif ($msg =~ m/D0$/) {
-        push @event, "3:channelD:D0";
-      } elsif ($msg =~ m/DI$/) {
-        push @event, "3:channelD:DI";
-      }
       # released events are disturbing when using a remote, since it overwrites
       # the "real" state immediately. In the case of an Eltako FSB14, FSB61 ...
       # the state should remain released. (by Thomas)
@@ -2292,7 +2314,10 @@ EnOcean_Parse($$)
   # Single Input Contact (EEP D5-00-01)
   # [Eltako FTK, STM-250]
     push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
-    push @event, "3:learnBtn:on" if (!($db[0] & 8));
+    if (!($db[0] & 8)) {
+      push @event, "3:teach-in:EEP D5-00-01 Manufacturer: no ID";
+      Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+    }
 
   } elsif ($rorg eq "A5") {
   # 4BS telegram
@@ -2310,11 +2335,11 @@ EnOcean_Parse($$)
         if($EnO_subType{$st}) {
           $st = $EnO_subType{$st};
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf";          
-          Log3 $name, 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
+          Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
           $attr{$name}{subType} = $st;
         } else {
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf not supported";          
-          Log3 $name, 1, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf not supported";
+          Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf not supported";
           $attr{$name}{subType} = "raw";        
         }
 
@@ -2333,31 +2358,31 @@ EnOcean_Parse($$)
             select(undef, undef, undef, 0.5);
             EnOcean_hvac_01Cmd($hash, $name, 128); # 128 == 20 degree C
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }
         } elsif ($st eq "hvac.02") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.03") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.10") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         } elsif ($st eq "hvac.11") {
           if ($teach) {
           } else {
-            Log3 $name, 3, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
+            Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
           }        
         }
@@ -2368,6 +2393,7 @@ EnOcean_Parse($$)
         CommandDeleteReading(undef, "$name D[0-9]");
       } else {
         push @event, "3:teach-in:No EEP profile identifier and no Manufacturer ID";
+        Log3 $name, 2, "EnOcean $name teach-in No EEP profile identifier and no Manufacturer ID";
       }
 
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
@@ -3340,7 +3366,7 @@ EnOcean_Parse($$)
 
     } elsif ($st eq "environmentApp") {
       # Environmental Applications (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)
-      # [Eltako FWS61, untested]
+      # [Eltako FWS61]
       # $db[0]_bit_7 ... $db[0]_bit_4 is the Identifier
       my $identifier = $db[0] >> 4;
       if ($identifier == 1) {
@@ -3353,8 +3379,8 @@ EnOcean_Parse($$)
         my $dawn = sprintf "%d", $db[3] * 999 / 255;
         my $temp = sprintf "%0.1f", -40 + $db[2] * 120 / 255;
         my $windSpeed = sprintf "%0.1f", $db[1] * 70 / 255;
-        my $dayNight = $db[0] & 2 ? "night" : "day";
-        my $isRaining = $db[0] & 1 ? "yes" : "no";
+        my $dayNight = $db[0] & 4 ? "night" : "day";
+        my $isRaining = $db[0] & 2 ? "yes" : "no";
         push @event, "3:brightness:$dawn";
         push @event, "3:dayNight:$dayNight";
         push @event, "3:isRaining:$isRaining";
@@ -3664,7 +3690,7 @@ EnOcean_Parse($$)
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
       # (D2-01-00 - D2-01-11)
-      my $channel = (hex substr($data, 2, 2)) | 0x1F;
+      my $channel = (hex substr($data, 2, 2)) & 0x1F;
       if ($channel == 31) {$channel = "Input";}
       my $cmd = hex substr($data, 1, 1);
 
@@ -3674,39 +3700,47 @@ EnOcean_Parse($$)
         my $error;
         my $localControl;
         my $dim;
-        if ( hex(substr($data, 2, 2)) | 0x80 == 1) {
-          $overCurrentOff = "executed";
-        } else {
+        push @event, "3:powerFailure" . $channel . ":" . 
+                      (($db[2] & 0x80) ? "enabled":"disabled");
+        push @event, "3:powerFailureDetection" . $channel . ":" .
+                      (($db[2] & 0x40) ? "detected":"not_detected");
+        if (($db[1] & 0x80) == 0) {
           $overCurrentOff = "ready";       
+        } else {
+          $overCurrentOff = "executed";
         }
         push @event, "3:overCurrentOff" . $channel . ":" . $overCurrentOff;
-        if (substr($data, 2, 2) | 0x60 == 1) {
+        if ((($db[1] & 0x60) >> 5) == 1) {
           $error = "warning";
-        } elsif (hex(substr($data, 2, 2)) | 0x60 == 2) {
+        } elsif (((hex(substr($data, 2, 2)) & 0x60) >> 5) == 2) {
           $error = "failure";
         } else {
           $error = "ok";       
         }
         push @event, "3:error" . $channel . ":" . $error;
-        if (hex(substr($data, 4, 2)) | 0x80 == 1) {
-          $localControl = "enabled";
-        } else {
+        if (($db[0] & 0x80) == 0) {
           $localControl = "disabled";       
+        } else {
+          $localControl = "enabled";
         }
         push @event, "3:localControl" . $channel . ":" . $localControl;
-        my $dimValue = hex(substr($data, 4, 2)) | 0x1F;
-        if (hex(substr($data, 4, 2)) | 0x1F == 0) {
+        my $dimValue = $db[0] & 0x7F;
+        if ($dimValue == 0) {
           push @event, "3:channel" . $channel . ":off";
           push @event, "3:state:off";
         } else {
           push @event, "3:channel" . $channel . ":on";
           push @event, "3:state:on";
         }
-        push @event, "3:dim" . $channel . ":" . $dimValue;        
+        if ($channel ne "input" && $channel == 0) {
+          push @event, "3:dim:" . $dimValue;
+        } else {
+          push @event, "3:dim" . $channel . ":" . $dimValue;
+        }
       
       } elsif ($cmd == 7) {
         # actuator measurement response
-        my $unit = hex(substr($data, 2, 2)) | 0xE0;
+        my $unit = $db[4] >> 5;
         if ($unit == 1) {
           $unit = "Wh";
           push @event, "3:energyUnit" . $channel . ":" . $unit;
@@ -3782,9 +3816,9 @@ EnOcean_Parse($$)
             # command will be sent with a delay
             select(undef, undef, undef, 0.1);
             EnOcean_SndRadio(undef, $hash, "D4", $data, $subDef, "00", $id);
-            Log3 $name, 1, "EnOcean $name UTE teach-in-response send to $id";
+            Log3 $name, 2, "EnOcean $name UTE teach-in-response send to $id";
           }
-          Log3 $name, 1, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
+          Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           # store attr subType, manufID ...
           CommandSave(undef, undef);          
         } else {
@@ -3800,7 +3834,7 @@ EnOcean_Parse($$)
           # command will be sent with a delay
           select(undef, undef, undef, 0.1);
           EnOcean_SndRadio(undef, $hash, "D4", $data, $defs{$name}{IODev}{BaseID}, "00", $id);        
-          Log3 $name, 1, "EnOcean $name EEP $rorg-$func-$type not supported";
+          Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
           # store attr subType, manufID ...
           CommandSave(undef, undef);          
         }
@@ -3812,14 +3846,14 @@ EnOcean_Parse($$)
         # command will be sent with a delay
         select(undef, undef, undef, 0.1);
         EnOcean_SndRadio(undef, $hash, "D4", $data, AttrVal($name, "subDef", $defs{$name}{IODev}{BaseID}), "00", $id);
-        Log3 $name, 1, "EnOcean $name delete request executed";        
+        Log3 $name, 2, "EnOcean $name delete request executed";        
       } elsif ($teachInReq == 2) {
         # Deletion of Teach-In or Teach-In Request, not specified      
       }      
     } else {
       # Teach-In Respose telegram received
       # no action
-      Log3 $name, 1, "EnOcean $name $data UTE Teach-In Respose telegram received";
+      Log3 $name, 2, "EnOcean $name $data UTE Teach-In Respose telegram received";
     }  
   }
 
@@ -3851,7 +3885,7 @@ sub EnOcean_Attr(@) {
     } elsif ($attrVal =~ m/^\d+(\.\d+)?$/) {
     } else {
       #RemoveInternalTimer($hash);    
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal is not a number with positive sign";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a number with positive sign";
       CommandDeleteAttr(undef, "$name pollInterval");
     }
     
@@ -3859,7 +3893,7 @@ sub EnOcean_Attr(@) {
     if (!defined $attrVal){
     
     } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
-      Log3 $name, 3, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name devUpdate");
     }
 
@@ -3871,7 +3905,7 @@ sub EnOcean_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME}; 
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
-    Log3($name, 3, "EnOcean $name initialized");
+    Log3($name, 2, "EnOcean $name initialized");
   }
   return undef;
 }
@@ -4114,6 +4148,9 @@ EnOcean_Undef($$)
   <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be
   changed separately.
   <br><br>
+  Fhem and the EnOcean devices must be trained with each other. To this, Fhem
+  must be in the learning mode, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>
+  and <a href="#TCM_learningMode">learningMode</a>.<br>
   The teach-in procedure depends on the type of the devices. Switches (EEP RPS)
   and contacts (EEP 1BS) are recognized when receiving the first message.
   Contacts can also send a teach-in telegram. Fhem not need this telegram.
@@ -4125,7 +4162,7 @@ EnOcean_Undef($$)
   <a href="#model">model</a>. If the EEP profile identifier and the manufacturer
   ID are sent the device is clearly identifiable. Fhem automatically assigns
   these devices to the correct profile. Some 4BS, VLD or MSC devices must be paired
-  bidirectional, see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.<br><br>
+  bidirectional, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br><br>
   Fhem supports many of most common EnOcean profiles and manufacturer-specific
   devices. Additional profiles and devices can be added if required.
   <br><br>
@@ -4192,19 +4229,21 @@ EnOcean_Undef($$)
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
-    <li><a name="EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>
+    <li><a name="EnOcean_teach-in">Teach-In / Teach-Out</a>
     <ul>
-    <code>set &lt;name&gt; teach &lt;t/s&gt;</code>
+    <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code>
     <br><br>
-    Set the EnOcean Transceiver module (TCM Modul) in the pairing mode.
+    Set Fhem in the learning mode.<br>
     A device, which is then also put in this state is to paired with
-    Fhem. Pearing is used for some 4BS, VLD and MSC devices,
+    Fhem. Bidirectional Teach-In / Teach-Out is used for some 4BS, VLD and MSC devices,
     e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator).<br>
     Bidirectional 4BS Teach-In and UTE - Universal Uni- and Bidirectional
     Teach-In are supported. 
     <br>
-    <code>name</code> is the name of the TCM Module . <code>t/s</code> is the
-    time for the teach-in period.
+    <code>IODev</code> is the name of the TCM Module.<br>
+    <code>t/s</code> is the time for the learning period.
+    <br><br>
+    Types of learning modes see <a href="#TCM_learningMode">learningMode</a>
     <br><br>
     Example:
     <ul><code>set TCM_0 teach 600</code>
@@ -4265,12 +4304,15 @@ EnOcean_Undef($$)
         1BS Telegram (EEP D5-00-01)<br>
         [tested with Eltako FSR14]
     <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
         <li>closed<br>
           issue closed command</li>
          <li>open<br>
           issue open command</li>
         <li>teach<br>
-          initiate teach-in mode</li>
+          initiate teach-in</li>
     </ul></li>
         The attr subType must be contact. The attribute must be set manually.
     <br><br>
@@ -4342,7 +4384,8 @@ EnOcean_Undef($$)
       <li>desired-temp &lt;value&gt;<br>
           Use the builtin PI regulator, and set the desired temperature to the
           specified degree. The actual value will be taken from the temperature
-          reported by the MD15 or from the attribute actualTemp if it is set.</li>
+          reported by the Battery Powered Actuator, the <a href="#temperatureRefDev">temperatureRefDev</a>
+          or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.</li>
       <li>runInit<br>
           Maintenance Mode (service on): Run init sequence.</li>
       <li>liftSet<br>
@@ -4356,7 +4399,7 @@ EnOcean_Undef($$)
     </ul><br>
     The attr subType must be hvac.01. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.<br>
+    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
     The command is not sent until the device wakes up and sends a mesage, usually
     every 10 minutes.
     </li>
@@ -4888,6 +4931,7 @@ EnOcean_Undef($$)
       Name of the device whose reference value is read. The reference values is
       the reading temperature.
     </li>
+    <li><a href="#verbose">verbose</a></li>
     <li><a href="#webCmd">webCmd</a></li>
     </ul>
   </ul>
@@ -4967,10 +5011,9 @@ EnOcean_Undef($$)
      <li>Key Card Activated Switch (EEP F6-04-01)<br>
          [Eltako FKC, FKF, FZS, untested]<br>
      <ul>
-         <li>keycard inserted</li>
-         <li>keycard removed</li>
-         <li>buttons: pressed|released</li>         
-         <li>state: keycard inserted|keycard removed</li>
+         <li>keycard_inserted</li>
+         <li>keycard_removed</li>
+         <li>state: keycard_inserted|keycard_removed</li>
      </ul><br>
          Set attr subType to keycard manually.
      </li>
@@ -4982,9 +5025,8 @@ EnOcean_Undef($$)
          <li>closed</li>
          <li>open</li>
          <li>tilted</li>
-         <li>open from tilted</li>
-         <li>buttons: pressed|released</li>         
-         <li>state: closed|open|tilted|open from tilted</li>
+         <li>open_from_tilted</li>
+         <li>state: closed|open|tilted|open_from_tilted</li>
      </ul><br>
         The device windowHandle should be created by autocreate.
      </li>
@@ -4996,7 +5038,6 @@ EnOcean_Undef($$)
      <ul>
          <li>closed</li>
          <li>open</li>
-         <li>learnBtn: on</li>
          <li>state: open|closed</li>
      </ul></li>
         The device should be created by autocreate.
@@ -5516,7 +5557,7 @@ EnOcean_Undef($$)
      <li>Environmental Applications<br>
          Weather Station (EEP A5-13-01)<br>
          Sun Intensity (EEP A5-13-02)<br>
-         [Eltako FWS61, untested]<br>
+         [Eltako FWS61]<br>
      <ul>
        <li>T: t/&#176C B: E/lx W: Vs/m IR: yes|no</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 999 lx)</li>
@@ -5775,6 +5816,8 @@ EnOcean_Undef($$)
         <li>overCurrentShutdown&lt;channel&gt;: off|restart</li>
         <li>overCurrentShutdownReset&lt;channel&gt;: not_active|trigger</li>
         <li>power&lt;channel&gt;: 1/[W|KW]</li>
+        <li>powerFailure&lt;channel&gt;: enabled|disabled</li>
+        <li>powerFailureDetection&lt;channel&gt;: detected|not_detected</li>
         <li>powerUnit&lt;channel&gt;: W|KW</li>        
         <li>rampTime&lt;1...3l&gt;: 1/s</li>
         <li>responseTimeMax: 1/s</li>

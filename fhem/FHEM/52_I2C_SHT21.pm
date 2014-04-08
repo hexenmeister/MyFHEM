@@ -107,7 +107,7 @@ sub I2C_SHT21_Catch($) {
 }
 
 
-sub I2C_SHT21_Attr (@) {# hier noch WerteÃ¼berprÃ¼fung einfÃ¼gen
+sub I2C_SHT21_Attr (@) {# hier noch Werte�berpr�fung einf�gen
 	my (undef, $name, $attr, $val) =  @_;
 	my $hash = $defs{$name};
 	my $msg = '';
@@ -169,7 +169,7 @@ sub I2C_SHT21_I2CRec ($$) {
   my $name = $hash->{NAME};  
   my $phash = $hash->{IODev};
   my $pname = $phash->{NAME};
-  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fÃ¼r alle Keys in $clientmsg die mit dem physical Namen beginnen
+  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
 	if ($clientmsg->{direction} && $clientmsg->{type} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
@@ -228,7 +228,7 @@ sub I2C_SHT21_readTemperature($) {
 	my $i2creq = { i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" };
   $i2creq->{data} = hex("F3");
 	CallFn($pname, "I2CWrtFn", $phash, $i2creq);
-	usleep(85000); #fÃ¼r 14bit
+	usleep(85000); #für 14bit
 
 	# Read the two byte result from device
 	my $i2cread = { i2caddress => $hash->{I2C_Address}, direction => "i2cread" };
@@ -250,7 +250,7 @@ sub I2C_SHT21_readHumidity($) {
 	my $i2creq = { i2caddress => $hash->{I2C_Address}, direction => "i2cwrite" };
   $i2creq->{data} = hex("F5");
 	CallFn($pname, "I2CWrtFn", $phash, $i2creq);
-	usleep(39000); #fÃ¼r 12bit
+	usleep(39000); #für 12bit
 
 	# Read the two byte result from device
 	my $i2cread = { i2caddress => $hash->{I2C_Address}, direction => "i2cread" };
@@ -317,7 +317,7 @@ sub I2C_SHT21_readHumidity($) {
 <ul>
 	<a name="I2C_SHT21"></a>
 		Erm&ouml;glicht die Verwendung eines SHT21 I2C Feuchtesensors von <a href="www.sensirion.com">Sensirion</a>.
-		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>
+		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
 		<b>Das Attribut IODev muss definiert sein.</b><br>
 	<a name="I2C_SHT21Define"></a><br>
@@ -340,11 +340,11 @@ sub I2C_SHT21_readHumidity($) {
 			Standard: 5, g&uuml;ltige Werte: 1,2,5,10,20,30<br><br>
 		</li>
 		<li>roundHumidityDecimal<br>
-			Anzahl Dezimalstellen für den Feuchtewert<br>
+			Anzahl Dezimalstellen f�r den Feuchtewert<br>
 			Standard: 1, g&uuml;ltige Werte: 0 1 2<br><br>
 		</li>
 		<li>roundTemperatureDecimal<br>
-			Anzahl Dezimalstellen für den Temperaturwert<br>
+			Anzahl Dezimalstellen f�r den Temperaturwert<br>
 			Standard: 1, g&uuml;ltige Werte: 0,1,2<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>

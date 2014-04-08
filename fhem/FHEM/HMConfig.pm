@@ -1,6 +1,6 @@
 ##############################################
+# $Id$
 # CUL HomeMatic device configuration data
-# $Id: $
 
 #####################################################
 # configuration data for CUL_HM -used to split code and configuration
@@ -217,7 +217,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,3'          ,chn=>"",}, # HM Switch Interface 3 switches
   "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"",}, #
   "0094" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",}, #
-  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
+  "0095" => {name=>"HM-CC-RT-DN"             ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "0096" => {name=>"WDF-solar"               ,st=>'blindActuatorSol'  ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"win:1:1,blind:2:3",}, #
   "009B" => {name=>"Schueco_263-xxx"         ,st=>'tipTronic'         ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1:1.2,3:1p.3p',chn=>"act:1:1,sen:2:2,sec:3:3",}, #
@@ -227,8 +227,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
-  "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:3,BTN_A:4:4",},#only 1 and 2 can be peered???
-  "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2,BTN_T:3:3,BTN_A:4:4",},#only 1 and 2 can be peered???
+  "00A5" => {name=>"HM-RC-Sec4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armExt:1:1,armInt:2:2,disarm:3:3,light:4:4",},
+  "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"lock:1:1,unlock:2:2,open:3:3,light:4:4",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1p'     ,chn=>"Rain:1:1,Heating:2:2",},#stc:70 THSensor
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'12:00' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
   "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:6",},
@@ -249,7 +249,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
-  "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.5p.6p,3:3p.6p,1,7:3p.4'
+  "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "00BE" => {name=>"HM-MOD-RC-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:8",},
   "00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",},
@@ -441,6 +441,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # addr Dec!!
 # SEC-WM55 02:01 (AES on?)
 # CC-RT    02:01 16:00
+# TC-IT    02:01 16:00
 # SEC-WDS  02:01 16:01(sabotage) ?
 # 4DIS     02:01 ?
 # HM-SEC-MDIR  02:01 ?
@@ -1289,7 +1290,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,on             =>""
                       ,off            =>""
                       ,toggle         =>""
-                      ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                      ,press          =>"[long|short] [<peer>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
@@ -1301,7 +1302,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1313,7 +1314,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"[<value>] ... [<ontime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] [<peerChn>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1344,7 +1345,6 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
 
-$culHmSubTypeSets{sensor}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
@@ -1367,7 +1367,7 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                         ,on             =>""
                         ,off            =>""
                         ,toggle         =>""
-                        ,press          =>"[long|short] [<peer>] [<peerChn>]..."
+                        ,press          =>"[long|short] [<peer>] ..."
                         ,inhibit        =>"[on|off]"},
   "HM-CC-TC"         =>{ burstXmit      =>""},
   "HM-CC-RT-DN"      =>{ burstXmit      =>""
@@ -1383,7 +1383,7 @@ $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
-
+$culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
@@ -1414,7 +1414,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,level          =>"<level> <relockDly> <speed>..."
                          ,keydef         =>"<btn> <txt1> <txt2>"
                          ,inhibit        =>"[on|off]"
-                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,press          =>"[long|short] [<peer>] ..."
                          ,peerIODev      =>"[IO] <btn> [set|unset]..."
                         },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
@@ -1435,6 +1435,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,tempListThu    =>"[prep|exec] HH:MM temp ..."
                          ,tempListWed    =>"[prep|exec] HH:MM temp ..."
                          ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListTmpl   =>"[verify|restore] [[<file>:]templateName] ..."
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
@@ -1449,6 +1450,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                          ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
+                         ,tempListTmpl   =>"[verify|restore] [[<file>:]templateName] ..."
                          ,peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
                         },
   "HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"},
@@ -1458,7 +1460,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""
-                         ,press          =>"[long|short] [<peer>] [<peerChn>] ..."
+                         ,press          =>"[long|short] [<peer>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 );
@@ -1470,6 +1472,8 @@ $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
 
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
+
+$culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};

@@ -76,7 +76,7 @@ use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.06";
+my $owx_version="5.12";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -98,6 +98,7 @@ my %gets = (
 );
 
 my %sets = (
+  "initialize"  => "",
   "interval"    => "",
   "AAlarm"      => "",
   "ALow"        => "",
@@ -249,13 +250,15 @@ sub OWAD_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
-  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
-  AssignIoPort($hash); 
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
+  AssignIoPort($hash);
+  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWAD: Warning, no 1-Wire I/O device found for $name.";
+  } else {
+    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
+
   $main::modules{OWAD}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -306,7 +309,14 @@ sub OWAD_Attr(@) {
           if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
         $ret = OWAD_Set($hash,($name,$key,$value));
         last;
-      }
+      };
+      $key eq "IODev" and do {
+        AssignIoPort($hash,$value);
+        if( defined($hash->{IODev}) ) {
+          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        last;
+      };
     }
   } elsif ( $do eq "del" ) {
     ARGUMENT_HANDLER: {
@@ -545,7 +555,12 @@ sub OWAD_Get($@) {
   if($a[1] eq "present") {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
-    $value           = OWX_Verify($master,$owx_dev);
+    #-- asynchronous mode
+    if( $hash->{ASYNC} ){
+      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+    } else {
+      $value = OWX_Verify($master,$hash->{ROM_ID});
+    }
     $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
@@ -565,8 +580,8 @@ sub OWAD_Get($@) {
   #-- get reading according to interface type
   if($a[1] eq "reading") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXAD_GetPage($hash,"reading",1);
+    if( $interface =~ /^OWX/ ){
+      $ret = OWXAD_GetPage($hash,"reading",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -589,8 +604,8 @@ sub OWAD_Get($@) {
   #-- get alarm values according to interface type
   if($a[1] eq "alarm") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXAD_GetPage($hash,"alarm",1);
+    if( $interface =~ /^OWX/ ){
+      $ret = OWXAD_GetPage($hash,"alarm",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -621,8 +636,8 @@ sub OWAD_Get($@) {
    #-- get status values according to interface type
   if($a[1] eq "status") {
     #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXAD_GetPage($hash,"status",1);
+    if( $interface =~ /^OWX/ ){
+      $ret = OWXAD_GetPage($hash,"status",1,1);
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -658,7 +673,7 @@ sub OWAD_Get($@) {
         $value .= "alarmed low, ";
       }
       if (!defined $hash->{owg_shigh}) {
-        $value .= "high aralm undefined";
+        $value .= "high alarm undefined";
       } elsif( $hash->{owg_shigh}->[$i]==0 ) {
         $value .= "high alarm disabled";
       } elsif( $hash->{owg_shigh}->[$i]==1 ) {
@@ -706,7 +721,7 @@ sub OWAD_GetValues($) {
   InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
    
   #-- Get readings, alarms and stati according to interface type
-  if( $interface eq "OWX" ){
+  if( $interface =~ /^OWX/ ){
     #-- max 3 tries
     #for(my $try=0; $try<3; $try++){
       $ret1 = OWXAD_GetPage($hash,"reading",0);
@@ -860,7 +875,13 @@ sub OWAD_Set($@) {
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
  
- #-- set new timer interval
+ #-- re-intialize
+ if($key eq "initialize") {
+    OWADInitializeDevice($hash);
+    return undef;
+  }
+  
+  #-- set new timer interval
   if($key eq "interval") {
     # check value
     return "OWAD: Set with short interval, must be > 1"
@@ -911,7 +932,7 @@ sub OWAD_Set($@) {
     }    
    
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_SetPage($hash,"status");
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -957,7 +978,7 @@ sub OWAD_Set($@) {
     }
   
     #-- OWX interface
-    if( $interface eq "OWX" ){
+    if( $interface =~ /^OWX/ ){
       $ret = OWXAD_SetPage($hash,"alarm");
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -1218,34 +1239,35 @@ sub OWFSAD_SetPage($$) {
 ########################################################################################
 
 sub OWXAD_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $command, $final, $res) = @_;
+  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
   
   #-- always check for success, unused are reset
   return unless ($success and $context);
   #Log 1,"OWXAD_BinValues context = $context";
+  my $final = ($context =~ /\.final$/ );
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   
   #-- process results
-  @data=split(//,substr($res,3,10));
+  @data=split(//,$res);
   return "invalid data length, ".int(@data)." instead of 10 bytes"
     if (@data != 10); 
   return "invalid CRC"
-    if (OWX_CRC16(substr($res,9,11),$data[11],$data[12])==0);    
+    if (OWX_CRC16($command.substr($res,0,8),$data[8],$data[9])==0);    
       
   #=============== get the voltage reading ===============================
-  if( $context eq "ds2450.getreading"){
+  if( $context =~ /^ds2450.getreading/ ){
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
   #=============== get the alarm reading ===============================
-  } elsif ( $context eq "ds2450.getalarm" ) {
+  } elsif ( $context =~ /^ds2450.getalarm/ ){
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_vlow}->[$i]  = int(ord($data[2*$i])/256 * $owg_range[$i]+0.5)/1000;
       $hash->{owg_vhigh}->[$i] = int(ord($data[1+2*$i])/256 * $owg_range[$i]+0.5)/1000;
     }
   #=============== get the status reading ===============================
-  } elsif ( $context eq "ds2450.getstatus" ) {  
+  } elsif ( $context =~ /^ds2450.getstatus/ ) {  
     my ($sb1,$sb2);
     for( my $i=0;$i<int(@owg_fixed);$i++){
       $sb1 = ord($data[2*$i]); 
@@ -1301,7 +1323,7 @@ sub OWXAD_BinValues($$$$$$$$) {
   } 
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
-  if( $final==1 ){
+  if( $final ){
     my $value = OWAD_FormatValues($hash);
     Log 5, $value;
   }
@@ -1318,9 +1340,9 @@ sub OWXAD_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXAD_GetPage($$$) {
+sub OWXAD_GetPage($$$@) {
 
-  my ($hash,$page,$final) = @_;
+  my ($hash,$page,$final,$sync) = @_;
   
   my ($select, $res, $res2, $res3, @data, $an, $vn);
   
@@ -1369,26 +1391,26 @@ sub OWXAD_GetPage($$$) {
   #=============== wrong value requested ===============================
   } else {
     return "wrong memory page requested from $owx_dev";
-  } 
+  }
+  my $context = "ds2450.get".$page.($final ? ".final" : "");
   #-- asynchronous mode
   if( $hash->{ASYNC} ){
     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-    if (OWX_Execute( $master, "ds2450.get".$page, 1, $owx_dev, $select, 10, undef)) {
-      return OWX_AwaitExecuteResponse( $master, "getpage$page", $owx_dev );
-    } else {
+    if (!OWX_Execute( $master, $context, 1, $owx_dev, $select, 10, undef) or ($sync and !OWX_AwaitExecuteResponse($master,$context,$owx_dev))) {
       return "$owx_dev not accessible in reading $page page"; 
-	}
+    }
   #-- synchronous mode
   } else {
     #-- reset the bus
     OWX_Reset($master);
     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
     $res=OWX_Complex($master,$owx_dev,$select,10);
-    if( $res eq 0 ){
-      return "$owx_dev not accessible in reading $page page"; 
-    }
+    return "$owx_dev not accessible in reading page $page"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=22);
     #-- for processing we also need the 3 command bytes
-    OWXAD_BinValues($hash,"ds2450.get".$page,1,undef,$owx_dev,undef,$final,substr($res,9,13));
+    OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
   }
 
   return undef;

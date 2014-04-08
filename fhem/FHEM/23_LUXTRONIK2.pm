@@ -46,11 +46,11 @@ sub LUXTRONIK2_storeReadings ($$$$$);
 sub LUXTRONIK2_doStatisticDelta ($$$$) ;
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-03-03";
+  my $modulVersion = "2014-03-31";
 
 #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.54C#V1.60#V1.69#";
-  my $compatibleFirmware = "#V1.54C#V1.60#V1.69#";
+  my $testedFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
+  my $compatibleFirmware = "#V1.52#V1.54C#V1.60#V1.69#";
  
 sub ########################################
 LUXTRONIK2_Initialize($)
@@ -266,7 +266,8 @@ LUXTRONIK2_Set($$@)
       return $resultStr;
    } elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
-            || $cmd eq 'opModeHotWater')) {
+            || $cmd eq 'opModeHotWater'
+            || $cmd eq 'returnTemperatureSetBack')) {
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
       $hash->{LOCAL} = 0;
@@ -276,6 +277,7 @@ LUXTRONIK2_Set($$@)
   my $list = "statusRequest:noArg"
           ." resetStatistics:all,statBoilerGradientCoolDownMin"
           ." hotWaterTemperatureTarget:slider,30.0,0.5,65.0"
+          ." returnTemperatureSetBack:slider,-5,0.5,5"
           ." opModeHotWater:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
           ." INTERVAL:slider,30,30,1800";
@@ -538,8 +540,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|".$heatpump_values[12];
   # 18 - returnTemperatureExtern
   $return_str .= "|".($heatpump_visibility[24]==1 ? $heatpump_values[13] : "no");
-  # 19 - flowRate
-  $return_str .= "|".$heatpump_values[155];
+  # 19 - flowRate 
+  $return_str .= "|".($heatpump_parameters[870]!=0 ? $heatpump_values[155] : "no");
   # 20 - firmware
   my $fwvalue = "";
   for(my $fi=81; $fi<91; $fi++) {
@@ -612,6 +614,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|". ($heatpump_visibility[248]==1 ? $heatpump_values[161] : "no");
   # 53 - Number of visibility attributes
   $return_str .= "|".$countVisibAttr;
+  # 54 - returnTemperatureSetBack
+  $return_str .= "|".$heatpump_parameters[1];
   return $return_str;
 }
 
@@ -834,7 +838,7 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash, "deviceTimeCalc", $value);
      my $delayDeviceTimeCalc=sprintf("%.0f",$a[29]-$a[22]);
      readingsBulkUpdate($hash, "delayDeviceTimeCalc", $delayDeviceTimeCalc);
-     my $durationFetchReadings = sprintf("%.2f",$a[30]-$a[29]);
+     my $durationFetchReadings = sprintf("%.5f",$a[30]-$a[29]);
      readingsBulkUpdate($hash, "durationFetchReadings", $durationFetchReadings);
      #Remember min and max reading durations, will be reset when initializing the device
      if ($hash->{fhem}{durationFetchReadingsMin} == 0 || $hash->{fhem}{durationFetchReadingsMin} > $durationFetchReadings) {
@@ -855,8 +859,9 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "flowTemperature", $flowTemperature);
      readingsBulkUpdate( $hash, "returnTemperature", $returnTemperature);
      readingsBulkUpdate( $hash, "returnTemperatureTarget",LUXTRONIK2_CalcTemp($a[17]));
-     if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]))};
-     readingsBulkUpdate( $hash, "flowRate",$a[19]);
+     readingsBulkUpdate( $hash, "returnTemperaturSetBack",LUXTRONIK2_CalcTemp($a[54]));
+     if ($a[18] !~ /no/) {readingsBulkUpdate( $hash, "returnTemperatureExtern",LUXTRONIK2_CalcTemp($a[18]));}
+     if ($a[19] !~ /no/) {readingsBulkUpdate( $hash, "flowRate",$a[19]);}
      readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
      readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
      readingsBulkUpdate( $hash, "hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
@@ -869,9 +874,9 @@ LUXTRONIK2_UpdateDone($)
       LUXTRONIK2_storeReadings $hash, "counterHoursHeatPump", $a[33], 3600, $doStatistic;
       LUXTRONIK2_storeReadings $hash, "counterHoursHeating", $a[34], 3600, $doStatistic;
       LUXTRONIK2_storeReadings $hash, "counterHoursHotWater", $a[35], 3600, $doStatistic;
-      LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, $doStatistic;
-      LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, $doStatistic;
-      LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $a[36] + $a[37], 10, $doStatistic;
+      LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, $a[19] !~ /no/ ? $doStatistic : 0;
+      LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, $a[19] !~ /no/ ? $doStatistic : 0;
+      LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $a[36] + $a[37], 10, $a[19] !~ /no/ ? $doStatistic : 0;
       
      
    # Input / Output status
@@ -1027,8 +1032,18 @@ LUXTRONIK2_SetParameter($$$)
     if (! exists($opMode{$realValue})) {
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
      }
-    $setParameter = 4;
+     $setParameter = 4;
      $setValue = $opMode{$realValue};
+  }
+  elsif ($parameterName eq "returnTemperatureSetBack") {
+     #parameter number
+    $setParameter = 1;
+    #limit temperature range
+    $realValue = -5 if( $realValue < -5 );
+    $realValue = 5 if( $realValue > 5 );
+    #Allow only integer temperature or with decimal .5
+    $setValue = int($realValue * 2) * 5;
+    $realValue = $setValue / 10;
   }
   else {
     return "$name LUXTRONIK2_SetParameter-Error: unknown parameter $parameterName";
@@ -1601,6 +1616,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   <br>
   <i>The modul is reported to work with firmware: V1.54C, V1.60, V1.69.</i>
   <br>
+  More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
+  <br>
   &nbsp;
   <br>
   
@@ -1622,6 +1639,10 @@ LUXTRONIK2_doStatisticDelta ($$$$)
          </li><br>
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in &deg;C
+         </li><br>
+     <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
+         <br>
+         Decreasing or increasing of the returnTemperatureTarget by -5&deg;C till + 5&deg;C
          </li><br>
       <li><code>INTERVAL &lt;polling interval&gt;</code><br>
          Polling interval in seconds
@@ -1666,7 +1687,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
          <br>
          Corrects the clock of the heatpump automatically if a certain <i>delay</i> (10 s - 600 s) against the FHEM time is exeeded. Does a firmware check before.
          <br>
-         <i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i></li>
+         <i>(A 'delayDeviceTimeCalc' &lt;= 2 s can be caused by the internal calculation interval of the heat pump controller.)</i>
+         </li><br>
       <li><code>ignoreFirmwareCheck &lt; 0 | 1 &gt;</code>
          <br>
          A firmware check assures before each set operation that a heatpump controller with untested firmware is not damaged accidently.
@@ -1690,9 +1712,10 @@ LUXTRONIK2_doStatisticDelta ($$$$)
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.54C, V1.60, V1.69.</i>
+  <br>
+  Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
   <br>
-  
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
@@ -1716,6 +1739,10 @@ LUXTRONIK2_doStatisticDelta ($$$$)
      <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
          <br>
          Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C
+         </li><br>
+     <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
+         <br>
+         Absenkung oder Anhebung der Rücklauftemperatur um -5&deg;C - + 5&deg;C
          </li><br>
      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
@@ -1774,7 +1801,8 @@ LUXTRONIK2_doStatisticDelta ($$$$)
       gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden.
       Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.
       </li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a>
+    </li><br>
   </ul>
 </ul>
 

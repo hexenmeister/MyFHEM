@@ -251,7 +251,7 @@ sub OWX_Start ($) {
   $hash->{PRESENT} = 1;
   readingsSingleUpdate($hash,"state","defined",1);
   #-- Intiate first alarm detection and eventually conversion in a minute or so
-  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
+  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,0);
   $hash->{STATE} = "Active";
   return undef;
 }
@@ -404,6 +404,10 @@ sub OWX_CRC ($) {
       $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
     }  
     return $crc8;
+  } elsif (ref($romid) eq "ARRAY") {
+    for(my $i=0; $i<8; $i++){
+      $crc8 = $crc8_table[ $crc8 ^ $romid->[$i] ];
+    }  
   } else {
     #-- from search string to byte id
     $romid=~s/\.//g;
@@ -902,7 +906,7 @@ sub OWX_Kick($) {
   my $ret;
 
   #-- Call us in n seconds again.
-  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
+  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,0);
   #-- During reset we see if an alarmed device is present.
   OWX_Reset($hash);
    

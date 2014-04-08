@@ -101,7 +101,7 @@ sub FRM_Undef($) {
 	if (defined $hash->{DeviceName}) {
 		DevIo_Disconnected($hash);
 	};
-	
+	TcpServer_Close($hash);
 	foreach my $d ( sort keys %main::defs ) { # close and dispose open tcp-connection (if any) to free open filedescriptors
 		if ( defined( my $dev = $main::defs{$d} )) {
 			if ( defined( $main::defs{$d}{SNAME} )
@@ -682,7 +682,7 @@ sub
 FRM_i2c_observer
 {
 	my ($data,$hash) = @_;
-	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
+	Log3 $hash->{NAME},5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: [".(join(',',@{$data->{data}}))."]";
 	FRM_forall_clients($hash,\&FRM_i2c_update_device,$data);
 }
 
@@ -696,7 +696,8 @@ sub FRM_i2c_update_device
 			direction  => "i2cread",
 			reg        => $data->{register},
 			nbyte      => scalar(@{$data->{data}}),
-			data       => join (' ',@{$data->{data}})
+			received   => join (' ',@{$data->{data}}),
+			$hash->{IODev}->{NAME}."_SENDSTAT" => "Ok",
 		});
 	} elsif (defined $hash->{"i2c-address"} && $hash->{"i2c-address"}==$data->{address}) {
 		my $replydata = $data->{data};

@@ -50,6 +50,9 @@
 #                        improved source code documentation
 #
 # 2014-03-20 - added     export/import
+# 2014-04-01 - removed   export/import due to not working properly
+#
+# 2014-04-03 - fixed     global attributes not read from version 0
 #
 ##############################################################################
 #
@@ -162,7 +165,8 @@ sub cfgDB_GlobalAttr {
 	my ($sth, @line, $row, @dbconfig);
 
 	my $fhem_dbh = _cfgDB_Connect;
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global'" );  
+	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'global' and VERSIONUUID = '$uuid'" );  
 	$sth->execute();
 
 	while (@line = $sth->fetchrow_array()) {
@@ -172,7 +176,7 @@ sub cfgDB_GlobalAttr {
 		$attr{global}{$line[2]} = $line[3];
 	}
 
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb'" );  
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE DEVICE = 'configdb' and VERSIONUUID = '$uuid'" );  
 	$sth->execute();
 
 	while (@line = $sth->fetchrow_array()) {
@@ -353,11 +357,12 @@ sub _cfgDB_InsertLine($$$) {
 # pass command table to AnalyzeCommandChain
 sub _cfgDB_Execute($@) {
 	my ($cl, @dbconfig) = @_;
-	my $ret;
+	my ($ret,$r2);
 	foreach (@dbconfig){
 		my $l = $_;
 		$l =~ s/[\r\n]//g;
-		$ret .= AnalyzeCommandChain($cl, $l);
+		$r2 = AnalyzeCommandChain($cl, $l);
+		$ret .= "$r2\n" if($r2);
 	}
 	return $ret if($ret);
 	return undef;
@@ -372,7 +377,7 @@ sub _cfgDB_ReadCfg(@) {
 
 # using a join would be much nicer, but does not work due to sort of join's result
 	my $uuid = $fhem_dbh->selectrow_array('SELECT versionuuid FROM fhemversions WHERE version = 0');
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid'" );  
+	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb'" );  
 
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
@@ -610,33 +615,6 @@ sub _cfgDB_Diff($$) {
 	return $ret;
 }
 
-# backup database
-sub _cfgDB_Export($$) {
-	my ($filename,$version) = @_;
-	my ($counter, $ret);
-
-	my $sql =	"select command,device,p1,p2 from fhemconfig".
-						" as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
-						"WHERE v.version = '$version' ORDER BY command DESC";
-
-	my $fhem_dbh = _cfgDB_Connect;
-	my $sth=$fhem_dbh->prepare( $sql );
-	$sth->execute();
-
-	open( FILE, ">./$filename" );
-	while ( my $row = $sth->fetchrow_arrayref ) {
-		$counter++;
-		print FILE join( " ", @$row ), "\n";
-	}
-	close ( FILE );
-
-	$sth->finish();
-	$fhem_dbh->disconnect();
-
-	$ret  = "\n $counter records exported ";
-	$ret .= "from version $version ";
-	$ret .= "to $filename";
-}
 
 1;
 

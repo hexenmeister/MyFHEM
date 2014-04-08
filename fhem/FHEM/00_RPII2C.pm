@@ -7,7 +7,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use Device::SMBus;
 
-my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
+#my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
 
 my @clients = qw(
 I2C_LCD
@@ -21,10 +21,10 @@ I2C_SHT21
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
 
 
-my %matchListI2C = (			#kann noch weg?
-    "1:I2C_PCF8574"=> ".*",
-    "2:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-);
+#my %matchListI2C = (			#kann noch weg?
+#    "1:I2C_PCF8574"=> ".*",
+#    "2:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+#);
 
 sub RPII2C_Initialize($) {
   my ($hash) = @_;
@@ -40,7 +40,7 @@ sub RPII2C_Initialize($) {
   $hash->{GetFn}   = "RPII2C_Get";
   $hash->{SetFn}   = "RPII2C_Set";
   #$hash->{AttrFn}  = "RPII2C_Attr";
-  $hash->{NotifyFn} = "RPII2C_Notify";
+	$hash->{NotifyFn} = "RPII2C_Notify";
   $hash->{AttrList}= "do_not_notify:1,0 ignore:1,0 showtime:1,0 " .
                      "$readingFnAttributes";
 }
@@ -82,11 +82,15 @@ sub RPII2C_Define($$) {							#
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  $hash->{DeviceName} = "/dev/i2c-".$dev;
+  
+  return $name . ': Error! I2C device not found: /dev/i2c-'.$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev' unless -e "/dev/i2c-".$dev;
+	return $name . ': Error! I2C device not readable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -r "/dev/i2c-".$dev;
+	return $name . ': Error! I2C device not writable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -w "/dev/i2c-".$dev;
+	
+	$hash->{DeviceName} = "/dev/i2c-".$dev;
 	$hash->{STATE} = "initialized";
   return undef;
 }
-
 #####################################
 sub RPII2C_Notify {									#
   my ($hash,$dev) = @_;
@@ -204,12 +208,12 @@ sub RPII2C_Get($@) {								#
 		my $i2chash = { i2caddress => hex($a[2]), direction => "i2cread" };
 		$i2chash->{reg}   = hex($a[3]) if defined($a[3]);																			#startadresse zum lesen
 		$i2chash->{nbyte} = $a[4] if defined($a[4]);
-		Log3 $hash, 1, "Reg: ". $i2chash->{reg};
+		#Log3 $hash, 1, "Reg: ". $i2chash->{reg};
 	  my $status = RPII2C_HWACCESS($hash, $i2chash);
 		#my $received = join(" ", @{$i2chash->{received}});															#als Array
 		my $received = $i2chash->{received};																						#als Scalar
 		undef $i2chash;																																	#Hash löschen
-		return "$received transmission: $status";	
+		return (defined($received) ? "received : " . $received ." | " : "" ) . " transmission: $status";	
 	} 
   return undef;
 }
@@ -352,7 +356,8 @@ sub RPII2C_HWACCESS($$) {
 			</li>
 			<li>
 				To access the I2C-Bus the Device::SMBus module is necessary:<br>
-				<code>sudo cpan Device::SMBus</code><br>
+				<code>sudo apt-get install libmoose-perl<br>
+				sudo cpan Device::SMBus</code><br>
 			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>
@@ -456,7 +461,8 @@ sub RPII2C_HWACCESS($$) {
 			</li>
 			<li>
 				Desweiteren ist das Perl Modul Device::SMBus f&uuml;r den Zugrff auf den I2C Bus notwendig:<br>
-				<code>sudo cpan Device::SMBus</code><br>
+				<code>sudo apt-get install libmoose-perl<br>
+				sudo cpan Device::SMBus</code><br>
 			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>

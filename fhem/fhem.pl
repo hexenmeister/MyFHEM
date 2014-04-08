@@ -191,51 +191,50 @@ sub cfgDB_svnId;
 # VOLATILE- Set if the definition should be saved to the "statefile"
 # NOTIFYDEV - if set, the notifyFn will only be called for this device
 
-use vars qw(%modules);          # List of loaded modules (device/log/etc)
-use vars qw(%defs);             # FHEM device/button definitions
-use vars qw(%attr);             # Attributes
-use vars qw(%interfaces);       # see createInterfaceDefinitions below
-use vars qw(%selectlist);       # devices which want a "select"
-use vars qw(%readyfnlist);      # devices which want a "readyfn"
-use vars qw($readytimeout);     # Polling interval. UNIX: device search only
-$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-
-use vars qw(%value);            # Current values, see commandref.html
-use vars qw(%oldvalue);         # Old values, see commandref.html
+use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw($fhem_started);     # used for uptime calculation
 use vars qw($init_done);        #
 use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
-use vars qw(%cmds);             # Global command name hash.
-use vars qw(%data);             # Hash for user data
-use vars qw($devcount);         # Maximum device number, used for storing
-use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
-use vars qw(%inform);           # Used by telnet_ActivateInform
-use vars qw(%intAt);            # Internal at timer hash, global for benchmark
 use vars qw($nextat);           # Time when next timer will be triggered.
-use vars qw(%ntfyHash);         # hash of devices needed to be notified.
-
+use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 use vars qw($reread_active);
 use vars qw($winService);       # the Windows Service object
+use vars qw(%attr);             # Attributes
+use vars qw(%cmds);             # Global command name hash.
+use vars qw(%data);             # Hash for user data
+use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
+use vars qw(%defs);             # FHEM device/button definitions
+use vars qw(%inform);           # Used by telnet_ActivateInform
+use vars qw(%intAt);            # Internal at timer hash, global for benchmark
+use vars qw(%interfaces);       # see createInterfaceDefinitions below
+use vars qw(%modules);          # List of loaded modules (device/log/etc)
+use vars qw(%ntfyHash);         # hash of devices needed to be notified.
+use vars qw(%oldvalue);         # Old values, see commandref.html
+use vars qw(%readyfnlist);      # devices which want a "readyfn"
+use vars qw(%selectlist);       # devices which want a "select"
+use vars qw(%value);            # Current values, see commandref.html
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
-
-my %comments;			# Comments from the include files
-my $currlogfile;		# logfile, without wildcards
 my $currcfgfile="";		# current config/include file
-my $logopened = 0;              # logfile opened or using stdout
-my $rcvdquit;			# Used for quit handling in init files
-my $sig_term = 0;		# if set to 1, terminate (saving the state)
-my $intAtCnt=0;
-my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
-my $duplidx=0;                  # helper for the above pool
-my $readingsUpdateDelayTrigger; # needed internally
+my $currlogfile;		# logfile, without wildcards
 my $cvsid = '$Id$';
+my $duplidx=0;                  # helper for the above pool
+my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $intAtCnt=0;
+my $logopened = 0;              # logfile opened or using stdout
 my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
+my $rcvdquit;			# Used for quit handling in init files
+my $readingsUpdateDelayTrigger; # needed internally
+my $sig_term = 0;		# if set to 1, terminate (saving the state)
+my $wbName = ".WRITEBUFFER";    # Buffuer-name for delayed writing via select
+my %comments;			# Comments from the include files
+my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
-my $evalSpecials;       # Used by EvalSpecials->AnalyzeCommand parameter passing
-my $wbName = ".WRITEBUFFER";
 
 $init_done = 0;
+$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
+
 
 $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
@@ -434,18 +433,29 @@ while(time() < 2*3600) {
   sleep(5);
 }
 
+my $cfgErrMsg = "Error messages while initializing FHEM:";
+my $cfgRet="";
 if($attr{global}{configfile} eq 'configDB') {
   my $ret = cfgDB_ReadAll(undef);
-  Log 1, "configDB: $ret" if($ret);
+  $cfgRet .= "configDB: $ret" if($ret);
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
-  Log 1, "configfile: $ret" if($ret);
+  $cfgRet .= "configfile: $ret\n" if($ret);
 
   if($attr{global}{statefile} && -r $attr{global}{statefile}) {
     $ret = CommandInclude(undef, $attr{global}{statefile});
-    Log 1, "statefile: $ret" if($ret);
+    $cfgRet .= "statefile: $ret" if($ret);
   }
+}
+
+if($cfgRet) {
+  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet";
+  Log 1, $cfgRet;
+
+} elsif($attr{global}{motd} =~ m/^$cfgErrMsg/) {
+  $attr{global}{motd} = "";
+
 }
 
 SignalHandling();
@@ -480,11 +490,12 @@ foreach my $d (keys %defs) {
   }
 }
 DoTrigger("global", "INITIALIZED", 1);
+$fhem_started = time;
 
 $attr{global}{motd} .= "Running with root privileges."
         if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
 $attr{global}{motd} .=
-        "\nRestart fhem for a new check if the problem is fixed,\n".
+        "\nRestart FHEM for a new check if the problem is fixed,\n".
         "or set the global attribute motd to none to supress this message.\n"
         if($attr{global}{motd} =~ m/^$sc_text\n\n./);
 my $motd = $attr{global}{motd};
@@ -1510,11 +1521,7 @@ CommandDefine($$)
   return "Cannot load module $m" if($newm eq "UNDEFINED");
   $m = $newm;
 
-  if(!$modules{$m} || !$modules{$m}{DefFn}) {
-    my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
-                sort keys %modules;
-    return "Unknown module $m, choose one of @m";
-  }
+  return "Unknown module $m" if(!$modules{$m} || !$modules{$m}{DefFn});
 
   my %hash;
 
@@ -1586,6 +1593,9 @@ AssignIoPort($;$)
                       $modules{$ht}{AttrList} &&
                       $modules{$ht}{AttrList} =~ m/IODev/);
 
+  $proposed = $attr{$hn}{IODev}
+        if(!$proposed && $attr{$hn} && $attr{$hn}{IODev});
+  
   if($proposed && $defs{$proposed}) {
     $hash->{IODev} = $defs{$proposed};
     $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
@@ -2641,6 +2651,27 @@ GetTimeSpec($)
 }
 
 
+sub
+deviceEvents($$)
+{
+  my ($hash, $withState) = @_;
+
+  return undef if(!$hash || !$hash->{CHANGED});
+
+  if($withState) {
+    my $cws = $hash->{CHANGEDWITHSTATE};
+    if(defined($cws)){
+      if(int(@{$cws}) == 0) {
+        @{$cws} = @{$hash->{CHANGED}};
+        push @{$cws}, "state: $hash->{READINGS}{state}{VAL}"
+                if($hash->{READINGS} && $hash->{READINGS}{state});
+      }
+      return $cws;
+    }
+  }
+  return $hash->{CHANGED};
+}
+
 #####################################
 # Do the notification
 sub
@@ -2729,7 +2760,10 @@ DoTrigger($$@)
   $oldvalue{$dev}{TIME} = TimeNow();
   $oldvalue{$dev}{VAL} = $hash->{STATE};
 
-  delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
+  if(!defined($hash->{INTRIGGER})) {
+    delete($hash->{CHANGED});
+    delete($hash->{CHANGEDWITHSTATE});
+  }
 
   Log 3, "NTFY return: $ret" if($ret);
 
@@ -3549,7 +3583,10 @@ readingsEndUpdate($$)
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 0) if(!$readingsUpdateDelayTrigger);
   } else {
-    delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
+    if(!defined($hash->{INTRIGGER})) {
+      delete($hash->{CHANGED});
+      delete($hash->{CHANGEDWITHSTATE})
+    }
   }
   
   return undef;
@@ -3626,7 +3663,10 @@ readingsBulkUpdate($$$@)
   
   my $rv = "$reading: $value";
   if($changed) {
-    $rv = "$value" if($reading eq "state");
+    if($reading eq "state") {
+      $rv = "$value";
+      $hash->{CHANGEDWITHSTATE} = [];
+    }
     addEvent($hash, $rv);
   }
   return $rv;

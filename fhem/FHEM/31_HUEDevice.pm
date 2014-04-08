@@ -18,12 +18,17 @@ use SetExtensions;
 
 my %hueModels = (
   LCT001 => {name => 'HUE Bulb'             ,type => 'Extended color light'   ,subType => 'colordimmer',},
+  LCT002 => {name => 'HUE Bulb BR30'        ,type => 'Extended color light'   ,subType => 'colordimmer',},
+  LCT003 => {name => 'HUE Bulb GU10'        ,type => 'Extended color light'   ,subType => 'colordimmer',},
   LLC001 => {name => 'LivingColors G2'      ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC005 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC011 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC012 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
   LST001 => {name => 'LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB003 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
 
@@ -82,7 +87,7 @@ HUEDevice_devStateIcon($)
 
   my $name = $hash->{NAME};
 
-  return ".*:light_question" if( !$hash->{helper}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:light_question" if( $hash->{helper}{reachable} ne 'true' && AttrVal($name, "color-icons", 0) != 0 );
 
   return ".*:off:toggle"
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
@@ -191,10 +196,11 @@ sub HUEDevice_Define($$)
   } else {
     $hash->{DEF} = "group $id $args[3]";
     $attr{$name}{webCmd} = 'on:off' if( !defined( $attr{$name}{webCmd} ) );
+    $attr{$name}{delayedUpdate} = 1 if( !defined( $attr{$name}{delayedUpdate} ) );
   }
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
+  InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0) if( !$hash->{helper}->{group} );
 
   return undef;
 }
@@ -287,35 +293,41 @@ HUEDevice_SetParam($$@)
     $obj->{'xy'}  = [0+$x, 0+$y];
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
-    # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-#Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
 
-    my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
-    my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
-    my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
-#Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+    if( !defined( AttrVal($name, "model", undef) ) ) {
+      my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
-    if( $X != 0
-        || $Y != 0
-        || $Z != 0 ) {
-      my $x = $X / ($X + $Y + $Z);
-      my $y = $Y / ($X + $Y + $Z);
-#Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
+      $obj->{'on'}  = JSON::true;
+      $obj->{'hue'} = int( $h * 65535 );
+      $obj->{'sat'} = int( $s * 254 );
+      $obj->{'bri'} = int( $v * 254 );
+    } else {
+      # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
 
-      #$x = 0 if( $x < 0 );
-      #$x = 1 if( $x > 1 );
-      #$y = 0 if( $y < 0 );
-      #$y = 1 if( $y > 1 );
-      $Y = 1 if( $Y > 1 );
+      my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
+      my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
+      my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
+      #Log3 $name, 3, "rgb: ". $r . " " . $g ." ". $b;
+      #Log3 $name, 3, "XYZ: ". $X . " " . $Y ." ". $Y;
 
-      my $bri  = maxNum($r,$g,$b);
-      #my $bri  = $Y;
+      if( $X != 0
+          || $Y != 0
+          || $Z != 0 ) {
+        my $x = $X / ($X + $Y + $Z);
+        my $y = $Y / ($X + $Y + $Z);
+        #Log3 $name, 3, "xyY:". $x . " " . $y ." ". $Y;
 
-    $obj->{'on'}  = JSON::true;
-    $obj->{'xy'}  = [0+$x, 0+$y];
-    $obj->{'bri'}  = int(254*$bri);
-        }
+        $Y = 1 if( $Y > 1 );
+
+        my $bri  = maxNum($r,$g,$b);
+        #my $bri  = $Y;
+
+        $obj->{'on'}  = JSON::true;
+        $obj->{'xy'}  = [0+$x, 0+$y];
+        $obj->{'bri'}  = int(254*$bri);
+      }
+    }
   } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
     my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
 
@@ -352,7 +364,7 @@ HUEDevice_Set($@)
 
   my %obj;
 
-  $defs{$name}->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
+  $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
     my @cmds = split(":", $joined);
@@ -371,15 +383,15 @@ HUEDevice_Set($@)
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
-#  if( $defs{$name}->{helper}->{update_timeout} == -1 ) {
+#  if( $hash->{helper}->{update_timeout} == -1 ) {
 #    my $diff;
 #    my ($seconds, $microseconds) = gettimeofday();
-#    if( $defs{$name}->{helper}->{timestamp} ) {
-#      my ($seconds2, $microseconds2) = @{$defs{$name}->{helper}->{timestamp}};
+#    if( $hash->{helper}->{timestamp} ) {
+#      my ($seconds2, $microseconds2) = @{$hash->{helper}->{timestamp}};
 #
 #      $diff = (($seconds-$seconds2)*1000000 + $microseconds-$microseconds2)/1000;
 #    }
-#    $defs{$name}->{helper}->{timestamp} = [$seconds, $microseconds];
+#    $hash->{helper}->{timestamp} = [$seconds, $microseconds];
 #
 #    return undef if( $diff < 100 );
 #  }
@@ -391,16 +403,18 @@ HUEDevice_Set($@)
     } else {
       $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
     }
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
 
-    if( $defs{$name}->{helper}->{update_timeout} == -1 ) {
-    } elsif( $defs{$name}->{helper}->{update_timeout}
-        && !$hash->{helper}->{group} ) {
+    if( defined($result) && $result->{'error'} ) {
+      $hash->{STATE} = $result->{'error'}->{'description'};
+      return undef;
+    }
+
+    return undef if( !defined($result) );
+
+    if( $hash->{helper}->{update_timeout} == -1 ) {
+    } elsif( $hash->{helper}->{update_timeout} ) {
       RemoveInternalTimer($hash);
-      InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $hash, 0);
+      InternalTimer(gettimeofday()+$hash->{helper}->{update_timeout}, "HUEDevice_GetUpdate", $hash, 0);
     } else {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate( $hash );
@@ -516,10 +530,20 @@ HUEDevice_Get($@)
     my $g = 0;
     my $b = 0;
 
-    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+    my $cm = ReadingsVal($name,"colormode","");
+    if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
         ($r,$g,$b) = cttorgb($1);
       }
+    } elsif( $cm eq "hs" ) {
+      my $h = ReadingsVal($name,"hue",0) / 65535.0;
+      my $s = ReadingsVal($name,"sat",0) / 254.0;
+      my $v = ReadingsVal($name,"bri",0) / 254.0;
+      ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+
+      $r *= 255;
+      $g *= 255;
+      $b *= 255;
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
       my ($x,$y) = ($1, $2);
       my $Y = ReadingsVal($name,"bri","") / 254.0;
@@ -532,10 +556,20 @@ HUEDevice_Get($@)
     my $g = 0;
     my $b = 0;
 
-    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+    my $cm = ReadingsVal($name,"colormode","");
+    if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
         ($r,$g,$b) = cttorgb($1);
       }
+    } elsif( $cm eq "hs" ) {
+      my $h = ReadingsVal($name,"hue",0) / 65535.0;
+      my $s = ReadingsVal($name,"sat",0) / 254.0;
+      my $v = 1;
+      ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+
+      $r *= 255;
+      $g *= 255;
+      $b *= 255;
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
       my ($x,$y) = ($1, $2);
       my $Y = 1;
@@ -565,6 +599,7 @@ HUEDevice_ReadFromServer($@)
   my $ret;
   unshift(@a,$name);
   $ret = IOWrite($hash, @a);
+  #$ret = IOWrite($hash,$hash,@a);
   use strict "refs";
   return $ret;
   return if(IsDummy($name) || IsIgnored($name));
@@ -602,25 +637,49 @@ HUEDevice_GetUpdate($)
       return;
     }
 
-    $hash->{lights} = join( ",", @{$result->{lights}} );
+    HUEDevice_Parse($hash,$result);
 
     return undef;
   }
 
   if(!$hash->{LOCAL}) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
   }
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
-    $hash->{helper}{reachable} = 0;
+    $hash->{helper}{reachable} = 'false';
     $hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
-    $hash->{helper}{reachable} = 0;
+    $hash->{helper}{reachable} = 'false';
     $hash->{STATE} = $result->{'error'}->{'description'};
     return;
+  }
+
+  HUEDevice_Parse($hash,$result);
+}
+
+sub
+HUEDevice_Parse($$)
+{
+  my($hash,$result) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "parse status message for $name";
+
+  if( $hash->{helper}->{group} ) {
+    $hash->{lighes} = join( ",", @{$result->{lights}} );
+
+    foreach my $id ( @{$result->{lights}} ) {
+      my $code = $hash->{IODev}->{NAME} ."-". $id;
+      my $chash = $modules{HUEDevice}{defptr}{$code};
+
+      HUEDevice_GetUpdate($chash) if( defined($chash) );
+    }
+
+    return undef;
   }
 
   $hash->{modelid} = $result->{'modelid'};
@@ -691,6 +750,7 @@ HUEDevice_GetUpdate($)
     }
   else
     {
+      $on = 0;
       $s = 'off';
       $percent = 0;
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
