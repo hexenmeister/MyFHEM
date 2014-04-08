@@ -84,7 +84,7 @@ use constant En => 0b00000100;    # Enable bit
 use constant Rw => 0b00000010;    # Read / Write bit
 use constant Rs => 0b00000001;    # Register select bit
 
-our %mapping_bits = {
+our %mapping_bits = (
   RS  => 0,
   RW  => 1,
   E   => 2,
@@ -93,7 +93,7 @@ our %mapping_bits = {
   D5  => 5,
   D6  => 6,
   D7  => 7,
-};
+);
 
 sub print($$) {
 	my ($self,$c) = @_;
@@ -117,7 +117,7 @@ sub new($$$$@) {
 		rows         => $lcd_rows,
 		backlightval => LCD_NOBACKLIGHT,
 	}, $class;
-	lcd->setMapping();
+	$lcd->setMapping();
 	return $lcd;
 }
 

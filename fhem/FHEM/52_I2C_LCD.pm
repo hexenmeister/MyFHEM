@@ -361,11 +361,11 @@ sub new {
 }
 
 sub write {
-	my ( $self, $address, @data ) = @_;
+	my ( $self, @data ) = @_;
 	my $hash = $self->{hash};
 	if (defined (my $iodev = $hash->{IODev})) {
 		main::CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-			i2caddress => $address,
+			i2caddress => $hash->{I2C_Address},
 			direction  => "i2cwrite",
 			data       => join (' ',@data)
 		});
