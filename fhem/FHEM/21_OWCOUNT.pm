@@ -86,7 +86,7 @@ use strict;
 use warnings;
 sub Log3($$$);
 
-my $owx_version="5.15";
+my $owx_version="5.16";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1505,18 +1505,7 @@ sub OWFSCOUNT_SetPage($$$) {
   } 
   #=============== midnight value =====================================
   if( ($page==14) || ($page==15) ){
-    my $strval=$data;
-    #-- midnight value
-    #-- new format
-    if ($strval =~ /^\d\d\d\d-\d\d-\d\d.*/){
-      my @datan=split(' ',$strval);
-      $strval = $datan[2];
-    } 
-    #-- parse float from midnight
-    $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if(!defined($strval) or $strval !~ /^\d+\.\d*$/);
-    $strval = int($strval*100)/100;
-    $hash->{owg_midnight}->[$page-14] = $strval;
+    OWCOUNT_parseMidnight($hash,$data,$page);
   }
   OWServer_Write($master, "/$owx_add/pages/page.".$page,$data );
   return undef
