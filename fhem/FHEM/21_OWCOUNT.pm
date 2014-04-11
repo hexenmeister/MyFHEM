@@ -86,7 +86,7 @@ use strict;
 use warnings;
 sub Log3($$$);
 
-my $owx_version="5.16";
+my $owx_version="5.17";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1120,7 +1120,7 @@ sub OWCOUNT_InitializeDevice($) {
 
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
-    $ret  = OWXCOUNT_GetPage($hash,14,0);
+    $ret  = OWFSCOUNT_GetPage($hash,14,0);
     $olddata = $hash->{owg_str}->[14];
     $ret  = OWFSCOUNT_SetPage($hash,14,$newdata);
     $ret  = OWFSCOUNT_GetPage($hash,14,0);
@@ -1141,7 +1141,7 @@ sub OWCOUNT_InitializeDevice($) {
 
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
-    $ret  = OWXCOUNT_GetPage($hash,0,0);
+    $ret  = OWFSCOUNT_GetPage($hash,0,0);
     $olddata = $hash->{owg_str}->[0];
     $ret  = OWFSCOUNT_SetPage($hash,0,$newdata);
     $ret  = OWFSCOUNT_GetPage($hash,0,0);
