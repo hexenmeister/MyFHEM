@@ -453,7 +453,7 @@ if($cfgRet) {
   $attr{global}{motd} = "$cfgErrMsg\n$cfgRet";
   Log 1, $cfgRet;
 
-} elsif($attr{global}{motd} =~ m/^$cfgErrMsg/) {
+} elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
   $attr{global}{motd} = "";
 
 }
@@ -2166,7 +2166,7 @@ CommandAttr($$)
       my $arg= $a[2];
 
       # matches myReading1[:trigger2] { codecode1 }
-      my $regexi= '\s*(\w+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
+      my $regexi= '\s*([\w-]+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
 
       #Log 1, "arg is $arg";
@@ -2403,6 +2403,7 @@ CommandVersion($$)
   push @ret, cfgDB_svnId if $attr{global}{configfile} eq 'configDB';
   foreach my $m (sort keys %modules) {
     next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
+    Log 4, "Looking for SVN Id in module $m";
     my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
     if(!open(FH, $fn)) {
       push @ret, "$fn: $!";

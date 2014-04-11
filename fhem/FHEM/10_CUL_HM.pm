@@ -338,11 +338,11 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){
-          if   ($hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
-          elsif($hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
-          elsif($hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
-          elsif ($hash->{helper}{role}{chn})         {$webCmd="press short:press long";}
-          else                                       {$webCmd="virtual";}
+          if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
+          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
+          elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
+          elsif($hash->{helper}{role}{chn})                                  {$webCmd="press short:press long";}
+          else                                                               {$webCmd="virtual";}
 
       }elsif((!$hash->{helper}{role}{chn} &&
                $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
@@ -1842,6 +1842,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+    my $sendAck = 0;
     if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
       my $longPress = ($recChn & 0x40)?"long":"short";
@@ -1852,6 +1853,7 @@ sub CUL_HM_Parse($$) {#########################################################
         my $dChName = CUL_HM_id2Name($dChId);
         if(($attr{$dChName}{peerIDs}?$attr{$dChName}{peerIDs}:"") =~m/$recId/){
           my $dChHash = $defs{$dChName};
+          $sendAck = 1;
           $dChHash->{helper}{trgLgRpt} = 0
                 if (!defined($dChHash->{helper}{trgLgRpt}));
           $dChHash->{helper}{trgLgRpt} +=1;
@@ -1896,7 +1898,7 @@ sub CUL_HM_Parse($$) {#########################################################
         CUL_HM_respPendRm($dhash);
       }
     }
-    push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack));
+    push @ack,$dhash,$mNo."8002".$dst.$src."00" if (hex($mFlg)&0x20 && (!@ack) && $sendAck);
   }
   elsif($ioId eq $dst){# if fhem is destination check if we need to react
     if($mTp =~ m/^4./ && $p =~ m/^(..)/ &&  #Push Button event
@@ -3548,6 +3550,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $action = "verify";#defaults
     my $template = AttrVal($name,"tempListTmpl","tempList.cfg:$name");
     for my $ax ($a[2],$a[3]){
+      next if (!$ax);
       if ($ax =~ m/^(verify|restore)$/){
         $action = $ax;
       }
@@ -3794,10 +3797,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $modules{CUL_HM}{helper}{updateDst} = $dst;
     $modules{CUL_HM}{helper}{updateId} = $id;
     $modules{CUL_HM}{helper}{updateNbr} = 10;
-    my $msg;
     Log3 $name,2,"CUL_HM fwUpdate started for $name";
-    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+    my $manual = 0;
+    if ($manual == 1){
+      $modules{CUL_HM}{helper}{updateStep} = 1;
+      CUL_HM_FWupdateSpeed($name,100);
+      InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst.$id."00",0);
+      select(undef, undef, undef, (0.1));
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
+      select(undef, undef, undef, (0.1));
+      CUL_HM_SndCmd($hash,"0A20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
+      select(undef, undef, undef, (0.1));
+    }
+    else{
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                        ."3011$id${dst}CA");
+    }
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
   elsif($cmd eq "postEvent") { ################################################
@@ -5011,8 +5027,7 @@ sub CUL_HM_ID2PeerList ($$$) {
       if ($chn eq "04"){
         #if 04 is peered we are "teamed" -> set channel 05
         my $ch05H = $modules{CUL_HM}{defptr}{$dHash->{DEF}."05"};
-        CUL_HM_UpdtReadSingle($ch05H,"state","peered",0)
-            if($ch05H);
+        CUL_HM_UpdtReadSingle($ch05H,"state","peered",0) if($ch05H);
       }
       else{
         CUL_HM_UpdtReadSingle($hash,"state","peered",0);
@@ -5025,7 +5040,8 @@ sub CUL_HM_ID2PeerList ($$$) {
     if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|04|05|06)/)
       ||($md eq "HM-TC-IT-WM-W-EU" && $chn=~ m/(03|06|07)/)){
       if ($chn eq "04"){
-        CUL_HM_UpdtReadSingle($modules{CUL_HM}{defptr}{$dHash->{DEF}."05"},"state","peered");
+        my $ch05H = $modules{CUL_HM}{defptr}{$dHash->{DEF}."05"};
+        CUL_HM_UpdtReadSingle($ch05H,"state","unpeered") if($ch05H);
       }
       else{
         CUL_HM_UpdtReadSingle($hash,"state","unpeered");
@@ -5035,6 +5051,7 @@ sub CUL_HM_ID2PeerList ($$$) {
 }
 sub CUL_HM_peerChId($$) {# in:<IDorName> <deviceID>, out:channelID
   my($pId,$dId)=@_;
+  return "" if (!$pId);
   my $iId = CUL_HM_id2IoId($dId);
   my ($pSc,$pScNo) = unpack 'A4A*',$pId; #helper for shortcut spread
   return $dId.sprintf("%02X",'0'.$pScNo) if ($pSc eq 'self');
@@ -6040,7 +6057,7 @@ sub CUL_HM_UpdtReadSingle(@) { #update single reading and trigger the event
 }
 sub CUL_HM_setAttrIfCh($$$$) {
   my ($name,$att,$val,$trig) = @_;
-  if($attr{$name}{$att} ne $val){
+  if(AttrVal($name,$att,"") ne $val){
     DoTrigger($name,$trig.":".$val) if($trig);
     $attr{$name}{$att} = $val;
   }
@@ -6423,6 +6440,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   while(<aSave>){
     chomp;
     my $line = $_;
+    next if($line =~ m/#/);
     if($line =~ m/^entities:/){
       last if ($found != 0);
       $line =~s/.*://;
