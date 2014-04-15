@@ -4,8 +4,8 @@
 #
 # FHEM module to commmunicate with 1-Wire bus devices
 # * via an active DS2480 bus master interface attached to an USB port
-# * via an Arduino running CopnfigurableFirmata attached to USB
-# * via an Arduino running CopnfigurableFirmata connecting to FHEM via Ethernet
+# * via an Arduino running ConfigurableFirmata attached to USB
+# * via an Arduino running ConfigurableFirmata connecting to FHEM via Ethernet
 #
 # Norbert Truchsess
 # Prof. Dr. Peter A. Henning
@@ -189,15 +189,15 @@ sub OWX_ASYNC_Define ($$) {
   #-- First step - different methods
   #-- check if we have a serial device attached
   if ( $dev =~ m|$SER_regexp|i){  
-    require "$main::attr{global}{modpath}/FHEM/11_OWX_SER.pm";
+    require "$main::attr{global}{modpath}/FHEM/OWX_SER.pm";
     $owx = OWX_SER->new();
   #-- check if we have a COC/CUNO interface attached  
   }elsif( (defined $main::defs{$dev} && (defined( $main::defs{$dev}->{VERSION} ) ? $main::defs{$dev}->{VERSION} : "") =~ m/CSM|CUNO/ )){
-    require "$main::attr{global}{modpath}/FHEM/11_OWX_CCC.pm";
+    require "$main::attr{global}{modpath}/FHEM/OWX_CCC.pm";
     $owx = OWX_CCC->new();
   #-- check if we are connecting to Arduino (via FRM):
   } elsif ($dev =~ /^\d{1,2}$/) {
-  	require "$main::attr{global}{modpath}/FHEM/11_OWX_FRM.pm";
+  	require "$main::attr{global}{modpath}/FHEM/OWX_FRM.pm";
     $owx = OWX_FRM->new();
   } else {
     return "OWX: Define failed, unable to identify interface type $dev"
@@ -260,18 +260,16 @@ sub OWX_ASYNC_Notify {
 
 sub OWX_ASYNC_Ready ($) {
   my $hash = shift;
-	
-	return DevIo_OpenDev($hash, 1, "OWX_ASYNC_Init") if($hash->{STATE} eq "disconnected");
-	
-	# This is relevant for windows/USB only
-	my $po = $hash->{USBDev};
-	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
-	if($po) {
-		($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-	}
-	return ($InBytes && $InBytes>0);  
-}
-  
+  unless ( $hash->{STATE} eq "Active" ) {
+    my $ret = OWX_ASYNC_Init($hash);
+    if ($ret) {
+      Log3 ($hash->{NAME},2,"OWX: Error initializing ".$hash->{NAME}.": ".$ret);
+      return undef;
+    }
+  }
+	return 1;
+};
+
 sub OWX_ASYNC_Poll ($) {
 	my $hash = shift;
 	if (defined $hash->{ASYNC}) {
