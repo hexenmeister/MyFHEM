@@ -69,6 +69,8 @@ BEGIN {
 	};
 };
 
+use Protothreads;
+
 #-- unfortunately some things OS-dependent
 my $SER_regexp;
 if( $^O =~ /Win/ ) {
@@ -184,6 +186,7 @@ sub OWX_ASYNC_Define ($$) {
 	$hash->{ROM_ID}      = "FF";
 	$hash->{DEVS}        = [];
 	$hash->{ALARMDEVS}   = [];
+	$hash->{threads}     = {};
   
   my $owx;
   #-- First step - different methods
@@ -940,7 +943,6 @@ sub OWX_ASYNC_Verify ($$) {
 #
 ########################################################################################
 
-
 sub OWX_Execute($$$$$$$) {
 	my ( $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
 	if (my $executor = $hash->{ASYNC}) {
@@ -1041,6 +1043,29 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 			$master->{replies}{$owx_dev}{$context} = $readdata;
 		}
 	}
+};
+
+sub OWX_ASYNC_SCHEDULE($$$) {
+  my ( $hash, $owx_dev, $task ) = @_;
+  
+  if (defined $hash->{tasks}->{$owx_dev}) {
+    push @{$hash->{threads}->{$owx_dev}}, $task;
+  } else {
+    $hash->{tasks}->{$owx_dev} = [$task];
+  }
+  OWX_ASYNC_RUNTASKS($hash);
+};
+
+sub OWX_ASYNC_RUNTASKS($) {
+  my ( $hash ) = @_;
+  my ( $owx_dev, $queue );
+  while ( ( $owx_dev, $queue ) = each %{$hash->{tasks}} ) {
+    if (@$queue) {
+      shift @$queue unless (PT_SCHEDULE($queue->[0]));
+    } else {
+      delete $hash->{tasks}->{$owx_dev};
+    }
+  }
 };
 
 1;
