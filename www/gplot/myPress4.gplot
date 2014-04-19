@@ -1,5 +1,5 @@
 #
-# Display the measured temp and the pressure of Oregon sensors.
+# Display the measured temp and the pressure.
 #
 # FileLog definition: 
 # define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
@@ -7,8 +7,7 @@
 # define FileLog_BTHR918N_2d FileLog /var/log/fhem/BTHR918N_2d-%Y.log BTHR918N_2d
 #
 # Logfile record example:
-# 2010-08-10_18:00:22 BTHR918N_2d pressure: 1007
-
+#
 
 # Attribute 'small' is useful for gnuplot/-scroll only,
 # if plotsize is less than 800,400
