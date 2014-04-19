@@ -532,7 +532,9 @@ sub GSD_Parse($$) {
 
     my $sid = GSD_parseNumber(@msg_data[$c_pos_sid..$c_pos_sid+$c_len_sid-1]);
   	
-  	my $NodeID = $msg_data[$c_pos_nid].".".$msg_data[$c_pos_sid];
+  	my $NodeNID = $msg_data[$c_pos_nid];
+  	my $NodeNID = $NodeNID % 32;
+  	my $NodeID = $NodeNID.".".$msg_data[$c_pos_sid];
   	my $msgCounter = GSD_parseNumber(@msg_data[$c_pos_counter..$c_pos_counter+$c_len_counter-1]);
   	Log 3, "GSD: message number: " . $msgCounter;
   	

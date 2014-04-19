@@ -318,7 +318,7 @@ SYSMON_getObsoleteReadingsMap($) {
 	
 	#return $rMap; # TODO TEST
 	
-	if(!defined($cur_readings_map) {
+	if(!defined($cur_readings_map)) {
 	  SYSMON_updateCurrentReadingsMap($hash);
   }
 
@@ -564,7 +564,7 @@ SYSMON_obtainParameters($$)
 
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
-	
+	 
 	# Einmaliges
 	$map = SYSMON_getCPUBogoMIPS($hash, $map);
   
@@ -1404,6 +1404,11 @@ sub SYSMON_ShowValuesFmt ($$;@)
     }
     
     my $hash = $main::defs{$name};
+    
+    if(!defined($cur_readings_map)) {
+	    SYSMON_updateCurrentReadingsMap($hash);
+    }
+  
     SYSMON_updateCurrentReadingsMap($hash);
 #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
