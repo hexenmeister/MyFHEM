@@ -216,8 +216,28 @@ my $ctrlTable_Absent;
  $ctrlTable_Absent->{on}->{MAX_TIME_BEFORE_CHANGE_MINUTES} = 20;
   
 # Liefert aktuell aktive Steuertabelle für die Zirkulationspumpe.
+# zum Testen: {_steuerungZirkulationspumpe_getCtrlTable()->{name};;}
 sub
 _steuerungZirkulationspumpe_getCtrlTable() {
+	# zuerst den manuellen Schalter abfragen
+	my $zpctrl = ReadingsVal("ZP_Ctrl", "state",undef);
+	if(defined($zpctrl)) {
+		$zpctrl = lc($zpctrl);
+		if($zpctrl eq "default" || $zpctrl eq "normal") {
+			return  $ctrlTable_Normal;
+		}
+		if($zpctrl eq "reduced" || $zpctrl eq "reduziert") {
+			return  $ctrlTable_Reduced;
+		}
+		if($zpctrl eq "night" || $zpctrl eq "nacht") {
+			return  $ctrlTable_Night;
+		}
+		if($zpctrl eq "absent" || $zpctrl eq "abwesend") {
+			return  $ctrlTable_Absent;
+		}
+	}
+	# falls nicht definiert, oder Automatik, dann nach Tag/Zeit bestimmen
+	
 	# Steuertabelle bestimmen
   
   # gegen Google Calender pruefen
@@ -487,6 +507,7 @@ notGreaterThen($$;@)
   	$wdValue = lc($wdValue);
     if($wdValue ne 'closed') { $wndOpen=1; }
   }
+  #$wndOpen=checkWindowOpen(@wndDeviceList);
   # wenn offen, dann gewuenschten Wert redefinieren
   if($wndOpen>0) { $desiredValue = $desiredValueWhenOpened; }
   
@@ -527,6 +548,7 @@ notLesserThen($$;@)
   	$wdValue = lc($wdValue);
     if($wdValue ne 'closed') { $wndOpen=1; }
   }
+  #$wndOpen=checkWindowOpen(@wndDeviceList);
   # wenn offen, dann gewuenschten Wert redefinieren
   if($wndOpen>0) { $desiredValue = $desiredValueWhenOpened; }
   
@@ -540,6 +562,23 @@ notLesserThen($$;@)
   #$deviceCurrentValue = max($desiredValue, $deviceCurrentValue);
   #fhem "set $device $deviceCurrentValue";
   #return $deviceCurrentValue ;
+}
+
+
+sub
+checkWindowOpen(@)
+{
+	my (@wndDeviceList) = @_;
+	my $wndOpen = 0; # wird auf 1 gesetzt, wenn min 1 Fensterkontakt 'offen' meldet
+	foreach my $wndDevice (@wndDeviceList) {
+  	#fhem "set $wndDevice statusRequest"; # TEST!
+  	my $wdValue = Value($wndDevice);
+  	$wdValue = lc($wdValue);
+  	Log 3, ">checkWindowOpen>".$wdValue;
+    if($wdValue ne 'closed') { $wndOpen=1; }
+  }
+  
+  return $wndOpen;
 }
 
 sub
@@ -744,6 +783,33 @@ SetTempList_Heizung_OG_Bad()
 }
 # End SetTempList_Heizung_OG_Bad
 
+######################################################
+# Temperatur-Liste fürs Duschbad
+# setzen per Aufruf von "{SetTempList_Heizung_OG_DBad}"
+# Vorsicht, bei HM-CC-RT-DN (im Unterschied zum z.B. HM-CC-TC), ist 
+# ein anderer Channel zu nehmen. Zudem wird mit prep|exec gearbeitet, 
+# um nicht alle Zeilen als einzelnen Befehl zu senden, 
+# sondern per "prep" erst alles zusammenzufassen 
+# und dann per "exec" an das Thermostat zu senden.
+# Also als ein einziger Befehl statt sieben. Vermeidet "NACKs"
+######################################################
+sub
+SetTempList_Heizung_OG_DBad()
+ {
+    my($mo, $di, $mi, $do, $fr, $sa, $so);
+ 	  
+ 	  $mo = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $di = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $mi = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $do = "01:00 20.0 05:00 19.5 09:00 21.5 16:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $fr = "02:00 20.0 05:00 19.5 09:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $sa = "02:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  $so = "01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
+ 	  
+    SetTempList_Heizung("OG_DZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+}
+# End SetTempList_Heizung_OG_Duschbad
+
 # Temperatur-Liste fürs Wohnzimmer
 sub
 SetTempList_Heizung_OG_Wohnzimmer()
@@ -804,23 +870,26 @@ sendMeStatusMsg()
 }
 
 ######################################################
-# Test
+# Kleines Jabber-Cmd-Interface
 ######################################################
 sub
 sendJabberAnswer()
 {
 	my $lastsender=ReadingsVal("jabber","LastSenderJID","0");
   my $lastmsg=ReadingsVal("jabber","LastMessage","0");
-  
+  my @cmd_list = split(/\s+/, trim($lastmsg));
+  my $cmd = lc($cmd_list[0]);
+  # erstes Element entfernen
+  shift(@cmd_list);
   #Log 3, "Jabber: ".$lastsender." - ".$lastmsg;
   
   my $newmsg;
-  if(lc($lastmsg) eq "status") {
+  if($cmd eq "status") {
   	#Log 3, "Jabber: CMD: Status";
   	$newmsg.= "Status: nicht implementiert";
   }
   
-  if(lc($lastmsg) eq "umwelt") {
+  if($cmd eq "umwelt") {
   	#Log 3, "Jabber: CMD: Umwelt";
     $newmsg.= "Umwelt";
 	  $newmsg.="\n  Ost: ";
@@ -834,7 +903,7 @@ sendJabberAnswer()
 	  $newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "power_main", "---")." V";
   }
 
-  if(lc($lastmsg) eq "system") {
+  if($cmd eq "system") {
   	#Log 3, "Jabber: CMD: System";
   	$newmsg.= "CPU Temp: ".ReadingsVal("sysmon", "cpu_temp_avg", "---")." C\n";
   	$newmsg.= "loadavg: ".ReadingsVal("sysmon", "loadavg", "---")."\n";
@@ -847,13 +916,22 @@ sendJabberAnswer()
   	$newmsg.= "FS USB: ".ReadingsVal("sysmon", "fs_usb1", "---")."\n";
   	$newmsg.= "Updates: ".ReadingsVal("sysmon", "sys_updates", "---")."\n";
   }
-    
+
   # ggf. weitere Befehle
   
-  if(lc($lastmsg) eq "help" || lc($lastmsg) eq "hilfe") {
+  if($cmd eq "help" || $cmd eq "hilfe" || $cmd eq "?") {
   	$newmsg.= "Befehle: Help (Hilfe), Status, System, Umwelt";
   }
   
+  if($cmd eq "fhem") {
+    my $cmd_tail = join(" ",@cmd_list);
+    $newmsg.=fhem($cmd_tail);
+  }
+  
+  if($cmd eq "perl") {
+    my $cmd_tail = join(" ",@cmd_list);
+    $newmsg.=eval($cmd_tail);
+  }
   #Log 3, "Jabber: response: >".$newmsg."<";
   
   
@@ -875,5 +953,85 @@ sendJabberEcho()
   fhem("set jabber msg ". $lastsender . " Echo: ".$lastmsg);
 }
 
-1;
 
+
+
+###############################################################################
+my $debounce_map;
+###############################################################################
+# Eine Art Entprellung. 
+# Es wird geprüft, ob der Schluessel in der angegebenen Zeit bereits 
+# angefragt wurde. Dann wird liefert 1 (true), sonst 0 (false).
+# Damit kann z.B. sichergestellt werden, dass nur ein Befehl 
+# in der angegebenen Zeit ausgefuehrt. Nuetzlich bei notify-Befehlen.
+#
+# Parameter: Key - Schluessel; time - Zeit in Sekunden
+###############################################################################
+sub
+debounce($$)
+{
+	my($key, $dtime) = @_;
+  
+  my $ctime = time();
+  my $otime = $debounce_map->{$key};
+  
+  if(!defined($otime)) {
+  	# neuer Key, Zeitstempel speichern
+  	$debounce_map->{$key}=$ctime;
+  	return 1;
+  }
+  
+  # Zeitablauf pruefen
+  my $delta = $otime+$dtime-$ctime;
+  if($delta gt 0) {
+  	# Zeitfenster noch nicht abgelaufen
+  	return 0;
+  }
+  
+  # Zeit abgelaufen, Zeitstempel redefinieren
+  $debounce_map->{$key}=$ctime;
+  return 1;
+}
+
+###############################################################################
+# Für den relativen Luftdruck relDruck() werden drei Parameter benötigt: 
+#   portvalue, Aussentemperatur am Messort, Höhe des Messortes über N.N.
+# Meine Höhe: 49m
+# Die Werte Temperatur und Höhe haben direkten Einfluß auf die Berechnung 
+# des relativen Luftdrucks, der zu Vergleichszwecken immer auf Meereshöhe 
+# bezogen und temperaturabhängig ist.
+# Eigentlich spielt auch die Luftfeuchte noch eine Rolle, 
+# aber der Einfluß ist so marginal, dass er sich lediglich 
+# in Nachkommastellen auswirkt. 
+# Deshalb wurde darauf verzichtet, diesen Parameter zu berücksichtigen.
+#
+# Die Umrechnung selbst erfolgt anhand der Empfehlung 
+# des Deutschen Wetterdienste, die auch in Wikipedia gut erklärt ist.
+###############################################################################
+sub
+relDruck($$$){
+  # Messwerte
+  my $Pa   = $_[0];
+  my $Temp = $_[1];
+  my $Alti = $_[2];
+
+  # Konstanten
+  my $g0 = 9.80665;
+  my $R  = 287.05;
+  my $T  = 273.15;
+  my $Ch = 0.12;
+  my $a  = 0.065;
+  my $E  = 0;
+
+  if($Temp < 9.1){
+    $E = 5.6402*(-0.0916 + exp(0.06 * $Temp));
+  } else {
+    $E = 18.2194*(1.0463 - exp(-0.0666 * $Temp));
+  }
+
+  my $xp = $Alti * $g0 / ($R*($T+$Temp + $Ch*$E + $a*$Alti/2));
+  my $Pr = $Pa*exp($xp);
+  return int($Pr);
+}
+
+1;
