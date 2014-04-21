@@ -69,7 +69,8 @@ BEGIN {
 	};
 };
 
-use Protothreads;
+use ProtoThreads;
+no warnings 'deprecated';
 
 #-- unfortunately some things OS-dependent
 my $SER_regexp;
@@ -186,7 +187,7 @@ sub OWX_ASYNC_Define ($$) {
 	$hash->{ROM_ID}      = "FF";
 	$hash->{DEVS}        = [];
 	$hash->{ALARMDEVS}   = [];
-	$hash->{threads}     = {};
+	$hash->{tasks}       = {};
   
   my $owx;
   #-- First step - different methods
@@ -762,18 +763,18 @@ sub OWX_ASYNC_Init ($) {
   my $owx = $hash->{OWX};
   
   if (defined $owx) {
-	$hash->{INTERFACE} = $owx->{interface};
-	my $ret;
-	#-- Third step: see, if a bus interface is detected
-	eval {
-	  $ret = $owx->initialize($hash);
-	};
-	if (my $err = GP_Catch($@)) {
-	  $hash->{PRESENT} = 0;
-	  $hash->{STATE} = "Init Failed: $err";
-	  return "OWX_ASYNC_Init failed: $err";
-	};
-	$hash->{ASYNC} = $ret;
+    $hash->{INTERFACE} = $owx->{interface};
+    my $ret;
+    #-- Third step: see, if a bus interface is detected
+    eval {
+      $ret = $owx->initialize($hash);
+    };
+    if (my $err = GP_Catch($@)) {
+      $hash->{PRESENT} = 0;
+      $hash->{STATE} = "Init Failed: $err";
+      return "OWX_ASYNC_Init failed: $err";
+    };
+    $hash->{ASYNC} = $ret;
    	$hash->{INTERFACE} = $owx->{interface};
   } else {
     return "OWX: Init called with undefined interface";
@@ -953,6 +954,16 @@ sub OWX_Execute($$$$$$$) {
 	}
 };
 
+sub OWX_ASYNC_Execute($$$$$$$) {
+	my ( $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
+	if (my $executor = $hash->{ASYNC}) {
+		delete $context->{ExecuteResponse};
+		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread, $delay );
+	} else {
+		return 0;
+	}
+};
+
 #######################################################################################
 #
 # OWX_AwaitExecuteResponse - Wait for the result of a call to OWX_Execute 
@@ -1021,50 +1032,73 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 	", readdata: ".(defined $readdata ? unpack ("H*",$readdata) : "undef"));
 
 	if (defined $owx_dev) {
-		foreach my $d ( sort keys %main::defs ) {
-			if ( my $hash = $main::defs{$d} ) {
-				if ( defined( $hash->{ROM_ID} )
-				  && defined( $hash->{IODev} )
-				  && $hash->{IODev} == $master
-				  && $hash->{ROM_ID} eq $owx_dev ) {
-				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
-				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata);
-				    Log3 ($master->{NAME},4,"OWX_ASYNC_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
-				    if ($success) {
-				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
-				    } else {
-				      readingsSingleUpdate($hash,"PRESENT",0,1) if ($hash->{PRESENT});
-				    }
-					}
-				}
-			}
-		}
-		if (defined $context) {
-			$master->{replies}{$owx_dev}{$context} = $readdata;
-		}
+	  if ( defined $context and ref $context eq "ProtoThreads" ) {
+	    $context->{ExecuteResponse} = {
+	      success   => $success,
+	      'reset'   => $reset,
+	      writedata => $writedata,
+	      readdata  => $readdata,
+	      numread   => $numread,
+	    };
+	  } else {
+  		foreach my $d ( sort keys %main::defs ) {
+  			if ( my $hash = $main::defs{$d} ) {
+  				if ( defined( $hash->{ROM_ID} )
+  				  && defined( $hash->{IODev} )
+  				  && $hash->{IODev} == $master
+  				  && $hash->{ROM_ID} eq $owx_dev ) {
+  				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
+  				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata);
+  				    Log3 ($master->{NAME},4,"OWX_ASYNC_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
+  				    if ($success) {
+  				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
+  				    } else {
+  				      readingsSingleUpdate($hash,"PRESENT",0,1) if ($hash->{PRESENT});
+  				    }
+  					}
+  				}
+  			}
+  		}
+  		if (defined $context) {
+  			$master->{replies}{$owx_dev}{$context} = $readdata;
+  		}
+	  }
 	}
 };
 
-sub OWX_ASYNC_SCHEDULE($$$) {
-  my ( $hash, $owx_dev, $task ) = @_;
-  
-  if (defined $hash->{tasks}->{$owx_dev}) {
-    push @{$hash->{threads}->{$owx_dev}}, $task;
+sub OWX_ASYNC_Schedule($$@) {
+  my ( $hash, $task, @args ) = @_;
+  my $master = $hash->{IODev};
+  my $owx_dev = $hash->{ROM_ID};
+  $task->{ExecuteArgs} = \@args;
+  if (defined $master->{tasks}->{$owx_dev}) {
+    push @{$master->{threads}->{$owx_dev}}, $task;
   } else {
-    $hash->{tasks}->{$owx_dev} = [$task];
+    $master->{tasks}->{$owx_dev} = [$task];
   }
-  OWX_ASYNC_RUNTASKS($hash);
+  OWX_ASYNC_RunTasks($master);
 };
 
-sub OWX_ASYNC_RUNTASKS($) {
-  my ( $hash ) = @_;
+sub OWX_ASYNC_RunTasks($) {
+  my ( $master ) = @_;
   my ( $owx_dev, $queue );
-  while ( ( $owx_dev, $queue ) = each %{$hash->{tasks}} ) {
-    if (@$queue) {
-      shift @$queue unless (PT_SCHEDULE($queue->[0]));
-    } else {
-      delete $hash->{tasks}->{$owx_dev};
+  if ($master->{STATE} eq "Active") {
+    while ( ( $owx_dev, $queue ) = each %{$master->{tasks}} ) {
+      if (@$queue) {
+        my $task = $queue->[0];
+        unless ($task->PT_SCHEDULE(@{$task->{ExecuteArgs}})) {
+          shift @$queue;
+          delete $master->{tasks}->{$owx_dev} unless @$queue;
+        }
+        OWX_ASYNC_Poll( $master );
+      } else {
+        delete $master->{tasks}->{$owx_dev};
+      }
     }
+    main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0) if (keys %{$master->{tasks}});
+  } else {
+    #TODO implement more reasonable scheduling
+    main::InternalTimer(gettimeofday()+1, "OWX_ASYNC_RunTasks", $master,0) if (keys %{$master->{tasks}});
   }
 };
 
