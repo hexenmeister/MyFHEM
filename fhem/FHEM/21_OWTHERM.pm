@@ -73,6 +73,16 @@ use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 use Time::HiRes qw( gettimeofday tv_interval usleep );
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
