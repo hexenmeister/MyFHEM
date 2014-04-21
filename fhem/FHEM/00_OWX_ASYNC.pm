@@ -954,11 +954,11 @@ sub OWX_Execute($$$$$$$) {
 	}
 };
 
-sub OWX_ASYNC_Execute($$$$$$$) {
-	my ( $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
+sub OWX_ASYNC_Execute($$$$$$) {
+	my ( $hash, $context, $reset, $owx_dev, $data, $numread ) = @_;
 	if (my $executor = $hash->{ASYNC}) {
 		delete $context->{ExecuteResponse};
-		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread, $delay );
+		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread, undef );
 	} else {
 		return 0;
 	}

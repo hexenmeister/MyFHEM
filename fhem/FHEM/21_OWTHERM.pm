@@ -1085,7 +1085,7 @@ sub OWXTHERM_PT_GetValues($@) {
   #-- if the conversion has not been called before 
   if( $con==1 ){
     #-- issue the match ROM command \x55 and the start conversion command \x44
-    unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\x44",0,undef)) {
+    unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\x44",0)) {
       PT_EXIT("$owx_dev not accessible for convert");
     }
     my ($seconds,$micros) = gettimeofday;
@@ -1104,7 +1104,7 @@ sub OWXTHERM_PT_GetValues($@) {
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\xBE",9,undef)) {
+  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\xBE",9)) {
     PT_EXIT("$owx_dev not accessible in reading");
   }
   PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
@@ -1169,7 +1169,7 @@ sub OWXTHERM_PT_SetValues($$) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
-  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,$select,3,undef)) {
+  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,$select,3)) {
     PT_EXIT("OWXTHERM: Device $owx_dev not accessible"); 
   }
   PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});

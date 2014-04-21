@@ -1258,7 +1258,7 @@ sub OWXSWITCH_PT_GetState($) {
     #   \xF5 plus the two byte channel control and the value
     #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
     $select=sprintf("\xF5\xDD\xFF");
-    unless(OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 4, undef )) {
+    unless(OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 4)) {
       PT_EXIT("device $owx_dev not accessible in reading");
     }
     PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
@@ -1277,7 +1277,7 @@ sub OWXSWITCH_PT_GetState($) {
     #   \xF5 plus the two byte channel target address
     #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
     $select=sprintf("\xF0\x88\x00");   
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 10, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 10)) {
       PT_EXIT("device $owx_dev not accessible in reading");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
@@ -1296,7 +1296,7 @@ sub OWXSWITCH_PT_GetState($) {
     #   \xF5 plus 2 empty bytes
     #-- reading 9 + 1 + 2 data bytes = 12 bytes
     $select = "\xF5";
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
       PT_EXIT("device $owx_dev not accessible in reading");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
@@ -1346,7 +1346,7 @@ sub OWXSWITCH_PT_SetState($$) {
     #   \xAA at address TA1 = \x07 TA2 = \x00   
     #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xAA\x07\x00", 3, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xAA\x07\x00", 3)) {
       PT_EXIT("device $owx_dev not accessible in writing");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
@@ -1364,7 +1364,7 @@ sub OWXSWITCH_PT_SetState($$) {
     #-- reading 9 + 4 + 2 data bytes = 15 bytes
     $select=sprintf("\x55\x07\x00%c",$statneu);   
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
       PT_EXIT("device $owx_dev not accessible in writing");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
@@ -1395,7 +1395,7 @@ sub OWXSWITCH_PT_SetState($$) {
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",$value,255-$value);  
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
       PT_EXIT("device $owx_dev not accessible in writing");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
@@ -1418,7 +1418,7 @@ sub OWXSWITCH_PT_SetState($$) {
     #-- issue the match ROM command \x55 and the write gpio command
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",252+$value,3-$value);   
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1, undef )) {
+    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
       PT_EXIT("device $owx_dev not accessible in writing");
     }
     PT_WAIT_UNTIL($thread->{ExecuteResponse});
