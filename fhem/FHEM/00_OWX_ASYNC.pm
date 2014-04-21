@@ -795,7 +795,18 @@ sub OWX_ASYNC_Init ($) {
   #-- Intiate first alarm detection and eventually conversion in a minute or so
   InternalTimer(gettimeofday() + $hash->{interval}, "OWX_ASYNC_Kick", $hash,0);
   $hash->{STATE} = "Active";
+  GP_ForallClients($hash,\&OWX_ASYNC_InitClient,undef);
   return undef;
+}
+
+sub OWX_ASYNC_InitClient {
+  my ($hash) = @_;
+	my $name = $hash->{NAME};
+	#return undef unless (defined $hash->{InitFn});
+	my $ret = CallFn($name,"InitFn",$hash);
+	if ($ret) {
+		Log3 $name,2,"error initializing '".$hash->{NAME}."': ".$ret;
+	}
 }
 
 ########################################################################################
@@ -1069,14 +1080,15 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 sub OWX_ASYNC_Schedule($$@) {
   my ( $hash, $task, @args ) = @_;
   my $master = $hash->{IODev};
+  die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   my $owx_dev = $hash->{ROM_ID};
   $task->{ExecuteArgs} = \@args;
   if (defined $master->{tasks}->{$owx_dev}) {
-    push @{$master->{threads}->{$owx_dev}}, $task;
+    push @{$master->{tasks}->{$owx_dev}}, $task;
   } else {
     $master->{tasks}->{$owx_dev} = [$task];
   }
-  OWX_ASYNC_RunTasks($master);
+  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
 };
 
 sub OWX_ASYNC_RunTasks($) {
@@ -1096,9 +1108,6 @@ sub OWX_ASYNC_RunTasks($) {
       }
     }
     main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0) if (keys %{$master->{tasks}});
-  } else {
-    #TODO implement more reasonable scheduling
-    main::InternalTimer(gettimeofday()+1, "OWX_ASYNC_RunTasks", $master,0) if (keys %{$master->{tasks}});
   }
 };
 
