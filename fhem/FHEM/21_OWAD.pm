@@ -1397,22 +1397,13 @@ sub OWXAD_GetPage($$$@) {
   #=============== get the voltage reading ===============================
   if( $page eq "reading") {
     #-- issue the match ROM command \x55 and the start conversion command
-    #-- asynchronous mode
-    # difficult here, shoul dbe put into Binvalues as in OWSWITCH
-    if( $hash->{ASYNC} ){
-      if (!OWX_Execute( $master, "getpageconvert", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
-        return "not accessible for conversion";
-      }
-    #-- synchronous mode
-    } else {
-      OWX_Reset($master);
-      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-      if( $res eq 0 ){
-        return "not accessible for conversion";
-      } 
-      #-- conversion needs some 5 ms per channel
-      select(undef,undef,undef,0.02);
+    OWX_Reset($master);
+    $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+    if( $res eq 0 ){
+      return "not accessible for conversion";
     } 
+    #-- conversion needs some 5 ms per channel
+    select(undef,undef,undef,0.02);
 
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
@@ -1655,8 +1646,9 @@ sub OWXAD_PT_SetPage($$) {
   #=============== wrong page write attempt  ===============================
   } else {
     PT_EXIT("wrong memory page write attempt");
-  } 
-  unless (OWX_ASYNC_Execute( $master, "setpage", 1, $owx_dev, $select, 0 )) {
+  }
+  #"setpage"
+  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
     PT_EXIT("device $owx_dev not accessible for writing"); 
   }
   PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
