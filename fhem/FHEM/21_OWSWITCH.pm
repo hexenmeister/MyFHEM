@@ -162,8 +162,6 @@ sub OWSWITCH_Initialize ($) {
   $hash->{owg_val} = [];
   $hash->{owg_vax} = [];
   
-  #-- ASYNC this function is needed for asynchronous execution of the device reads 
-  $hash->{AfterExecuteFn} = "OWXSWITCH_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
