@@ -58,7 +58,9 @@ use constant {
 use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
-  DIFF_SUFFIX => "_diff"
+  DIFF_SUFFIX => "_diff",
+  FB_WLAN_STATE      => "wlan_state",
+  FB_WLAN_STATE_TEXT => "wlan_state_text"
 };
 
 use constant FS_PREFIX => "~ ";
@@ -275,6 +277,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $nName = "vdsl";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+	   
 	  } else {
 	  	my $nName = ETH0;
 	  	$rMap->{$nName}         = "Network adapter ".$nName;
@@ -285,7 +288,13 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
     }
   }
-
+  
+  if(SYSMON_isFB($hash)) {
+    # FB WLAN state
+	  $rMap->{+FB_WLAN_STATE}      = "WLAN State";
+	  $rMap->{+FB_WLAN_STATE_TEXT} = "WLAN State";
+  }
+  
 	# User defined
 	my $userdefined = AttrVal($name, "user-defined", undef);
   if(defined $userdefined) {
@@ -543,7 +552,7 @@ SYSMON_Update($@)
     
   }
 
-  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
+  readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);
 }
 
 sub
@@ -599,7 +608,7 @@ SYSMON_obtainParameters($$)
   }
 
   if($m3 gt 0) { # Nur wenn > 0
-    # M3: eth0, eth0_diff, wlan0, wlan0_diff
+    # M3: eth0, eth0_diff, wlan0, wlan0_diff, wlan_on (FritzBox)
     my $update_ns = ($refresh_all || ($ref % $m3) eq 0);
     #if($refresh_all || ($ref % $m3) eq 0) {
     my $networks = AttrVal($name, "network-interfaces", undef);
@@ -630,6 +639,9 @@ SYSMON_obtainParameters($$)
           $map = SYSMON_getNetworkInfo($hash, $map, WLAN0);
           #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".$map->{+WLAN0};
         }
+      }
+      if(SYSMON_isFB($hash)) {
+      	$map = SYSMON_getWLANState($hash, $map);
       }
     }
   }
@@ -963,7 +975,9 @@ SYSMON_getDiskStat_intern($$$)
   }
   #$map->{"iostat_test"}="TEST";
 	my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
-	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+	if(defined($lastVal)) {
+  	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+  }
 	if(defined $lastVal) {
 		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
 		my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
@@ -1362,6 +1376,33 @@ sub SYSMON_getNetworkInfo ($$$)
   }
 
   return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Informationen, ob WLAN an oder aus ist (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getWLANState($$)
+{
+	my ($hash, $map) = @_;
+	
+	logF($hash, "SYSMON_getWLANState", "");
+	
+	my $ret_str = trim(SYSMON_execute($hash, "ctlmgr_ctl r wlan settings/ap_enabled"));
+	
+	$map->{+FB_WLAN_STATE}=$ret_str;
+	if($ret_str+0 == 1)
+	{
+		$map->{+FB_WLAN_STATE_TEXT}="on";
+  } else {
+    if($ret_str+0 == 0)
+	  {
+      $map->{+FB_WLAN_STATE_TEXT}="off";
+	  }	else {
+	  	$map->{+FB_WLAN_STATE_TEXT}="unknown";
+	  }
+  }
+	return $map;
 }
 
 #------------------------------------------------------------------------------
