@@ -527,8 +527,10 @@ sub OWTHERM_GetValues($@) {
         if( !defined($ret) );
     }
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_GetValues),$hash );
-    return undef;
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_GetValues),$hash );
+    };
+    $ret = GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
@@ -723,8 +725,10 @@ sub OWTHERM_Set($@) {
       $ret = OWXTHERM_SetValues($hash,$args);
     }elsif( $interface eq "OWX_ASYNC" ){
       $args->{format} = 1;
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_SetValues),$hash,$args );
-      return undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_SetValues),$hash,$args );
+      };
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSTHERM_SetValues($hash,$args);

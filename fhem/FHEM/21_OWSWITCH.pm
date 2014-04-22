@@ -578,8 +578,10 @@ sub OWSWITCH_GetValues($) {
       return if( !defined($ret) );
     }
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_GetState),$hash );
-    return undef;
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_GetState),$hash );
+    };
+    $ret = GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
      $ret = OWFSSWITCH_GetState($hash);
   }else{
@@ -745,8 +747,10 @@ sub OWSWITCH_Set($@) {
       }
       $ret2 = OWXSWITCH_SetState($hash,$value);
     }elsif( $interface eq "OWX_ASYNC"){
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetOutput),$hash,$fnd,$nval );
-      return undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetOutput),$hash,$fnd,$nval );
+      };
+      $ret2 = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret1  = OWFSSWITCH_GetState($hash);
@@ -781,8 +785,10 @@ sub OWSWITCH_Set($@) {
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_SetState($hash,int($value));
     }elsif( $interface eq "OWX_ASYNC" ){
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetState),$hash,int($value) );
-      $ret = undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_SetState),$hash,int($value) );
+      };
+      $ret = GP_Catch($@) if $@;
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_SetState($hash,int($value));
     }else{

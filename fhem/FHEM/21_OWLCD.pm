@@ -459,7 +459,10 @@ sub OWLCD_Set($@) {
     return "OWLCD: Set with wrong value for gpio port, must be 0 <= gpio <= 7"
       if( ! ((int($value) >= 0) && (int($value) <= 7)) );
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", int($value) );
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", int($value) );
+      };
+      return GP_Catch($@) if $@;
     } else {
       OWXLCD_SetFunction($hash, "gpio", int($value));
     }
@@ -471,13 +474,19 @@ sub OWLCD_Set($@) {
     #-- check value and write to device   
     if( uc($value) eq "ON"){
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdon", 0 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdon", 0 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash, "lcdon", 0);
       }
     }elsif( uc($value) eq "OFF" ){
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdoff", 0 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdoff", 0 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash, "lcdoff", 0);
       }
@@ -492,13 +501,19 @@ sub OWLCD_Set($@) {
     #-- check value and write to device   
     if( uc($value) eq "ON"){
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkon", 0 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkon", 0 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash, "bklon", 0);
       }
     }elsif( uc($value) eq "OFF" ){
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkoff", 0 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkoff", 0 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash, "bkloff", 0);
       }
@@ -511,9 +526,12 @@ sub OWLCD_Set($@) {
   #-- reset
   if($key eq "reset") {
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "reset", 0 );
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 0, 0 );
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "reset", 0 );
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 0, 0 );
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+      };
+      return GP_Catch($@) if $@;
     } else {
       OWXLCD_SetFunction($hash,"reset",0);
       OWXLCD_SetIcon($hash,0,0);
@@ -530,19 +548,28 @@ sub OWLCD_Set($@) {
     if( $icon == 16 ){
       if( uc($value) eq "OFF" ){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 0 );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 0 );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, 16, 0);
         }
       }elsif( uc($value) eq "BLINK" ){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 6 );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 6 );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, 16, 6);
         }
       }elsif(  ((int($value) > 0) && (int($value) < 6)) ){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, int($value) );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, int($value) );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, 16, int($value));
         }
@@ -552,19 +579,28 @@ sub OWLCD_Set($@) {
     }else{
       if( uc($value) eq "OFF"){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 0 );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 0 );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, $icon, 0);
         }
       }elsif( uc($value) eq "ON" ){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 1 );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 1 );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, $icon, 1);
         }
       }elsif( uc($value) eq "BLINK" ){
         if ($hash->{ASYNC}) {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 2 );
+          eval {
+            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 2 );
+          };
+          return GP_Catch($@) if $@;
         } else {
           OWXLCD_SetIcon($hash, $icon, 2);
         }
@@ -584,7 +620,10 @@ sub OWLCD_Set($@) {
       if( length($value) > $lcdchars );
     #-- check value and write to device   
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash, $line, $value );
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash, $line, $value );
+      };
+      return GP_Catch($@) if $@;
     } else {
       OWXLCD_SetLine($hash,$line,$value);
     }
@@ -600,7 +639,10 @@ sub OWLCD_Set($@) {
     #-- check value and write to device   
     Log3 $name,1,"Calling SetMemory with page $line";
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetMemory), $hash, $line, $value );
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetMemory), $hash, $line, $value );
+      };
+      return GP_Catch($@) if $@;
     } else {
       OWXLCD_SetMemory($hash,$line,$value);
     }
@@ -611,28 +653,40 @@ sub OWLCD_Set($@) {
   if($key eq "alert") {
     if(lc($value) eq "beep") {
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 14 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 14 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash,"gpio",14);
       }
       return undef;
     }elsif(lc($value) eq "red") {
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 13 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 13 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash,"gpio",13);
       }
       return undef;
     }elsif(lc($value) eq "yellow") {
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 11 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 11 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash,"gpio",11);
       }
       return undef;
     }elsif( (lc($value) eq "off") || (lc($value) eq "none") ) {
       if ($hash->{ASYNC}) {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+        };
+        return GP_Catch($@) if $@;
       } else {
         OWXLCD_SetFunction($hash,"gpio",15);
       }
@@ -645,10 +699,13 @@ sub OWLCD_Set($@) {
   #-- start test
   if($key eq "test") {
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,0,"Hallo Welt"); 
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,1,"Mary had a big lamb"); 
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,2,"Solar 4.322 kW "); 
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE"); 
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,0,"Hallo Welt"); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,1,"Mary had a big lamb"); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,2,"Solar 4.322 kW "); 
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE");
+      };
+      return GP_Catch($@) if $@; 
     } else {
       OWXLCD_SetLine($hash,0,"Hallo Welt");
       OWXLCD_SetLine($hash,1,"Mary had a big lamb");
@@ -1045,11 +1102,14 @@ sub OWXLCD_InitializeDevice($) {
     #OWXLCD_Byte($hash,"register",6);
 
     if ($hash->{ASYNC}) {
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",38);
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 9);
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",32);
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",12);
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 1);
+      eval {
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",38);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 9);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",32);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",12);
+        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 1);
+      };
+      return GP_Catch($@) if $@;
     } else {
       #-- Function Set: 4 bit data size, RE => 1, blink Enable = \x26
       OWXLCD_Byte($hash,"register",38);

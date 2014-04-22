@@ -820,8 +820,10 @@ sub OWCOUNT_GetPage ($$$@) {
         while ($task->PT_SCHEDULE($hash,$page,$final)) { OWX_ASYNC_Poll($hash->{IODev}); };
         $ret = $task->PT_RETVAL();
       } else {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_GetPage),$hash,$page,$final );
-        return undef;
+        eval {
+          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_GetPage),$hash,$page,$final );
+        };
+        $ret = GP_Catch($@) if $@;
       }
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
@@ -1353,8 +1355,10 @@ sub OWCOUNT_SetPage ($$$) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
     }elsif( $interface eq "OWX_ASYNC" ){
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_SetPage),$hash,$page,$data );
-      return undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_SetPage),$hash,$page,$data );
+      };
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_SetPage($hash,$page,$data);

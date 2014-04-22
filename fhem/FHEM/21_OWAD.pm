@@ -74,6 +74,7 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
+use GPUtils qw(:all);
 use Time::HiRes qw( gettimeofday tv_interval usleep );
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
@@ -755,9 +756,12 @@ sub OWAD_GetValues($) {
       $ret3 = OWXAD_GetPage($hash,"status",1);
     #}
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"reading",0 );
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"alarm",0 );
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"status",1 );
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"reading",0 );
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"alarm",0 );
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"status",1 );
+    };
+    $ret .= GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_GetPage($hash,"reading",0);
     $ret2 = OWFSAD_GetPage($hash,"alarm",0);
@@ -848,8 +852,11 @@ sub OWAD_InitializeDevice($) {
     $ret1 = OWXAD_SetPage($hash,"status");
     $ret2 = OWXAD_SetPage($hash,"alarm");
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"alarm" );
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"alarm" );
+    };
+    $ret .= GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_SetPage($hash,"status");
@@ -968,8 +975,10 @@ sub OWAD_Set($@) {
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"status");
     }elsif( $interface eq "OWX_ASYNC" ){
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
-      return undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
+      };
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"status");
@@ -1017,8 +1026,10 @@ sub OWAD_Set($@) {
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"alarm");
     }elsif( $interface eq "OWX_ASYNC" ){
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
-      return undef;
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
+      };
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"alarm");

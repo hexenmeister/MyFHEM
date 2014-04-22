@@ -555,8 +555,10 @@ sub OWMULTI_GetValues($) {
       return if( !defined($ret) );
     }
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_GetValues),$hash );
-    return undef;
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_GetValues),$hash );
+    };
+    $ret = GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
   }else{
@@ -651,8 +653,10 @@ sub OWMULTI_Set($@) {
   if( $interface eq "OWX" ){
     $ret = OWXMULTI_SetValues($hash,@a);
   }elsif( $interface eq "OWX_ASYNC" ){
-    OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_SetValues),$hash,@a );
-    $ret = undef;
+    eval {
+      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXMULTI_PT_SetValues),$hash,@a );
+    };
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface 
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_SetValues($hash,@a);
