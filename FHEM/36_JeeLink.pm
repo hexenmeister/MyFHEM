@@ -1,5 +1,5 @@
 
-# $Id: 36_JeeLink.pm 5557 2014-04-18 17:25:28Z justme1968 $
+# $Id: 36_JeeLink.pm 5579 2014-04-20 08:15:06Z justme1968 $
 
 package main;
 
@@ -173,8 +173,6 @@ JeeLink_Set($@)
 
 
   if($cmd eq "raw") {
-    #return "\"set JeeLink $cmd\" needs exactly one parameter" if(@_ != 4);
-    #return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
 
@@ -270,7 +268,7 @@ JeeLink_Get($@)
   my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
   if( $cmd eq "devices" ) {
-        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
         JeeLink_SimpleWrite($hash, "h");
     } else {
         JeeLink_SimpleWrite($hash, "l");
@@ -279,7 +277,7 @@ JeeLink_Get($@)
 
         $hash->{STATE} = "Opened";
 
-        if($hash->{VERSION} =~m/JeeNode -- HomeControl -/ ) {
+        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
                 JeeLink_SimpleWrite($hash, "o");
         } else {
             JeeLink_SimpleWrite($hash, "0c");
@@ -330,11 +328,6 @@ JeeLink_DoInit($)
   JeeLink_Clear($hash);
 
   $hash->{STATE} = "Opened";
-
-  #Reset JeeNode and set quite mode
-  JeeLink_SimpleWrite($hash, "o");
-  sleep(2);
-  JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -561,7 +554,7 @@ JeeLink_Parse($$$$)
   return if($dmsg =~ m/^-> ack/ );                 # ignore send ack
 
   if($dmsg =~ m/^\[/ ) {
-        $hash->{VERSION} = $dmsg;
+        $hash->{model} = $dmsg;
 
     if( $hash->{STATE} eq "Opened" ) {
       if( $dmsg =~m /pcaSerial/ ) {
@@ -574,15 +567,15 @@ JeeLink_Parse($$$$)
 
       } elsif( $dmsg =~m /ec3kSerial/ ) {
         $hash->{MatchList} = \%matchListPCA301;
-        #JeeLink_SimpleWrite($hash, "ec");
+        #JeeLink_SimpleWrite($hash, "ec", 1);
 
       } elsif( $dmsg =~m /JeeNode -- HomeControl -/ ) {
         $hash->{MatchList} = \%matchListJeeLink433 if($dmsg =~ m/433MHz/);
                                 $hash->{MatchList} = \%matchListJeeLink868 if($dmsg =~ m/868MHz/);
-          JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
-                                JeeLink_SimpleWrite($hash, "a0");  # turn activity led off
-                                JeeLink_SimpleWrite($hash, "f");  # get RFM frequence config
-                                JeeLink_SimpleWrite($hash, "m");        # show used ram on jeenode
+        JeeLink_SimpleWrite($hash, "q1");  # turn quiet mode on
+        JeeLink_SimpleWrite($hash, "a0");  # turn activity led off
+        JeeLink_SimpleWrite($hash, "f");   # get RFM frequence config
+        JeeLink_SimpleWrite($hash, "m");   # show used ram on jeenode
       }
       $hash->{STATE} = "Initialized";
         }
@@ -598,7 +591,7 @@ JeeLink_Parse($$$$)
         return;
 
   } elsif( $dmsg =~ m/drecvintr exit/ ) {
-        JeeLink_SimpleWrite($hash, "ec", 1);
+        JeeLink_SimpleWrite($hash, "ec",1);
     return;
   }
 
@@ -732,9 +725,9 @@ JeeLink_Attr(@)
   if( $aName eq "Clients" ) {
     $hash->{Clients} = $aVal;
     $hash->{Clients} = $clientsJeeLink if( !$hash->{Clients}) ;
-  } elsif( $aName =~ "MatchList" ) {
+  } elsif( $aName eq "MatchList" ) {
     $hash->{MatchList} = $aVal;
-    $hash->{MatchList} = \%matchListPCA301 if( !$hash->{Clients} );
+    $hash->{MatchList} = \%matchListPCA301 if( !$hash->{MatchList} );
   } elsif($aName =~ m/^tune/i) { #tune attribute freq / rx:bWidth / rx:rAmpl / rx:sens / tx:deviation / tx:power
   # Frequenze: Fc =860+ F x0.0050MHz
         # LNA Gain [dB] = MAX -6, -14, -20
