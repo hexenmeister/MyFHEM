@@ -1916,6 +1916,35 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         These readings provide output of commands, which are passed to the operating system. 
     </li>
     <br>
+    <b>FritzBox specific Readings</b>
+    <li>wlan_state<br>
+        WLAN state: on/off
+    </li>
+    <br>
+    <li>wlan_guest_state<br>
+        GuestWLAN state: on/off
+    </li>
+    <br>
+    <li>internet_ip<br>
+        current IP-Adresse
+    </li>
+    <br>
+    <li>internet_state<br>
+        state of the Internet connection: connected/disconnected
+    </li>
+    <br>
+    <li>night_time_ctrl<br>
+        state night time control (do not disturb): on/off
+    </li>
+    <br>
+    <li>num_new_messages<br>
+        Number of new Voice Mail messages
+    </li>
+    <br>
+    <li>fw_version_info<br>
+        Information on the installed firmware version: <VersionNum> <creation date> <time>
+    </li>
+    <br>
   <br>
   </ul>
 
@@ -2352,6 +2381,35 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
         Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
+    </li>
+    <br>
+    <b>FritzBox-spezifische Readings</b>
+    <li>wlan_state<br>
+        WLAN-Status: on/off
+    </li>
+    <br>
+    <li>wlan_guest_state<br>
+        Gast-WLAN-Status: on/off
+    </li>
+    <br>
+    <li>internet_ip<br>
+        aktuelle IP-Adresse
+    </li>
+    <br>
+    <li>internet_state<br>
+        Status der Internetverbindung: connected/disconnected
+    </li>
+    <br>
+    <li>night_time_ctrl<br>
+        Status der Klingelsperre on/off
+    </li>
+    <br>
+    <li>num_new_messages<br>
+        Anzahl der neuen Anrufbeantworter-Meldungen
+    </li>
+    <br>
+    <li>fw_version_info<br>
+        Angaben zu der installierten Firmware-Version: <VersionNr> <Erstelldatum> <Zeit>
     </li>
     <br>
   <br>
