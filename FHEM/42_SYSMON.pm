@@ -59,8 +59,13 @@ use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
   DIFF_SUFFIX => "_diff",
-  FB_WLAN_STATE      => "wlan_state",
-  FB_WLAN_STATE_TEXT => "wlan_state_text"
+  FB_WLAN_STATE       => "wlan_state",
+  FB_WLAN_GUEST_STATE => "wlan_guest_state",
+  FB_INET_IP          => "internet_ip",
+  FB_INET_STATE       => "internet_state",
+  FB_N_TIME_CTRL      => "night_time_ctrl",
+  FB_NUM_NEW_MESSAGES => "num_new_messages",
+  FB_FW_VERSION       => "fw_version_info",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -291,8 +296,13 @@ SYSMON_updateCurrentReadingsMap($) {
   
   if(SYSMON_isFB($hash)) {
     # FB WLAN state
-	  $rMap->{+FB_WLAN_STATE}      = "WLAN State";
-	  $rMap->{+FB_WLAN_STATE_TEXT} = "WLAN State";
+	  $rMap->{+FB_WLAN_STATE}       = "WLAN State";
+	  $rMap->{+FB_WLAN_GUEST_STATE} = "WLAN Guest State";
+	  $rMap->{+FB_INET_IP}          = "Internet IP";
+	  $rMap->{+FB_INET_STATE}       = "Internet connection state";
+	  $rMap->{+FB_N_TIME_CTRL}      = "night time control";
+	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
+	  $rMap->{+FB_FW_VERSION}       = "firmware info";
   }
   
 	# User defined
@@ -524,13 +534,17 @@ SYSMON_Update($@)
   } else {
 	  # Beim ersten mal alles aktualisieren!
 	  if(!$u_first_mark) {
-	    $u_first_mark = 1;
 	    $refresh_all = 1;
 	  }
 
 	  # Parameter holen
     my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
+    # Mark setzen 
+    if(!$u_first_mark) {
+	    $u_first_mark = 1;
+	  }
+	  
     $hash->{STATE} = "Active";
     #my $state = $map->{LOADAVG};
     #readingsBulkUpdate($hash,"state",$state);
@@ -575,8 +589,14 @@ SYSMON_obtainParameters($$)
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
 	 
 	# Einmaliges
-	$map = SYSMON_getCPUBogoMIPS($hash, $map);
-  
+	if(!$u_first_mark) {
+	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
+	
+	  if(SYSMON_isFB($hash)) {
+	    $map = SYSMON_FBVersionInfo($hash, $map);
+    }
+  }
+
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
   $map = SYSMON_getUptime($hash, $map);
   $map = SYSMON_getFHEMUptime($hash, $map);
@@ -596,7 +616,7 @@ SYSMON_obtainParameters($$)
       }
       $map = SYSMON_getLoadAvg($hash, $map);
       $map = SYSMON_getCPUProcStat($hash, $map);
-      $map = SYSMON_getDiskStat($hash, $map);
+      #$map = SYSMON_getDiskStat($hash, $map);
     }
   }
 
@@ -641,7 +661,12 @@ SYSMON_obtainParameters($$)
         }
       }
       if(SYSMON_isFB($hash)) {
-      	$map = SYSMON_getWLANState($hash, $map);
+      	$map = SYSMON_getFBWLANState($hash, $map);
+      	$map = SYSMON_getFBWLANGuestState($hash, $map);
+      	$map = SYSMON_getFBInetIP($hash, $map);
+      	$map = SYSMON_getFBInetConnectionState($hash, $map);
+      	$map = SYSMON_getFBNightTimeControl($hash, $map);
+      	$map = SYSMON_getFBNumNewMessages($hash, $map);
       }
     }
   }
@@ -1382,27 +1407,143 @@ sub SYSMON_getNetworkInfo ($$$)
 # Liefert Informationen, ob WLAN an oder aus ist (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getWLANState($$)
+sub SYSMON_getFBWLANState($$)
 {
 	my ($hash, $map) = @_;
 	
-	logF($hash, "SYSMON_getWLANState", "");
+	#logF($hash, "SYSMON_getFBWLANState", "");
 	
-	my $ret_str = trim(SYSMON_execute($hash, "ctlmgr_ctl r wlan settings/ap_enabled"));
+	$map->{+FB_WLAN_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/ap_enabled",1);
 	
-	$map->{+FB_WLAN_STATE}=$ret_str;
-	if($ret_str+0 == 1)
-	{
-		$map->{+FB_WLAN_STATE_TEXT}="on";
-  } else {
-    if($ret_str+0 == 0)
-	  {
-      $map->{+FB_WLAN_STATE_TEXT}="off";
-	  }	else {
-	  	$map->{+FB_WLAN_STATE_TEXT}="unknown";
-	  }
-  }
 	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Informationen, ob WLAN-Gastzugang an oder aus ist (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBWLANGuestState($$)
+{
+	my ($hash, $map) = @_;
+	
+	#logF($hash, "SYSMON_getFBWLANGuestState", "");
+	
+	$map->{+FB_WLAN_GUEST_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/guest_ap_enabled",1);
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert IP Adresse im Internet (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBInetIP($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_INET_IP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/ipaddr");
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Status Internet-Verbindung (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBInetConnectionState($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_INET_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connection_status");
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Status Klingelsperre (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBNightTimeControl($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_N_TIME_CTRL}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r box settings/night_time_control_enabled",1);
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert Anzahl der nicht abgehörten Nachrichten auf dem Anrufbeantworter (nur FritzBox)
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBNumNewMessages($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
+	
+	return $map;
+}
+
+# TODO: FritzBox-Infos: Dateien /var/env oder /proc/sys/urlader/environment. 
+
+#------------------------------------------------------------------------------
+# Liefert Informationen zu verschiedenen Eigenschaften durch Aufruf von entsprechenden Befehlen
+# Parameter: HASH; cmd; Art (Interpretieren als: 1=on/off)
+#------------------------------------------------------------------------------
+sub SYSMON_acquireInfo_intern($$;$)
+{
+	my ($hash, $cmd, $art) = @_;
+	
+	logF($hash, "SYSMON_acquireInfo_intern", "cmd: ".$cmd);
+	
+	my $str = trim(SYSMON_execute($hash, $cmd));
+	my $ret;
+	
+	if(!defined($art)) { $art= 0; }
+
+  $ret = $str;
+  if($art == 1) {
+    if($str+0 == 1) {
+	   $ret="on";
+    } else {
+      if($str+0 == 0) {
+        $ret="off";
+	    }	else {
+	  	  $ret="unknown";
+	    }
+    }
+  }
+	return $ret;
+}
+
+sub SYSMON_FBVersionInfo($$)
+{
+	my ($hash, $map) = @_;
+	
+  my $data = SYSMON_execute($hash, "/etc/version --version --date");
+  
+  my($v, $d, $t) = split(/\s+/, $data);
+  
+  my $version = "";
+  if(defined($v)) { $version = $v; }
+  if(defined($d)) { $version.= " ".$d; }
+  if(defined($t)) { $version.= " ".$t; }
+  
+  #if(defined($data[0])) {
+  #	#Version
+  #	$version = $data[0];
+  #}
+  #if(defined($data[1])) {
+  #	#Date
+  #	$version = $version." ".$data[1];
+  #}
+  
+  if($version ne "") {
+  	$map->{+FB_FW_VERSION}=$version;
+  }
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
