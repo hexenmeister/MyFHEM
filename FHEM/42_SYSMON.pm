@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 5203 2014-03-11 22:08:38Z hexenmeister $
+# $Id: 42_SYSMON.pm 5618 2014-04-23 21:22:54Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.3.8";
+my $VERSION = "1.4.0";
 
 use constant {
   DATE            => "date",
