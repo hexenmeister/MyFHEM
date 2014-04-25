@@ -30,10 +30,10 @@
 # RPiRamSwap: parameter "R" for RAM, "S" for swap
 #
 # programming:
-# initial module by Jörg Wiemann
+# initial module by Jï¿½rg Wiemann
 # https://groups.google.com/forum/?fromgroups#!topic/fhem-users/cfefH97QeY4
 # corrections by Prof. Dr. Peter A. Henning
-# modifications by Peter Mühlbeyer:
+# modifications by Peter Mï¿½hlbeyer:
 #  - WLAN added, CPU frequency changed, added USB stick (/dev/sda1)
 #  - changed german words to english
 #  - changed sequence of filesystem values to match others
@@ -163,13 +163,13 @@ sub RPiCPUSpeed ()
   # /proc/cpuinfo gives the speed in BogoMIPS and not in MHz, for overclocking
   # the MHz value is more interesting
   # my $CPUSpeed = qx(cat /proc/cpuinfo | grep "BogoMIPS" | sed 's/[^0-9\.]//g');
-  # original thread from Jörg
+  # original thread from Jï¿½rg
   # RPiCPUSpeed" => substr(qx(cat /proc/cpuinfo | grep BogoMIPS),11).' MHz',
   
   # comments for unix/perl newbie, can be deleted
-  # drei letzte Zeichen löschen mit sed: sed -e 's/.\{3\}$//' -> funktioniert nicht
-  # letztes Zeichen löschen mit sed: sed 's/.$//' (3 mal) -> funktioniert nicht
-  # drei letzte Zeichen löschen mit sed: sed 's/...\$//' sollte funktionieren
+  # drei letzte Zeichen lï¿½schen mit sed: sed -e 's/.\{3\}$//' -> funktioniert nicht
+  # letztes Zeichen lï¿½schen mit sed: sed 's/.$//' (3 mal) -> funktioniert nicht
+  # drei letzte Zeichen lï¿½schen mit sed: sed 's/...\$//' sollte funktionieren
   
   my $CPUSpeed = qx(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq | sed 's/[^0-9\.]//g') / 1000;
 
@@ -323,13 +323,12 @@ sub RPiNetwork ($$)
   return $network;
 }
 
-my $Datum = `date "+%d.%m.20%y %H.%M.%S"`;
-
 #------------------------------------------------------------------------------
 # shows the values on the screen
 #------------------------------------------------------------------------------
 sub ShowRPiValues ()
 {
+  my $Datum = `date "+%d.%m.20%y %H:%M:%S"`;
   my @RamValues = RPiRamSwap("I");
   my %RPiValues =
   (
