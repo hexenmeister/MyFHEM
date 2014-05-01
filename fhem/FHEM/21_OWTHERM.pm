@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.15";
+my $owx_version="5.16";
 
 my %gets = (
   "id"          => "",
@@ -526,10 +526,13 @@ sub OWTHERM_GetValues($@) {
         if( !defined($ret) );
     }
   }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_GetValues),$hash );
-    };
-    $ret = GP_Catch($@) if $@;
+    #-- skip, if the conversion is driven by master
+    unless ( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
+      eval {
+        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_GetValues),$hash );
+      };
+      $ret = GP_Catch($@) if $@;
+    }
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{

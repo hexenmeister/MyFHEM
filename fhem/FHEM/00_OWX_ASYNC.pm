@@ -82,7 +82,7 @@ if( $^O =~ /Win/ ) {
   $SER_regexp= "/dev/";
 } 
 
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw( gettimeofday tv_interval );
 
 require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 sub Log3($$$);
@@ -128,7 +128,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.0;
+$owx_async_version=5.1;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -829,12 +829,10 @@ sub OWX_ASYNC_Kick($) {
 
   #-- Only if we have the dokick attribute set to 1
   if (main::AttrVal($hash->{NAME},"dokick",0)) {
-    #-- issue the skip ROM command \xCC followed by start conversion command \x44 
-    $ret = OWX_Execute($hash,"kick",1,undef,"\xCC\x44",0,undef);
-    if( !$ret ){
-      Log3 ($hash->{NAME},3, "OWX: Failure in temperature conversion\n");
-      return 0;
-    }
+    eval {
+      OWX_ASYNC_ScheduleMaster( $hash, PT_THREAD(\&OWX_ASYNC_PT_Kick), $hash );
+    };
+    Log3 $hash->{NAME},3,"OWX_ASYNC_Kick: ".GP_Catch($@) if $@;
   }
   
   if (OWX_ASYNC_Search($hash)) {
@@ -842,6 +840,31 @@ sub OWX_ASYNC_Kick($) {
   };
   
   return 1;
+}
+
+sub OWX_ASYNC_PT_Kick($) {
+  my ($thread,$hash) = @_;
+
+  PT_BEGIN($thread);
+  Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
+  #-- issue the skip ROM command \xCC followed by start conversion command \x44 
+  unless (OWX_ASYNC_Execute($hash,$thread,1,undef,"\x44",0)) {
+    PT_EXIT("OWX_ASYNC: Failure in temperature conversion");
+  }
+  my ($seconds,$micros) = gettimeofday;
+  $thread->{execute_delayed} = [$seconds+1,$micros];
+  #PT_YIELD_UNTIL(defined $thread->{ExecuteResponse});
+  PT_YIELD_UNTIL(tv_interval($thread->{execute_delayed})>=0);
+
+  GP_ForallClients($hash,sub { 
+    my ($client) = @_;
+    Log3 $client->{NAME},5,"OWX_ASYNC_PT_Kick: doing tempConv for $client->{TYPE}, tempConv: ".main::AttrVal($client->{NAME},"tempConv","-");
+    if ($client->{TYPE} eq "OWTHERM" and AttrVal($client->{NAME},"tempConv","") eq "onkick" ) {
+      OWX_ASYNC_Schedule($client, PT_THREAD(\&OWXTHERM_PT_GetValues), $client );
+    }
+  },undef);
+  
+  PT_END;
 }
 
 ########################################################################################
@@ -1087,6 +1110,18 @@ sub OWX_ASYNC_Schedule($$@) {
     push @{$master->{tasks}->{$owx_dev}}, $task;
   } else {
     $master->{tasks}->{$owx_dev} = [$task];
+  }
+  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
+};
+
+sub OWX_ASYNC_ScheduleMaster($$@) {
+  my ( $master, $task, @args ) = @_;
+  die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
+  $task->{ExecuteArgs} = \@args;
+  if (defined $master->{tasks}->{master}) {
+    push @{$master->{tasks}->{master}}, $task;
+  } else {
+    $master->{tasks}->{master} = [$task];
   }
   main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
 };
