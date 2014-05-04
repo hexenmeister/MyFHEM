@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.18";
+my $owx_version="5.19";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1896,7 +1896,7 @@ sub OWXCOUNT_PT_SetPage($$$) {
   } 
   #=============== midnight value =====================================
   if( ($page==14) || ($page==15) ){
-    OWCOUNT_parseMidnight($hash,$data,$page);
+    OWCOUNT_ParseMidnight($hash,$data,$page);
   }
   #=============== set memory =========================================
   #-- issue the match ROM command \x55 and the write scratchpad command
