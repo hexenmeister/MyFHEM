@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -581,7 +581,8 @@ sub OWSWITCH_GetValues($) {
     eval {
       OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXSWITCH_PT_GetState),$hash );
     };
-    $ret = GP_Catch($@) if $@;
+    return unless $@;
+    $ret = GP_Catch($@);
   }elsif( $interface eq "OWServer" ){
      $ret = OWFSSWITCH_GetState($hash);
   }else{
