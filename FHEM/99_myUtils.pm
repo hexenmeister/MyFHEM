@@ -493,9 +493,19 @@ _checkOWX($$) {
 # Wenn ein Fensterkontakt nicht verfügbar ist (Battery leer, name falsch geschrieben) 
 # wird das wie ein offenes Fenster behandelt.
 sub
-notGreaterThen($$;@)
+notGreaterThen($$;@) {
+  my ($device, $desiredValue, @wndDeviceList) = @_;
+  my @list = struct2Array($device,undef);
+  foreach (@list) {
+  	notGreaterThen_($_, $desiredValue, @wndDeviceList);
+  }
+}
+
+sub
+notGreaterThen_($$;@)
 {
   my ($device, $desiredValue, @wndDeviceList) = @_;
+  $desiredValue = _convertValueForDevice($device, $desiredValue);
   my $wndOpen = 0; # wird auf 1 gesetzt, wenn min 1 Fensterkontakt 'offen' meldet
   my $desiredValueWhenOpened = 90; # wenn offen, wird dieser Wert statt den gewünschten verwendet (bei 100 wäre keine Änderung duchgeführt)
   
@@ -534,9 +544,19 @@ notGreaterThen($$;@)
 # Wenn ein Fensterkontakt nicht verfügbar ist (Battery leer, name falsch geschrieben) 
 # wird das wie ein offenes Fenster behandelt.
 sub
-notLesserThen($$;@)
+notLesserThen($$;@) {
+  my ($device, $desiredValue, @wndDeviceList) = @_;
+  my @list = struct2Array($device,undef);
+  foreach (@list) {
+  	notLesserThen_($_, $desiredValue, @wndDeviceList);
+  }
+}
+
+sub
+notLesserThen_($$;@)
 {
   my ($device, $desiredValue, @wndDeviceList) = @_;
+  $desiredValue = _convertValueForDevice($device, $desiredValue);
   my $wndOpen = 0; # wird auf 1 gesetzt, wenn min 1 Fensterkontakt 'offen' meldet
   my $desiredValueWhenOpened = 20; # wenn offen, wird dieser Wert statt den gewünschten verwendet (bei 0 wäre keine Änderung duchgeführt)
   
@@ -586,6 +606,32 @@ _getRolloLevel($)
 {
 	my ($name) = @_;
 	return int(ReadingsVal($name, "level", "100"));
+}
+
+###############################################################################
+# Liest eventMap-Attribut aus und ersetzt ggf. die symbolischen 
+# Werte durch entsprechenden Numerischen.
+###############################################################################
+sub
+_convertValueForDevice($$)
+{
+	my ($name, $value) = @_;
+	my $eventMap = AttrVal($name, 'eventMap', undef);
+	
+	if(defined($eventMap)) {
+    my @list = split(/\s+/, trim($eventMap));
+    foreach (@list) {
+      my($nVal, $sVal) = split(/:/, $_);
+      if($value eq $sVal) {
+        $value = $nVal;
+        if(lc($value) eq 'on') {$value = 100;}
+	      if(lc($value) eq 'off') {$value = 0;}
+        last;
+      }
+    }
+	}
+	
+	return $value;
 }
 
 # Liefert den aktuelen numerisschen Wert eines Geraetezustandes. 
@@ -1032,6 +1078,49 @@ relDruck($$$){
   my $xp = $Alti * $g0 / ($R*($T+$Temp + $Ch*$E + $a*$Alti/2));
   my $Pr = $Pa*exp($xp);
   return int($Pr);
+}
+
+#sub
+#teststruc($) {
+#	my($name) = @_;
+#	my @ret = struct2Array($name, 'CUL_HM');
+#  #my @ret = struct2Array($name, undef);
+#  Log 3, ">>---------------->".join(", ",@ret);
+#  Log 3, ">>---------------->".@ret;
+#  return @ret;
+#}
+
+###############################################################################
+# Geht die angegebene Struktur rekursiv durch und liefert alle Elementen 
+# eines angegebenen Types zurueck. 
+# Parameter: 
+#  Name:   Name der Struktur
+#  Target: Typ der gesuchten Elemente (undef für alles, was nicht Struktur ist)
+#  (ret - Parameter fuer die Rekursion, soll beim ersten Aufruf unterbleiben)
+###############################################################################
+sub
+struct2Array($$;@) {
+  my($name,$target,@ret) = @_;
+  if(defined($name)) {
+  	my $dev = $defs{$name};
+  	my $type = $dev->{TYPE};
+  	if($type eq 'structure') {
+      #my @a = {DEF};
+      # interne Struktur auslesen
+      foreach my $kname (keys($dev->{CONTENT})) {
+        @ret = struct2Array($kname,$target,@ret);
+      }
+    } else {
+    	if(!defined($target) || $type eq $target) {
+    		#Log 3, ">>>>>>>>>>>>>>>".$name;
+    		push(@ret,$name);
+    	} else {
+    		# ignore
+    		Log 5, "unexpected type: ".$name;
+    	}
+    }
+  }
+  return @ret;
 }
 
 1;
