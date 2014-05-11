@@ -1,5 +1,5 @@
 
-# $Id: 36_JeeLink.pm 5579 2014-04-20 08:15:06Z justme1968 $
+# $Id: 36_JeeLink.pm 5794 2014-05-09 08:43:19Z justme1968 $
 
 package main;
 
@@ -110,7 +110,7 @@ JeeLink_Define($$)
   $dev .= "\@57600" if( $dev !~ m/\@/ );
 
   $hash->{Clients} = $clientsJeeLink;
-  #$hash->{MatchList} = \%matchListJeeLink;
+  $hash->{MatchList} = \%matchListPCA301;
 
   $hash->{DeviceName} = $dev;
 
@@ -565,6 +565,9 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
 
+      } elsif( $dmsg =~m /LaCrosseITPlusReader/ ) {
+        $hash->{MatchList} = \%matchListPCA301;
+
       } elsif( $dmsg =~m /ec3kSerial/ ) {
         $hash->{MatchList} = \%matchListPCA301;
         #JeeLink_SimpleWrite($hash, "ec", 1);
@@ -578,8 +581,9 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "m");   # show used ram on jeenode
       }
       $hash->{STATE} = "Initialized";
-        }
-        return;
+    }
+
+    return;
 
   } elsif ( $dmsg =~ m/^(OOK|FSK)\-(433|868)MHz/ ) {
         readingsSingleUpdate($hash,"RFM-config",$dmsg,0);
