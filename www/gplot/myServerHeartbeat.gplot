@@ -18,7 +18,7 @@ set y2tics ("" 0, "" 30, "" 59)
 set y2label ""
 set y2range [-1:60]
 
-#FileLog 3:V:0:
+#FileLog 3:.*Heartbeat:0:
 
 plot "<IN>" x1y1 notitle ls l1fill lw 0.5 with steps
 
