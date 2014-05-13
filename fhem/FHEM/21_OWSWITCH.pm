@@ -1193,7 +1193,7 @@ sub OWXSWITCH_SetState($$) {
     #-- issue the match ROM command \x55 and the write status command
     #   \x55 at address TA1 = \x07 TA2 = \x00
     #-- reading 9 + 4 + 2 data bytes = 15 bytes
-    my $select=sprintf("\x55\x07\x00%c",$statneu);   
+    $select=sprintf("\x55\x07\x00%c",$statneu);
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,$select,2);
     if( $res eq 0 ){
