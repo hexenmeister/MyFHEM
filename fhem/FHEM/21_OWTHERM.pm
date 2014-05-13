@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.17";
+my $owx_version="5.18";
 
 my %gets = (
   "id"          => "",
@@ -1008,7 +1008,6 @@ sub OWXTHERM_GetValues($) {
   return "$owx_dev has returned invalid data"
     if( length($res)!=19);
   return OWXTHERM_BinValues($hash,"ds182x.reading",1,undef,$owx_dev,undef,undef,substr($res,10,9));
-  return undef;
 } 
 
 #######################################################################################
