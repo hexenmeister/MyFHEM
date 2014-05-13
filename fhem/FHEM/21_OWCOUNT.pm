@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.19";
+my $owx_version="5.20";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -803,12 +803,9 @@ sub OWCOUNT_GetPage ($$$@) {
   my $interface= $hash->{IODev}->{TYPE};
   my $name    = $hash->{NAME};
   my $ret; 
-  my $oldfinal= $final;
   
   #-- check if memory usage has been disabled
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;
-  $final=0
-    if($nomemory==1);
   
   #-- even if memory usage has been disabled, we need to read the page because it contains the counter values
   if( ($nomemory==0) || ($nomemory==1 && (($page==14)||($page==15))) ){
