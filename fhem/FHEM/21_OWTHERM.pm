@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.16";
+my $owx_version="5.17";
 
 my %gets = (
   "id"          => "",
@@ -504,7 +504,7 @@ sub OWTHERM_GetValues($@) {
   
   my $name    = $hash->{NAME};
   my $value   = "";
-  my $ret     = "";
+  my $ret;
   
   #-- check if device needs to be initialized
   if( $hash->{READINGS}{"state"}{VAL} eq "defined"){
