@@ -274,6 +274,12 @@ sub OWX_ASYNC_Ready ($) {
 	return 1;
 };
 
+sub OWX_ASYNC_Read ($) {
+  my $hash = shift;
+  OWX_ASYNC_Poll($hash);
+  OWX_ASYNC_RunTasks($hash);
+};
+
 sub OWX_ASYNC_Poll ($) {
 	my $hash = shift;
 	if (defined $hash->{ASYNC}) {
@@ -978,21 +984,11 @@ sub OWX_ASYNC_Verify ($$) {
 #
 ########################################################################################
 
-sub OWX_Execute($$$$$$$) {
-	my ( $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
-	if (my $executor = $hash->{ASYNC}) {
-		delete $hash->{replies}{$owx_dev}{$context} if (defined $owx_dev and defined $context);
-		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread, $delay );
-	} else {
-		return 0;
-	}
-};
-
 sub OWX_ASYNC_Execute($$$$$$) {
 	my ( $hash, $context, $reset, $owx_dev, $data, $numread ) = @_;
 	if (my $executor = $hash->{ASYNC}) {
 		delete $context->{ExecuteResponse};
-		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread, undef );
+		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread );
 	} else {
 		return 0;
 	}
@@ -1106,52 +1102,97 @@ sub OWX_ASYNC_Schedule($$@) {
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   my $owx_dev = $hash->{ROM_ID};
   $task->{ExecuteArgs} = \@args;
+  $task->{ExecuteTime} = [gettimeofday];
   if (defined $master->{tasks}->{$owx_dev}) {
     push @{$master->{tasks}->{$owx_dev}}, $task;
   } else {
     $master->{tasks}->{$owx_dev} = [$task];
   }
-  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
+  OWX_ASYNC_RunTasks($master);
 };
 
 sub OWX_ASYNC_ScheduleMaster($$@) {
   my ( $master, $task, @args ) = @_;
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   $task->{ExecuteArgs} = \@args;
+  $task->{ExecuteTime} = [gettimeofday];
   if (defined $master->{tasks}->{master}) {
     push @{$master->{tasks}->{master}}, $task;
   } else {
     $master->{tasks}->{master} = [$task];
   }
-  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
+  OWX_ASYNC_RunTasks($master);
 };
 
 sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
-  my ( $owx_dev, $queue );
   if ($master->{STATE} eq "Active") {
-    foreach my $owx_dev (keys %{$master->{tasks}}) {
-      my $queue = $master->{tasks}->{$owx_dev};
-      if (@$queue) {
-        my $task = $queue->[0];
-        my $ret;
-        eval {
-          $ret = $task->PT_SCHEDULE(@{$task->{ExecuteArgs}});
-        };
-        if (!$ret or $@) {
-          shift @$queue;
-          delete $master->{tasks}->{$owx_dev} unless @$queue;
-          my $msg = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
-          if (defined $msg) {
-            Log3 ($master->{NAME},2,"OWX_ASYNC: Error running task for $owx_dev: $msg");
+    my $now = [gettimeofday];
+    my $queue = $master->{currenttaskqueue};
+    unless (defined $queue and @$queue) {
+      foreach my $owx_dev (keys %{$master->{tasks}}) {
+        $queue = $master->{tasks}->{$owx_dev};
+        if (@$queue) {
+          # if task is eligible to run now:
+          if (defined ($queue->[0]->{ExecuteTime}) and (tv_interval($queue->[0]->{ExecuteTime},$now) >= 0)) {
+            $master->{currenttaskqueue} = $queue;
+            $master->{currenttaskdevice} = $owx_dev;
+            last;
           }
+        } else {
+          delete $master->{tasks}->{$owx_dev};
         }
-        OWX_ASYNC_Poll( $master );
-      } else {
-        delete $master->{tasks}->{$owx_dev};
       }
     }
-    main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0) if (keys %{$master->{tasks}});
+    if (defined $queue and @$queue) {
+      my $task = $queue->[0];
+      delete $task->{ExecuteTime};
+      my $ret;
+      eval {
+        $ret = $task->PT_SCHEDULE(@{$task->{ExecuteArgs}});
+      };
+      # finished running or error:
+      if (!$ret or $@) {
+        shift @$queue;
+        delete $master->{currenttaskqueue};
+        my $msg = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+        if (defined $msg) {
+          Log3 ($master->{NAME},2,"OWX_ASYNC: Error running task for $master->{currenttaskdevice}: $msg");
+        }
+      # or task timed out:
+      } elsif (defined $task->{TimeoutTime} and tv_interval($task->{TimeoutTime},$now) > 0) {
+        shift @$queue;
+        delete $master->{currenttaskqueue};
+        Log3 ($master->{NAME},2,"OWX_ASYNC: Timeout task for $master->{currenttaskdevice}");
+      # or not finished running, no error but scheduled for future:
+      } elsif (defined $task->{ExecuteTime} and tv_interval($task->{ExecuteTime},$now) < 0) {
+        delete $master->{currenttaskqueue};
+      # not finished running, no error and not scheduled for future -> waiting for data!
+      } else {
+      }
+    }
+    unless (defined $master->{currenttaskqueue}) {
+      my $nexttime;
+      foreach my $owx_dev (keys %{$master->{tasks}}) {
+        $queue = $master->{tasks}->{$owx_dev};
+        if (@$queue) {
+          my $nexttask = $queue->[0];
+          unless (defined $nexttask->{ExecuteTime}) {
+            $nexttime = [gettimeofday];
+            last;
+          # if task is scheduled for future:
+          } elsif (tv_interval($nexttask->{ExecuteTime},$now) < 0) {
+            $nexttime = $nexttask->{ExecuteTime} unless (defined $nexttime and tv_interval($nexttime,$nexttask->{ExecuteTime}) > 0);
+          }
+        } else {
+          delete $master->{tasks}->{$owx_dev};
+        }
+      }
+      # nexttime is defined if there's no current task in queue and a task that is scheduled for the future exists
+      if (defined $nexttime) {
+        main::InternalTimer(sprintf ("%d.%06u",$nexttime->[0],$nexttime->[1]), "OWX_ASYNC_RunTasks", $master,0);
+      }
+    }
   }
 };
 

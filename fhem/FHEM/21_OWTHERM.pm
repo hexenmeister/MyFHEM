@@ -1116,9 +1116,8 @@ sub OWXTHERM_PT_GetValues($@) {
     } else {
       $micros += ($delay*1000);
     }
-    $thread->{execute_delayed} = [$seconds,$micros];
-    PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-    PT_YIELD_UNTIL(tv_interval($thread->{execute_delayed})>=0);
+    $thread->{ExecuteTime} = [$seconds,$micros];
+    PT_YIELD_UNTIL(defined $thread->{ExecuteResponse} and tv_interval($thread->{ExecuteTime}) >= 0 );
   }
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
