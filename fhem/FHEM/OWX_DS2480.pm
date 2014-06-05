@@ -136,7 +136,11 @@ sub read() {
     if ($count_in>0) {
       main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, Receiving: ".unpack("H*",$string_part));
     } else {
-      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}");
+      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, no data read:");
+      foreach my $i (0..6) {
+        my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller($i);
+        main::Log3($serial->{name},5, "$subroutine $filename $line");
+      }
     }
   }
   return $count_in > 0 ? 1 : undef;
@@ -158,7 +162,7 @@ sub response_ready() {
 sub start_query() {
   my ($serial) = @_;
   #read and discard any outstanding data from previous commands:
-  while($serial->read(255)) {};
+  while($serial->read()) {};
 
   $serial->{string_in} = "";
   $serial->{num_reads} = 0;
