@@ -1055,7 +1055,7 @@ sub OWX_ASYNC_Schedule($$@) {
   } else {
     $master->{tasks}->{$owx_dev} = [$task];
   }
-  OWX_ASYNC_RunTasks($master);
+  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
 };
 
 sub OWX_ASYNC_ScheduleMaster($$@) {
@@ -1068,7 +1068,7 @@ sub OWX_ASYNC_ScheduleMaster($$@) {
   } else {
     $master->{tasks}->{master} = [$task];
   }
-  OWX_ASYNC_RunTasks($master);
+  main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $master,0);
 };
 
 sub OWX_ASYNC_RunTasks($) {
