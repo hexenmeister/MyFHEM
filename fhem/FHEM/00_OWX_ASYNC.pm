@@ -156,7 +156,7 @@ sub OWX_ASYNC_Initialize ($) {
   $hash->{SetFn}    = "OWX_ASYNC_Set";
   $hash->{AttrFn}   = "OWX_ASYNC_Attr";
   $hash->{NotifyFn} = "OWX_ASYNC_Notify";
-  $hash->{ReadFn}   = "OWX_ASYNC_Poll";
+  $hash->{ReadFn}   = "OWX_ASYNC_Read";
   $hash->{ReadyFn}  = "OWX_ASYNC_Ready";
   $hash->{InitFn}   = "OWX_ASYNC_Init";
   $hash->{AttrList} = "dokick:0,1 interval IODev timeout";
@@ -994,39 +994,6 @@ sub OWX_ASYNC_Execute($$$$$$) {
 	}
 };
 
-#######################################################################################
-#
-# OWX_AwaitExecuteResponse - Wait for the result of a call to OWX_Execute 
-#
-# Parameter hash = hash of bus master
-#        context = correlates the response with the call to OWX_Execute
-#        owx_dev = 1-Wire-address of device that is to be read
-#
-# Return: Data that has been read from device
-#         undef if timeout occours
-#
-########################################################################################
-
-sub OWX_AwaitExecuteResponse($$$) {
-	my ($hash,$context,$owx_dev) = @_;
-	#-- get the interface
-	my $async = $hash->{ASYNC};
-
-	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
-	if (defined $async and defined $owx_dev and defined $context) {
-		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec
-		for (my $i=0;$i<$times;$i++) {
-			if(! defined $hash->{replies}{$owx_dev}{$context}) {
-				select (undef,undef,undef,0.05);
-				$async->poll($hash);
-			} else {
-				return $hash->{replies}{$owx_dev}{$context};
-			};
-		};
-	};
-	return undef;
-};
-
 ########################################################################################
 #
 # OWX_ASYNC_AfterExecute - is called when a query initiated by OWX_Execute successfully returns
@@ -1071,27 +1038,7 @@ sub OWX_ASYNC_AfterExecute($$$$$$$$) {
 	      numread   => $numread,
 	    };
 	  } else {
-  		foreach my $d ( sort keys %main::defs ) {
-  			if ( my $hash = $main::defs{$d} ) {
-  				if ( defined( $hash->{ROM_ID} )
-  				  && defined( $hash->{IODev} )
-  				  && $hash->{IODev} == $master
-  				  && $hash->{ROM_ID} eq $owx_dev ) {
-  				  if ($main::modules{$hash->{TYPE}}{AfterExecuteFn}) {
-  				    my $ret = CallFn($d,"AfterExecuteFn", $hash, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata);
-  				    Log3 ($master->{NAME},4,"OWX_ASYNC_AfterExecute [".(defined $owx_dev ? $owx_dev : "unknown owx device")."]: $ret") if ($ret);
-  				    if ($success) {
-  				      readingsSingleUpdate($hash,"PRESENT",1,1) unless ($hash->{PRESENT});
-  				    } else {
-  				      readingsSingleUpdate($hash,"PRESENT",0,1) if ($hash->{PRESENT});
-  				    }
-  					}
-  				}
-  			}
-  		}
-  		if (defined $context) {
-  			$master->{replies}{$owx_dev}{$context} = $readdata;
-  		}
+	    die "OWX_ASYNC_AfterExecute: $context is not a ProtoThread";
 	  }
 	}
 };
@@ -1165,7 +1112,7 @@ sub OWX_ASYNC_RunTasks($) {
         delete $master->{currenttaskqueue};
         Log3 ($master->{NAME},2,"OWX_ASYNC: Timeout task for $master->{currenttaskdevice}");
       # or not finished running, no error but scheduled for future:
-      } elsif (defined $task->{ExecuteTime} and tv_interval($task->{ExecuteTime},$now) < 0) {
+      } elsif (defined $task->{ExecuteTime}) {
         delete $master->{currenttaskqueue};
       # not finished running, no error and not scheduled for future -> waiting for data!
       } else {
@@ -1177,11 +1124,8 @@ sub OWX_ASYNC_RunTasks($) {
         $queue = $master->{tasks}->{$owx_dev};
         if (@$queue) {
           my $nexttask = $queue->[0];
-          unless (defined $nexttask->{ExecuteTime}) {
-            $nexttime = [gettimeofday];
-            last;
           # if task is scheduled for future:
-          } elsif (tv_interval($nexttask->{ExecuteTime},$now) < 0) {
+          if (defined $nexttask->{ExecuteTime}) {
             $nexttime = $nexttask->{ExecuteTime} unless (defined $nexttime and tv_interval($nexttime,$nexttask->{ExecuteTime}) > 0);
           }
         } else {
@@ -1190,7 +1134,9 @@ sub OWX_ASYNC_RunTasks($) {
       }
       # nexttime is defined if there's no current task in queue and a task that is scheduled for the future exists
       if (defined $nexttime) {
-        main::InternalTimer(sprintf ("%d.%06u",$nexttime->[0],$nexttime->[1]), "OWX_ASYNC_RunTasks", $master,0);
+        my $schedule = sprintf ("%d.%06u",$nexttime->[0],$nexttime->[1]);
+        Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks schedule next for $schedule";
+        main::InternalTimer($schedule, "OWX_ASYNC_RunTasks", $master,0);
       }
     }
   }
