@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 5756 2014-05-05 22:18:22Z hexenmeister $
+# $Id: 42_SYSMON.pm 6077 2014-06-06 19:27:44Z hexenmeister $
 
 package main;
 
@@ -66,6 +66,7 @@ use constant {
   FB_N_TIME_CTRL      => "night_time_ctrl",
   FB_NUM_NEW_MESSAGES => "num_new_messages",
   FB_FW_VERSION       => "fw_version_info",
+  FB_DECT_TEMP        => "dect_temp",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -359,6 +360,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	  $rMap->{+FB_N_TIME_CTRL}      = "night time control";
 	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
 	  $rMap->{+FB_FW_VERSION}       = "firmware info";
+	  $rMap->{+FB_DECT_TEMP}        = "DECT temperatur";
   }
   
 	# User defined
@@ -727,6 +729,7 @@ SYSMON_obtainParameters($$)
       	$map = SYSMON_getFBInetConnectionState($hash, $map);
       	$map = SYSMON_getFBNightTimeControl($hash, $map);
       	$map = SYSMON_getFBNumNewMessages($hash, $map);
+      	$map = SYSMON_getFBDECTTemp($hash, $map);
       }
     }
   }
@@ -1571,6 +1574,19 @@ sub SYSMON_getFBNumNewMessages($$)
 	return $map;
 }
 
+#------------------------------------------------------------------------------
+# Liefert DECT-Temperatur einer FritzBox.
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBDECTTemp($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_DECT_TEMP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dect status/Temperature");
+	
+	return $map;
+}
+
 # TODO: FritzBox-Infos: Dateien /var/env oder /proc/sys/urlader/environment. 
 
 #------------------------------------------------------------------------------
@@ -1589,6 +1605,7 @@ sub SYSMON_acquireInfo_intern($$;$)
 	if(!defined($art)) { $art= 0; }
 
   $ret = $str;
+  no warnings;
   if($art == 1) {
     if($str+0 == 1) {
 	   $ret="on";
@@ -1600,6 +1617,7 @@ sub SYSMON_acquireInfo_intern($$;$)
 	    }
     }
   }
+  use warnings;
 	return $ret;
 }
 
@@ -1673,12 +1691,12 @@ sub SYSMON_ShowValuesFmt ($$;@)
     
     my $hash = $main::defs{$name};
     
-    if(!defined($cur_readings_map)) {
-	    SYSMON_updateCurrentReadingsMap($hash);
-    }
+    #if(!defined($cur_readings_map)) {
+	  #  SYSMON_updateCurrentReadingsMap($hash);
+    #}
   
     SYSMON_updateCurrentReadingsMap($hash);
-#Log 3, "SYSMON $>name, @data<";
+  #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(scalar(@data)<=0) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
