@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_myUtils.pm 0001 2013-10-10 22:49:15Z a_schulz $
+# $Id$
 package main;
 
 use strict;
@@ -345,7 +345,7 @@ readCalValue($$$) {
 # Es wird geprüft, ob es sich um ein AT Befehl handelt.
 #
 # Es gibt ganz bestimmt eine elegantere, schnellere und sicherere Methode (ohne globale Variablen wie $defs zu verwenden), 
-# die Zeit für AT-Befeh neu zu berechnen. Leider ist diese mir (noch)I nicht bekannt ;-)
+# die Zeit für AT-Befeh neu zu berechnen. Leider ist diese mir (noch) nicht bekannt ;-)
 sub
 _refreshAtCmd($) {
 	my ($name) = @_;
@@ -1122,5 +1122,28 @@ struct2Array($$;@) {
   }
   return @ret;
 }
+
+# time2dec und dec2hms dienen dazu, Uhrzeiten als Dezimalwerte zu verwenden (und umgekehrt)
+sub time2dec($){
+  my ($h,$m,$s) = split(":", shift);
+  $m = 0 if(!$m);
+  $s = 0 if(!$s);
+  my $t  = $m * 60;
+     $t += $s;
+     $t /= 3600;
+     $t += $h;
+  return ($t)
+}
+
+sub dec2hms($){
+  my ($t) = @_;
+  my $h = int($t);
+  my $r = ($t - $h)*3600;
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  return sprintf("%02d:%02d:%02d",$h,$m,$s);
+}
+
+
 
 1;
