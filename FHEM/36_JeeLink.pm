@@ -1,5 +1,5 @@
 
-# $Id: 36_JeeLink.pm 5794 2014-05-09 08:43:19Z justme1968 $
+# $Id: 36_JeeLink.pm 6085 2014-06-07 21:10:24Z justme1968 $
 
 package main;
 
@@ -17,8 +17,9 @@ sub JeeLink_Ready($);
 sub JeeLink_Write($$);
 
 sub JeeLink_SimpleWrite(@);
+sub JeeLink_ResetDevice($);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:GSD:ETH200comfort:CUL_IR:HX2272:FS20:AliRF";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF";
 
 my %matchListPCA301 = (
     "1:PCA301"          => "^\\S+\\s+24",
@@ -26,7 +27,6 @@ my %matchListPCA301 = (
     "3:RoomNode"        => "^\\S+\\s+11",
     "4:LaCrosse"        => "^\\S+\\s+9 ",
     "5:AliRF"           => "^\\S+\\s+5 ",
-    "6:GSD" => "^GSD",
 );
 
 my %matchListJeeLink433 = (
@@ -76,17 +76,20 @@ JeeLink_Initialize($)
   $hash->{SetFn}        = "JeeLink_Set";
   $hash->{AttrFn}       = "JeeLink_Attr";
   $hash->{AttrList} = "Clients MatchList"
+                      ." hexFile"
+                      ." initCommands"
+                      ." flashCommand"
                       ." DebounceTime BeepLong BeepShort BeepDelay"
                       ." tune " . join(" ", map { "tune_$_" } keys %RxListJeeLink)
                       ." $readingFnAttributes";
 
   $hash->{ShutdownFn} = "JeeLink_Shutdown";
-
 }
 sub
 JeeLink_Fingerprint($$)
 {
 }
+
 
 #####################################
 sub
@@ -111,6 +114,10 @@ JeeLink_Define($$)
 
   $hash->{Clients} = $clientsJeeLink;
   $hash->{MatchList} = \%matchListPCA301;
+
+  if( !defined( $attr{$name}{flashCommand} ) ) {
+    $attr{$name}{flashCommand} = "avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]"
+  }
 
   $hash->{DeviceName} = $dev;
 
@@ -168,7 +175,7 @@ JeeLink_Set($@)
   my $arg = join(" ", @a);
 
 
-  my $list = "beep raw led:on,off led-on-for-timer LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20";
+  my $list = "beep raw led:on,off led-on-for-timer reset LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20 flash";
   return $list if( $cmd eq '?' || $cmd eq '');
 
 
@@ -176,80 +183,159 @@ JeeLink_Set($@)
     Log3 $name, 4, "set $name $cmd $arg";
     JeeLink_SimpleWrite($hash, $arg);
 
-        } elsif( $cmd eq "beep" ) {
-                # +    = Langer Piep
-                # -    = Kurzer Piep
-                # anderes = Pause
-                my $longbeep = AttrVal($name, "BeepLong", "250");
-                my $shortbeep = AttrVal($name, "BeepShort", "100");
-                my $delaybeep = AttrVal($name, "BeepDelay", "0.25");
+  } elsif( $cmd eq "beep" ) {
+    # +    = Langer Piep
+    # -    = Kurzer Piep
+    # anderes = Pause
+    my $longbeep = AttrVal($name, "BeepLong", "250");
+    my $shortbeep = AttrVal($name, "BeepShort", "100");
+    my $delaybeep = AttrVal($name, "BeepDelay", "0.25");
 
-                for(my $i=0;$i<length($arg);$i++) {
-                        my $x=substr($arg,$i,1);
-                        if($x eq "+") {
-                                # long beep
-                                JeeLink_Write($hash, "bFF" . $longbeep);
-                        } elsif($x eq "-") {
-                                # short beep
-                                JeeLink_Write($hash, "bFF" . $shortbeep);
-                        }
-                        select(undef, undef, undef, $delaybeep);
-                }
+    for(my $i=0;$i<length($arg);$i++) {
+      my $x=substr($arg,$i,1);
+      if($x eq "+") {
+              # long beep
+              JeeLink_Write($hash, "bFF" . $longbeep);
+      } elsif($x eq "-") {
+              # short beep
+              JeeLink_Write($hash, "bFF" . $shortbeep);
+      }
+      select(undef, undef, undef, $delaybeep);
+    }
+  }
+  elsif( $cmd eq "flash" ) {
+    my @args = split(' ', $arg);
+    my $log = "";
+    my $hexFile = "";
+    my @deviceName = split('@', $hash->{DeviceName});
+    my $port = $deviceName[0];
+    my $defaultHexFile = "./hexfiles/$hash->{TYPE}-LaCrosseITPlusReader10.hex";
+    my $logFile = AttrVal("global", "logdir", "./log") . "/JeeLinkFlash.log";
 
-  } elsif( $cmd eq "LaCrossePairForSec" ) {
-                my @args = split(' ', $arg);
 
-                return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $args[0] !~ m/^\d+$/ || ($args[1] && $args[1] ne "ignore_battery") );
-                $hash->{LaCrossePair} = $args[1]?2:1;
-                InternalTimer(gettimeofday()+$args[0], "JeeLink_RemoveLaCrossePair", $hash, 0);
+    if(!$arg || $args[0] !~ m/^(\w|\/|.)+$/) {
+      $hexFile = AttrVal($name, "hexFile", "");
+      if ($hexFile eq "") {
+        $hexFile = $defaultHexFile;
+      }
+    }
+    else {
+      $hexFile = $args[0];
+    }
 
-        } elsif( $cmd eq "setReceiverMode" ) {
+    return "Usage: set $name flash [filename]\n\nor use the hexFile attribute" if($hexFile !~ m/^(\w|\/|.)+$/);
 
-                return "Usage: set $name setReceiverMode (LaCrosse,HX2272,FS20)"  if($arg !~ m/^(LaCrosse|HX2272|FS20)$/);
+    $log .= "flashing JeeLink $name\n";
+    $log .= "hex file: $hexFile\n";
+    $log .= "port: $port\n";
+    $log .= "log file: $logFile\n";
 
-                #Get tune values of Transceiver if needed (TX+RX)
-                my $TuneStr = undef;
-                my $AttrStr = AttrVal($name, "tune_" . $arg, undef);
-                $AttrStr = AttrVal($name, "tune", undef) if(!(defined $AttrStr));
-                $TuneStr = JeeLink_CalcTuneCmd($AttrStr) if(defined $AttrStr);
+    my $flashCommand = AttrVal($name, "flashCommand", "");
 
-                JeeLink_Write($hash, $RxListJeeLink{$arg});     #set receiver
-                JeeLink_Write($hash, "t" . $TuneStr) if(defined $TuneStr); #set modified tune
+    if($flashCommand ne "") {
+      if (-e $logFile) {
+        unlink $logFile;
+      }
 
-                #reset debounce time for OOK Signals
-        if($RxListJeeLink{$arg} =~ m/^O/) {
-                my $DebStr = AttrVal($name, "DebounceTime", undef);
-                JeeLink_Write($hash, "Od" . $DebStr) if(defined $DebStr);
-        }
+      DevIo_CloseDev($hash);
+      $hash->{STATE} = "disconnected";
+      $log .= "$name closed\n";
 
-                JeeLink_Write($hash, "f");  # update RFM configuration in FHEM (returns e.g. "FSK-868MHz")
+      my $avrdude = $flashCommand;
+      $avrdude =~ s/\Q[PORT]\E/$port/g;
+      $avrdude =~ s/\Q[HEXFILE]\E/$hexFile/g;
+      $avrdude =~ s/\Q[LOGFILE]\E/$logFile/g;
 
-                Log3 $name, 4, "set $name $cmd $arg";
+      $log .= "command: $avrdude\n\n";
+      `$avrdude`;
 
-        } elsif ($cmd =~ m/^led$/i) {
+      local $/=undef;
+      if (-e $logFile) {
+        open FILE, $logFile;
+        my $logText = <FILE>;
+        close FILE;
+        $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n";
+        $log .= $logText;
+        $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n\n";
+      }
+      else {
+        $log .= "WARNING: avrdude created no log file\n\n";
+      }
 
-                return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^(on|off)$/i);
+    }
+    else {
+      $log .= "\n\nNo flashCommand found. Please define this attribute.\n\n";
+    }
+
+    DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
+    $log .= "$name opened\n";
+
+    return $log;
+  }
+
+  elsif( $cmd eq "LaCrossePairForSec" ) {
+    my @args = split(' ', $arg);
+
+    return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $args[0] !~ m/^\d+$/ || ($args[1] && $args[1] ne "ignore_battery") );
+    $hash->{LaCrossePair} = $args[1]?2:1;
+    InternalTimer(gettimeofday()+$args[0], "JeeLink_RemoveLaCrossePair", $hash, 0);
+
+  } elsif( $cmd eq "setReceiverMode" ) {
+    return "Usage: set $name setReceiverMode (LaCrosse,HX2272,FS20)"  if($arg !~ m/^(LaCrosse|HX2272|FS20)$/);
+
+    #Get tune values of Transceiver if needed (TX+RX)
+    my $TuneStr = undef;
+    my $AttrStr = AttrVal($name, "tune_" . $arg, undef);
+    $AttrStr = AttrVal($name, "tune", undef) if(!(defined $AttrStr));
+    $TuneStr = JeeLink_CalcTuneCmd($AttrStr) if(defined $AttrStr);
+
+    JeeLink_Write($hash, $RxListJeeLink{$arg});     #set receiver
+    JeeLink_Write($hash, "t" . $TuneStr) if(defined $TuneStr); #set modified tune
+
+    #reset debounce time for OOK Signals
+    if($RxListJeeLink{$arg} =~ m/^O/) {
+        my $DebStr = AttrVal($name, "DebounceTime", undef);
+        JeeLink_Write($hash, "Od" . $DebStr) if(defined $DebStr);
+    }
+
+    JeeLink_Write($hash, "f");  # update RFM configuration in FHEM (returns e.g. "FSK-868MHz")
 
     Log3 $name, 4, "set $name $cmd $arg";
-    JeeLink_Write($hash, "l" . ($arg eq "on" ? "1" : "0") );
 
+  } elsif ($cmd =~ m/^led$/i) {
+    return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^(on|off)$/i);
+
+    Log3 $name, 4, "set $name $cmd $arg";
+    if($hash->{model} =~ m/LaCrosseITPlusReader./i ) {
+      JeeLink_Write($hash, ($arg eq "on" ? "1" : "0") ."a" );
+    }
+    else {
+      JeeLink_Write($hash, "l" . ($arg eq "on" ? "1" : "0") );
+    }
   } elsif ($cmd =~ m/led-on-for-timer/i) {
+    return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^[0-9]+$/i);
 
-        return "Unknown argument $cmd, choose one of $list" if($arg !~ m/^[0-9]+$/i);
+    #remove timer if there is one active
+    if($modules{JeeLink}{ldata}{$name}) {
+    CommandDelete(undef, $name . "_timer");
+    delete $modules{JeeLink}{ldata}{$name};
+    }
 
-        #remove timer if there is one active
-        if($modules{JeeLink}{ldata}{$name}) {
-        CommandDelete(undef, $name . "_timer");
-        delete $modules{JeeLink}{ldata}{$name};
-        }
+    Log3 $name, 4, "set $name on";
+    if($hash->{model} =~ m/LaCrosseITPlusReader./i ) {
+      JeeLink_Write($hash, "1a");
+    }
+    else {
+      JeeLink_Write($hash, "l" . "1");
+    }
 
-        Log3 $name, 4, "set $name on";
-    JeeLink_Write($hash, "l" . "1");
-
-        my $to = sprintf("%02d:%02d:%02d", $arg/3600, ($arg%3600)/60, $arg%60);
-        $modules{JeeLink}{ldata}{$name} = $to;
+    my $to = sprintf("%02d:%02d:%02d", $arg/3600, ($arg%3600)/60, $arg%60);
+    $modules{JeeLink}{ldata}{$name} = $to;
     Log3 $name, 4, "Follow: +$to setstate $name off";
     CommandDefine(undef, $name."_timer at +$to {fhem(\"set $name led" ." off\")}");
+
+  } elsif ($cmd =~ m/reset/i) {
+    return JeeLink_ResetDevice($hash);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -268,10 +354,10 @@ JeeLink_Get($@)
   my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
   if( $cmd eq "devices" ) {
-        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
-        JeeLink_SimpleWrite($hash, "h");
+    if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
+      JeeLink_SimpleWrite($hash, "h");
     } else {
-        JeeLink_SimpleWrite($hash, "l");
+      JeeLink_SimpleWrite($hash, "l");
         }
   } elsif( $cmd eq "initJeeLink" ) {
 
@@ -332,6 +418,7 @@ JeeLink_DoInit($)
   # Reset the counter
   delete($hash->{XMIT_TIME});
   delete($hash->{NR_CMD_LAST_H});
+
   return undef;
 }
 
@@ -557,15 +644,22 @@ JeeLink_Parse($$$$)
         $hash->{model} = $dmsg;
 
     if( $hash->{STATE} eq "Opened" ) {
-      if( $dmsg =~m /pcaSerial/ ) {
+      if( my $initCommandsString = AttrVal($name, "initCommands", undef) ) {
+        my @initCommands = split(' ', $initCommandsString);
+        foreach my $command (@initCommands) {
+          JeeLink_SimpleWrite($hash, $command);
+        }
+
+      } elsif( $dmsg =~m /pcaSerial/ ) {
         $hash->{MatchList} = \%matchListPCA301;
         JeeLink_SimpleWrite($hash, "1a" ); # led on
         JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-        JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
+        #JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
 
-      } elsif( $dmsg =~m /LaCrosseITPlusReader/ ) {
+      }
+      elsif( $dmsg =~m /LaCrosseITPlusReader/ ) {
         $hash->{MatchList} = \%matchListPCA301;
 
       } elsif( $dmsg =~m /ec3kSerial/ ) {
@@ -580,6 +674,7 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "f");   # get RFM frequence config
         JeeLink_SimpleWrite($hash, "m");   # show used ram on jeenode
       }
+
       $hash->{STATE} = "Initialized";
     }
 
@@ -595,7 +690,16 @@ JeeLink_Parse($$$$)
         return;
 
   } elsif( $dmsg =~ m/drecvintr exit/ ) {
-        JeeLink_SimpleWrite($hash, "ec",1);
+        # command "ec" will not work with the EC3000, use reset instead
+        Log3 $hash, 0, "$name: drecvintr detected";
+        JeeLink_ResetDevice($hash);
+
+        #JeeLink_SimpleWrite($hash, "ec",1);
+  } elsif( $dmsg =~ m/RFM12 hang/ ) {
+        # EC3000 seems not to recover from an RFM12 hang, so do a reset
+        Log3 $hash, 0, "$name: RFM12 hang detected";
+        JeeLink_ResetDevice($hash);
+
     return;
   }
 
@@ -719,6 +823,17 @@ JeeLink_SimpleWrite(@)
   # Some linux installations are broken with 0.001, T01 returns no answer
   select(undef, undef, undef, 0.01);
 }
+sub
+JeeLink_ResetDevice($)
+{
+  my ($hash) = @_;
+
+  DevIo_CloseDev($hash);
+  my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
+
+  return $ret;
+}
+
 
 sub
 JeeLink_Attr(@)
@@ -730,8 +845,20 @@ JeeLink_Attr(@)
     $hash->{Clients} = $aVal;
     $hash->{Clients} = $clientsJeeLink if( !$hash->{Clients}) ;
   } elsif( $aName eq "MatchList" ) {
-    $hash->{MatchList} = $aVal;
-    $hash->{MatchList} = \%matchListPCA301 if( !$hash->{MatchList} );
+    my $match_list;
+    if( $cmd eq "set" ) {
+      $match_list = eval $aVal;
+      if( $@ ) {
+        Log3 $name, 2, $name .": $aVal: ". $@;
+      }
+    }
+
+    if( ref($match_list) eq 'HASH' ) {
+      $hash->{MatchList} = $match_list;
+    } else {
+      $hash->{MatchList} = \%matchListPCA301;
+      Log3 $name, 2, $name .": $aVal: not a HASH" if( $aVal );
+    }
   } elsif($aName =~ m/^tune/i) { #tune attribute freq / rx:bWidth / rx:rAmpl / rx:sens / tx:deviation / tx:power
   # Frequenze: Fc =860+ F x0.0050MHz
         # LNA Gain [dB] = MAX -6, -14, -20
@@ -801,12 +928,18 @@ sub JeeLink_getIndexOfArray($@) {
   It is possible to attach more than one device in order to get better
   reception, fhem will filter out duplicate messages.<br><br>
 
-  This module provides the IODevice for the <a href="#PCA301">PCA301</a> modules that implements the PCA301 protocoll.<br><br>
-  In the future other RF devices like the Energy Controll 3000, JeeLabs room nodes, fs20 or kaku devices will be supportet.<br><br>
+  This module provides the IODevice for:
+  <ul>
+  <li><a href="#PCA301">PCA301</a> modules that implement the PCA301 protocol.</li>
+  <li><a href="#LaCrosse">LaCrosse</a> modules that implement the IT+ protocol (Sensors like TX29DTH, TX35, ...).</li>
+  <li>LevelSender for measuring tank levels</li>
+  <li>EMT7110 energy meter</li>
+  <li>Other Sensors like WT440XH (their protocol gets transformed to IT+)</li>
+  </ul>
 
-  Note: this module may require the Device::SerialPort or Win32::SerialPort
-  module if you attach the device via USB and the OS sets strange default
-  parameters for serial devices.
+  <br>
+  Note: this module may require the Device::SerialPort or Win32::SerialPort module if you attach the device via USB
+  and the OS sets strange default parameters for serial devices.
 
   <br><br>
 
@@ -832,35 +965,99 @@ sub JeeLink_getIndexOfArray($@) {
       perl module Device::SerialPort is not needed, and fhem opens the device
       with simple file io. This might work if the operating system uses sane
       defaults for the serial parameters, e.g. some Linux distributions and
-      OSX.  <br><br>
+      OSX.  <br>
 
     </ul>
     <br>
   </ul>
-  <br>
 
   <a name="JeeLink_Set"></a>
   <b>Set</b>
   <ul>
-    <li>raw &lt;datar&gt;<br>
-        send &lt;data&gt; as a raw message to the JeeLink to be transmitted over the RF link.
-        </li><br>
+    <li>raw &lt;data&gt;<br>
+        send &lt;data&gt; to the JeeLink. Depending on the sketch running on the JeeLink, different commands are available. Most of the sketches support the v command to get the version info and the ? command to get the list of available commands.
+    </li><br>
+
+    <li>reset<br>
+        force a device reset closing and reopening the device.
+    </li><br>
+
     <li>LaCrossePairForSec &lt;sec&gt; [ignore_battery]<br>
-       enable autocreate of new LaCrosse sensors for &lt;sec&gt; seconds. if ignore_battery is not given only sensors
+       enable autocreate of new LaCrosse sensors for &lt;sec&gt; seconds. If ignore_battery is not given only sensors
        sending the 'new battery' flag will be created.
-        </li>
+    </li><br>
+
+    <li>flash [hexFile]<br>
+    The JeeLink needs the right firmware to be able to receive and deliver the sensor data to fhem. In addition to the way using the
+    arduino IDE to flash the firmware into the JeeLink this provides a way to flash it directly from FHEM.
+
+    There are some requirements:
+    <ul>
+      <li>avrdude must be installed on the host<br>
+      On a Raspberry PI this can be done with: sudo apt-get install avrdude</li>
+      <li>the flashCommand attribute must be set.<br>
+        This attribute defines the command, that gets sent to avrdude to flash the JeeLink.<br>
+        The default is: avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]<br>
+        It contains some place-holders that automatically get filled with the according values:<br>
+        <ul>
+          <li>[PORT]<br>
+            is the port the JeeLink is connectd to (e.g. /dev/ttyUSB0)</li>
+          <li>[HEXFILE]<br>
+            is the .hex file that shall get flashed. There are three options (applied in this order):<br>
+            - passed in set flash<br>
+            - taken from the hexFile attribute<br>
+            - the default value defined in the module<br>
+          </li>
+          <li>[LOGFILE]<br>
+            The logfile that collects information about the flash process. It gets displayed in FHEM after finishing the flash process</li>
+        </ul>
+      </li>
+    </ul>
+
+    </li><br>
+
+    <li>led &lt;on|off&gt;<br>
+    Is used to disable the blue activity LED
+    </li><br>
+
+    <li>beep<br>
+    ...
+    </li><br>
+
+    <li>setReceiverMode<br>
+    ...
+    </li><br>
+
   </ul>
 
   <a name="JeeLink_Get"></a>
   <b>Get</b>
   <ul>
   </ul>
+  <br>
 
   <a name="JeeLink_Attr"></a>
   <b>Attributes</b>
   <ul>
-    <li>Clients</li>
-    <li>MatchList</li>
+    <li>Clients<br>
+      The received data gets distributed to a client (e.g. LaCrosse, EMT7110, ...) that handles the data.
+      This attribute tells, which are the clients, that handle the data. If you add a new module to FHEM, that shall handle
+      data distributed by the JeeLink module, you must add it to the Clients attribute.</li>
+
+    <li>MatchList<br>
+      can be set to a perl expression that returns a hash that is used as the MatchList<br>
+      <code>attr myJeeLink MatchList {'5:AliRF' => '^\\S+\\s+5 '}</code></li>
+
+    <li>initCommands<br>
+      Space separated list of commands to send for device initialization.<br>
+      This can be used e.g. to bring the LaCrosse Sketch into the data rate toggle mode. In this case initCommands would be: 30t
+    </li>
+
+    <li>flashCommand<br>
+      See "Set flash"
+    </li><br>
+
+
   </ul>
   <br>
 </ul>
