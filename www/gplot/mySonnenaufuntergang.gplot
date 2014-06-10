@@ -1,0 +1,27 @@
+# Created by FHEM/98_SVG.pm, 2014-05-18 23:36:13
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid ytics
+set ylabel "Sonnenaufgang"
+set y2label "Sonnenuntergang"
+set yrange [4:10]
+set y2range [16:22]
+
+#set yrange [3:22]
+#set y2range [3:22]
+
+
+#FileLog 4:sunDummy.sunrise\x3a::time2dec($fld[3])
+#FileLog 4:sunDummy.sunset\x3a::time2dec($fld[3])
+#FileLog 4:sunDummy.sunset\x3a::time2dec($fld[3])
+
+plot "<IN>" using 1:2 axes x1y1 title 'Sonnenaufgang' ls l6fill lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Sonnenuntergang' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title ' ' ls l4fill lw 1 with lines
+
