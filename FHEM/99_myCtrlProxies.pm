@@ -17,13 +17,14 @@ my $rooms;
   $rooms->{wohnzimmer}->{sensors_outdoor}=("hg_sensor"); # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
   $rooms->{wohnzimmer}->{measurements}->{temperature}=("wz_raumsensor:temperature"); 
+  $rooms->{wohnzimmer}->{measurements_outdoor}->{temperature}=("hg_sensor:temperature"); 
   
 # Sensoren
 my $sensors;
   $sensors->{wz_raumsensor}->{alias}     ="WZ Raumsensor";
   $sensors->{wz_raumsensor}->{fhem_name} ="EG_WZ_KS01";
   $sensors->{wz_raumsensor}->{type}      ="HomeMatic compatible";
-  $sensors->{wz_raumsensor}->{room}      ="wohnzimmer";
+  $sensors->{wz_raumsensor}->{location}  ="wohnzimmer";
   $sensors->{wz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
@@ -39,7 +40,7 @@ my $sensors;
   $sensors->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
   $sensors->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
   $sensors->{wz_wandthermostat}->{type}      ="HomeMatic";
-  $sensors->{wz_wandthermostat}->{room}      ="wohnzimmer";
+  $sensors->{wz_wandthermostat}->{location}  ="wohnzimmer";
   $sensors->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
@@ -54,7 +55,7 @@ my $sensors;
   $sensors->{hg_sensor}->{alias}     ="Garten-Sensor";
   $sensors->{hg_sensor}->{fhem_name} ="GSD_1.4";
   $sensors->{hg_sensor}->{type}      ="GSD";
-  $sensors->{hg_sensor}->{room}      ="garten";
+  $sensors->{hg_sensor}->{location}  ="garten";
   $sensors->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
@@ -65,7 +66,7 @@ my $sensors;
   $sensors->{tt_sensor}->{alias}     ="Test-Sensor";
   $sensors->{tt_sensor}->{fhem_name} ="GSD_1.1";
   $sensors->{tt_sensor}->{type}      ="GSD";
-  $sensors->{tt_sensor}->{room}      ="wohnzimmer";
+  $sensors->{tt_sensor}->{location}  ="wohnzimmer";
   $sensors->{tt_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{tt_sensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{tt_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
@@ -87,6 +88,15 @@ my $devTab;
   $devTab->{DEFAULT}->{SetFn}="";
   $devTab->{DEFAULT}->{valueFns}->{"nacht"}="0";
 # Badezimmer (Ost)
+#oder so?
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{valueFn}="{if...}";
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{value}="80"; # valueFn hat Vorrang, wenn sie undef liefert (oder nicht existiert), dann das hier
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabledFn}="{if...}";
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabled}="true"; # s.o. 
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{valueFilterFn}="{...}"; #nachdem Wert errechnet wurde, prüft nochmal, ob dieser ggf. korrigiert werden soll (Grenzen etc. z.B. bei geöffneter Tür 'schatten' max. auf X% herunterfahren. etc.)
+# Idee: Mehrere Action durch zwischengeschaltete Keys (mehrfach, alphabetisch sortiert):
+# $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabledFn}->{DoorOpenCheck}="{if(sensorVal($CURRENT_DEVICE, wndOpen)!='closed') {...}}"; # DoorOpenCheck ist ein solcher Key.
+
   $devTab->{"bz_rollo"}->{valueFns}->{"schatten"}="{if...}";
   $devTab->{"bz_rollo"}->{SetFn}="";
 # Badezimmer (Ost)
@@ -109,8 +119,11 @@ my $devTab;
 
 sub myCtrlProxies_Initialize($$);
 
+sub myCtrlProxies_getSensor($);
+sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
+
 sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
-sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<room>]
+
 sub myCtrlProxies_getRooms();
 sub myCtrlProxies_getActions(;$); # <DevName>
 
@@ -125,6 +138,96 @@ myCtrlProxies_Initialize($$)
 {
   my ($hash) = @_;
 }
+
+#------------------------------------------------------------------------------
+# returns Sensor-Record by name
+# Parameter: name 
+# record:
+#  X->{name}->{alias}     ="Text zur Anzeige etc.";
+#  X->{name}->{fhem_name} ="Name in FHEM";
+#  X->{name}->{type}      ="Typ für Gruppierung und Suche";
+#  X->{name}->{location}  ="Zugehörigkeit zu einem Raum ($rooms)";
+#  X->{name}->{readings}->{<readings_name>} ->{reading}  ="temperature";
+#  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
+#  ...
+sub 
+myCtrlProxies_getSensor($)
+{
+	my ($name) = @_;
+	return $sensors->{$name};
+}
+
+# sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
+sub
+myCtrlProxies_getSensorReadingCompositeRecord_intern($$)
+{
+	my ($device_record,$reading) = @_;
+	my $readings_record = $device_record->{readings};
+	my $single_reading_record = $readings_record->{$reading};
+	return $single_reading_record unless !defined($single_reading_record);
+	
+	# composites verarbeiten
+	# e.g.  $sensors->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); 
+	my $composites = $device_record->{composite};
+	foreach my $composite_name ($composites) {
+		my $new_device_record = myCtrlProxies_getSensor($composite_name);
+		my $new_single_reading_record = myCtrlProxies_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
+		if(defined($new_single_reading_record )) {
+			return $new_single_reading_record ;
+		}
+	}
+	
+	return undef;
+}
+
+# parameters: name, reading name
+# record:
+#  X->{reading} = "<fhem_device_reading_name>";
+#  X->{unit} = "";
+sub 
+myCtrlProxies_getSensorReadingRecord($$)
+{
+	my ($name, $reading) = @_;
+	my $record = myCtrlProxies_getSensor($name);
+	if(defined($record)) {
+    return myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
+  }
+	return undef;
+}
+
+# parameters: name, reading name
+# returns current readings value
+sub 
+myCtrlProxies_getSensorReadingValue($$)
+{
+	my ($name, $reading) = @_;
+	my $record = myCtrlProxies_getSensor($name);
+	if (defined($record)) {
+    my $single_reading_record = myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
+    if(defined($single_reading_record)) {    
+      my $fhem_name = $record->{fhem_name};
+      my $reading_fhem_name = $single_reading_record->{reading};
+      return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+    }
+  }
+	return undef;
+}
+
+# parameters: name, reading name
+# returns readings unit
+sub 
+myCtrlProxies_getSensorReadingUnit($$)
+{
+	my ($name, $reading) = @_;
+	my $record = myCtrlProxies_getSensorReadingRecord($name,$reading);
+	if (defined($record)) {
+	  return $record->{unit};
+	}
+	return undef;
+}
+
+
+#------------------------------------------------------------------------------
 
 #- Steuerung fuer manuelle Aufrufe (AT) ---------------------------------------
 
@@ -174,7 +277,7 @@ myCtrlProxies_doAction($$) {
 	  foreach my $dev (keys %{$devTab}) {     
 	  	Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
   	  if($dev ne 'DEFAULT') {
-  	  	myCtrlProxies_DeviceSetFn($dev, $actName, "www");
+  	  	myCtrlProxies_DeviceSetFn($dev, $actName, "www"); #?
   	  }
     }
 	}
@@ -183,7 +286,7 @@ myCtrlProxies_doAction($$) {
 #- Steuerung aus ReadingProxy -------------------------------------------------
 
 ###############################################################################
-# Eine bestimmte Set-Aktion für ein bestimmtes Gerät ausfuehren.
+# Eine bestimmte (Set-)Aktion für ein bestimmtes Gerät ausfuehren.
 # (Commando kann gefiltert und verändert werden, 
 # d.h. ggf. nicht oder anders ausgeführt)
 # Beispiel: Befehl 'schatten' für Rolladen: es wird gfeprüft (für jedes Rollo
@@ -193,6 +296,24 @@ myCtrlProxies_doAction($$) {
 ###############################################################################
 sub
 myCtrlProxies_DeviceSetFn($@) {
+	my ($DEVICE,@a) = @_;
+	my $CMD = $a[0];
+  my $ARGS = join(" ", @a[1..$#a]);
+  
+  #TODO
+  Log 3, "PROXY_CTRL:--------> set ".$DEVICE." - ".$CMD." - ".$ARGS;
+  my $cmdFn = $devTab->{$DEVICE}->{valueFns}->{$CMD}; #TODO
+  if(defined($cmdFn)) {
+  	# TODO
+  } else {
+    return;
+  }
+}
+
+# Zur Verwendung in ReadingProxy. Prüft (transparent) ob und wie ein Befehl ausgeführt werden soll.
+# TODO
+sub
+myCtrlProxies_SetProxyFn($@) {
 	my ($DEVICE,@a) = @_;
 	my $CMD = $a[0];
   my $ARGS = join(" ", @a[1..$#a]);
