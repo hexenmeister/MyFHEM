@@ -241,6 +241,7 @@ sub execute($$$$$$) {
 
   unless ($numread) {
     main::OWX_ASYNC_AfterExecute( $hash, $context, $success, $reset, $owx_dev, $data, $numread, "" );
+    main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $hash,0);
   }
   return $success;
 };
