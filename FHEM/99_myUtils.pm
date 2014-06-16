@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+use Time::Local;
 #use List::Util qw[min max];
 
 
@@ -932,7 +933,9 @@ sendJabberAnswer()
   my $newmsg;
   if($cmd eq "status") {
   	#Log 3, "Jabber: CMD: Status";
-  	$newmsg.= "Status: nicht implementiert";
+  	$newmsg.= "Status: \r\n";
+  	my $owtStatus = checkOWTHERMTimeOut();
+  	$newmsg.= $owtStatus;
   }
   
   if($cmd eq "umwelt") {
@@ -1144,6 +1147,78 @@ sub dec2hms($){
   return sprintf("%02d:%02d:%02d",$h,$m,$s);
 }
 
+# Ausrechnet aus der Zahl der Sekunden Anzeige in Stunden:Minuten:Sekunden.
+sub sec2hms($){
+  my ($t) = @_;
+  my $h = int($t/3600);
+  my $r = $t - ($h*3600);
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  return sprintf("%02d:%02d:%02d",$h,$m,$s);
+}
 
+# Ausrechnet aus der Zahl der Sekunden Anzeige in Stunden:Minuten:Sekunden.
+sub sec2Dauer($){
+  my ($t) = @_;
+  my $h = int($t/3600);
+  my $r = $t - ($h*3600);
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  return sprintf("%02d Std. %02d Min. %02d Sec.",$h,$m,$s);
+}
+
+#  2014-06-16 08:46:18
+sub dateTime2dec($){
+	my($date,$time) = split(" ", shift);
+	my ($hour,$min,$sec) = split(":", $time);
+  my ($year,$mon,$mday) = split("-", $date);
+  
+  #return "$year/$mon/$mday | $hour:$min:$sec";
+  my $z = timelocal($sec,$min,$hour,$mday,$mon-1,$year);
+  #my $z = mktime($s,$m,$h,$year,$mon,$day);
+  
+  return ($z)
+}
+
+sub checkOWTHERMTimeOut() {
+	my @a = devspec2array("TYPE=OWTHERM");
+	my $readingsName = "temperature";
+	my $max = 300; # in Sekunden
+	
+	my $ar = checkDeviceReadingUpdateTimeOut($readingsName,$max,\@a);
+	my $rText = "";
+	foreach my $dName (sort(keys %{$ar})) {
+		$rText.=$dName." : ".$ar->{$dName};
+		$rText.="\r\n";
+	}
+	
+	return $rText;
+}
+
+sub checkDeviceReadingUpdateTimeOut($$$) {
+	my($readingsName, $max, $devArray) = @_;
+	#Log 3, "YYYYYXXXXXXXX:".$readingsName.":".$max.":".$devArray->[0];
+	my $ret;
+	foreach my $devName (@$devArray) {
+		#Log 3, "CCCCCCCCCC:".$devName;
+ 	  my $readingsTime = ReadingsTimestamp($devName, $readingsName, undef);
+ 	  if(defined($readingsTime)) {
+ 	 	  my $rTimeNum = dateTime2dec($readingsTime);
+ 	 	  if(defined($rTimeNum)) {
+ 	 	    my $timeDiff = int(time()) - $rTimeNum;
+ 	 	    if($timeDiff>$max) {
+ 	 	    	#$ret->{$devName}="dead seit ".sec2Dauer($timeDiff);
+ 	 	    	#$ret->{$devName}="dead seit ".sec2hms($timeDiff);
+ 	 	    	$ret->{$devName}="dead seit ".$readingsTime;
+ 	 	    }
+ 	 	    #Log 3, "AAAAAAAAAAAAAAAA:".$timeDiff;
+ 	 	  } else {
+ 	 	  	$ret->{$devName}="dead / unbekannt";
+ 	 	  	#push(@ret,"$devName : unknown");
+ 	 	  }
+ 	  }
+  }
+  return $ret;
+}
 
 1;
