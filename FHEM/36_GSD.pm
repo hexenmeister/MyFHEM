@@ -470,7 +470,7 @@ GSD_Fingerprint($$)
     if($p>0) {
   	  $msg = substr($msg, 0, $p);
     }
-    Log 3, "GSD Fingerprint: " . $msg;
+    Log 5, "GSD Fingerprint: " . $msg;
    
     return ($name, $msg); # Teil der Message mit NodeID und MsgID
   } else {
@@ -512,7 +512,7 @@ sub GSD_Undefine($$){
 sub GSD_Parse($$) {
   my ($hash, $rawmsg) = @_;
   # rawmsg =  GSD 1 83 1 252 241 15 11 172 8 16 66 19
-  Log 3, "GSD: parse RAW message: " . $rawmsg . " IODev: " . $hash->{NAME};
+  Log 5, "GSD: parse RAW message: " . $rawmsg . " IODev: " . $hash->{NAME};
   
   # When disabled => ignore messages
   
@@ -536,12 +536,12 @@ sub GSD_Parse($$) {
   	my $NodeNID = $NodeNID % 32;
   	my $NodeID = $NodeNID.".".$msg_data[$c_pos_sid];
   	my $msgCounter = GSD_parseNumber(@msg_data[$c_pos_counter..$c_pos_counter+$c_len_counter-1]);
-  	Log 3, "GSD: message number: " . $msgCounter;
+  	Log 5, "GSD: message number: " . $msgCounter;
   	
   	my $data_len = int(@msg_data);
     if($data_len < $c_pos_counter+$c_len_counter-1) { 
   	  # message to short
-  	  log 3, "GSD: ERROR: message to short";
+  	  Log 3, "GSD: ERROR: message to short";
       return undef;
     }
   	
@@ -603,7 +603,7 @@ sub GSD_Parse($$) {
     }
     
     # Readings erstellen / updaten
-    Log 3, "GSD: update readings for $dev_name";
+    Log 5, "GSD: update readings for $dev_name";
     
     readingsBeginUpdate($dev_hash);
     my $mId_rName="msg_id";
@@ -612,23 +612,23 @@ sub GSD_Parse($$) {
       $mId_rName=$readings_mapping->{$mId_rName};
     }
     my $old_msg_id = ReadingsVal($dev_name,$mId_rName,$msgCounter-1);
-    Log 3, "GSD: DEBUG: old_msg_id = $old_msg_id";
+    Log 5, "GSD: DEBUG: old_msg_id = $old_msg_id";
     readingsBulkUpdate($dev_hash, $mId_rName, $msgCounter);
     my $msg_id_missing_cnt;
     if($old_msg_id == 65535 && $msgCounter <= 1) { # Max f. 2 bytes. => Ueberlauf beruecksichtigen
-    	Log 3, "GSD: DEBUG: counter overflow";
+    	Log 5, "GSD: DEBUG: counter overflow";
     	$msg_id_missing_cnt = 0;
     } else {
     	if($old_msg_id >= $msgCounter) { # Wahrscheinlich Batteriewechsel
-    		Log 3, "GSD: DEBUG: probable new battery";
+    		Log 5, "GSD: DEBUG: probable new battery";
         $msg_id_missing_cnt = 0;
       } else {
       	# Nachrechnen, ob eine oder mehrere Meldungen dazwischen liegen muessten.
         $msg_id_missing_cnt = $msgCounter-1-$old_msg_id;	
-        Log 3, "GSD: DEBUG: msg counter diff: $msg_id_missing_cnt";
+        Log 5, "GSD: DEBUG: msg counter diff: $msg_id_missing_cnt";
       }
     }
-    Log 3, "GSD: DEBUG: msg_id_missing_cnt = $msg_id_missing_cnt";
+    Log 5, "GSD: DEBUG: msg_id_missing_cnt = $msg_id_missing_cnt";
     my $mId_miss_rName="lost_msgs";
     #TODO: Mapping in sub auslagern
     if(defined($readings_mapping->{$mId_miss_rName})) {
@@ -651,7 +651,7 @@ sub GSD_Parse($$) {
     if(scalar(@readings_keys)>0) {
       foreach my $reading (sort @readings_keys) {
         my $val = $dMap->{READINGS}->{$reading};
-        Log 3, "GSD: update $dev_name $reading: " . $val;
+        Log 5, "GSD: update $dev_name $reading: " . $val;
         my $mReading = $readings_mapping->{$reading};
         if(defined($mReading)) {
         	#Log 1, "GSD remapp reading: $reading -> $mReading";
@@ -682,7 +682,7 @@ sub GSD_Parse($$) {
 sub GSD_parseNumber(@) {
   my(@sensor_data) = @_;
   
-  Log 3, "GSD: parse number: data: ".join(" ",@sensor_data);  
+  Log 5, "GSD: parse number: data: ".join(" ",@sensor_data);  
   @sensor_data = reverse(@sensor_data);
   my $value = "";
   map {$value .= sprintf "%02x",$_} @sensor_data;
@@ -695,13 +695,13 @@ sub GSD_parseNumber(@) {
 sub GSD_parseDefault($$) {
   my ($hash, $dMap) = @_;
   
-  #Log 3, "GSD: default parse function. data: " . join(" ",@{$dMap->{DATA}});
+  #Log 5, "GSD: default parse function. data: " . join(" ",@{$dMap->{DATA}});
   
   my @msg_data = @{$dMap->{DATA}};
   my $data_index = $dMap->{INDEX};
   my $msg_type = @msg_data[$data_index];
   
-  Log 3, "GSD: default parse function. index: " . $data_index . " msg type: " . $msg_type;
+  Log 5, "GSD: default parse function. index: " . $data_index . " msg type: " . $msg_type;
    
   my $msg_len = $data{GSCONF}{$msg_type}{DataLength};
   if(defined($msg_len)) {
@@ -718,14 +718,14 @@ sub GSD_parseDefault($$) {
     my $value = GSD_parseNumber(@sensor_data);
     my $sign = $data{GSCONF}{$msg_type}{DataSign};
     if(defined($sign) && ($sign == 1)) {
-    	Log 3, "GSD: read sensor signed data";
+    	Log 5, "GSD: read sensor signed data";
   	  my $tf = $htmap->{scalar(@sensor_data)};
       if(defined($tf)&&$value > ($tf/2)) {
       	$value = $value-$tf;
   	  }
     }  
     
-    Log 3, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
+    Log 5, "GSD: read sensor data: $msg_type : " . join(" " , @sensor_data) . " = " . $value;
     
     if(defined($data{GSCONF}{$msg_type}{CorrFactor})) {
       my $corr = $data{GSCONF}{$msg_type}{CorrFactor};
