@@ -854,6 +854,7 @@ SetTempList_Heizung_OG_DBad()
  	  $so = "01:00 20.0 06:30 19.5 10:00 21.5 15:00 20.0 18:00 20.5 24:00 21.5";
  	  
     SetTempList_Heizung("OG_DZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+    SetTempList_Heizung("OG_DZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
 }
 # End SetTempList_Heizung_OG_Duschbad
 
@@ -874,6 +875,25 @@ SetTempList_Heizung_OG_Wohnzimmer()
     SetTempList_Heizung("EG_WZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
     SetTempList_Heizung("EG_WZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
     SetTempList_Heizung("EG_WZ_TT02_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
+}
+#---
+
+# Temperatur-Liste fürs Schlafzimmer
+sub
+SetTempList_Heizung_OG_Schlafzimmer()
+ {
+ 	  my($mo, $di, $mi, $do, $fr, $sa, $so);
+ 	   	  
+ 	  $mo = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $di = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $mi = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $do = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $fr = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $sa = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  $so = "04:00 18.0 05:00 19.0 22:00 18.0 24:00 17.0";
+ 	  
+    SetTempList_Heizung("OG_SZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
+    SetTempList_Heizung("OG_SZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
 }
 #---
 
@@ -1186,11 +1206,17 @@ sub checkOWTHERMTimeOut() {
 	my $max = 300; # in Sekunden
 	
 	my $ar = checkDeviceReadingUpdateTimeOut($readingsName,$max,\@a);
-	my $rText = "";
-	foreach my $dName (sort(keys %{$ar})) {
-		$rText.=$dName." : ".$ar->{$dName};
+	my $rText = "Dead OWTHERM devices: ";
+	if($ar) {
 		$rText.="\r\n";
-	}
+	  foreach my $dName (sort(keys %{$ar})) {
+	  	$rText.=$dName." : ".$ar->{$dName};
+		  $rText.="\r\n";
+	  }
+  } else {
+  	$rText.="none";
+  	$rText.="\r\n";
+  }
 	
 	return $rText;
 }
@@ -1218,6 +1244,7 @@ sub checkDeviceReadingUpdateTimeOut($$$) {
  	 	  }
  	  }
   }
+  
   return $ret;
 }
 
