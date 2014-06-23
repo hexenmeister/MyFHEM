@@ -94,7 +94,7 @@ my $devTab;
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabledFn}="{if...}";
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabled}="true"; # s.o. 
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{valueFilterFn}="{...}"; #nachdem Wert errechnet wurde, prüft nochmal, ob dieser ggf. korrigiert werden soll (Grenzen etc. z.B. bei geöffneter Tür 'schatten' max. auf X% herunterfahren. etc.)
-# Idee: Mehrere Action durch zwischengeschaltete Keys (mehrfach, alphabetisch sortiert):
+# Idee: Mehrere Action durch zwischengeschaltete Keys (mehrfach, alphabetisch sortiert): Idee: Wenn hier ein HASH, dann einzelene ausführen, ansonstel ist hier die Fn direkt
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabledFn}->{DoorOpenCheck}="{if(sensorVal($CURRENT_DEVICE, wndOpen)!='closed') {...}}"; # DoorOpenCheck ist ein solcher Key.
 
   $devTab->{"bz_rollo"}->{valueFns}->{"schatten"}="{if...}";
