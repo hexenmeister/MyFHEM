@@ -876,12 +876,9 @@ sub OWFSTHERM_SetValues($$) {
 #
 ########################################################################################
 
-sub OWXTHERM_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
+sub OWXTHERM_BinValues($$$$$$) {
+  my ($hash, $reset, $owx_dev, $command, $numread, $res) = @_;
   
-  #-- always check for success, unused are reset, numread
-  return unless ($success and ($context =~ /.*reading.*/));
- 
   #Log3 $name, 1,"OWXTHERM_BinValues context = $context";
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
@@ -889,17 +886,15 @@ sub OWXTHERM_BinValues($$$$$$$$) {
 
   #Log3 $name, 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
-  if( $res eq 0 ){
-    return "$owx_dev not accessible in 2nd step"; 
-  }
+  die "$owx_dev not accessible in 2nd step" unless ( defined $res and $res ne 0 );
   
   #-- process results
   @data=split(//,$res);
-  return "invalid data length, ".int(@data)." instead of 9 bytes"
+  die "invalid data length, ".int(@data)." instead of 9 bytes"
     if (@data != 9); 
-  return "invalid data"
+  die "invalid data"
     if (ord($data[7])<=0); 
-  return "invalid CRC"
+  die "invalid CRC"
     if (OWX_CRC8(substr($res,0,8),$data[8])==0);
   
   #-- this must be different for the different device types
@@ -948,7 +943,7 @@ sub OWXTHERM_BinValues($$$$$$$$) {
     $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     
   } else {
-    return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
+    die "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
   }
   
   #-- process alarm settings
@@ -1011,8 +1006,11 @@ sub OWXTHERM_GetValues($) {
     if( $res eq 0 );
   return "$owx_dev has returned invalid data"
     if( length($res)!=19);
-  return OWXTHERM_BinValues($hash,"ds182x.reading",1,undef,$owx_dev,undef,undef,substr($res,10,9));
-} 
+  eval {
+    OWXTHERM_BinValues($hash,undef,$owx_dev,undef,undef,substr($res,10,9));
+  };
+  return $@;
+}
 
 #######################################################################################
 #
@@ -1090,12 +1088,12 @@ sub OWXTHERM_PT_GetValues($@) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
-  
+
   PT_BEGIN($thread);
 
   #-- reset presence
   $hash->{PRESENT}  = 0;
-  
+
   #-- check, if the conversion has been called before for all sensors
   if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
     $con=0;
@@ -1104,29 +1102,22 @@ sub OWXTHERM_PT_GetValues($@) {
   #-- if the conversion has not been called before 
   if( $con==1 ){
     #-- issue the match ROM command \x55 and the start conversion command \x44
-    unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\x44",0)) {
-      PT_EXIT("$owx_dev not accessible for convert");
-    }
     my $now = gettimeofday();
     my $delay = $convtimes{AttrVal($name,"resolution",12)};
     $thread->{ExecuteTime} = $now + $delay*0.001;
-    PT_YIELD_UNTIL(defined $thread->{ExecuteResponse} and (gettimeofday() >= $thread->{ExecuteTime}));
+    $thread->{pt_execute} = $master->{ASYNC}->get_pt_execute($thread,1,$owx_dev,"\x44",0);
+    PT_WAIT_THREAD($thread->{pt_execute});
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+    delete $thread->{ExecuteTime};
   }
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\xBE",9)) {
-    PT_EXIT("$owx_dev not accessible in reading");
-  }
-  PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-  my $response = $thread->{ExecuteResponse};
-  unless ($response->{success}) {
-    PT_EXIT("$owx_dev read not successful");
-  }
-  my $res = OWXTHERM_BinValues($hash,"ds182x.reading",1,1,$owx_dev,undef,$response->{numread},$response->{readdata});
-  if ($res) {
-    PT_EXIT($res);
-  }
+  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,$thread,1,$owx_dev,"\xBE",9);
+  PT_WAIT_THREAD($thread->{pt_execute});
+  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+  OWXTHERM_BinValues($hash,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
   PT_END;
 } 
 
@@ -1180,11 +1171,10 @@ sub OWXTHERM_PT_SetValues($$) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
-  unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,$select,3)) {
-    PT_EXIT("OWXTHERM: Device $owx_dev not accessible"); 
-  }
-  PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-  
+  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,$thread,1,$owx_dev,$select,3);
+  PT_WAIT_THREAD($thread->{pt_execute});
+  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
   #-- process results
   $hash->{PRESENT} = 1;
   if ($args->{format}) {
