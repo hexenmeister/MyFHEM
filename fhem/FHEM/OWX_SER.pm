@@ -29,7 +29,6 @@ use strict;
 use warnings;
 
 use vars qw/@ISA/;
-@ISA='OWX_Executor';
 
 use Time::HiRes qw( gettimeofday );
 use ProtoThreads;
@@ -42,30 +41,30 @@ no warnings 'deprecated';
 ########################################################################################
 
 sub new() {
-	my $class = shift;
-	
-	require "$main::attr{global}{modpath}/FHEM/OWX_Executor.pm";
-	
-	my $self = OWX_Executor->new();
-	
-	$self->{interface} = "serial";
-	#-- baud rate serial interface
-	$self->{baud} = 9600;
-	#-- 16 byte search string
-	$self->{search} = [0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0];
-	$self->{ROM_ID} = [0,0,0,0 ,0,0,0,0];
-	#-- search state for 1-Wire bus search
-	$self->{LastDiscrepancy} = 0;
-	$self->{LastFamilyDiscrepancy} = 0;
-	$self->{LastDeviceFlag} = 0;
-	#-- module version
-	$self->{version} = 4.1;
-	$self->{alarmdevs} = [];
-	$self->{devs} = [];
-	
-	$self->{timeout} = 1.0; #default timeout 1 sec.
+  my $class = shift;
+  my $self = {
+    interface => "serial",
+    #-- baud rate serial interface
+    baud => 9600,
+    #-- 16 byte search string
+    search => [0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0],
+    ROM_ID => [0,0,0,0 ,0,0,0,0],
+    #-- search state for 1-Wire bus search
+    LastDiscrepancy => 0,
+    LastFamilyDiscrepancy => 0,
+    LastDeviceFlag => 0,
+    #-- module version
+    version => 4.1,
+    alarmdevs => [],
+    devs => [],
+    timeout => 1.0, #default timeout 1 sec.
+  };
+  return bless $self,$class;
+}
 
-	return bless $self,$class;	
+sub poll($) {
+  my ( $self ) = @_;
+  $self->read();
 }
 
 ########################################################################################
@@ -152,7 +151,6 @@ sub get_pt_execute($$$$$) {
     my ($thread) = @_;
     
     PT_BEGIN($thread);
-    $context->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{writedata} = $writedata;
     
     #-- get the interface
@@ -206,8 +204,6 @@ sub get_pt_execute($$$$$) {
     }
     
     PT_WAIT_UNTIL($self->response_ready());
-  
-    delete $context->{TimeoutTime};  
     
     if ($reset and !$self->reset_response()) {
       PT_EXIT
