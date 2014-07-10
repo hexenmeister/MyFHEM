@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.16";
+my $owx_version="5.17";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -463,7 +463,13 @@ sub OWSWITCH_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+      #TODO use OWX_ASYNC_Schedule instead
+      my $task = OWX_ASYNC_PT_Verify($master,$hash->{ROM_ID});
+      eval {
+        while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      return GP_Catch($@) if $@;
+      $value = $task->PT_RETVAL();
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -1268,19 +1274,17 @@ sub OWXSWITCH_PT_GetState($) {
     #-- issue the match ROM command \x55 and the access channel command
     #   \xF5 plus the two byte channel control and the value
     #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
-    $select=sprintf("\xF5\xDD\xFF");
-    unless(OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 4)) {
-      PT_EXIT("device $owx_dev not accessible in reading");
-    }
-    PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-    $response = $thread->{ExecuteResponse};
-    unless ($response->{success}) {
+    $thread->{'select'}=sprintf("\xF5\xDD\xFF");
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},4);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $response = $thread->{pt_execute}->PT_RETVAL();
+    unless (length($response) == 4) { 
       PT_EXIT("$owx_dev has returned invalid data");
     }
-    unless (length($response->{readdata}) == 4) { 
-      PT_EXIT("$owx_dev has returned invalid data");
-    }
-    $ret = OWXSWITCH_BinValues($hash,"ds2406.getstate",1,1,$owx_dev,$response->{writedata},4,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2406.getstate",1,1,$owx_dev,$thread->{'select'},4,$response);
     if (defined $ret) {
       PT_EXIT($ret);
     }
@@ -1290,19 +1294,17 @@ sub OWXSWITCH_PT_GetState($) {
     #-- issue the match ROM command \x55 and the read PIO rtegisters command
     #   \xF5 plus the two byte channel target address
     #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
-    $select=sprintf("\xF0\x88\x00");   
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 10)) {
-      PT_EXIT("device $owx_dev not accessible in reading");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    $response = $thread->{ExecuteResponse};
-    unless ($response->{success}) {
-      PT_EXIT("$owx_dev has returned invalid data");
-    }
-    unless (length($response->{readdata}) == 10) {
+    $thread->{'select'}=sprintf("\xF0\x88\x00");
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},10);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $response = $thread->{pt_execute}->PT_RETVAL();
+    unless (length($response) == 10) {
       PT_EXIT("$owx_dev has returned invalid data")
     };
-    $ret = OWXSWITCH_BinValues($hash,"ds2408.getstate",1,1,$owx_dev,$response->{writedata},10,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2408.getstate",1,1,$owx_dev,$thread->{'select'},10,$response);
     if (defined $ret) {
       PT_EXIT($ret);
     }
@@ -1312,19 +1314,17 @@ sub OWXSWITCH_PT_GetState($) {
     #-- issue the match ROM command \x55 and the read gpio command
     #   \xF5 plus 2 empty bytes
     #-- reading 9 + 1 + 2 data bytes = 12 bytes
-    $select = "\xF5";
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
-      PT_EXIT("device $owx_dev not accessible in reading");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    $response = $thread->{ExecuteResponse};
-    unless ($response->{success}) {
+    $thread->{'select'}="\xF5";
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},2);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $response = $thread->{pt_execute}->PT_RETVAL();
+    unless (length($response) == 2) {
       PT_EXIT("$owx_dev has returned invalid data");
     }
-    unless (length($response->{readdata}) == 2) {
-      PT_EXIT("$owx_dev has returned invalid data");
-    }
-    $ret = OWXSWITCH_BinValues($hash,"ds2413.getstate",1,1,$owx_dev,$response->{writedata},2,$response->{readdata});
+    $ret = OWXSWITCH_BinValues($hash,"ds2413.getstate",1,1,$owx_dev,$thread->{'select'},2,$response);
     if (defined $ret) {
       PT_EXIT($ret);
     }
@@ -1366,14 +1366,12 @@ sub OWXSWITCH_PT_SetState($$) {
     #   \xAA at address TA1 = \x07 TA2 = \x00   
     #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\xAA\x07\x00", 3)) {
-      PT_EXIT("device $owx_dev not accessible in writing");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    unless ($thread->{ExecuteResponse}->{success}) {
-      PT_EXIT("state could not be set for device $owx_dev");
-    }
-    $res = $thread->{ExecuteResponse}->{readdata};
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xAA\x07\x00", 3);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
 
     #-- first step
     my $stat    = ord(substr($res,0,1));
@@ -1382,17 +1380,16 @@ sub OWXSWITCH_PT_SetState($$) {
     #-- issue the match ROM command \x55 and the write status command
     #   \x55 at address TA1 = \x07 TA2 = \x00
     #-- reading 9 + 4 + 2 data bytes = 15 bytes
-    $select=sprintf("\x55\x07\x00%c",$statneu);   
+    $thread->{'select'}=sprintf("\x55\x07\x00%c",$statneu);
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 2)) {
-      PT_EXIT("device $owx_dev not accessible in writing");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    unless ($thread->{ExecuteResponse}->{success}) {
-      PT_EXIT("state could not be set for device $owx_dev");
-    }
-    $res = $thread->{ExecuteResponse}->{readdata};
-    my $command = $thread->{ExecuteResponse}->{writedata};
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'}, 2);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
+
+    my $command = $thread->{'select'};
     
     #-- second step from above
     @data=split(//,$res);
@@ -1416,14 +1413,12 @@ sub OWXSWITCH_PT_SetState($$) {
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",$value,255-$value);  
 
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
-      PT_EXIT("device $owx_dev not accessible in writing");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    unless ($thread->{ExecuteResponse}->{success}) {
-      PT_EXIT("state could not be set for device $owx_dev");
-    }
-    $res = $thread->{ExecuteResponse}->{readdata};
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 1);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
 
     @data=split(//,$res);
     if (@data != 1) {
@@ -1439,14 +1434,12 @@ sub OWXSWITCH_PT_SetState($$) {
     #-- issue the match ROM command \x55 and the write gpio command
     #   \x5A plus the value byte and its complement
     $select=sprintf("\x5A%c%c",252+$value,3-$value);   
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 1)) {
-      PT_EXIT("device $owx_dev not accessible in writing");
-    }
-    PT_WAIT_UNTIL($thread->{ExecuteResponse});
-    unless ($thread->{ExecuteResponse}->{success}) {
-      PT_EXIT("state could not be set for device $owx_dev");
-    }
-    $res = $thread->{ExecuteResponse}->{readdata};
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 1);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
 
     @data=split(//,$res);
     if (@data != 1) {
@@ -1480,7 +1473,7 @@ sub OWXSWITCH_PT_SetOutput($$$) {
   for (my $i=0;$i<$cnumber{$attr{$hash->{NAME}}{"model"}};$i++){
     $value += ($hash->{owg_vax}->[$i]<<$i) 
       if( $i != $fnd );
-    $value += ($nval<<$i) 
+    $value += ($nval<<$i)
       if( $i == $fnd );  
   }
   $thread->{value} = $value;
