@@ -344,22 +344,8 @@ sub OWX_ASYNC_PT_Alarms ($) {
       PT_WAIT_THREAD($thread->{pt_alarms});
       delete $thread->{TimeoutTime};
       die $thread->{pt_alarms}->PT_CAUSE() if ($thread->{pt_alarms}->PT_STATE() == PT_ERROR);
-      if (my $alarmed_devs = $thread->{pt_alarms}->PT_RETVAL()) {
-        $hash->{ALARMDEVS} = $alarmed_devs;
-        my @alarmed_devnames;
-        GP_ForallClients($hash,sub {
-          my ($client) = @_;
-          my $romid = $client->{ROM_ID};
-          if (grep {/$romid/} @$alarmed_devs) {
-            readingsSingleUpdate($client,"alarm",1,!$client->{ALARM});
-            $client->{ALARM}=1;
-            push (@alarmed_devnames,$client->{NAME});
-          } else {
-            readingsSingleUpdate($client,"alarm",0, $client->{ALARM});
-            $client->{ALARM}=0;
-          }
-        },$alarmed_devs);
-        $hash->{ALARMDEVNAMES} = \@alarmed_devnames;
+      if (defined (my $alarmed_devs = $thread->{pt_alarms}->PT_RETVAL())) {
+        OWX_ASYNC_AfterAlarms($hash,$alarmed_devs);
       };
       PT_END;
     });
@@ -372,6 +358,41 @@ sub OWX_ASYNC_PT_Alarms ($) {
     } 
   }
 }
+
+########################################################################################
+#
+# OWX_ASYNC_AfterAlarms - is called when the search for alarmed devices that was initiated by OWX_ASYNC_Alarms successfully returns
+#
+# stores device-addresses found in $hash->{ALARMDEVS}
+#
+# Attention: this function is not intendet to be called directly!
+#
+# Parameter hash = hash of bus master
+# alarmed_devs = Reference to Array of device-address-strings
+#
+# Returns: nothing
+#
+########################################################################################
+
+sub OWX_ASYNC_AfterAlarms($$) {
+  my ($hash,$alarmed_devs) = @_;
+  my @alarmed_devnames = ();
+  GP_ForallClients($hash,sub {
+    my ($client) = @_;
+    my $romid = $client->{ROM_ID};
+    Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterAlarms client NAME: $client->{NAME}, ROM_ID: $romid, ALARM: $client->{ALARM}, alarmed_devs: [".join(",",@$alarmed_devs)."]") if ($owx_async_debug>2);
+    if (grep {/$romid/} @$alarmed_devs) {
+      readingsSingleUpdate($client,"alarm",1,!$client->{ALARM});
+      $client->{ALARM}=1;
+      push (@alarmed_devnames,$client->{NAME});
+    } else {
+      readingsSingleUpdate($client,"alarm",0, $client->{ALARM});
+      $client->{ALARM}=0;
+    }
+  });
+  $hash->{ALARMDEVS} = \@alarmed_devnames;
+  Log3 ($hash->{NAME},5,"OWX_ASYNC_AfterAlarms: ALARMDEVS = [".join(",",@alarmed_devnames)."]") if ($owx_async_debug>2);
+};
 
 ########################################################################################
 #
@@ -441,20 +462,8 @@ sub OWX_ASYNC_PT_Search($) {
       PT_WAIT_THREAD($thread->{pt_discover});
       delete $thread->{TimeoutTime};
       die $thread->{pt_discover}->PT_CAUSE() if ($thread->{pt_discover}->PT_STATE() == PT_ERROR);
-      my $owx_devs = $thread->{pt_discover}->PT_RETVAL();
-      if (defined $owx_devs and (ref($owx_devs) eq "ARRAY")) {
-        $hash->{DEVS} = $owx_devs;
-        GP_ForallClients($hash,sub {
-          my ($hash,$devs) = @_;
-          my $romid = $hash->{ROM_ID};
-          if (grep {/$romid/} @$devs) {
-            readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT});
-            $hash->{PRESENT} = 1;
-          } else {
-            readingsSingleUpdate($hash,"present",0,$hash->{PRESENT});
-            $hash->{PRESENT} = 0;
-          }
-        },$owx_devs);
+      if (defined (my $owx_devs = $thread->{pt_discover}->PT_RETVAL())) {
+        OWX_ASYNC_AfterSearch($hash,$owx_devs);
       }
       PT_END;
     });
@@ -466,6 +475,43 @@ sub OWX_ASYNC_PT_Search($) {
       die "OWX: Search called with unknown interface $owx_interface on bus $hash->{NAME}";
     } 
   }
+}
+
+########################################################################################
+#
+# OWX_ASYNC_AfterSearch - is called when the search initiated by OWX_ASYNC_Search successfully returns
+#
+# stores device-addresses found in $hash->{DEVS}
+#
+# Attention: this function is not intendet to be called directly!
+#
+# Parameter hash = hash of bus master
+# owx_devs = Reference to Array of device-address-strings
+#
+# Returns: nothing
+#
+########################################################################################
+
+sub OWX_ASYNC_AfterSearch($$) {
+  my ($hash,$owx_devs) = @_;
+#  if (defined $owx_devs and (ref($owx_devs) eq "ARRAY")) {
+  my @devnames = ();
+  GP_ForallClients($hash,sub {
+    my ($client) = @_;
+    my $romid = $client->{ROM_ID};
+    Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterSearch client NAME: $client->{NAME}, ROM_ID: $romid, PRESENT: $client->{PRESENT}, devs: [".join(",",@$owx_devs)."]") if ($owx_async_debug>2);
+    if (grep {/$romid/} @$owx_devs) {
+      readingsSingleUpdate($client,"present",1,!$client->{PRESENT});
+      $client->{PRESENT} = 1;
+      push (@devnames,$client->{NAME});
+    } else {
+      readingsSingleUpdate($client,"present",0,$client->{PRESENT});
+      $client->{PRESENT} = 0;
+    }
+  });
+  $hash->{DEVS} = \@devnames;
+  Log3 ($hash->{NAME},5,"OWX_ASYNC_AfterSearch: DEVS = [".join(",",@devnames)."]") if ($owx_async_debug>2);
+#  }
 }
 
 ########################################################################################
@@ -626,10 +672,10 @@ sub OWX_ASYNC_Get($@) {
     my $task = OWX_ASYNC_PT_Alarms($hash);
     while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash); };
     return $task->PT_CAUSE() if ($task->PT_STATE() == PT_ERROR);
-    unless ( defined $hash->{ALARMDEVNAMES} and @{$hash->{ALARMDEVNAMES}}) {
+    unless ( defined $hash->{ALARMDEVS} and @{$hash->{ALARMDEVS}}) {
       return "OWX: No alarmed 1-Wire devices found on bus $name";
     }
-    return "OWX: ".scalar(@{$hash->{ALARMDEVNAMES}})." alarmed 1-Wire devices found on bus $name (".join(",",@{$hash->{ALARMDEVNAMES}}).")";
+    return "OWX: ".scalar(@{$hash->{ALARMDEVS}})." alarmed 1-Wire devices found on bus $name (".join(",",@{$hash->{ALARMDEVS}}).")";
   } elsif( $a[1] eq "devices") {
     #TODO use OWX_ASYNC_Schedule instead
     my $task = OWX_ASYNC_PT_Discover($hash);
@@ -679,6 +725,7 @@ sub OWX_ASYNC_Init ($) {
       return "OWX_ASYNC_Init failed: $err";
     };
     $hash->{ASYNC} = $ret;
+    $hash->{ASYNC}->{debug} = $owx_async_debug;
    	$hash->{INTERFACE} = $owx->{interface};
   } else {
     return "OWX: Init called with undefined interface";
@@ -747,7 +794,7 @@ sub OWX_ASYNC_Kick($) {
         if (main::AttrVal($hash->{NAME},"dokick",0)) {
           Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
           #-- issue the skip ROM command \xCC followed by start conversion command \x44 
-          $thread->{pt_execute} = OWX_ASYNC_PT_Execute($hash,$thread,1,undef,"\x44",0);
+          $thread->{pt_execute} = OWX_ASYNC_PT_Execute($hash,1,undef,"\x44",0);
           $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
           PT_WAIT_THREAD($thread->{pt_execute});
           delete $thread->{TimeoutTime};
@@ -903,10 +950,10 @@ sub OWX_ASYNC_Verify ($$) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_PT_Execute($$$$$$) {
-  my ( $hash, $context, $reset, $owx_dev, $data, $numread ) = @_;
+sub OWX_ASYNC_PT_Execute($$$$$) {
+  my ( $hash, $reset, $owx_dev, $data, $numread ) = @_;
   if (my $executor = $hash->{ASYNC}) {
-    return $executor->get_pt_execute($context,$reset,$owx_dev,$data,$numread);
+    return $executor->get_pt_execute($reset,$owx_dev,$data,$numread);
   } else {
     die "OWX_ASYNC_PT_Execute: no async device assigned";
   }

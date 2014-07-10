@@ -145,8 +145,8 @@ sub get_pt_alarms() {
 #
 ########################################################################################
 
-sub get_pt_execute($$$$$) {
-  my ($self, $context, $reset, $dev, $writedata, $numread) = @_;
+sub get_pt_execute($$$$) {
+  my ($self, $reset, $dev, $writedata, $numread) = @_;
   return PT_THREAD(sub {
     my ($thread) = @_;
     
@@ -220,8 +220,6 @@ sub get_pt_execute($$$$$) {
       my @result = split (//, $res);
       my $readdata = 9+$writelen < @result ? substr($res,9+$writelen) : "";
       PT_EXIT($readdata);
-    } else {
-      PT_EXIT;
     }
     PT_END;
   });
