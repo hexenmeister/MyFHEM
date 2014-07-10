@@ -339,7 +339,7 @@ sub OWX_ASYNC_PT_Alarms ($) {
     return PT_THREAD(sub {
       my ($thread) = @_;
       PT_BEGIN($thread);
-      $thread->{pt_alarms} = $async->get_pt_alarms($thread);
+      $thread->{pt_alarms} = $async->get_pt_alarms();
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_alarms});
       delete $thread->{TimeoutTime};
@@ -381,7 +381,7 @@ sub OWX_ASYNC_AfterAlarms($$) {
     my ($client) = @_;
     my $romid = $client->{ROM_ID};
     Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterAlarms client NAME: $client->{NAME}, ROM_ID: $romid, ALARM: $client->{ALARM}, alarmed_devs: [".join(",",@$alarmed_devs)."]") if ($owx_async_debug>2);
-    if (grep {/$romid/} @$alarmed_devs) {
+    if (grep {$romid eq $_} @$alarmed_devs) {
       readingsSingleUpdate($client,"alarm",1,!$client->{ALARM});
       $client->{ALARM}=1;
       push (@alarmed_devnames,$client->{NAME});
@@ -416,7 +416,7 @@ sub OWX_ASYNC_PT_Discover ($) {
     return PT_THREAD(sub {
       my ($thread) = @_;
       PT_BEGIN($thread);
-      $thread->{pt_discover} = $async->get_pt_discover($thread);
+      $thread->{pt_discover} = $async->get_pt_discover();
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_discover});
       delete $thread->{TimeoutTime};
@@ -457,7 +457,7 @@ sub OWX_ASYNC_PT_Search($) {
     return PT_THREAD(sub {
       my ($thread) = @_;
       PT_BEGIN($thread);
-      $thread->{pt_discover} = $async->get_pt_discover($thread);
+      $thread->{pt_discover} = $async->get_pt_discover();
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_discover});
       delete $thread->{TimeoutTime};
@@ -500,7 +500,7 @@ sub OWX_ASYNC_AfterSearch($$) {
     my ($client) = @_;
     my $romid = $client->{ROM_ID};
     Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterSearch client NAME: $client->{NAME}, ROM_ID: $romid, PRESENT: $client->{PRESENT}, devs: [".join(",",@$owx_devs)."]") if ($owx_async_debug>2);
-    if (grep {/$romid/} @$owx_devs) {
+    if (grep {$romid eq $_} @$owx_devs) {
       readingsSingleUpdate($client,"present",1,!$client->{PRESENT});
       $client->{PRESENT} = 1;
       push (@devnames,$client->{NAME});
@@ -916,18 +916,33 @@ sub OWX_ASYNC_Undef ($$) {
 #
 ########################################################################################
 
-#TODO refactor OWX_ASYNC_Verify to use direct protothread interface
-sub OWX_ASYNC_Verify ($$) {
-	my ($hash,$dev) = @_;
-	my $address = substr($dev,0,15);
-	if (OWX_ASYNC_Search($hash)) {
-		if (my $owx_devices = OWX_ASYNC_AwaitSearchResponse($hash)) {
-		  if (grep {/$address/} @{$owx_devices}) {
-		    return 1;
-			};
-		};
-	}
-	return 0;
+sub OWX_ASYNC_PT_Verify($$) {
+  my ($hash,$dev) = @_;
+  
+  #-- get the interface
+  my $async = $hash->{ASYNC};
+
+  #-- Verify a devices is present on the 1-Wire bus
+  if (defined $async) {
+    return PT_THREAD(sub {
+      my ($thread) = @_;
+      PT_BEGIN($thread);
+      $thread->{pt_verify} = $async->get_pt_verify($dev);
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_verify});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_verify}->PT_CAUSE() if ($thread->{pt_verify}->PT_STATE() == PT_ERROR);
+      PT_EXIT($thread->{pt_verify}->PT_RETVAL());
+      PT_END;
+    });
+  } else {
+    my $owx_interface = $hash->{INTERFACE};
+    if( !defined($owx_interface) ) {
+      die "OWX: Verify called with undefined interface on bus $hash->{NAME}";
+    } else {
+      die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{NAME}";
+    } 
+  }
 }
 
 ########################################################################################

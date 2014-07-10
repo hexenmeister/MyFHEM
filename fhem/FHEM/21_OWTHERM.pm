@@ -70,7 +70,7 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-use Time::HiRes qw( gettimeofday tv_interval usleep );
+use Time::HiRes qw( gettimeofday );
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
 BEGIN {
@@ -436,7 +436,13 @@ sub OWTHERM_Get($@) {
       my $master       = $hash->{IODev};
       #-- asynchronous mode
       if( $hash->{ASYNC} ){
-        $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+        #TODO use OWX_ASYNC_Schedule instead
+        my $task = OWX_ASYNC_PT_Verify($master,$hash->{ROM_ID});
+        eval {
+          while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        };
+        return GP_Catch($@) if $@;
+        $value = $task->PT_RETVAL();
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
       }

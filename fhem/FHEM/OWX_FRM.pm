@@ -204,6 +204,19 @@ sub get_pt_alarms() {
   });
 }
 
+sub get_pt_verify($) {
+  my ($self,$dev) = @_;
+  return PT_THREAD(sub {
+    my ($thread) = @_;
+    PT_BEGIN($thread);
+    delete $self->{devs};
+    main::FRM_Client_FirmataDevice($self->{hash})->onewire_search($self->{pin});
+    PT_WAIT_UNTIL(defined $self->{devs});
+    PT_EXIT(scalar(grep {$dev eq $_} @{$self->{devs}}));
+    PT_END;
+  });
+}
+
 ########################################################################################
 # 
 # Complex - Send match ROM, data block and receive bytes as response
@@ -227,6 +240,7 @@ sub get_pt_execute($$$$) {
 
     if (  my $firmata = main::FRM_Client_FirmataDevice($self->{hash}) and my $pin = $self->{pin} ) {
       my @data = unpack "C*", $writedata if defined $writedata;
+      my $id = $self->{id};
       my $ow_command = {
         'reset'  => $reset,
         'skip'   => defined($owx_dev) ? undef : 1,
@@ -234,15 +248,17 @@ sub get_pt_execute($$$$) {
         'read'  => $numread,
         'write' => @data ? \@data : undef,
         'delay' => undef,
-        'id'    => $numread ? $self->{id} : undef
+        'id'    => $numread ? $id : undef
       };
       $firmata->onewire_command_series( $pin, $ow_command );
       if ($numread) {
-        $thread->{id} = $self->{id};
-        delete $self->{responses}->{$thread->{id}};
+        $thread->{id} = $id;
+        $self->{id} = ( $id + 1 ) & 0xFFFF;
+        delete $self->{responses}->{$id};
         PT_WAIT_UNTIL(defined $self->{responses}->{$thread->{id}});
-        $self->{id} = ( ( $self->{id} + 1 ) & 0xFFFF );
-        PT_EXIT(pack "C*", @{$self->{responses}->{$thread->{id}}});
+        my $ret = pack "C*", @{$self->{responses}->{$thread->{id}}};
+        delete $self->{responses}->{$thread->{id}};
+        PT_EXIT($ret);
       };
     };
     PT_END;

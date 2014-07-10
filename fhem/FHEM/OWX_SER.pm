@@ -425,7 +425,7 @@ sub get_pt_verify($) {
     if ($dev eq $dev2){
       PT_EXIT(1);
     }else{
-      PT_EXIT;
+      PT_EXIT(0);
     }
     PT_END;
   });

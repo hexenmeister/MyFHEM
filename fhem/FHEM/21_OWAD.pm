@@ -75,7 +75,7 @@ use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 use GPUtils qw(:all);
-use Time::HiRes qw( gettimeofday tv_interval usleep );
+use Time::HiRes qw( gettimeofday );
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
 BEGIN {
@@ -90,7 +90,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.15";
+my $owx_version="5.16";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -569,7 +569,13 @@ sub OWAD_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+      #TODO use OWX_ASYNC_Schedule instead
+      my $task = OWX_ASYNC_PT_Verify($master,$hash->{ROM_ID});
+      eval {
+        while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      return GP_Catch($@) if $@;
+      $value = $task->PT_RETVAL();
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -1539,7 +1545,7 @@ sub OWXAD_PT_GetPage($$$) {
 
   my ($thread,$hash,$page,$final) = @_;
   
-  my ($select, $res, $res2, $res3, @data, $an, $vn);
+  my ($res, $res2, $res3, @data, $an, $vn);
   
   #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
@@ -1555,40 +1561,43 @@ sub OWXAD_PT_GetPage($$$) {
   #=============== get the voltage reading ===============================
   if( $page eq "reading") {
     #-- issue the match ROM command \x55 and the start conversion command
-    unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 )) {
-      PT_EXIT("$owx_dev not accessible for conversion");
-    }
-    PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-    #TODO async 20ms delay
-    select(undef,undef,undef,0.02);
+
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    $thread->{ExecuteTime} = gettimeofday() + 0.02;
+    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+    delete $thread->{ExecuteTime};
 
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
-    $select="\xAA\x00\x00";
+    $thread->{'select'}="\xAA\x00\x00";
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
     #-- issue the match ROM command \x55 and the read alarm page command 
     #   \xAA\x10\x00 
-    $select="\xAA\x10\x00";
+    $thread->{'select'}="\xAA\x10\x00";
   #=============== get the status reading ===============================
   } elsif ( $page eq "status" ) {
     #-- issue the match ROM command \x55 and the read status memory page command 
     #   \xAA\x08\x00 r
-    $select="\xAA\x08\x00";
+    $thread->{'select'}="\xAA\x08\x00";
   #=============== wrong value requested ===============================
   } else {
     return "wrong memory page requested from $owx_dev";
   }
   #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 10 )) {
-    PT_EXIT("$owx_dev not accessible in reading $page page"); 
-  }
-  PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-  my $response = $thread->{ExecuteResponse};
-  unless ($response->{success}) {
-    PT_EXIT("$owx_dev read not successful");
-  }
-  my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$response->{writedata},$response->{numread},$response->{readdata});
+  
+  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
+  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+  PT_WAIT_THREAD($thread->{pt_execute});
+  delete $thread->{TimeoutTime};
+  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+  my $response = $thread->{pt_execute}->PT_RETVAL();
+  my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
   if ($res) {
     PT_EXIT($res);
   }
@@ -1663,14 +1672,11 @@ sub OWXAD_PT_SetPage($$) {
     PT_EXIT("wrong memory page write attempt");
   }
   #"setpage"
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0 )) {
-    PT_EXIT("device $owx_dev not accessible for writing"); 
-  }
-  PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-  my $response = $thread->{ExecuteResponse};
-  unless ($response->{success}) {
-    PT_EXIT("$owx_dev write not successful");
-  }
+  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
+  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+  PT_WAIT_THREAD($thread->{pt_execute});
+  delete $thread->{TimeoutTime};
+  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
   PT_END;
 }
 
