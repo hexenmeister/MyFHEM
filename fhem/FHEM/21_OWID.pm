@@ -49,13 +49,13 @@
 package main;
 
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
-use Time::HiRes qw(usleep ualarm gettimeofday tv_interval);
+use Time::HiRes qw(gettimeofday);
 
 use strict;
 use warnings;
 sub Log($$);
 
-my $owx_version="5.12";
+my $owx_version="5.13";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -92,9 +92,12 @@ sub OWID_Initialize ($) {
   $hash->{GetFn}    = "OWID_Get";
   $hash->{SetFn}    = "OWID_Set";
   $hash->{AttrFn}   = "OWID_Attr";
+  $hash->{NotifyFn} = "OWID_Notify";
+  $hash->{InitFn}   = "OWID_Init";
   $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
                       "interval ".
                       $readingFnAttributes;
+  $hash->{NOTIFYDEV} = "global";
 
   #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
@@ -197,14 +200,27 @@ sub OWID_Define ($$) {
   $modules{OWID}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","Defined",1);
-  Log 3, "OWID: Device $name defined."; 
+  Log 3, "OWID:    Device $name defined."; 
 
-  #-- Initialization reading according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
-  
+  if ($init_done) {
+    return OWID_Init($hash);
+  }
+  return undef;
+}
+
+sub OWID_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWID_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWID_Init ($) {
+  my ($hash)=@_;
   #-- Start timer for updates
-  InternalTimer(time()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
-  
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
   #--
   readingsSingleUpdate($hash,"state","Initialized",1);
   
@@ -248,6 +264,9 @@ sub OWID_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+        }
+        if ($init_done) {
+          OWID_Init($hash);
         }
         last;
       };
@@ -301,7 +320,13 @@ sub OWID_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+      #TODO use OWX_ASYNC_Schedule instead
+      my $task = OWX_ASYNC_PT_Verify($hash);
+      eval {
+        while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      return GP_Catch($@) if $@;
+      return "$name.present => ".$task->PT_RETVAL();
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -344,22 +369,18 @@ sub OWID_GetValues($) {
   #-- hash of the busmaster
   my $master       = $hash->{IODev};
   
-  #-- measure elapsed time
-  my $t0 = [gettimeofday];
-
   if( $hash->{ASYNC} ){
-    $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+    #TODO use OWX_ASYNC_Schedule instead
+    my $task = OWX_ASYNC_PT_Verify($hash);
+    eval {
+      OWX_ASYNC_Schedule($hash,$task);
+    };
+    return GP_Catch($@) if $@;
+    return undef;
   } else {
     $value = OWX_Verify($master,$hash->{ROM_ID});
   }
-  
-  #my $thr = threads->create('OWX_Verify', $master, $hash->{ROM_ID});
-  #$thr->detach();
 
-  my $t1 = [gettimeofday];
-  my $t0_t1 = tv_interval $t0, $t1;
-  #Log 1,"====> Time for verify = $t0_t1";
-  
   #-- generate an event only if presence has changed
   if( $value == 0 ){
     readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 

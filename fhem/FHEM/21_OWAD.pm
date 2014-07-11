@@ -570,9 +570,9 @@ sub OWAD_Get($@) {
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
       #TODO use OWX_ASYNC_Schedule instead
-      my $task = OWX_ASYNC_PT_Verify($master,$hash->{ROM_ID});
+      my $task = OWX_ASYNC_PT_Verify($hash);
       eval {
-        while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
       $value = $task->PT_RETVAL();

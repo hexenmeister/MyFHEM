@@ -251,7 +251,7 @@ sub OWX_ASYNC_Attr(@) {
   return $ret;
 }
 
-sub OWX_ASYNC_Notify {
+sub OWX_ASYNC_Notify ($$) {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
@@ -916,31 +916,42 @@ sub OWX_ASYNC_Undef ($$) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_PT_Verify($$) {
-  my ($hash,$dev) = @_;
-  
+sub OWX_ASYNC_PT_Verify($) {
+  my ($hash) = @_;
+
   #-- get the interface
-  my $async = $hash->{ASYNC};
+  my $async = $hash->{IODev}->{ASYNC};
+  my $romid = $hash->{ROM_ID};
 
   #-- Verify a devices is present on the 1-Wire bus
   if (defined $async) {
     return PT_THREAD(sub {
       my ($thread) = @_;
       PT_BEGIN($thread);
-      $thread->{pt_verify} = $async->get_pt_verify($dev);
+      $thread->{pt_verify} = $async->get_pt_verify($romid);
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_verify});
       delete $thread->{TimeoutTime};
       die $thread->{pt_verify}->PT_CAUSE() if ($thread->{pt_verify}->PT_STATE() == PT_ERROR);
-      PT_EXIT($thread->{pt_verify}->PT_RETVAL());
+      
+      my $value = $thread->{pt_verify}->PT_RETVAL();
+
+      if( $value == 0 ){
+        readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
+      } else {
+        readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+      }
+      $hash->{PRESENT} = $value;
+      
+      PT_EXIT($value);
       PT_END;
     });
   } else {
-    my $owx_interface = $hash->{INTERFACE};
+    my $owx_interface = $hash->{IODev}->{INTERFACE};
     if( !defined($owx_interface) ) {
-      die "OWX: Verify called with undefined interface on bus $hash->{NAME}";
+      die "OWX: Verify called with undefined interface on bus $hash->{IODev}->{NAME}";
     } else {
-      die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{NAME}";
+      die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{IODev}->{NAME}";
     } 
   }
 }
