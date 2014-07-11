@@ -298,9 +298,7 @@ sub OWAD_Init ($) {
   my ($hash)=@_;
   #-- Start timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "OWAD_GetValues", $hash, 0);
-  #--
-  readingsSingleUpdate($hash,"state","Initialized",1);
+  InternalTimer(gettimeofday()+10, "OWAD_InitializeDevice", $hash, 0);
   return undef; 
 }
   
@@ -628,7 +626,7 @@ sub OWAD_Get($@) {
       eval {
         while ($task->PT_SCHEDULE($hash,"reading",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -659,7 +657,7 @@ sub OWAD_Get($@) {
       eval {
         while ($task->PT_SCHEDULE($hash,"alarm",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -698,7 +696,7 @@ sub OWAD_Get($@) {
       eval {
         while ($task->PT_SCHEDULE($hash,"status",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -768,11 +766,7 @@ sub OWAD_GetValues($) {
   my $value   = "";
   my $ret     = "";
   my ($ret1,$ret2,$ret3);
-  
-  #-- check if device needs to be initialized
-  OWAD_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
-  
+
   #-- define warnings
   my $warn        = "none";
   $hash->{ALARM}  = "0";
@@ -908,7 +902,7 @@ sub OWAD_InitializeDevice($) {
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
   
-  return undef;
+  return OWAD_GetValues($hash);
 }
 
 #######################################################################################
@@ -1585,12 +1579,12 @@ sub OWXAD_PT_GetPage($$$) {
     #-- issue the match ROM command \x55 and the start conversion command
 
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
+    $thread->{ExecuteTime} = gettimeofday() + 0.05; # was 0.02
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
-    $thread->{ExecuteTime} = gettimeofday() + 0.02;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
 
@@ -1609,7 +1603,7 @@ sub OWXAD_PT_GetPage($$$) {
     $thread->{'select'}="\xAA\x08\x00";
   #=============== wrong value requested ===============================
   } else {
-    return "wrong memory page requested from $owx_dev";
+    die "wrong memory page requested from $owx_dev";
   }
   #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
   

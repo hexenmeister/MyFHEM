@@ -1609,12 +1609,12 @@ sub OWFSCOUNT_SetPage($$$) {
 #
 ########################################################################################
 
-sub OWXCOUNT_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $select, $numread, $res) = @_;
+sub OWXCOUNT_BinValues($$$$$) {
+  my ($hash, $context, $owx_dev, $select, $res) = @_;
   
   #-- unused are success, reset, data
   
-  return undef unless ($success and defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
+  return undef unless (defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
   
   my $cmd = $1;
   my $page = $2;
@@ -1742,7 +1742,7 @@ sub OWXCOUNT_GetPage($$$) {
     if( $res eq 0 );
   return "$owx_dev has returned invalid data"
     if( length($res)!=54);
-  return OWXCOUNT_BinValues($hash,$context,1,1,$owx_dev,$select,42,substr($res,12));
+  return OWXCOUNT_BinValues($hash,$context,$owx_dev,$select,substr($res,12));
 }
 
 ########################################################################################
@@ -1891,7 +1891,7 @@ sub OWXCOUNT_PT_GetPage($$$) {
   delete $thread->{TimeoutTime};
   die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
-  if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},42,$thread->{response})) {
+  if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),$owx_dev,$thread->{'select'},$thread->{response})) {
     die $ret;
   }
   PT_END;

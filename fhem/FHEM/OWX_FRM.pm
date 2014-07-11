@@ -250,6 +250,7 @@ sub get_pt_execute($$$$) {
         'delay' => undef,
         'id'    => $numread ? $id : undef
       };
+      main::Log3 ($self->{name},5,"FRM_OWX_Execute: $id: $owx_dev [".join(" ",(map sprintf("%02X",$_),@data))."] numread: ".(defined $numread ? $numread : 0)) if $self->{debug};
       $firmata->onewire_command_series( $pin, $ow_command );
       if ($numread) {
         $thread->{id} = $id;

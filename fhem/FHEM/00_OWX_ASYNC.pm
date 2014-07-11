@@ -995,6 +995,7 @@ sub OWX_ASYNC_Schedule($$@) {
   } else {
     $master->{tasks}->{$owx_dev} = [$task];
   }
+  #TODO make use of $master->{".nexttasktime"}
   InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
 };
 
@@ -1008,6 +1009,7 @@ sub OWX_ASYNC_ScheduleMaster($$@) {
   } else {
     $master->{tasks}->{master} = [$task];
   }
+  #TODO make use of $master->{".nexttasktime"}
   InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
 };
 
@@ -1047,7 +1049,6 @@ sub OWX_ASYNC_RunTasks($) {
       if (defined (my $current = @queue_waiting ? shift @queue_waiting : @queue_ready ? shift @queue_ready : @queue_initial ? shift @queue_initial : undef)) {
         my $task = $current->{queue}->[0];
         my $timeout = $task->{TimeoutTime};
-        my $schedule = $task->{ExecuteTime};
         if ($task->PT_SCHEDULE(@{$task->{ExecuteArgs}})) {
           my $state = $task->PT_STATE();
           # waiting for ExecuteResponse:
