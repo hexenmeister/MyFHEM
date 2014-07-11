@@ -329,6 +329,7 @@ sub OWLCD_Get($@) {
         while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }

@@ -942,8 +942,6 @@ sub OWX_ASYNC_PT_Verify($) {
         readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
       }
       $hash->{PRESENT} = $value;
-      
-      PT_EXIT($value);
       PT_END;
     });
   } else {

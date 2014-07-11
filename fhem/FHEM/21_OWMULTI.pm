@@ -130,6 +130,8 @@ sub OWMULTI_Initialize ($) {
   $hash->{UndefFn} = "OWMULTI_Undef";
   $hash->{GetFn}   = "OWMULTI_Get";
   $hash->{SetFn}   = "OWMULTI_Set";
+  $hash->{NotifyFn}= "OWMULTI_Notify";
+  $hash->{InitFn}  = "OWMULTI_Init";
   $hash->{AttrFn}  = "OWMULTI_Attr";
 
   #tempOffset = a temperature offset added to the temperature reading for correction 
@@ -182,6 +184,9 @@ sub OWMULTI_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWMULTI_Init($hash);
+          }
         }
         last;
       };
@@ -276,10 +281,30 @@ sub OWMULTI_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWMULTI: Device $name defined."; 
-  
-  #-- Start timer for updates
-  InternalTimer(time()+10, "OWMULTI_GetValues", $hash, 0);
 
+  $hash->{NOTIFYDEV} = "global";
+
+  if ($init_done) {
+    OWMULTI_Init($hash);
+  }
+  return undef;
+}
+
+sub OWMULTI_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWMULTI_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWMULTI_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWMULTI_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
   
@@ -462,7 +487,7 @@ sub OWMULTI_Get($@) {
           while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
         };
         return GP_Catch($@) if $@;
-        $value = $task->PT_RETVAL();
+        return "$name.present => ".ReadingsVal($name,"present","unknown");
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
       }
@@ -1106,8 +1131,8 @@ sub OWXMULTI_PT_GetValues($) {
     PT_EXIT("$owx_dev has returned invalid data");
   }
   $ret = OWXMULTI_BinValues($hash,"ds2438.getvdd",1,undef,$owx_dev,undef,undef,$res);
-  if (defined $ret) {
-    PT_EXIT($ret);
+  if ($ret) {
+    die $ret;
   }
   #------------------------------------------------------------------------------------
   #-- switch the device to current measurement off, V external only
@@ -1172,8 +1197,8 @@ sub OWXMULTI_PT_GetValues($) {
     PT_EXIT("$owx_dev has returned invalid data");
   }
   $ret = OWXMULTI_BinValues($hash,"ds2438.getvad",1,undef,$owx_dev,undef,undef,$res);
-  if (defined $ret) {
-    PT_EXIT($ret);
+  if ($ret) {
+    die $ret;
   }
   PT_END;
 }

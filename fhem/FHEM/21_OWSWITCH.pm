@@ -144,6 +144,8 @@ sub OWSWITCH_Initialize ($) {
   $hash->{UndefFn} = "OWSWITCH_Undef";
   $hash->{GetFn}   = "OWSWITCH_Get";
   $hash->{SetFn}   = "OWSWITCH_Set";
+  $hash->{NotifyFn}= "OWSWITCH_Notify";
+  $hash->{InitFn}  = "OWSWITCH_Init";
   $hash->{AttrFn}  = "OWSWITCH_Attr";
   
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406,DS2408 loglevel:0,1,2,3,4,5 ".
@@ -265,10 +267,30 @@ sub OWSWITCH_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWSWITCH: Device $name defined."; 
-  
-  #-- Start timer for updates
-  InternalTimer(time()+10, "OWSWITCH_GetValues", $hash, 0);
 
+  $hash->{NOTIFYDEV} = "global";
+
+  if ($init_done) {
+    OWSWITCH_Init($hash);
+  }
+  return undef;
+}
+
+sub OWSWITCH_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWSWITCH_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWSWITCH_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWSWITCH_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
 
@@ -307,6 +329,9 @@ sub OWSWITCH_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWSWITCH_Init($hash);
+          }
         }
         last;
       };
@@ -469,7 +494,7 @@ sub OWSWITCH_Get($@) {
         while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
-      $value = $task->PT_RETVAL();
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }

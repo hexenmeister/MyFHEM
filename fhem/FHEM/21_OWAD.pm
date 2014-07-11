@@ -157,6 +157,8 @@ sub OWAD_Initialize ($) {
   $hash->{UndefFn} = "OWAD_Undef";
   $hash->{GetFn}   = "OWAD_Get";
   $hash->{SetFn}   = "OWAD_Set";
+  $hash->{NotifyFn}= "OWAD_Notify";
+  $hash->{InitFn}  = "OWAD_Init";
   $hash->{AttrFn}  = "OWAD_Attr";
  
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
@@ -276,15 +278,32 @@ sub OWAD_Define ($$) {
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWAD:    Device $name defined."; 
 
-  #-- Initialization reading according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
+  $hash->{NOTIFYDEV} = "global";
   
-  #-- Start timer for updates
-  InternalTimer(time()+60, "OWAD_GetValues", $hash, 0);
-
+  if ($init_done) {
+    OWAD_Init($hash);
+  }
   return undef; 
 }
 
+sub OWAD_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWAD_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWAD_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWAD_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
+  return undef; 
+}
+  
 #######################################################################################
 #
 # OWAD_Attr - Set one attribute value for device
@@ -326,6 +345,9 @@ sub OWAD_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWAD_Init($hash);
+          }
         }
         last;
       };
@@ -575,7 +597,7 @@ sub OWAD_Get($@) {
         while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
-      $value = $task->PT_RETVAL();
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -1599,7 +1621,7 @@ sub OWXAD_PT_GetPage($$$) {
   my $response = $thread->{pt_execute}->PT_RETVAL();
   my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
   if ($res) {
-    PT_EXIT($res);
+    die $res;
   }
   PT_END;
 }

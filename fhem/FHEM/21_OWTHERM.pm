@@ -138,6 +138,8 @@ sub OWTHERM_Initialize ($) {
   $hash->{UndefFn} = "OWTHERM_Undef";
   $hash->{GetFn}   = "OWTHERM_Get";
   $hash->{SetFn}   = "OWTHERM_Set";
+  $hash->{NotifyFn}= "OWTHERM_Notify";
+  $hash->{InitFn}  = "OWTHERM_Init";
   $hash->{AttrFn}  = "OWTHERM_Attr";
   $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
                      "stateAL stateAH ".
@@ -253,13 +255,33 @@ sub OWTHERM_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log3 $name, 3, "OWTHERM: Device $name defined.";
-   
-  #-- Start timer for updates
-  InternalTimer(time()+10, "OWTHERM_GetValues", $hash, 0);
 
+  $hash->{NOTIFYDEV} = "global";
+
+  if ($init_done) {
+    OWTHERM_Init($hash);
+  }
+  return undef;
+}
+
+sub OWTHERM_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWTHERM_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWTHERM_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWTHERM_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
- 
+
 #######################################################################################
 #
 # OWTHERM_Attr - Set one attribute value for device
@@ -307,6 +329,9 @@ sub OWTHERM_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWTHERM_Init($hash);
+          }
         }
         last;
       };
@@ -442,7 +467,7 @@ sub OWTHERM_Get($@) {
           while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
         };
         return GP_Catch($@) if $@;
-        $value = $task->PT_RETVAL();
+        return "$name.present => ".ReadingsVal($name,"present","unknown");
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
       }

@@ -221,7 +221,7 @@ sub OWID_Init ($) {
   my ($hash)=@_;
   #-- Start timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
+  InternalTimer(gettimeofday()+10, "OWID_GetValues", $hash, 0);
   #--
   readingsSingleUpdate($hash,"state","Initialized",1);
   
@@ -265,9 +265,9 @@ sub OWID_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
-        }
-        if ($init_done) {
-          OWID_Init($hash);
+          if ($init_done) {
+            OWID_Init($hash);
+          }
         }
         last;
       };
@@ -327,7 +327,7 @@ sub OWID_Get($@) {
         while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
-      return "$name.present => ".$task->PT_RETVAL();
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }

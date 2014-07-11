@@ -151,6 +151,8 @@ sub OWCOUNT_Initialize ($) {
   $hash->{UndefFn} = "OWCOUNT_Undef";
   $hash->{GetFn}   = "OWCOUNT_Get";
   $hash->{SetFn}   = "OWCOUNT_Set";
+  $hash->{NotifyFn}= "OWCOUNT_Notify";
+  $hash->{InitFn}  = "OWCOUNT_Init";
   $hash->{AttrFn}  = "OWCOUNT_Attr";
   #-- see header for attributes
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold LogM LogY ".
@@ -264,9 +266,29 @@ sub OWCOUNT_Define ($$) {
   readingsSingleUpdate($hash,"state","defined",1);
   Log3 $name, 3, "OWCOUNT: Device $name defined."; 
   
-  #-- Start timer for updates
-  InternalTimer(time()+10, "OWCOUNT_GetValues", $hash, 0);
+  $hash->{NOTIFYDEV} = "global";
+  
+  if ($init_done) {
+    OWCOUNT_Init($hash);
+  }
+  return undef; 
+}
 
+sub OWCOUNT_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWCOUNT_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWCOUNT_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWCOUNT_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
 
@@ -303,6 +325,9 @@ sub OWCOUNT_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWCOUNT_Init($hash);
+          }
         }
         last;
       };
@@ -632,7 +657,7 @@ sub OWCOUNT_Get($@) {
         while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
       };
       return GP_Catch($@) if $@;
-      $value = $task->PT_RETVAL();
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -1841,7 +1866,7 @@ sub OWXCOUNT_PT_GetPage($$$) {
 
   #=============== wrong value requested ===============================
   if( ($page<0) || ($page>15) ){
-    PT_EXIT("wrong memory page requested");
+    die("wrong memory page requested");
   } 
   #=============== get memory + counter ===============================
   #-- issue the match ROM command \x55 and the read memory + counter command
@@ -1866,7 +1891,9 @@ sub OWXCOUNT_PT_GetPage($$$) {
   delete $thread->{TimeoutTime};
   die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
-  PT_EXIT(OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},42,$thread->{response}));
+  if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},42,$thread->{response})) {
+    die $ret;
+  }
   PT_END;
 }
 
