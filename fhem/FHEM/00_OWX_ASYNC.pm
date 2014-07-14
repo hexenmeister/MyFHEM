@@ -667,20 +667,28 @@ sub OWX_ASYNC_Get($@) {
   my $name     = $hash->{NAME};
   my $owx_dev  = $hash->{ROM_ID};
 
+  my ($task,$task_state);
+
   if( $a[1] eq "alarms") {
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = OWX_ASYNC_PT_Alarms($hash);
-    while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash); };
-    return $task->PT_CAUSE() if ($task->PT_STATE() == PT_ERROR);
+    eval {
+      $task = OWX_ASYNC_PT_Alarms($hash);
+      OWX_ASYNC_ScheduleMaster($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($hash,$task);
+    };
+    return $@ if $@;
+    return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
     unless ( defined $hash->{ALARMDEVS} and @{$hash->{ALARMDEVS}}) {
       return "OWX: No alarmed 1-Wire devices found on bus $name";
     }
     return "OWX: ".scalar(@{$hash->{ALARMDEVS}})." alarmed 1-Wire devices found on bus $name (".join(",",@{$hash->{ALARMDEVS}}).")";
   } elsif( $a[1] eq "devices") {
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = OWX_ASYNC_PT_Discover($hash);
-    while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash); };
-    return $task->PT_STATE() == PT_ERROR ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    eval {
+      $task = OWX_ASYNC_PT_Discover($hash);
+      OWX_ASYNC_ScheduleMaster($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($hash,$task);
+    };
+    return $@ if $@;
+    return ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   } elsif( $a[1] eq "version") {
     return $owx_async_version;
     
@@ -1013,6 +1021,17 @@ sub OWX_ASYNC_ScheduleMaster($$@) {
   InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
 };
 
+sub OWX_ASYNC_RunToCompletion($$) {
+  my ($master,$task) = @_;
+  my $task_state;
+  do {
+    OWX_ASYNC_Poll($master);
+    OWX_ASYNC_RunTasks($master);
+    $task_state = $task->PT_STATE();
+  } while ($task_state == PT_INITIAL or $task_state == PT_WAITING or $task_state == PT_YIELDED);
+  return $task_state;
+}
+
 sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
   if ($master->{STATE} eq "Active") {
@@ -1058,6 +1077,7 @@ sub OWX_ASYNC_RunTasks($) {
             if ($now >= $task->{TimeoutTime}) {
               Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task timed out");
               Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now));
+              $task->PT_CANCEL("Timeout");
               shift @{$current->{queue}};
               next;
             } else {

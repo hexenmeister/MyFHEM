@@ -451,7 +451,8 @@ sub OWTHERM_Get($@) {
   } 
   
   #-- Get other values according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
+  my $master = $hash->{IODev};
+  my $interface= $master->{TYPE};
   
   #-- get present
   if($a[1] eq "present" ) {
@@ -461,12 +462,14 @@ sub OWTHERM_Get($@) {
       my $master       = $hash->{IODev};
       #-- asynchronous mode
       if( $hash->{ASYNC} ){
-        #TODO use OWX_ASYNC_Schedule instead
-        my $task = OWX_ASYNC_PT_Verify($hash);
+        my ($task,$task_state);
         eval {
-          while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
+          $task = OWX_ASYNC_PT_Verify($hash);
+          OWX_ASYNC_Schedule($hash,$task);
+          $task_state = OWX_ASYNC_RunToCompletion($master,$task);
         };
         return GP_Catch($@) if $@;
+        return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
         return "$name.present => ".ReadingsVal($name,"present","unknown");
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -494,12 +497,13 @@ sub OWTHERM_Get($@) {
     #-- not different from getting all values ..
     $ret = OWXTHERM_GetValues($hash);
   }elsif( $interface eq "OWX_ASYNC" ){
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = PT_THREAD(\&OWXTHERM_PT_GetValues);
+    my ($task,$task_state);
     eval {
-      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $task = OWXTHERM_PT_GetValues($hash);
+      OWX_ASYNC_Schedule($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
     };
-    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -562,7 +566,7 @@ sub OWTHERM_GetValues($@) {
     #-- skip, if the conversion is driven by master
     unless ( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_GetValues),$hash );
+        OWX_ASYNC_Schedule( $hash, OWXTHERM_PT_GetValues($hash) );
       };
       $ret = GP_Catch($@) if $@;
     }
@@ -597,7 +601,8 @@ sub OWTHERM_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
-  my $interface = $hash->{IODev}->{TYPE};
+  my $master = $hash->{IODev};
+  my $interface = $master->{TYPE};
   my @a = ($name,"",0);
   my ($unit,$offset,$factor,$abbr,$value,$ret);
   
@@ -664,12 +669,13 @@ sub OWTHERM_InitializeDevice($) {
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,$args);
   }elsif( $interface eq "OWX_ASYNC" ){
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = PT_THREAD(\&OWXTHERM_PT_SetValues);
+    my ($task,$task_state);
     eval {
-      while ($task->PT_SCHEDULE($hash,$args)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $task = OWXTHERM_PT_SetValues($hash,$args);
+      OWX_ASYNC_Schedule($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
     };
-    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_SetValues($hash,$args);
@@ -763,7 +769,7 @@ sub OWTHERM_Set($@) {
     }elsif( $interface eq "OWX_ASYNC" ){
       $args->{format} = 1;
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXTHERM_PT_SetValues),$hash,$args );
+        OWX_ASYNC_Schedule( $hash, OWXTHERM_PT_SetValues($hash,$args) );
       };
       $ret = GP_Catch($@) if $@;
     #-- OWFS interface
@@ -1016,9 +1022,9 @@ sub OWXTHERM_GetValues($) {
   #-- check, if the conversion has been called before for all sensors
   if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
     $con=0;
-  }  
+  }
 
-  #-- if the conversion has not been called before 
+  #-- if the conversion has not been called before
   if( $con==1 ){
     #-- issue the match ROM command \x55 and the start conversion command \x44
     OWX_Reset($master);     
@@ -1068,13 +1074,13 @@ sub OWXTHERM_SetValues($$) {
     
   #-- $owg_tl and $owg_th are preset and may be changed here
   foreach my $key (keys %$args) {
-  	$hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
-  	$hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
-  	$hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
+    $hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
+    $hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
+    $hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
   }
 
   #-- put into 2's complement formed (signed byte)
-  my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
+  my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl};
   my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th};
   #-- resolution is defined in bits 5+6 of configuration register
   my $cfg = defined $hash->{owg_cf} ? (($hash->{owg_cf}-9) << 5) | 0x1f : 0x7f;
@@ -1085,14 +1091,14 @@ sub OWXTHERM_SetValues($$) {
   #
   #   so far writing the EEPROM does not work properly.
   #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
-  #   2. \x48 appended to match ROM => command not ok. 
+  #   2. \x48 appended to match ROM => command not ok.
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
-  my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
+  my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg);
   OWX_Reset($master);
   my $res=OWX_Complex($master,$owx_dev,$select,3);
   if( $res eq 0 ){
-    return "OWXTHERM: Device $owx_dev not accessible"; 
+    return "OWXTHERM: Device $owx_dev not accessible";
   }
   
   return undef;
@@ -1108,52 +1114,55 @@ sub OWXTHERM_SetValues($$) {
 
 sub OWXTHERM_PT_GetValues($@) {
 
-  my ($thread,$hash) = @_;
+  my ($hash) = @_;
   
-  #-- For default, perform the conversion now
-  my $con=1;
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
-  my $name   = $hash->{NAME};
+  return PT_THREAD(sub {
+    my ($thread) = @_;
+    #-- For default, perform the conversion now
+    my $con=1;
 
-  PT_BEGIN($thread);
+    #-- ID of the device
+    my $owx_dev = $hash->{ROM_ID};
 
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
+    #-- hash of the busmaster
+    my $master = $hash->{IODev};
+    my $name   = $hash->{NAME};
 
-  #-- check, if the conversion has been called before for all sensors
-  if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-    $con=0;
-  }  
+    PT_BEGIN($thread);
 
-  #-- if the conversion has not been called before 
-  if( $con==1 ){
-    #-- issue the match ROM command \x55 and the start conversion command \x44
-    my $now = gettimeofday();
-    my $delay = $convtimes{AttrVal($name,"resolution",12)};
-    $thread->{ExecuteTime} = $now + $delay*0.001;
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
+    #-- reset presence
+    $hash->{PRESENT}  = 0;
+
+    #-- check, if the conversion has been called before for all sensors
+    if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
+      $con=0;
+    }  
+
+    #-- if the conversion has not been called before 
+    if( $con==1 ){
+      #-- issue the match ROM command \x55 and the start conversion command \x44
+      my $now = gettimeofday();
+      my $delay = $convtimes{AttrVal($name,"resolution",12)};
+      $thread->{ExecuteTime} = $now + $delay*0.001;
+      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_execute});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+      PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+      delete $thread->{ExecuteTime};
+    }
+    #-- NOW ask the specific device
+    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+    #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE",9);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
-  }
-  #-- NOW ask the specific device
-  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE",9);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  OWXTHERM_BinValues($hash,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
-  PT_END;
+    OWXTHERM_BinValues($hash,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
+    PT_END;
+  });
 } 
 
 #######################################################################################
@@ -1166,56 +1175,61 @@ sub OWXTHERM_PT_GetValues($@) {
 ########################################################################################
 
 sub OWXTHERM_PT_SetValues($$) {
-  my ($thread, $hash, $args) = @_;
   
-  my ($i,$j,$k);
+  my ($hash,$args) = @_;
   
-  my $name = $hash->{NAME};
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  return PT_THREAD( sub {
+    my ($thread) = @_;
 
-  PT_BEGIN($thread);
-  
-  unless (defined $args->{resolution} or defined $args->{tempLow} or defined $args->{tempHigh}) {
-    PT_EXIT;
-  }
-    
-  #-- $owg_tl and $owg_th are preset and may be changed here
-  foreach my $key (keys %$args) {
-  	$hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
-  	$hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
-  	$hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
-  }
+    my ($i,$j,$k);
 
-  #-- put into 2's complement formed (signed byte)
-  my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
-  my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th};
-  #-- resolution is defined in bits 5+6 of configuration register
-  my $cfg = defined $hash->{owg_cf} ? (($hash->{owg_cf}-9) << 5) | 0x1f : 0x7f;
+    my $name = $hash->{NAME};
 
-  #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-  #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
-  #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
-  #
-  #   so far writing the EEPROM does not work properly.
-  #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
-  #   2. \x48 appended to match ROM => command not ok. 
-  #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
-  
-  my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,3);
-  PT_WAIT_THREAD($thread->{pt_execute});
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    #-- ID of the device
+    my $owx_dev = $hash->{ROM_ID};
+    #-- hash of the busmaster
+    my $master = $hash->{IODev};
 
-  #-- process results
-  $hash->{PRESENT} = 1;
-  if ($args->{format}) {
-    OWTHERM_FormatValues($hash);
-  }
-  PT_END;
+    PT_BEGIN($thread);
+
+    unless (defined $args->{resolution} or defined $args->{tempLow} or defined $args->{tempHigh}) {
+      PT_EXIT;
+    }
+
+    #-- $owg_tl and $owg_th are preset and may be changed here
+    foreach my $key (keys %$args) {
+    	$hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
+    	$hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
+    	$hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
+    }
+
+    #-- put into 2's complement formed (signed byte)
+    my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
+    my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th};
+    #-- resolution is defined in bits 5+6 of configuration register
+    my $cfg = defined $hash->{owg_cf} ? (($hash->{owg_cf}-9) << 5) | 0x1f : 0x7f;
+
+    #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
+    #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
+    #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
+    #
+    #   so far writing the EEPROM does not work properly.
+    #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
+    #   2. \x48 appended to match ROM => command not ok. 
+    #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
+
+    my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,3);
+    PT_WAIT_THREAD($thread->{pt_execute});
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    #-- process results
+    $hash->{PRESENT} = 1;
+    if ($args->{format}) {
+      OWTHERM_FormatValues($hash);
+    }
+    PT_END;
+  });
 }
 
 1;

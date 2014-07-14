@@ -1,4 +1,4 @@
-# Perl Protothreads Version 1.03
+# Perl Protothreads Version 1.04
 # 
 # a lightwight pseudo-threading framework for perl that is
 # heavily inspired by Adam Dunkels protothreads for the c-language
@@ -58,18 +58,19 @@
 package ProtoThreads;
 
 use constant {
-  PT_INITIAL => 0,
-  PT_WAITING => 1,
-  PT_YIELDED => 2,
-  PT_EXITED  => 3,
-  PT_ENDED   => 4,
-  PT_ERROR   => 5,
+  PT_INITIAL   => 0,
+  PT_WAITING   => 1,
+  PT_YIELDED   => 2,
+  PT_EXITED    => 3,
+  PT_ENDED     => 4,
+  PT_ERROR     => 5,
+  PT_CANCELED  => 6,
 };
 
 my $DEBUG=0;
 
 use Exporter 'import';
-@EXPORT = qw(PT_THREAD PT_INITIAL PT_WAITING PT_YIELDED PT_EXITED PT_ENDED PT_ERROR PT_INIT PT_SCHEDULE);
+@EXPORT = qw(PT_THREAD PT_INITIAL PT_WAITING PT_YIELDED PT_EXITED PT_ENDED PT_ERROR PT_CANCELED PT_INIT PT_SCHEDULE);
 @EXPORT_OK = qw();
 
 use Text::Balanced qw (
@@ -96,6 +97,13 @@ sub PT_SCHEDULE(@) {
   my ($self) = @_;
   my $state = $self->{PT_THREAD_METHOD}(@_); 
   return ($state == PT_WAITING or $state == PT_YIELDED);
+}
+
+sub PT_CANCEL($) {
+  my ($self,$cause) = @_;
+  $self->{PT_THREAD_POSITION} = 0;
+  $self->{PT_THREAD_ERROR} = $cause;
+  $self->{PT_THREAD_STATE} = PT_CANCELED;
 }
 
 sub PT_RETVAL() {
