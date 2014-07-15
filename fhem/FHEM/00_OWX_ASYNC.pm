@@ -1040,7 +1040,7 @@ sub OWX_ASYNC_RunToCompletion($$) {
 sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
   if ($master->{STATE} eq "Active") {
-    Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: called") if ($owx_async_debug);
+    Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: called") if ($owx_async_debug>2);
     my $now = gettimeofday();
     while(1) {
       my @queue_waiting  = ();
@@ -1082,13 +1082,13 @@ sub OWX_ASYNC_RunTasks($) {
             #task timed out:
             if ($now >= $task->{TimeoutTime}) {
               Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task timed out");
-              Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now));
+              Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now)) if ($owx_async_debug>1);
               $task->PT_CANCEL("Timeout");
               shift @{$current->{queue}};
               $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
               next;
             } else {
-              Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} waiting for data or timeout" if ($owx_async_debug);
+              Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} waiting for data or timeout" if ($owx_async_debug>2);
               #new timeout or timeout did change:
               if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
                 Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} schedule for timeout at %.6f",$task->{TimeoutTime});
@@ -1130,19 +1130,19 @@ sub OWX_ASYNC_RunTasks($) {
         if (defined $nexttime) {
           if ($nexttime > $now) {
             if (!defined $master->{".nexttasktime"} or $nexttime < $master->{".nexttasktime"} or $now >= $master->{".nexttasktime"}) {
-              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice schedule next at %.6f",$nexttime);
+              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice schedule next at %.6f",$nexttime) if ($owx_async_debug);
               main::InternalTimer($nexttime, "OWX_ASYNC_RunTasks", $master,0);
               $master->{".nexttasktime"} = $nexttime;
             } else {
-              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice skip %.6f, allready scheduled at %.6f",$nexttime,$master->{".nexttasktime"}) if ($owx_async_debug);
+              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice skip %.6f, allready scheduled at %.6f",$nexttime,$master->{".nexttasktime"}) if ($owx_async_debug>2);
             }
           } else {
-            Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice nexttime at %.6f allready passed",$nexttime) if ($owx_async_debug);
+            Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice nexttime at %.6f allready passed",$nexttime) if ($owx_async_debug>2);
           }
         } else {
-          Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- no nexttime") if ($owx_async_debug);
+          Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- no nexttime") if ($owx_async_debug>2);
         }
-        Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- exit loop") if ($owx_async_debug);
+        Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- exit loop") if ($owx_async_debug>2);
         last;
       }
     };
