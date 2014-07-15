@@ -53,6 +53,19 @@ use Time::HiRes qw(gettimeofday);
 
 use strict;
 use warnings;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+  if (!grep(/FHEM\/lib$/,@INC)) {
+    foreach my $inc (grep(/FHEM$/,@INC)) {
+      push @INC,$inc."/lib";
+    };
+  };
+};
+
+use GPUtils qw(:all);
+use ProtoThreads;
+no warnings 'deprecated';
 sub Log($$);
 
 my $owx_version="5.13";
@@ -321,12 +334,14 @@ sub OWID_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = OWX_ASYNC_PT_Verify($hash);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWX_ASYNC_PT_Verify($hash);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
       return GP_Catch($@) if $@;
+      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});

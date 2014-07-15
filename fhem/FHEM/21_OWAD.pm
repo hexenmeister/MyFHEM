@@ -585,16 +585,16 @@ sub OWAD_Get($@) {
   
   #-- get present
   if($a[1] eq "present") {
-    #-- hash of the busmaster
-    my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = OWX_ASYNC_PT_Verify($hash);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWX_ASYNC_PT_Verify($hash);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
       return GP_Catch($@) if $@;
+      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -621,12 +621,13 @@ sub OWAD_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"reading",1);
     }elsif( $interface eq "OWX_ASYNC" ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = PT_THREAD(\&OWXAD_PT_GetPage);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"reading",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXAD_PT_GetPage($hash,"reading",1);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -636,7 +637,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret)  ){
+    if( defined($ret) ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -652,12 +653,13 @@ sub OWAD_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"alarm",1);
     }elsif( $interface eq "OWX_ASYNC" ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = PT_THREAD(\&OWXAD_PT_GetPage);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"alarm",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXAD_PT_GetPage($hash,"alarm",1);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -667,7 +669,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret)  ){
+    if( defined($ret) ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -691,12 +693,13 @@ sub OWAD_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"status",1);
     }elsif( $interface eq "OWX_ASYNC" ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = PT_THREAD(\&OWXAD_PT_GetPage);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"status",1)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXAD_PT_GetPage($hash,"status",1);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -706,7 +709,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret)  ){
+    if( defined($ret) ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -785,9 +788,9 @@ sub OWAD_GetValues($) {
     #}
   }elsif( $interface eq "OWX_ASYNC" ){
     eval {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"reading",0 );
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"alarm",0 );
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_GetPage),$hash,"status",1 );
+      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"reading",0));
+      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"alarm",0));
+      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"status",1));
     };
     $ret .= GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
@@ -881,8 +884,8 @@ sub OWAD_InitializeDevice($) {
     $ret2 = OWXAD_SetPage($hash,"alarm");
   }elsif( $interface eq "OWX_ASYNC" ){
     eval {
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
-      OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"alarm" );
+      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
+      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"alarm"));
     };
     $ret .= GP_Catch($@) if $@;
   #-- OWFS interface
@@ -1004,7 +1007,7 @@ sub OWAD_Set($@) {
       $ret = OWXAD_SetPage($hash,"status");
     }elsif( $interface eq "OWX_ASYNC" ){
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
+        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
       };
       $ret = GP_Catch($@) if $@;
     #-- OWFS interface
@@ -1055,7 +1058,7 @@ sub OWAD_Set($@) {
       $ret = OWXAD_SetPage($hash,"alarm");
     }elsif( $interface eq "OWX_ASYNC" ){
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXAD_PT_SetPage),$hash,"status" );
+        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
       };
       $ret = GP_Catch($@) if $@;
     #-- OWFS interface
@@ -1559,65 +1562,70 @@ sub OWXAD_SetPage($$) {
 
 sub OWXAD_PT_GetPage($$$) {
 
-  my ($thread,$hash,$page,$final) = @_;
+  my ($hash,$page,$final) = @_;
   
-  my ($res, $res2, $res3, @data, $an, $vn);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  my ($i,$j,$k);
-  
-  PT_BEGIN($thread);
+  return PT_THREAD(sub {
 
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-  
-  #=============== get the voltage reading ===============================
-  if( $page eq "reading") {
-    #-- issue the match ROM command \x55 and the start conversion command
+    my ($thread) = @_;
 
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
-    $thread->{ExecuteTime} = gettimeofday() + 0.05; # was 0.02
+    my ($res, $res2, $res3, @data, $an, $vn);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    my ($i,$j,$k);
+
+    PT_BEGIN($thread);
+
+    #-- reset presence
+    $hash->{PRESENT}  = 0;
+
+    #=============== get the voltage reading ===============================
+    if( $page eq "reading") {
+      #-- issue the match ROM command \x55 and the start conversion command
+
+      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
+      $thread->{ExecuteTime} = gettimeofday() + 0.05; # was 0.02
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_execute});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+      PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+      delete $thread->{ExecuteTime};
+
+      #-- issue the match ROM command \x55 and the read conversion page command
+      #   \xAA\x00\x00 
+      $thread->{'select'}="\xAA\x00\x00";
+    #=============== get the alarm reading ===============================
+    } elsif ( $page eq "alarm" ) {
+      #-- issue the match ROM command \x55 and the read alarm page command 
+      #   \xAA\x10\x00 
+      $thread->{'select'}="\xAA\x10\x00";
+    #=============== get the status reading ===============================
+    } elsif ( $page eq "status" ) {
+      #-- issue the match ROM command \x55 and the read status memory page command 
+      #   \xAA\x08\x00 r
+      $thread->{'select'}="\xAA\x08\x00";
+    #=============== wrong value requested ===============================
+    } else {
+      die "wrong memory page requested from $owx_dev";
+    }
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
-
-    #-- issue the match ROM command \x55 and the read conversion page command
-    #   \xAA\x00\x00 
-    $thread->{'select'}="\xAA\x00\x00";
-  #=============== get the alarm reading ===============================
-  } elsif ( $page eq "alarm" ) {
-    #-- issue the match ROM command \x55 and the read alarm page command 
-    #   \xAA\x10\x00 
-    $thread->{'select'}="\xAA\x10\x00";
-  #=============== get the status reading ===============================
-  } elsif ( $page eq "status" ) {
-    #-- issue the match ROM command \x55 and the read status memory page command 
-    #   \xAA\x08\x00 r
-    $thread->{'select'}="\xAA\x08\x00";
-  #=============== wrong value requested ===============================
-  } else {
-    die "wrong memory page requested from $owx_dev";
-  }
-  #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-  
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  my $response = $thread->{pt_execute}->PT_RETVAL();
-  my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
-  if ($res) {
-    die $res;
-  }
-  PT_END;
+    my $response = $thread->{pt_execute}->PT_RETVAL();
+    my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
+    if ($res) {
+      die $res;
+    }
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1631,69 +1639,73 @@ sub OWXAD_PT_GetPage($$$) {
 
 sub OWXAD_PT_SetPage($$) {
 
-  my ($thread,$hash,$page) = @_;
-  
-  my ($select, $res, $res2, $res3, @data);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  my ($i,$j,$k);
-  
-  PT_BEGIN($thread);
-  
-  #=============== set the alarm values ===============================
-  if ( $page eq "alarm" ) {
-    #-- issue the match ROM command \x55 and the set alarm page command 
-    #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
-    $select="\x55\x10\x00";
-    for( $i=0;$i<int(@owg_fixed);$i++){
-      $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vlow}->[$i]*256000/$owg_range[$i]); 
-      $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
-    }
-     
-#++Use of uninitialized value within @owg_vlow in multiplication  at 
-#++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
-  #=============== set the status ===============================
-  } elsif ( $page eq "status" ) {
-    my ($sb1,$sb2)=(0,0);
-    #-- issue the match ROM command \x55 and the set status memory page command 
-    #   \x55\x08\x00 reading 8 data bytes and 2 CRC bytes
-    $select="\x55\x08\x00";
-    for( $i=0;$i<int(@owg_fixed);$i++){
-      #if( $owg_mode[$i] eq "input" ){
-      if( 1 > 0){
-        #-- resolution (TODO: check !)
-        $sb1 = $owg_resoln[$i] & 15;
-        #-- alarm enabled        
-        if( defined($hash->{owg_slow}->[$i]) ){
-          $sb2   =  ( $hash->{owg_slow}->[$i] ne 0  ) ? 4 : 0;
-        }
-        if( defined($hash->{owg_shigh}->[$i]) ){
-          $sb2  += ( $hash->{owg_shigh}->[$i] ne 0 ) ? 8 : 0;
-        }
-        #-- range 
-        $sb2 |= 1 
-          if( $owg_range[$i] > 2560 );
-      } else {
-        $sb1 = 128;
-        $sb2 = 0;
+  my ($hash,$page) = @_;
+
+  return PT_THREAD(sub {
+
+    my ($thread) = @_;
+    my ($select, $res, $res2, $res3, @data);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    my ($i,$j,$k);
+
+    PT_BEGIN($thread);
+
+    #=============== set the alarm values ===============================
+    if ( $page eq "alarm" ) {
+      #-- issue the match ROM command \x55 and the set alarm page command 
+      #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
+      $select="\x55\x10\x00";
+      for( $i=0;$i<int(@owg_fixed);$i++){
+        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vlow}->[$i]*256000/$owg_range[$i]); 
+        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
       }
-      $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
-      $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
+
+    #++Use of uninitialized value within @owg_vlow in multiplication  at 
+    #++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
+    #=============== set the status ===============================
+    } elsif ( $page eq "status" ) {
+      my ($sb1,$sb2)=(0,0);
+      #-- issue the match ROM command \x55 and the set status memory page command 
+      #   \x55\x08\x00 reading 8 data bytes and 2 CRC bytes
+      $select="\x55\x08\x00";
+      for( $i=0;$i<int(@owg_fixed);$i++){
+        #if( $owg_mode[$i] eq "input" ){
+        if( 1 > 0){
+          #-- resolution (TODO: check !)
+          $sb1 = $owg_resoln[$i] & 15;
+          #-- alarm enabled        
+          if( defined($hash->{owg_slow}->[$i]) ){
+            $sb2   =  ( $hash->{owg_slow}->[$i] ne 0  ) ? 4 : 0;
+          }
+          if( defined($hash->{owg_shigh}->[$i]) ){
+            $sb2  += ( $hash->{owg_shigh}->[$i] ne 0 ) ? 8 : 0;
+          }
+          #-- range 
+          $sb2 |= 1 
+            if( $owg_range[$i] > 2560 );
+        } else {
+          $sb1 = 128;
+          $sb2 = 0;
+        }
+        $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
+        $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
+      }
+    #=============== wrong page write attempt  ===============================
+    } else {
+      PT_EXIT("wrong memory page write attempt");
     }
-  #=============== wrong page write attempt  ===============================
-  } else {
-    PT_EXIT("wrong memory page write attempt");
-  }
-  #"setpage"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  PT_END;
+    #"setpage"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    PT_END;
+  });
 }
 
 1;

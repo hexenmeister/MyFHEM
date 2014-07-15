@@ -450,16 +450,15 @@ sub OWTHERM_Get($@) {
      return "$name.id => $value";
   } 
   
-  #-- Get other values according to interface type
+  #-- hash of the busmaster
   my $master = $hash->{IODev};
-  my $interface= $master->{TYPE};
+  #-- Get other values according to interface type
+  my $interface= $hash->{IODev}->{TYPE};
   
   #-- get present
   if($a[1] eq "present" ) {
     #-- OWX interface
     if( $interface =~ /^OWX/ ){
-      #-- hash of the busmaster
-      my $master       = $hash->{IODev};
       #-- asynchronous mode
       if( $hash->{ASYNC} ){
         my ($task,$task_state);

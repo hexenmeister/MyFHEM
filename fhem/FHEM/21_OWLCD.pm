@@ -233,11 +233,11 @@ sub OWLCD_Init($) {
     eval {
       OWXLCD_InitializeDevice($hash);
       #-- set backlight on
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetFunction),$hash,"bklon",0);
+      OWX_ASYNC_Schedule($hash,OWXLCD_PT_SetFunction($hash,"bklon",0));
       #-- erase all icons
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetIcon),$hash,0,0);
+      OWX_ASYNC_Schedule($hash,OWXLCD_PT_SetIcon($hash,0,0));
       #-- erase alarm state
-      OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_SetFunction),$hash,"gpio",15);
+      OWX_ASYNC_Schedule($hash,OWXLCD_PT_SetFunction($hash,"gpio",15));
     };
     return GP_Catch($@) if $@;
   #-- Unknown interface
@@ -316,19 +316,22 @@ sub OWLCD_Get($@) {
     $value = $hash->{ROM_ID};
      return "$name.id => $value";
   } 
-  
+
+  #-- hash of the busmaster
+  my $master       = $hash->{IODev};
+
   #-- get present
   if($a[1] eq "present") {
-    #-- hash of the busmaster
-    my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      #TODO use OWX_ASYNC_Schedule instead
-      my $task = OWX_ASYNC_PT_Verify($hash);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE()) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWX_ASYNC_PT_Verify($hash);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
       return GP_Catch($@) if $@;
+      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -340,11 +343,13 @@ sub OWLCD_Get($@) {
   #-- get gpio states
   if($a[1] eq "gpio") {
     if ($hash->{ASYNC}) {
-      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"gpio")) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXLCD_PT_Get($hash,"gpio");
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"gpio","");
     } else {
@@ -356,11 +361,13 @@ sub OWLCD_Get($@) {
   #-- get gpio counters
   if($a[1] eq "counter") {
     if ($hash->{ASYNC}) {
-      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"counter")) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXLCD_PT_Get($hash,"counter");
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.counter => ".main::ReadingsVal($hash->{NAME},"counter","");
     } else {
@@ -372,11 +379,13 @@ sub OWLCD_Get($@) {
   #-- get version
   if($a[1] eq "version") {
     if ($hash->{ASYNC}) {
-      my $task = PT_THREAD(\&OWXLCD_PT_Get);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,"version")) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXLCD_PT_Get($hash,"version");
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"version","");
     } else {
@@ -390,11 +399,13 @@ sub OWLCD_Get($@) {
     my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
     Log3 $name,1,"Calling GetMemory with page $page";
     if ($hash->{ASYNC}) {
-      my $task = PT_THREAD(\&OWXLCD_PT_GetMemory);
+      my ($task,$task_state);
       eval {
-        while ($task->PT_SCHEDULE($hash,$page)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        $task = OWXLCD_PT_GetMemory($hash,$page);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
       };
-      $ret = ($@) ? GP_Catch($@) : $task->PT_CAUSE();
+      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name $reading $page => ".main::ReadingsVal($hash->{NAME},"memory$page","");
     } else {
@@ -489,7 +500,7 @@ sub OWLCD_Set($@) {
       if( ! ((int($value) >= 0) && (int($value) <= 7)) );
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", int($value) );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", int($value)) );
       };
       return GP_Catch($@) if $@;
     } else {
@@ -504,7 +515,7 @@ sub OWLCD_Set($@) {
     if( uc($value) eq "ON"){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdon", 0 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "lcdon", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -513,7 +524,7 @@ sub OWLCD_Set($@) {
     }elsif( uc($value) eq "OFF" ){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "lcdoff", 0 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "lcdoff", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -531,7 +542,7 @@ sub OWLCD_Set($@) {
     if( uc($value) eq "ON"){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkon", 0 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "blkon", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -540,7 +551,7 @@ sub OWLCD_Set($@) {
     }elsif( uc($value) eq "OFF" ){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "blkoff", 0 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "blkoff", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -556,9 +567,9 @@ sub OWLCD_Set($@) {
   if($key eq "reset") {
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "reset", 0 );
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 0, 0 );
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "reset", 0) );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, 0, 0) );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", 15) );
       };
       return GP_Catch($@) if $@;
     } else {
@@ -578,7 +589,7 @@ sub OWLCD_Set($@) {
       if( uc($value) eq "OFF" ){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 0 );
+            OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, 16, 0) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -587,7 +598,7 @@ sub OWLCD_Set($@) {
       }elsif( uc($value) eq "BLINK" ){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, 6 );
+            OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, 16, 6) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -596,7 +607,7 @@ sub OWLCD_Set($@) {
       }elsif(  ((int($value) > 0) && (int($value) < 6)) ){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, 16, int($value) );
+            OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, 16, int($value)) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -609,7 +620,7 @@ sub OWLCD_Set($@) {
       if( uc($value) eq "OFF"){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 0 );
+            OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, $icon, 0) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -618,7 +629,7 @@ sub OWLCD_Set($@) {
       }elsif( uc($value) eq "ON" ){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 1 );
+            OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetIcon($hash, $icon, 1) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -627,7 +638,7 @@ sub OWLCD_Set($@) {
       }elsif( uc($value) eq "BLINK" ){
         if ($hash->{ASYNC}) {
           eval {
-            OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetIcon), $hash, $icon, 2 );
+            OWX_ASYNC_Schedule( $hash, &OWXLCD_PT_SetIcon($hash, $icon, 2) );
           };
           return GP_Catch($@) if $@;
         } else {
@@ -650,7 +661,7 @@ sub OWLCD_Set($@) {
     #-- check value and write to device   
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash, $line, $value );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetLine($hash, $line, $value) );
       };
       return GP_Catch($@) if $@;
     } else {
@@ -669,7 +680,7 @@ sub OWLCD_Set($@) {
     Log3 $name,1,"Calling SetMemory with page $line";
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetMemory), $hash, $line, $value );
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetMemory($hash, $line, $value) );
       };
       return GP_Catch($@) if $@;
     } else {
@@ -683,7 +694,7 @@ sub OWLCD_Set($@) {
     if(lc($value) eq "beep") {
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 14 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", 14) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -693,7 +704,7 @@ sub OWLCD_Set($@) {
     }elsif(lc($value) eq "red") {
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 13 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", 13) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -703,7 +714,7 @@ sub OWLCD_Set($@) {
     }elsif(lc($value) eq "yellow") {
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 11 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", 11) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -713,7 +724,7 @@ sub OWLCD_Set($@) {
     }elsif( (lc($value) eq "off") || (lc($value) eq "none") ) {
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetFunction), $hash, "gpio", 15 );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "gpio", 15) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -729,10 +740,10 @@ sub OWLCD_Set($@) {
   if($key eq "test") {
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,0,"Hallo Welt"); 
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,1,"Mary had a big lamb"); 
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,2,"Solar 4.322 kW "); 
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXLCD_PT_SetLine), $hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE");
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetLine($hash,0,"Hallo Welt")); 
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetLine($hash,1,"Mary had a big lamb")); 
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetLine($hash,2,"Solar 4.322 kW ")); 
+        OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetLine($hash,3,"\x5B\x5C\x5E\x7B\x7C\x7E\xBE"));
       };
       return GP_Catch($@) if $@; 
     } else {
@@ -822,40 +833,40 @@ sub OWXLCD_Byte($$$) {
 
 sub OWXLCD_PT_Byte($$$) {
 
-  my ($thread,$hash,$cmd,$byte) = @_;
+  my ($hash,$cmd,$byte) = @_;
+  
+  return PT_THREAD(sub {
+    my ($thread) = @_;
+    my ($select);
+    #-- ID of the device
+    my $owx_dev = $hash->{ROM_ID};
+    #-- hash of the busmaster
+    my $master = $hash->{IODev};
+    my ($i,$j,$k);
 
-  my ($select);
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
-  
-  my ($i,$j,$k);
-  
-  PT_BEGIN($thread);
-  
-  #=============== write to LCD register ===============================
-  if ( $cmd eq "register" ) {
-    #-- issue the read LCD register command \x10
-    $select = sprintf("\x10%c",$byte);
-  #=============== write to LCD data ===============================
-  }elsif ( $cmd eq "data" ) {
-    #-- issue the read LCD data command \x12
-    $select = sprintf("\x12%c",$byte);
-  #=============== wrong value requested ===============================
-  } else {
-    die "OWXLCD: Wrong byte write attempt";
-  } 
+    PT_BEGIN($thread);
 
-  #"byte"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  PT_END;
+    #=============== write to LCD register ===============================
+    if ( $cmd eq "register" ) {
+      #-- issue the read LCD register command \x10
+      $select = sprintf("\x10%c",$byte);
+    #=============== write to LCD data ===============================
+    }elsif ( $cmd eq "data" ) {
+      #-- issue the read LCD data command \x12
+      $select = sprintf("\x12%c",$byte);
+    #=============== wrong value requested ===============================
+    } else {
+      die "OWXLCD: Wrong byte write attempt";
+    } 
+
+    #"byte"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -932,54 +943,58 @@ sub OWXLCD_Get($$) {
 
 sub OWXLCD_PT_Get($$) {
 
-  my ($thread,$hash,$cmd) = @_;
+  my ($hash,$cmd) = @_;
 
-  my ($select);
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
-  
-  my ($i,$j,$k);
+  return PT_THREAD(sub {
 
-  PT_BEGIN($thread);
-  #=============== fill scratch with gpio ports ===============================
-  if ( $cmd eq "gpio" ) {
-    #-- issue the read GPIO command \x22 (1 byte)
-    $select = "\x22";
-    $thread->{len}     = 1;
-  #=============== fill scratch with gpio counters ===============================
-  }elsif ( $cmd eq "counter" ) {
-    #-- issue the read counter command \x23 (8 bytes)
-    $select = "\x23";
-    $thread->{len}     = 8;
-  #=============== fill scratch with version ===============================
-  }elsif ( $cmd eq "version" ) {
-    #-- issue the read version command \x41
-    $select = "\x41";
-    $thread->{len}     = 16;
-  } else {
-    die("OWXLCD: Wrong get attempt");
-  } 
-  #"get.prepare"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  #-- issue the read scratchpad command \xBE
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE", $thread->{len});
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, "\xBE", $thread->{len}, $thread->{pt_execute}->PT_RETVAL());
+    my ($thread) = @_;
+    my ($select);
 
-  PT_END;
+    #-- ID of the device
+    my $owx_dev = $hash->{ROM_ID};
+
+    #-- hash of the busmaster
+    my $master = $hash->{IODev};
+
+    my ($i,$j,$k);
+
+    PT_BEGIN($thread);
+    #=============== fill scratch with gpio ports ===============================
+    if ( $cmd eq "gpio" ) {
+      #-- issue the read GPIO command \x22 (1 byte)
+      $select = "\x22";
+      $thread->{len}     = 1;
+    #=============== fill scratch with gpio counters ===============================
+    }elsif ( $cmd eq "counter" ) {
+      #-- issue the read counter command \x23 (8 bytes)
+      $select = "\x23";
+      $thread->{len}     = 8;
+    #=============== fill scratch with version ===============================
+    }elsif ( $cmd eq "version" ) {
+      #-- issue the read version command \x41
+      $select = "\x41";
+      $thread->{len}     = 16;
+    } else {
+      die("OWXLCD: Wrong get attempt");
+    }
+    #"get.prepare"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    #-- issue the read scratchpad command \xBE
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE", $thread->{len});
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, "\xBE", $thread->{len}, $thread->{pt_execute}->PT_RETVAL());
+
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1048,46 +1063,50 @@ sub OWXLCD_GetMemory($$) {
 
 sub OWXLCD_PT_GetMemory($$) {
 
-  my ($thread,$hash,$page) = @_;
+  my ($hash,$page) = @_;
 
-  my ($select);
-  
-  #-- ID of the device
-  my $owx_dev = $hash->{ROM_ID};
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
-  
-  PT_BEGIN($thread);
-  #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \x4E
-  #Log 1," page read is ".$page;
-  $select = sprintf("\4E%c\x10\x37",$page);
-  #"prepare"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+  return PT_THREAD(sub {
 
-  #-- sleeping for some time
-  $thread->{ExecuteTime} = gettimeofday()+0.5;
-  PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-  delete $thread->{ExecuteTime};
-  
-  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  $thread->{'select'} = "\xBE";
-  #"get.memory.$page"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},16);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    my ($thread) = @_;
+    my ($select);
 
-  OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $thread->{'select'}, 16, $thread->{pt_execute}->PT_RETVAL());
-  #-- process results (10 bytes or more have been sent)
-  #$res2 = substr($res,11,16);
-  #return $res2;
-  PT_END;
+    #-- ID of the device
+    my $owx_dev = $hash->{ROM_ID};
+
+    #-- hash of the busmaster
+    my $master = $hash->{IODev};
+
+    PT_BEGIN($thread);
+    #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \x4E
+    #Log 1," page read is ".$page;
+    $select = sprintf("\4E%c\x10\x37",$page);
+    #"prepare"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    #-- sleeping for some time
+    $thread->{ExecuteTime} = gettimeofday()+0.5;
+    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+    delete $thread->{ExecuteTime};
+
+    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+    $thread->{'select'} = "\xBE";
+    #"get.memory.$page"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},16);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $thread->{'select'}, 16, $thread->{pt_execute}->PT_RETVAL());
+    #-- process results (10 bytes or more have been sent)
+    #$res2 = substr($res,11,16);
+    #return $res2;
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1123,11 +1142,11 @@ sub OWXLCD_InitializeDevice($) {
 
     if ($hash->{ASYNC}) {
       eval {
-        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",38);
-        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 9);
-        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",32);
-        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register",12);
-        OWX_ASYNC_Schedule($hash,PT_THREAD(\&OWXLCD_PT_Byte),$hash,"register", 1);
+        OWX_ASYNC_Schedule($hash,OWXLCD_PT_Byte($hash,"register",38));
+        OWX_ASYNC_Schedule($hash,OWXLCD_PT_Byte($hash,"register", 9));
+        OWX_ASYNC_Schedule($hash,OWXLCD_PT_Byte($hash,"register",32));
+        OWX_ASYNC_Schedule($hash,OWXLCD_PT_Byte($hash,"register",12));
+        OWX_ASYNC_Schedule($hash,OWXLCD_PT_Byte($hash,"register", 1));
       };
       return GP_Catch($@) if $@;
     } else {
@@ -1229,55 +1248,59 @@ sub OWXLCD_SetFunction($$$) {
 
 sub OWXLCD_PT_SetFunction($$$) {
 
-  my ($thread,$hash,$cmd,$value) = @_;
+  my ($hash,$cmd,$value) = @_;
 
-  my ($select);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  my ($i,$j,$k);
-  
-  PT_BEGIN($thread);
-  
-  #=============== set gpio ports ===============================
-  if ( $cmd eq "gpio" ) {
-    #-- issue the write GPIO command 
-    #   \x21 followed by the data value (= integer 0 - 7)
-    $select = sprintf("\x21%c",$value); 
-  #=============== switch LCD on ===============================
-  }elsif ( $cmd eq "lcdon" ) {
-    #-- issue the lcd on cmd
-    $select = "\x03";
-  #=============== switch LCD off ===============================
-  }elsif ( $cmd eq "lcdoff" ) {
-    #-- issue the lcd off cmd
-    $select = "\x05";
-  #=============== switch LCD backlight on ===============================
-  }elsif ( $cmd eq "bklon" ) {
-    #-- issue the backlight on cmd
-    $select = "\x08";
-  #=============== switch LCD backlight off ===============================
-  }elsif ( $cmd eq "bkloff" ) {
-    #-- issue the backlight off cmd
-    $select = "\x07";
-  #=============== switch LCD backlight off ===============================
-  }elsif ( $cmd eq "reset" ) {
-    #-- issue the clear LCD command
-    $select = "\x49";
-  #=============== wrong write attempt ===============================
-  } else {
-    return "OWXLCD: Wrong function selected";
-  } 
-  #"set.function"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  PT_END;
+  return PT_THREAD(sub {
+
+    my ($thread) = @_;
+    my ($select);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    my ($i,$j,$k);
+
+    PT_BEGIN($thread);
+
+    #=============== set gpio ports ===============================
+    if ( $cmd eq "gpio" ) {
+      #-- issue the write GPIO command 
+      #   \x21 followed by the data value (= integer 0 - 7)
+      $select = sprintf("\x21%c",$value); 
+    #=============== switch LCD on ===============================
+    }elsif ( $cmd eq "lcdon" ) {
+      #-- issue the lcd on cmd
+      $select = "\x03";
+    #=============== switch LCD off ===============================
+    }elsif ( $cmd eq "lcdoff" ) {
+      #-- issue the lcd off cmd
+      $select = "\x05";
+    #=============== switch LCD backlight on ===============================
+    }elsif ( $cmd eq "bklon" ) {
+      #-- issue the backlight on cmd
+      $select = "\x08";
+    #=============== switch LCD backlight off ===============================
+    }elsif ( $cmd eq "bkloff" ) {
+      #-- issue the backlight off cmd
+      $select = "\x07";
+    #=============== switch LCD backlight off ===============================
+    }elsif ( $cmd eq "reset" ) {
+      #-- issue the clear LCD command
+      $select = "\x49";
+    #=============== wrong write attempt ===============================
+    } else {
+      return "OWXLCD: Wrong function selected";
+    } 
+    #"set.function"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1390,121 +1413,125 @@ sub OWXLCD_SetIcon($$$) {
 ########################################################################################
 
 sub OWXLCD_PT_SetIcon($$$) {
-  my ($thread,$hash,$icon,$value) = @_;
+  my ($hash,$icon,$value) = @_;
 
-  my ($i,$data,$select, $res);
-    
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  PT_BEGIN($thread);
-  
-  #-- only for KS0073
-  if ( $lcdcontroller eq "KS0073"){
-    
-    #-- write 16 zeros to erase all icons
-    if( $icon == 0){
-      #-- 4 bit data size, RE => 1, blink Enable = \x26     
-      $select = "\x10\x26";
-      #"set.icon.1"
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-      PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-      
-      #-- SEGRAM addres to 0 = \x40,
-      $select = "\x10\x40";
-      #-- write 16 zeros to scratchpad
-      $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-      #"set.icon.2"
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-      PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-      
-      #-- issue the copy scratchpad to LCD command \x48
-      $select="\x48";  
-      #"set.icon.3"
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-      PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    } else {
-      #-- determine data value
-      if( int($icon) != 16 ){
-        if( $value == 0 ){
-          $data = 0;
-        } elsif ( $value == 1) {
-          $data = 16;
-        } elsif ( $value == 2) {
-          $data = 80;
-        } else {
-          die("OWXLCD: Wrong data value $value for icon $icon");
-        }
+  return PT_THREAD(sub {
+
+    my ($thread) = @_;
+    my ($i,$data,$select, $res);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    PT_BEGIN($thread);
+
+    #-- only for KS0073
+    if ( $lcdcontroller eq "KS0073"){
+
+      #-- write 16 zeros to erase all icons
+      if( $icon == 0){
+        #-- 4 bit data size, RE => 1, blink Enable = \x26     
+        $select = "\x10\x26";
+        #"set.icon.1"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+        #-- SEGRAM addres to 0 = \x40,
+        $select = "\x10\x40";
+        #-- write 16 zeros to scratchpad
+        $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        #"set.icon.2"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+        #-- issue the copy scratchpad to LCD command \x48
+        $select="\x48";  
+        #"set.icon.3"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       } else {
-        if( $value == 0 ){
-          $data = 0;
-        } elsif ( $value == 1) {
-          $data = 16;
-        } elsif ( $value == 2) {
-          $data = 24;
-        } elsif ( $value == 3) {
-          $data = 28;
-        } elsif ( $value == 4) {
-          $data = 30;
-        } elsif ( $value == 5) {
-          $data = 31;
-        } elsif ( $value == 6) {
-          $data = 80;
+        #-- determine data value
+        if( int($icon) != 16 ){
+          if( $value == 0 ){
+            $data = 0;
+          } elsif ( $value == 1) {
+            $data = 16;
+          } elsif ( $value == 2) {
+            $data = 80;
+          } else {
+            die("OWXLCD: Wrong data value $value for icon $icon");
+          }
         } else {
-          die("OWXLCD: Wrong data value $value for icon $icon");
+          if( $value == 0 ){
+            $data = 0;
+          } elsif ( $value == 1) {
+            $data = 16;
+          } elsif ( $value == 2) {
+            $data = 24;
+          } elsif ( $value == 3) {
+            $data = 28;
+          } elsif ( $value == 4) {
+            $data = 30;
+          } elsif ( $value == 5) {
+            $data = 31;
+          } elsif ( $value == 6) {
+            $data = 80;
+          } else {
+            die("OWXLCD: Wrong data value $value for icon $icon");
+          }
         }
-      }
-      #-- 4 bit data size, RE => 1, blink Enable = \x26
-      $select = "\x10\x26";
-      #"set.icon.4"
+        #-- 4 bit data size, RE => 1, blink Enable = \x26
+        $select = "\x10\x26";
+        #"set.icon.4"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+        #-- SEGRAM addres to 0 = \x40 + icon address
+        $select = sprintf("\x10%c",63+$icon);
+        #"set.icon.5"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+        #-- data
+        $select = sprintf("\x12%c",$data);
+        #"set.icon.6"
+        $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_execute});
+        delete $thread->{TimeoutTime};
+        die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+      }  
+
+      #-- return to normal state
+      $select = "\x10\x20";
+      #"set.icon.7"
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
       delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-     
-      #-- SEGRAM addres to 0 = \x40 + icon address
-      $select = sprintf("\x10%c",63+$icon);
-      #"set.icon.5"
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-      PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-      
-      #-- data
-      $select = sprintf("\x12%c",$data);
-      #"set.icon.6"
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-      PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    }  
-    
-    #-- return to normal state
-    $select = "\x10\x20";
-    #"set.icon.7"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-    PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  #-- or else
-  } else {
-    die("OWXLCD: Wrong LCD controller type");
-  }
-  PT_END;
+    #-- or else
+    } else {
+      die("OWXLCD: Wrong LCD controller type");
+    }
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1605,90 +1632,94 @@ sub OWXLCD_SetLine($$$) {
 
 sub OWXLCD_PT_SetLine($$$) {
 
-  my ($thread,$hash,$line,$msg) = @_;
+  my ($hash,$line,$msg) = @_;
   
-  my ($select, $i, $msgA, $msgB);
+  return PT_THREAD(sub {
   
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  $line = int($line);  
-  
-  PT_BEGIN($thread);
-  
-  $msg =   defined($msg) ? $msg : "";
-  $msg = OWXLCD_Trans($msg);
-  
-  #-- split if longer than 16 bytes, fill each with blanks
-  #   has already been checked to be <= $lcdchars
-  if( $lcdchars > 16 ){
-    if( length($msg) > 16 ) {
-      $msgA = substr($msg,0,16);
-      $msgB = substr($msg,16,length($msg)-16);
-      for($i = 0;$i<$lcdchars-length($msg);$i++){
-        $msgB .= "\x20";
+    my ($thread) = @_;
+    my ($select, $i, $msgA, $msgB);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    $line = int($line);  
+
+    PT_BEGIN($thread);
+
+    $msg =   defined($msg) ? $msg : "";
+    $msg = OWXLCD_Trans($msg);
+
+    #-- split if longer than 16 bytes, fill each with blanks
+    #   has already been checked to be <= $lcdchars
+    if( $lcdchars > 16 ){
+      if( length($msg) > 16 ) {
+        $msgA = substr($msg,0,16);
+        $msgB = substr($msg,16,length($msg)-16);
+        for($i = 0;$i<$lcdchars-length($msg);$i++){
+          $msgB .= "\x20";
+        }
+      } else {
+        $msgA = $msg;
+        for($i = 0;$i<16-length($msg);$i++){
+          $msgA .= "\x20";
+        }
+        for($i = 0;$i<$lcdchars-16;$i++){
+          $msgB .= "\x20";
+        }
       }
-    } else {
+    }else{
       $msgA = $msg;
-      for($i = 0;$i<16-length($msg);$i++){
+      for($i = 0;$i<$lcdchars-length($msg);$i++){
         $msgA .= "\x20";
       }
-      for($i = 0;$i<$lcdchars-16;$i++){
-        $msgB .= "\x20";
-      }
+      $msgB = undef;
     }
-  }else{
-    $msgA = $msg;
-    for($i = 0;$i<$lcdchars-length($msg);$i++){
-      $msgA .= "\x20";
-    }
-    $msgB = undef;
-  }
-  $thread->{msgB} = $msgB;
-   
-  #-- issue the match ROM command \x55 and the write scratchpad command \x4E
-  #   followed by LCD page address and the text 
-  $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;
-  #"set.line.1"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  #-- issue the copy scratchpad to LCD command \x48
-  $select="\x48";  
-  #"set.line.2"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  #-- if second string available:
-  if( defined($thread->{msgB}) ) {
-    #select(undef,undef,undef,0.005); 
+    $thread->{msgB} = $msgB;
+
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
-    $select=sprintf("\x4E%c",$lcdpage[$line]+16).$thread->{msgB};
-    #"set.line.3"
+    $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;
+    #"set.line.1"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-   
+
     #-- issue the copy scratchpad to LCD command \x48
     $select="\x48";  
-    #"set.line.4"
+    #"set.line.2"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  }
-  PT_END;
+
+    #-- if second string available:
+    if( defined($thread->{msgB}) ) {
+      #select(undef,undef,undef,0.005); 
+      #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+      #   followed by LCD page address and the text 
+      $select=sprintf("\x4E%c",$lcdpage[$line]+16).$thread->{msgB};
+      #"set.line.3"
+      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_execute});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+      #-- issue the copy scratchpad to LCD command \x48
+      $select="\x48";  
+      #"set.line.4"
+      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_execute});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    }
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1782,45 +1813,49 @@ sub OWXLCD_SetMemory($$$) {
 
 sub OWXLCD_PT_SetMemory($$$) {
 
-  my ($thread,$hash,$page,$msg) = @_;
-  
-  my ($select, $i, $msgA);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  PT_BEGIN($thread);
-  
-  $page = int($page);
-  $msg =   defined($msg) ? $msg : "";
-  
-  #-- fillup with blanks
-  $msgA = $msg;
-  for($i = 0;$i<16-length($msg);$i++){
-    $msgA .= "\x20";
-  }
-   
-  #-- issue the match ROM command \x55 and the write scratchpad command \x4E
-  #   followed by LCD page address and the text 
-  #Log 1," page written is ".$page;
-  $select=sprintf("\x4E\%c",$page).$msgA;
-  #"set.memory.page"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  
-  #-- issue the copy scratchpad to EEPROM command \x39
-  $select = "\x39"; 
-  #"set.memory.copy"
-  $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-  $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
-  PT_WAIT_THREAD($thread->{pt_execute});
-  delete $thread->{TimeoutTime};
-  die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-  PT_END;
+  my ($hash,$page,$msg) = @_;
+
+  return PT_THREAD(sub {
+
+    my ($thread,$hash,$page,$msg) = @_;
+    my ($select, $i, $msgA);
+
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    PT_BEGIN($thread);
+
+    $page = int($page);
+    $msg =   defined($msg) ? $msg : "";
+
+    #-- fillup with blanks
+    $msgA = $msg;
+    for($i = 0;$i<16-length($msg);$i++){
+      $msgA .= "\x20";
+    }
+
+    #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+    #   followed by LCD page address and the text 
+    #Log 1," page written is ".$page;
+    $select=sprintf("\x4E\%c",$page).$msgA;
+    #"set.memory.page"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    #-- issue the copy scratchpad to EEPROM command \x39
+    $select = "\x39"; 
+    #"set.memory.copy"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    PT_END;
+  });
 }
 
 sub OWXLCD_BinValues($$$$$$$$) {
