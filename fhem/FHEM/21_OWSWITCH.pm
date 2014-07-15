@@ -1297,9 +1297,6 @@ sub OWXSWITCH_PT_GetState($) {
 
     PT_BEGIN($thread);
 
-    #-- reset presence
-    $hash->{PRESENT}  = 0;
-
     my ($i,$j,$k);
 
     #-- family = 12 => DS2406

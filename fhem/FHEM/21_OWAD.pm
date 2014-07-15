@@ -1578,9 +1578,6 @@ sub OWXAD_PT_GetPage($$$) {
 
     PT_BEGIN($thread);
 
-    #-- reset presence
-    $hash->{PRESENT}  = 0;
-
     #=============== get the voltage reading ===============================
     if( $page eq "reading") {
       #-- issue the match ROM command \x55 and the start conversion command

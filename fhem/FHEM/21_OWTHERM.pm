@@ -1015,9 +1015,6 @@ sub OWXTHERM_GetValues($) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
  
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
-  
   #-- check, if the conversion has been called before for all sensors
   if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
     $con=0;
@@ -1128,9 +1125,6 @@ sub OWXTHERM_PT_GetValues($@) {
     my $name   = $hash->{NAME};
 
     PT_BEGIN($thread);
-
-    #-- reset presence
-    $hash->{PRESENT}  = 0;
 
     #-- check, if the conversion has been called before for all sensors
     if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){

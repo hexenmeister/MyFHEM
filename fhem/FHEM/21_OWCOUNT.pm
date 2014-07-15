@@ -1872,9 +1872,6 @@ sub OWXCOUNT_PT_GetPage($$$) {
 
     PT_BEGIN($thread);
 
-    #-- reset presence
-    $hash->{PRESENT}  = 0;
-
     #=============== wrong value requested ===============================
     if( ($page<0) || ($page>15) ){
       die("wrong memory page requested");

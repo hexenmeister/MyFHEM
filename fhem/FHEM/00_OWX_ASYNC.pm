@@ -573,7 +573,8 @@ sub OWX_ASYNC_AutoCreate($$) {
           push(@owx_names,$exname);
           #-- replace the ROM ID by the proper value including CRC
           $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
-          $main::defs{$fhem_dev}{PRESENT}=1;    
+          readingsSingleUpdate($main::defs{$fhem_dev},"present",1,!$main::defs{$fhem_dev}->{PRESENT});
+          $main::defs{$fhem_dev}{PRESENT}=1;
           $match = 1;
           last;
         }
@@ -608,6 +609,7 @@ sub OWX_ASYNC_AutoCreate($$) {
         } else{
           select(undef,undef,undef,0.1);
           push(@owx_names,$acname);
+          readingsSingleUpdate($main::defs{$acname},"present",1,!$main::defs{$acname}->{PRESENT});
           $main::defs{$acname}{PRESENT}=1;
           #-- THIS IODev, default room (model is set in the device module)
           CommandAttr (undef,"$acname IODev $hash->{NAME}"); 
@@ -1110,6 +1112,7 @@ sub OWX_ASYNC_RunTasks($) {
             Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} exited task: ".(defined $task->PT_RETVAL() ? $task->PT_RETVAL : "- no retval -"));
           } elsif ($state == PT_ERROR) {
             Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} Error task: ".$task->PT_CAUSE());
+            $main::defs{$current->{device}}->{PRESENT} = 0;
           } else {
             die "$current->{device} unexpected thread state after termination: $state";
           }

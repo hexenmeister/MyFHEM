@@ -1061,8 +1061,6 @@ sub OWXMULTI_PT_GetValues($) {
     my $master = $hash->{IODev};
 
     PT_BEGIN($thread);
-    #-- reset presence
-    $hash->{PRESENT}  = 0;
     #------------------------------------------------------------------------------------
     #-- switch the device to current measurement off, VDD only
     #-- issue the match ROM command \x55 and the write scratchpad command
