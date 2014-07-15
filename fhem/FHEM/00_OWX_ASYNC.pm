@@ -995,13 +995,15 @@ sub OWX_ASYNC_Schedule($$@) {
   my ( $hash, $task, @args ) = @_;
   my $master = $hash->{IODev};
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
-  my $owx_dev = $hash->{ROM_ID};
+  my $name = $hash->{NAME};
   $task->{ExecuteArgs} = \@args;
   $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
-  if (defined $master->{tasks}->{$owx_dev}) {
-    push @{$master->{tasks}->{$owx_dev}}, $task;
+  if (defined $master->{tasks}->{$name}) {
+    push @{$master->{tasks}->{$name}}, $task;
+    $hash->{NUMTASKS} = @{$master->{tasks}->{$name}};
   } else {
-    $master->{tasks}->{$owx_dev} = [$task];
+    $master->{tasks}->{$name} = [$task];
+    $hash->{NUMTASKS} = 1;
   }
   #TODO make use of $master->{".nexttasktime"}
   InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
@@ -1010,12 +1012,15 @@ sub OWX_ASYNC_Schedule($$@) {
 sub OWX_ASYNC_ScheduleMaster($$@) {
   my ( $master, $task, @args ) = @_;
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
+  my $name = $master->{NAME};
   $task->{ExecuteArgs} = \@args;
   $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
-  if (defined $master->{tasks}->{master}) {
-    push @{$master->{tasks}->{master}}, $task;
+  if (defined $master->{tasks}->{$name}) {
+    push @{$master->{tasks}->{$name}}, $task;
+    $master->{NUMTASKS} = @{$master->{tasks}->{$name}};
   } else {
-    $master->{tasks}->{master} = [$task];
+    $master->{tasks}->{$name} = [$task];
+    $master->{NUMTASKS} = 1;
   }
   #TODO make use of $master->{".nexttasktime"}
   InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
@@ -1042,28 +1047,29 @@ sub OWX_ASYNC_RunTasks($) {
       my @queue_ready    = ();
       my @queue_sleeping = ();
       my @queue_initial  = ();
-      foreach my $owx_dev (keys %{$master->{tasks}}) {
-        my $queue = $master->{tasks}->{$owx_dev};
+      foreach my $name (keys %{$master->{tasks}}) {
+        my $queue = $master->{tasks}->{$name};
         while (@$queue) {
           my $state = $queue->[0]->PT_STATE();
           if ($state == PT_WAITING) {
-            push @queue_waiting,{ device => $owx_dev, queue => $queue};
+            push @queue_waiting,{ device => $name, queue => $queue};
             last;
           } elsif ($state == PT_YIELDED) {
             if ($now >= $queue->[0]->{ExecuteTime}) {
-              push @queue_ready, { device => $owx_dev, queue => $queue};
+              push @queue_ready, { device => $name, queue => $queue};
             } else {
-              push @queue_sleeping, { device => $owx_dev, queue => $queue};
+              push @queue_sleeping, { device => $name, queue => $queue};
             }
             last;
           } elsif ($state == PT_INITIAL) {
-            push @queue_initial, { device => $owx_dev, queue => $queue};
+            push @queue_initial, { device => $name, queue => $queue};
             last;
           } else {
-            shift $queue;
+            shift @$queue;
+            $main::defs{$name}->{NUMTASKS} = @$queue;
           }
         };
-        delete $master->{tasks}->{$owx_dev} unless (@$queue);
+        delete $master->{tasks}->{$name} unless (@$queue);
       }
       if (defined (my $current = @queue_waiting ? shift @queue_waiting : @queue_ready ? shift @queue_ready : @queue_initial ? shift @queue_initial : undef)) {
         my $task = $current->{queue}->[0];
@@ -1079,6 +1085,7 @@ sub OWX_ASYNC_RunTasks($) {
               Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now));
               $task->PT_CANCEL("Timeout");
               shift @{$current->{queue}};
+              $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
               next;
             } else {
               Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} waiting for data or timeout" if ($owx_async_debug);
@@ -1107,6 +1114,7 @@ sub OWX_ASYNC_RunTasks($) {
             die "$current->{device} unexpected thread state after termination: $state";
           }
           shift @{$current->{queue}};
+          $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
           next;
         }
       } else {
