@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.17";
+my $owx_version="5.18";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -489,14 +489,10 @@ sub OWSWITCH_Get($@) {
   if($a[1] eq "present") {
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      my ($task,$task_state);
       eval {
-        $task = OWX_ASYNC_PT_Verify($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
       };
       return GP_Catch($@) if $@;
-      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -540,13 +536,10 @@ sub OWSWITCH_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
     }elsif( $interface eq "OWX_ASYNC") {
-      my ($task,$task_state);
       eval {
-        $task = OWXSWITCH_PT_GetState($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXSWITCH_PT_GetState($hash));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -565,13 +558,10 @@ sub OWSWITCH_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
     }elsif( $interface eq "OWX_ASYNC" ){
-      my ($task,$task_state);
       eval {
-        $task = OWXSWITCH_PT_GetState($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXSWITCH_PT_GetState($hash));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{
