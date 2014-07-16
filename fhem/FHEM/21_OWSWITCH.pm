@@ -826,7 +826,7 @@ sub OWSWITCH_Set($@) {
       return "OWSWITCH: GetValues with wrong IODev type $interface";
     }
     #-- process results
-    if( defined($ret)  ){
+    if($ret){
       return "OWSWITCH: Could not set device $name, reason: ".$ret;
     }
   }
@@ -1492,11 +1492,12 @@ sub OWXSWITCH_PT_SetOutput($$$) {
     PT_BEGIN($thread);
 
     $thread->{task} = OWXSWITCH_PT_GetState($hash);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{task});
+    delete $thread->{TimeoutTime};
+    die $thread->{task}->PT_CAUSE() if ($thread->{task}->PT_STATE() == PT_ERROR);
     $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
+    die $ret if $ret;
     $value = 0;
     #-- vax or val ?
     for (my $i=0;$i<$cnumber{$attr{$hash->{NAME}}{"model"}};$i++){
@@ -1507,11 +1508,12 @@ sub OWXSWITCH_PT_SetOutput($$$) {
     }
     $thread->{value} = $value;
     $thread->{task} = OWXSWITCH_PT_SetState($hash,$thread->{value});
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{task});
+    delete $thread->{TimeoutTime};
+    die $thread->{task}->PT_CAUSE() if ($thread->{task}->PT_STATE() == PT_ERROR);
     $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
+    die $ret if $ret;
     PT_END;
   });
 }

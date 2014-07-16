@@ -1062,45 +1062,49 @@ sub OWX_ASYNC_RunTasks($) {
       if (defined (my $current = @queue_waiting ? shift @queue_waiting : @queue_ready ? shift @queue_ready : @queue_initial ? shift @queue_initial : undef)) {
         my $task = $current->{queue}->[0];
         my $timeout = $task->{TimeoutTime};
-        if ($task->PT_SCHEDULE(@{$task->{ExecuteArgs}})) {
+        if ($task->PT_SCHEDULE()) {
           my $state = $task->PT_STATE();
           # waiting for ExecuteResponse:
           if ($state == PT_WAITING) {
-            die "$current->{device} unexpected thread state PT_WAITING without TimeoutTime" unless (defined $task->{TimeoutTime});
-            #task timed out:
-            if ($now >= $task->{TimeoutTime}) {
-              Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task timed out");
-              Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now)) if ($owx_async_debug>1);
-              $task->PT_CANCEL("Timeout");
-              shift @{$current->{queue}};
-              $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
-              next;
-            } else {
-              Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} waiting for data or timeout" if ($owx_async_debug>2);
-              #new timeout or timeout did change:
-              if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
-                Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} schedule for timeout at %.6f",$task->{TimeoutTime});
-                InternalTimer($task->{TimeoutTime}, "OWX_ASYNC_RunTasks", $master,0);
+            if (defined $task->{TimeoutTime}) {
+              #task timed out:
+              if ($now >= $task->{TimeoutTime}) {
+                Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task timed out");
+                Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now)) if ($owx_async_debug>1);
+                $task->PT_CANCEL("Timeout");
+                shift @{$current->{queue}};
+                $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
+                next;
+              } else {
+                Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} task waiting for data or timeout" if ($owx_async_debug>2);
+                #new timeout or timeout did change:
+                if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
+                  Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} task schedule for timeout at %.6f",$task->{TimeoutTime});
+                  InternalTimer($task->{TimeoutTime}, "OWX_ASYNC_RunTasks", $master,0);
+                }
+                last;
               }
-              last;
+            } else {
+              Log3 ($master->{NAME},4,"$current->{device} unexpected thread state PT_WAITING without TimeoutTime");
+              $task->{TimeoutTime} = $now + 2; #TODO implement attribute based timeout
             }
           # sleeping:
           } elsif ($state == PT_YIELDED) {
             next;
           } else {
-            die "$current->{device} unexpected thread state while running: $state";
+            Log3 ($master->{NAME},4,"$current->{device} unexpected thread state while running: $state");
           }
         } else {
           my $state = $task->PT_STATE();
           if ($state == PT_ENDED) {
-            Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} finished task");
+            Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} task finished");
           } elsif ($state == PT_EXITED) {
-            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} exited task: ".(defined $task->PT_RETVAL() ? $task->PT_RETVAL : "- no retval -"));
+            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task exited: ".(defined $task->PT_RETVAL() ? $task->PT_RETVAL : "- no retval -"));
           } elsif ($state == PT_ERROR) {
-            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} Error task: ".$task->PT_CAUSE());
+            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task Error: ".$task->PT_CAUSE());
             $main::defs{$current->{device}}->{PRESENT} = 0;
           } else {
-            die "$current->{device} unexpected thread state after termination: $state";
+            Log3 ($master->{NAME},4,"$current->{device} unexpected thread state after termination: $state");
           }
           shift @{$current->{queue}};
           $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
