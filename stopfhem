@@ -14,4 +14,4 @@ sudo ./killwatchdog.sh 2>>log/watchdog_err.log
 #sudo -u fhem ./killfhem.sh 2>>log/watchdog_err.log
 sudo ./killfhem.sh 2>>log/watchdog_err.log
 
-return $?
+#return $?

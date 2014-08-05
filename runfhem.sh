@@ -23,4 +23,4 @@ cd $home
 #  RETVAL=1
 #fi
 
-return $RETVAL
+#return $RETVAL

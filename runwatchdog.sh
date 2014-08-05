@@ -83,4 +83,4 @@ fi
 # Fertig
 #print "runwatchdog done";
 
-return 0;
+#return 0;

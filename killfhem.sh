@@ -48,4 +48,4 @@ if [ "$cnt" -ge "0" ] ; then
 
 fi
 
-return $RETVAL
+#return $RETVAL
