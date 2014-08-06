@@ -585,7 +585,7 @@ sub GSD_Parse($$) {
         }
         if (!defined($dMap)) {
           # Function hat Abbruch-Kennzeichen geliefert (es wir alles oder nichts verarbeitet)
-          log 0, "GSD: ERROR: parse function failure";
+          Log 0, "GSD: ERROR: parse function failure";
           return undef;
         }
         #$data_index = $dMap->{INDEX};
