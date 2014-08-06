@@ -195,6 +195,7 @@ SYSMON_updateCurrentReadingsMap($) {
 		#$rMap->{"power_battery_voltage"} = "Batterie-Versorgung Spannung";
 		$rMap->{"power_battery_stat"}    = "Batterie-Versorgung Info";
 		$rMap->{"power_battery_text"}    = "Batterie-Versorgung  Info";
+		$rMap->{"power_battery_info"}    = "Batterie-Versorgung  Zusatzinfo";
   }
 
   #$rMap->{"fhemuptime"}      = "Betriebszeit FHEM";
@@ -1996,7 +1997,21 @@ sub SYSMON_PowerBatInfo($$)
   $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
   
   # TODO
-  # Zusaetzlich status, capacity, voltage_max_design, voltage_min_design, health, model_name, technology, temp (/10 => °C)
+  if($d_present eq "1") {
+    # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
+    my $d_technology = trim(SYSMON_execute($hash, $base."technology"));
+    my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
+    my $d_status = trim(SYSMON_execute($hash, $base."status"));
+    my $d_health = trim(SYSMON_execute($hash, $base."health"));
+    my $d_temp = trim(SYSMON_execute($hash, $base."temp"));
+    if(defined $d_temp) {$d_temp/=10;}
+    
+    $map->{"power_".$type."_info"}=$type." info: ".$d_technology." , capacity: ".$d_capacity." %, status: ".$d_status." , health: ".$d_health." , temperatur: ".$d_temp." C";
+    
+    # ggf. noch irgendwann: model_name, voltage_max_design, voltage_min_design
+  } else {
+  	$map->{"power_".$type."_info"}=$type." info: n/a , capacity: n/a %, status: n/a , health: n/a , temperatur: n/a C";
+  }
   
   return $map;
 }
@@ -2200,6 +2215,41 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Information on the installed firmware version: <VersionNum> <creation date> <time>
     </li>
     <br>
+    <b>Power Supply Readings</b>
+    <li>power_ac_stat<br>
+        status information to the AC socket: present (0|1), online (0|1), voltage, current
+        Example:<br>
+    		<code>power_ac_stat: 1 1 4.807 264</code><br>
+    </li>
+    <br>
+    <li>power_ac_text<br>
+        human readable status information to the AC socket<br>
+        Example:<br>
+    		<code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
+    </li>
+    <br>
+    <li>power_usb_stat<br>
+        status information to the USB socket
+    </li>
+    <br>
+    <li>power_usb_text<br>
+        human readable status information to the USB socket
+    </li>
+    <br>
+    <li>power_battery_stat<br>
+        status information to the battery (if installed)
+    </li>
+    <br>
+    <li>power_battery_text<br>
+        human readable status information to the battery (if installed)
+    </li>
+    <br>
+    <li>power_battery_info<br>
+        human readable additional information to the battery (if installed): technology, capacity, status, health, temperatur<br>
+        Example:<br>
+    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , temperatur: 30 C</code><br>
+    </li>
+    <br>    
   <br>
   </ul>
 
@@ -2672,6 +2722,41 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Angaben zu der installierten Firmware-Version: <VersionNr> <Erstelldatum> <Zeit>
     </li>
     <br>
+    <b>Readings zur Stromversorgung</b>
+    <li>power_ac_stat<br>
+        Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current
+        Beispiel:<br>
+    		<code>power_ac_stat: 1 1 4.807 264</code><br>
+    </li>
+    <br>
+    <li>power_ac_text<br>
+        Statusinformation f&uuml;r die AC-Buchse in menschenlesbarer Form<br>
+        Beispiel:<br>
+    		<code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
+    </li>
+    <br>
+    <li>power_usb_stat<br>
+        Statusinformation f&uuml;r die USB-Buchse
+    </li>
+    <br>
+    <li>power_usb_text<br>
+        Statusinformation f&uuml;r die USB-Buchse in menschenlesbarer Form
+    </li>
+    <br>
+    <li>power_battery_stat<br>
+        Statusinformation f&uuml;r die Batterie (wenn vorhanden)
+    </li>
+    <br>
+    <li>power_battery_text<br>
+        Statusinformation f&uuml;r die Batterie (wenn vorhanden) in menschenlesbarer Form
+    </li>
+    <br>
+    <li>power_battery_info<br>
+        Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Temperatur<br>
+        Beispiel:<br>
+    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , temperatur: 30 C</code><br>
+    </li>
+    <br>    
   <br>
   </ul>
 
