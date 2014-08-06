@@ -169,6 +169,34 @@ SYSMON_updateCurrentReadingsMap($) {
     $rMap->{+CPU_TEMP}        = "CPU temperature";
     $rMap->{"cpu_temp_avg"}   = "Average CPU temperature";
   }
+  
+  if(SYSMON_isSysPowerAc($hash)) {
+  	#$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
+		#$rMap->{"power_ac_present"} = "AC-Versorgung vorhanden";
+		#$rMap->{"power_ac_current"} = "AC-Versorgung Strom";
+		#$rMap->{"power_ac_voltage"} = "AC-Versorgung Spannung";
+		$rMap->{"power_ac_stat"}    = "AC-Versorgung Info";
+		$rMap->{"power_ac_text"}    = "AC-Versorgung Info";
+  }
+
+  if(SYSMON_isSysPowerUsb($hash)) {
+  	#$rMap->{"power_usb_online"}  = "USB-Versorgung Status";
+		#$rMap->{"power_usb_present"} = "USB-Versorgung vorhanden";
+		#$rMap->{"power_usb_current"} = "USB-Versorgung Strom";
+		#$rMap->{"power_usb_voltage"} = "USB-Versorgung Spannung";
+		$rMap->{"power_usb_stat"}    = "USB-Versorgung Info";
+		$rMap->{"power_usb_text"}    = "USB-Versorgung Info";
+  }
+  
+  if(SYSMON_isSysPowerBat($hash)) {
+  	#$rMap->{"power_battery_online"}  = "Batterie-Versorgung Status";
+		#$rMap->{"power_battery_present"} = "Batterie-Versorgung vorhanden";
+		#$rMap->{"power_battery_current"} = "Batterie-Versorgung Strom";
+		#$rMap->{"power_battery_voltage"} = "Batterie-Versorgung Spannung";
+		$rMap->{"power_battery_stat"}    = "Batterie-Versorgung Info";
+		$rMap->{"power_battery_text"}    = "Batterie-Versorgung  Info";
+  }
+
   #$rMap->{"fhemuptime"}      = "Betriebszeit FHEM";
   #$rMap->{"fhemuptime_text"} = "Betriebszeit FHEM";
   #$rMap->{"idletime"}        = "Leerlaufzeit";
@@ -679,6 +707,17 @@ SYSMON_obtainParameters($$)
       $map = SYSMON_getLoadAvg($hash, $map);
       $map = SYSMON_getCPUProcStat($hash, $map);
       #$map = SYSMON_getDiskStat($hash, $map);
+      
+      # Power info (cubietruck)
+      if(SYSMON_isSysPowerAc($hash)) {
+      	$map = SYSMON_PowerAcInfo($hash, $map);
+      }
+      if(SYSMON_isSysPowerUsb($hash)) {
+      	$map = SYSMON_PowerUsbInfo($hash, $map);
+      }
+      if(SYSMON_isSysPowerBat($hash)) {
+      	$map = SYSMON_PowerBatInfo($hash, $map);
+      }
     }
   }
 
@@ -1852,6 +1891,116 @@ SYSMON_isFB($) {
   } 
 	return $sys_fb;
 }
+
+#-Power-------
+my $sys_power_ac = undef;
+sub
+SYSMON_isSysPowerAc($) {
+	my ($hash) = @_;
+	if(!defined $sys_power_ac) {
+	  $sys_power_ac = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/ac/online ] && echo 1 || echo 0"));
+  }
+
+	return $sys_power_ac;
+}
+
+my $sys_power_usb = undef;
+sub
+SYSMON_isSysPowerUsb($) {
+	my ($hash) = @_;
+	if(!defined $sys_power_usb) {
+	  $sys_power_usb = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/usb/online ] && echo 1 || echo 0"));
+  }
+
+	return $sys_power_usb;
+}
+
+my $sys_power_bat = undef;
+sub
+SYSMON_isSysPowerBat($) {
+	my ($hash) = @_;
+	if(!defined $sys_power_bat) {
+	  $sys_power_bat = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/battery/online ] && echo 1 || echo 0"));
+  }
+
+	return $sys_power_bat;
+}
+
+sub SYSMON_PowerAcInfo($$)
+{
+	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+	my ($hash, $map) = @_;
+	my $type="ac";
+	my $base = "cat /sys/class/power_supply/".$type."/";
+		
+  my $d_online = trim(SYSMON_execute($hash, $base."online"));
+  my $d_present = trim(SYSMON_execute($hash, $base."present"));
+  my $d_current = SYSMON_execute($hash, $base."current_now");
+  if(defined $d_current) {$d_current/=1000;}
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  if(defined $d_voltage) {$d_voltage/=1000000;}
+  
+  #$map->{"power_".$type."_online"}=$d_online;
+  #$map->{"power_".$type."_present"}=$d_present;
+  #$map->{"power_".$type."_current"}=$d_current;
+  #$map->{"power_".$type."_voltage"}=$d_voltage;
+  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  
+  return $map;
+}
+
+sub SYSMON_PowerUsbInfo($$)
+{
+	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+	my ($hash, $map) = @_;
+	my $type="usb";
+	my $base = "cat /sys/class/power_supply/".$type."/";
+		
+  my $d_online = trim(SYSMON_execute($hash, $base."online"));
+  my $d_present = trim(SYSMON_execute($hash, $base."present"));
+  my $d_current = SYSMON_execute($hash, $base."current_now");
+  if(defined $d_current) {$d_current/=1000;}
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  if(defined $d_voltage) {$d_voltage/=1000000;}
+  
+  #$map->{"power_".$type."_online"}=$d_online;
+  #$map->{"power_".$type."_present"}=$d_present;
+  #$map->{"power_".$type."_current"}=$d_current;
+  #$map->{"power_".$type."_voltage"}=$d_voltage;
+  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  
+  return $map;
+}
+
+sub SYSMON_PowerBatInfo($$)
+{
+	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+	my ($hash, $map) = @_;
+	my $type="battery";
+	my $base = "cat /sys/class/power_supply/".$type."/";
+		
+  my $d_online = trim(SYSMON_execute($hash, $base."online"));
+  my $d_present = trim(SYSMON_execute($hash, $base."present"));
+  my $d_current = SYSMON_execute($hash, $base."current_now");
+  if(defined $d_current) {$d_current/=1000;}
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  if(defined $d_voltage) {$d_voltage/=1000000;}
+  
+  #$map->{"power_".$type."_online"}=$d_online;
+  #$map->{"power_".$type."_present"}=$d_present;
+  #$map->{"power_".$type."_current"}=$d_current;
+  #$map->{"power_".$type."_voltage"}=$d_voltage;
+  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  
+  # TODO
+  # Zusaetzlich status, capacity, voltage_max_design, voltage_min_design, health, model_name, technology, temp (/10 => °C)
+  
+  return $map;
+}
+#-------------
 
 sub
 SYSMON_execute($$)
