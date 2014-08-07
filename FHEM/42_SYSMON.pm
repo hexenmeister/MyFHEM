@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.5.0";
+my $VERSION = "1.6.0";
 
 use constant {
   DATE            => "date",
