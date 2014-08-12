@@ -235,7 +235,7 @@ sub initialize() {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
     $ds2480->start_query();
     $ds2480->query("\x17\x45\x5B\x0F\x91",5);
-    my $until = gettimeofday + main::AttrVal($$hash->{NAME},"timeout",1);
+    my $until = gettimeofday + main::AttrVal($hash->{NAME},"timeout",1);
     eval {
       do {
         $ds2480->poll();
