@@ -2090,6 +2090,13 @@ sub SYSMON_PowerBatInfo($$)
 }
 #-------------
 
+# TODO: 
+#  FritzBox: 
+#   run_clock liefert: running: 19 hours 25 days 0 months 0 years (10 starts)
+#   echo ${OEM} liefert: 1und1
+#   /etc/version liefert: 113.06.05 => FritzOS Version 06.05
+#   run_clock -S liefert: FRITZ!Box 7490 (UI)-B-202500-000010-405222-113212-197902 (scheint aber etwas länger zu dauern)
+
 sub
 SYSMON_execute($$)
 {
