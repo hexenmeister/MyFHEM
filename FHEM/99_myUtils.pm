@@ -8,6 +8,26 @@ use POSIX;
 use Time::Local;
 #use List::Util qw[min max];
 
+# --- Konstanten fuer die verwendeten ElementNamen ----------------------------
+use constant {
+  ELEMENT_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
+  ELEMENT_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
+  ELEMENT_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
+  ELEMENT_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
+  ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
+};
+
+# --- Konstanten für die Werte f. Auto, Enabled, Disabled
+use constant {
+  AUTOMATIC    => "Automatik",
+  ENABLED      => "Aktiviert",
+  DISABLED     => "Deaktiviert",
+  #ON           => "Ein",
+  #OFF          => "Aus",
+  PRESENT      => "Anwesend",
+  ABSENT       => "Abwesend"
+};
+
 
 sub
 myUtils_Initialize($$)
@@ -221,7 +241,7 @@ my $ctrlTable_Absent;
 sub
 _steuerungZirkulationspumpe_getCtrlTable() {
 	# zuerst den manuellen Schalter abfragen
-	my $zpctrl = ReadingsVal("ZP_Ctrl", "state",undef);
+	my $zpctrl = ReadingsVal(ELEMENT_NAME_CTRL_ZIRK_PUMPE, "state",undef);
 	if(defined($zpctrl)) {
 		$zpctrl = lc($zpctrl);
 		if($zpctrl eq "default" || $zpctrl eq "normal") {
@@ -296,7 +316,7 @@ _isWe() {
 # Achtung: hier ist ein Name festverdrahted!
 sub
 isAbwesend() {
-	return Value("GC_Abwesend");
+	return Value(ELEMENT_NAME_GC_ANWESENHEIT);
 }
 
 # Führt ein update (reload) für den Calendar 'GC'.
@@ -1247,5 +1267,91 @@ sub checkDeviceReadingUpdateTimeOut($$$) {
   
   return $ret;
 }
+
+# --- Automatik und Steuerung -------------------------------------------------
+# wird beim Start von FHEM aufgerufen (notify global:INITIALIZED)
+sub notifierFn_FHEM_Start() {
+	sendMeJabberMessage('Service Message: FHEM gestartet');
+	setAllAutomatikControlsDefaults();
+	# ggf. Weiteres...
+}
+
+# wird beim Shutdown aufgrufen (notify global:SHUTDOWN)
+sub notifierFn_FHEM_Shutdown() {
+	sendMeJabberMessage('Service Message: FHEM faehrt herunter');
+	# ggf. Weiteres...
+}
+
+sub setValue($$) {
+  my($devName, $val) = @_;
+  fhem("set ".$devName." ".$val);
+}
+
+# Diese Methode setzt bei Bedarf die SteuerungsControlls (Dummies) auf 
+# Defaultwerte (AUTOMATIC). Sie soll beim FHEM-Start aufgerufen werden (global:INITIALIZED).
+sub setAllAutomatikControlsDefaults() {
+	# TODO: future: Pruefen, ob z.B. Status "Verreist" bereucksichtigt werden soll
+	if(Value(ELEMENT_NAME_CTRL_BESCHATTUNG) eq "???" ||  {ReadingsVal(ELEMENT_NAME_CTRL_BESCHATTUNG,"STATE","???")}) {
+	  setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
+	}
+	#setHomeAutomaticOn();
+	
+	if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) eq "???" ||  {ReadingsVal(ELEMENT_NAME_CTRL_ANWESENHEIT,"STATE","???")}) {
+    setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
+  }
+	#setHomePresence_Present();
+	
+	if(Value(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  {ReadingsVal(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT,"STATE","???")}) {
+    setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
+  }
+	
+}
+
+# Diese Methode setzt nachts die SteuerungsControlls (Dummies) auf 
+# Defaultwerte (AUTOMATIC). Sie soll jede Nacht zu einem Definierten Zeitpunkt
+# aufgerufen werden. Damit wird erreicht, dass alle Uebersteuerungen irgendwann 
+# in einen normalen Zustan uebergehen.
+sub resetAutomatikControls() {
+	setHomeAutomaticOn();
+	setHomePresence_Present();
+}
+
+# Schatet globale Haus-Automatik ein (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
+sub setHomeAutomaticOn() {
+	# Derzeit keine globale Automatik, daher delegieren
+	setBeschattungAutomaticOn();
+}
+
+# Schatet globale Haus-Automatik aus (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud DISABLED)
+sub setHomeAutomaticOff() {
+	# Derzeit keine globale Automatik, daher delegieren
+	setBeschattungAutomaticOff();
+}
+
+# Schatet Beschattung-Automatik ein (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
+sub setBeschattungAutomaticOn() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
+}
+
+# Schatet Beschattung-Automatik aus (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud DISABLED)
+sub setBeschattungAutomaticOff() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, DISABLED);
+}
+
+# Setzt PRESENCE-Status auf anwesent (jemand ist zuhause)
+sub setHomePresence_Present() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, PRESENT);
+}
+
+# Setzt PRESENCE-Status auf abwesent (niemand ist zuhause)
+sub setHomePresence_Absent() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+  setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, ABSENT);
+}
+
+
 
 1;
