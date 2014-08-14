@@ -80,8 +80,11 @@ sub GSD_Initialize($)
   # ---------------------------------------------------------------------------
   #
   # Message-Format: <Head><Payload>
-  #   GSD NodeID(1Byte) Magic(1Byte) SubNodeID(1Byte) MsgCounter(2Bytes) 
+  #   GSD NodeID(1Byte) Magic(1Byte) SubNodeID(1 oder 2Byte(s)) MsgCounter(2Bytes) 
   #   [Payload](NBytes)
+  #
+  # Magic = 83 => SubNodeID ist 1 Byte lang
+  # Magic = 84 => SubNodeID ist 2 Bytes lang
   #
   # Payload-Format:
   #   TypeID(1Byte) [Data](NBytes)
@@ -356,11 +359,32 @@ sub GSD_Initialize($)
   # --- 104-105(2) -- Wasserzähler -----------------------
   # TODO
   # --- 106-109(4) -- Counter32 --------------------------
-  # TODO
+  $data{GSCONF}{106}{ReadingName} = "counter1_0";
+  $data{GSCONF}{106}{DataLength} = 4;
+  $data{GSCONF}{107}{ReadingName} = "counter1_1";
+  $data{GSCONF}{107}{DataLength} = 4;
+  $data{GSCONF}{108}{ReadingName} = "counter1_2";
+  $data{GSCONF}{108}{DataLength} = 4;
+  $data{GSCONF}{109}{ReadingName} = "counter1_3";
+  $data{GSCONF}{109}{DataLength} = 4;
   # --- 110-113(4) -- Counter24 --------------------------
-  # TODO
-  # --- 114-117(4) -- Counter16 --------------------------
-  # TODO
+  $data{GSCONF}{110}{ReadingName} = "counter2_0";
+  $data{GSCONF}{110}{DataLength} = 3;
+  $data{GSCONF}{111}{ReadingName} = "counter2_1";
+  $data{GSCONF}{111}{DataLength} = 3;
+  $data{GSCONF}{112}{ReadingName} = "counter2_2";
+  $data{GSCONF}{112}{DataLength} = 3;
+  $data{GSCONF}{113}{ReadingName} = "counter2_3";
+  $data{GSCONF}{113}{DataLength} = 3;
+  # --- 114-117(4) -- Counter16 / ADC --------------------
+  $data{GSCONF}{114}{ReadingName} = "counter3_0";
+  $data{GSCONF}{114}{DataLength} = 2;
+  $data{GSCONF}{115}{ReadingName} = "counter3_1";
+  $data{GSCONF}{115}{DataLength} = 2;
+  $data{GSCONF}{116}{ReadingName} = "counter3_2";
+  $data{GSCONF}{116}{DataLength} = 2;
+  $data{GSCONF}{117}{ReadingName} = "counter3_3";
+  $data{GSCONF}{118}{DataLength} = 2;
   # --- 118-125(8) -- State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
   # TODO
   # --- 126-127(2) -- Prozentwerte (xx,xx: Füllstand etc.)
