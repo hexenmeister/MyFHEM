@@ -384,7 +384,7 @@ sub GSD_Initialize($)
   $data{GSCONF}{116}{ReadingName} = "counter3_2";
   $data{GSCONF}{116}{DataLength} = 2;
   $data{GSCONF}{117}{ReadingName} = "counter3_3";
-  $data{GSCONF}{118}{DataLength} = 2;
+  $data{GSCONF}{117}{DataLength} = 2;
   # --- 118-125(8) -- State (Kontakte/Melder: Reed, Fenster (auch 3state) etc.)
   # TODO
   # --- 126-127(2) -- Prozentwerte (xx,xx: Füllstand etc.)
