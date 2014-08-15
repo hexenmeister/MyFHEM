@@ -557,7 +557,7 @@ sub GSD_Parse($$) {
     my $sid = GSD_parseNumber(@msg_data[$c_pos_sid..$c_pos_sid+$c_len_sid-1]);
   	
   	my $NodeNID = $msg_data[$c_pos_nid];
-  	my $NodeNID = $NodeNID % 32;
+  	$NodeNID = $NodeNID % 32;
   	my $NodeID = $NodeNID.".".$msg_data[$c_pos_sid];
   	my $msgCounter = GSD_parseNumber(@msg_data[$c_pos_counter..$c_pos_counter+$c_len_counter-1]);
   	Log 5, "GSD: message number: " . $msgCounter;
@@ -723,7 +723,7 @@ sub GSD_parseDefault($$) {
   
   my @msg_data = @{$dMap->{DATA}};
   my $data_index = $dMap->{INDEX};
-  my $msg_type = @msg_data[$data_index];
+  my $msg_type = $msg_data[$data_index];
   
   Log 5, "GSD: default parse function. index: " . $data_index . " msg type: " . $msg_type;
    
