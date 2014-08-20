@@ -22,10 +22,11 @@ use constant {
   AUTOMATIC    => "Automatik",
   ENABLED      => "Aktiviert",
   DISABLED     => "Deaktiviert",
-  #ON           => "Ein",
-  #OFF          => "Aus",
+  #ON          => "Ein",
+  #OFF         => "Aus",
   PRESENT      => "Anwesend",
-  ABSENT       => "Abwesend"
+  ABSENT       => "Abwesend",
+  FAR_AWAY     => "Verreist"
 };
 
 
@@ -918,6 +919,50 @@ SetTempList_Heizung_OG_Schlafzimmer()
 #---
 
 ######################################################
+# Sprachausgabe ueber Text2Speak Modul
+#  Parameter:
+#   - text: Auszugebender Text
+#   - volume (optional) - Lautstaerke
+#     (wenn nicht vorhaneden: wird aktuell gesetzte 
+#      Lautstaerke benutzt,
+#      wenn 1 oder groesser: dieser Wert wird benutzt,
+#      wenn 0: adaptiv gesetzt je nach Fageszeit 
+#              (also Nachts wesentlich leiser)
+#       (ggf. spaeter adaptiv durch ermitteln der Zimmerlautstaerke)
+######################################################
+sub speak($;$) {
+	my($text,$volume)=@_;
+	if(defined ($volume)) {
+		if(int($volume) >=1) {
+      fhem("set tts volume ".$volume);
+    } else {
+    	if(int($volume) == 0) {
+    	# Adaptiv 
+    	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    	# 5 - sehr leise
+    	# 10 - ok
+    	# 50 - gut hoerbar
+    	# 110 - default / gut laut
+    	#
+    	# 20:00 - 22:00 => 10
+    	# 22:00 - 05:00 =>  5
+    	# 05:00 - 07:00 => 10
+    	# 07:00 - 08:00 => 50
+    	# 08:00 - 20:00 => 100
+    	if ($hour>=20 && $hour<22) {$volume=10}
+    	if ($hour>=22 || $hour<5)  {$volume=5}
+    	if ($hour>=5  && $hour<7)  {$volume=10}
+    	if ($hour>=7  && $hour<8)  {$volume=50}
+    	if ($hour>=8  && $hour<20)  {$volume=100}
+    	
+    	fhem("set tts volume ".$volume);
+      }
+    }
+  }
+	fhem("set tts tts ".$text);
+}
+
+######################################################
 # Meldung per Jabber senden
 ######################################################
 sub
@@ -1023,6 +1068,12 @@ sendJabberAnswer()
   }
   #Log 3, "Jabber: response: >".$newmsg."<";
   
+  if($cmd eq "say" || $cmd eq "sprich") {
+  	my $cmd_tail = join(" ",@cmd_list);
+  	#fhem("set tts tts ".$cmd_tail);
+  	speak($cmd_tail,0);
+  	$newmsg.="ok";
+  }
   
   if(defined($newmsg)) {
     fhem("set jabber msg ". $lastsender . " ".$newmsg);
@@ -1268,6 +1319,18 @@ sub checkDeviceReadingUpdateTimeOut($$$) {
   return $ret;
 }
 
+# --- Utils -------------------------------------------------------------------
+
+sub setValue($$) {
+  my($devName, $val) = @_;
+  fhem("set ".$devName." ".$val);
+}
+
+sub setReading($$$) {
+  my($devName, $rName, $val) = @_;
+  fhem("setreading ".$devName." ".$rName." ".$val);
+}
+
 # --- Automatik und Steuerung -------------------------------------------------
 # wird beim Start von FHEM aufgerufen (notify global:INITIALIZED)
 sub notifierFn_FHEM_Start() {
@@ -1282,9 +1345,58 @@ sub notifierFn_FHEM_Shutdown() {
 	# ggf. Weiteres...
 }
 
-sub setValue($$) {
-  my($devName, $val) = @_;
-  fhem("set ".$devName." ".$val);
+# speichert (Restart-sicher) ein Key/Value-Paar (fuer Steuerungszwecke)
+sub putCtrlData($$) {
+	my($key, $val) = @_;
+  # Ein Dummy als Container verwenden (ein nicht in Frontent sichtbares Reading speichern)
+	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
+	setReading(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, $val);
+}
+
+# liefert ein zum einem Key gespeichertes Wert (fuer Steuerungszwecke)
+sub getCtrlData($) {
+	my($key) = @_;
+	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
+	my $val = ReadingsVal(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, undef);
+	return $val;
+}
+
+# wird regelmaessig (minuetlich) aufgerufen (AT)
+sub automationHeartbeat() {
+	# nach Bedarf (nachts) Automatik wieder aktivieren:
+	#  - Wenn nicht 'Verrreist', dann Zirkulation, Beschattung, 
+	#    Tag/Nachtsteuerung (Rolladen), Presence wieder auf Automatik setzen.
+	#  - ...
+	
+	my $hms = CurrentTime();
+	my $cDate = CurrentDate(); 
+	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
+	my $lDate = getCtrlData("ctrl_last_automatic_heartbeat");
+	#my $lDate = ReadingsVal(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, "ctrl_last_automatic_heartbeat", "");
+	# einmal am Tag zw. 2 und 5 Uhr
+	if($cDate ne $lDate &&  $hms gt "02:00" and $hms lt "05:00") {
+		if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
+		  resetAutomatikControls();
+    } else {
+      # Verreist:
+      #  - ZPumpe in Minimal-Modus
+      setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, ABSENT);
+    }
+    putCtrlData("ctrl_last_automatic_heartbeat", $cDate);
+    #setReading(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, "ctrl_last_automatic_heartbeat", $cDate);
+  }
+  
+  # TODO: Wenn sich der Wert der Anwesenheit auf Auto geaendert hat (nur bei einer Aenderung!), 
+  #       dann auch ZPumpe anpassen. Auch fuer Aenderung auf Anwesend/Abwesend
+  #
+  	# Wenn PRESENCE Automatic, dann auch 
+	  #if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
+		  #setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, ABSENT);
+	  #}
+
+	
+	# TODO
+	
 }
 
 # Diese Methode setzt bei Bedarf die SteuerungsControlls (Dummies) auf 
@@ -1305,27 +1417,145 @@ sub setAllAutomatikControlsDefaults() {
     setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
   }
 	
+	if(Value(ELEMENT_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  {ReadingsVal(ELEMENT_NAME_CTRL_ZIRK_PUMPE,"STATE","???")}) {
+    setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
+  }
 }
 
 # Diese Methode setzt nachts die SteuerungsControlls (Dummies) auf 
 # Defaultwerte (AUTOMATIC). Sie soll jede Nacht zu einem Definierten Zeitpunkt
 # aufgerufen werden. Damit wird erreicht, dass alle Uebersteuerungen irgendwann 
-# in einen normalen Zustan uebergehen.
+# in einen normalen Zustand uebergehen.
 sub resetAutomatikControls() {
 	setHomeAutomaticOn();
-	setHomePresence_Present();
+	setHomePresence_Automatic();
+	#setHomePresence_Present();
+	setDayNightRolloAutomaticOn();
+	setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
+}
+
+# Controlblock fuer HomeAutomatic-Schalter
+# Parameter: Neuer Zustand
+sub getHomeAutomaticCtrlBlock($) {
+	my($new_state)=@_;
+	my $ctrl_gl_au = getCtrlData("ctrl_last_global_automatic_change");
+	# Format: [zustand on|off...],[datum/zeit decimal (sec)],[counter],[counter_last_min],[sekunden seit letzter aktion]
+	my $ctrl_cnt=0;
+	my $ctrl_state=undef;
+	my $ctrl_dt = undef;
+	my $ctrl_cnt_last_min = 0;
+	my $ctrl_sec_since = 0;
+	if(defined($ctrl_gl_au)) {
+		($ctrl_state, $ctrl_dt, $ctrl_cnt, $ctrl_cnt_last_min, $ctrl_sec_since)  = split(/,/,$ctrl_gl_au);
+	} else {
+		$ctrl_cnt=0;
+		$ctrl_cnt_last_min = 0;
+  	$ctrl_state=undef;
+  	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	  $month+=1, $year+=1900;
+	  $ctrl_dt = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	}
+	
+	# Aktuelle Zeitangaben	
+	my $c_date = CurrentDate();
+	my $c_time = CurrentTime();
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	$month+=1, $year+=1900;
+	my $dt_dec = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	
+	$ctrl_cnt_last_min=int($ctrl_cnt_last_min);
+	$ctrl_sec_since=int($ctrl_sec_since);
+	if($new_state ne $ctrl_state) {
+	  $ctrl_cnt = 0;
+	  $ctrl_cnt_last_min = 0;
+  } else {
+  	# wenn gleicher Zustand: 
+    if($dt_dec-$ctrl_dt <= 60) {
+  	  # wenn innerhalb einer minute
+	    $ctrl_cnt_last_min+= 1;
+	  } else {
+	  	$ctrl_cnt_last_min = 1;
+	  }
+	  $ctrl_cnt+=1;	
+  }
+	
+	putCtrlData("ctrl_last_global_automatic_change", $new_state.",".$dt_dec.",".$ctrl_cnt.",".$ctrl_cnt_last_min.",".($dt_dec-$ctrl_dt));
+	
+	# Rueckgabe: Sekunden seit der Letzten Abfrage, Sekunden zw. Abfragen davor, GesamtAnzahl gleiche Aktion, Anzahl letzte Minute (gleiche Aktion)
+	return (($dt_dec-$ctrl_dt), $ctrl_sec_since, $ctrl_cnt, $ctrl_cnt_last_min);
 }
 
 # Schatet globale Haus-Automatik ein (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
 sub setHomeAutomaticOn() {
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomaticOn();
+	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
+	
+	# Hier (Sprach)Meldungen:
+	# Konzept: ein "Knopf-Bedienung": 
+	#   Auswertung: vorheriger Zustand.
+	#    Wenn Zustand unverändert: Tageszeitabhängige Meldungen
+	#    Auswertung: Wann war dieser Knopf zuletzt gedrueckt? Wie oft?
+	my($since_last, $sinse_l2, $cnt, $cnt_1min)=getHomeAutomaticCtrlBlock("on");
+	
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	#TODO Alle Ausgaben umbauen / auslagern / sauber implmentieren
+	if($hour>23||$hour<3) {
+		if($cnt_1min<=1) {
+			# Nicht zu oft wiederholen
+      speak("Gute Nacht!");
+      
+	    #TODO: ZirkPumpe kurz anwerfen	
+	    # TODO: Sauber / Abstrakt
+      fhem("set EG_HA_SA01.Zirkulationspumpe on-for-timer 120");
+    } else {
+    	my $temp = ReadingsVal("GSD_1.4","temperature","unbekannt");
+			my $humi = ReadingsVal("GSD_1.4","humidity","unbekannt");
+      speak("Die Temperatur draussen betraegt ".$temp."Grad. Luftfeuchtigkeit ".$humi." Prozent.");
+    }
+	}
+	
+	if($hour>3&&$hour<10) {
+	  if($cnt_1min<=1) {
+			# Nicht zu oft wiederholen
+			my $temp = ReadingsVal("GSD_1.4","temperature","unbekannt");
+			my $humi = ReadingsVal("GSD_1.4","humidity","unbekannt");
+      speak("Guten Morgen! "."Die Temperatur draussen betraegt ".$temp."Grad. Luftfeuchtigkeit ".$humi." Prozent.");
+    } else {
+    	speak("Hallo!");
+    }
+  }
+  
+  if($hour>10) {
+  	if($cnt_1min<=1) {
+			# Nicht zu oft wiederholen
+			my $temp = ReadingsVal("GSD_1.4","temperature","unbekannt");
+			my $humi = ReadingsVal("GSD_1.4","humidity","unbekannt");
+      speak("Hallo! "."Die Temperatur draussen betraegt ".$temp."Grad. Luftfeuchtigkeit ".$humi." Prozent.");
+    } else {
+    	speak("Hallo!");
+    }
+  }
+
+	if($cnt>0) {
+		# wiederholte Aktion (by Aenderung waere cnt=0)
+		# TODO
+	}
+	# TODO
 }
 
 # Schatet globale Haus-Automatik aus (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud DISABLED)
 sub setHomeAutomaticOff() {
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomaticOff();
+	
+  # Hier (Sprach)Meldungen:
+	# Konzept: ein "Knopf-Bedienung": 
+	#   Auswertung: vorheriger Zustand.
+	#    Wenn Zustand unverändert: Tageszeitabhängige Meldungen
+	#    Auswertung: Wann war dieser Knopf zuletzt gedrueckt? Wie oft?
+	my($since_last, $sinse_l2, $cnt, $cnt_1min)=getHomeAutomaticCtrlBlock("off");
+  # TODO
 }
 
 # Schatet Beschattung-Automatik ein (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
@@ -1340,18 +1570,34 @@ sub setBeschattungAutomaticOff() {
 	setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, DISABLED);
 }
 
-# Setzt PRESENCE-Status auf anwesent (jemand ist zuhause)
-sub setHomePresence_Present() {
+# Setzt PRESENCE-Status auf automatic 
+sub setHomePresence_Automatic() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
+}
+
+# Setzt PRESENCE-Status auf anwesend (jemand ist zuhause)
+sub setHomePresence_Present() {
+	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
 	setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, PRESENT);
 }
 
-# Setzt PRESENCE-Status auf abwesent (niemand ist zuhause)
+# Setzt PRESENCE-Status auf abwesend (niemand ist zuhause)
 sub setHomePresence_Absent() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
   setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, ABSENT);
 }
 
+# Schatet Tag/Nacht-Rolladen-Automatik ein (setzt ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT aud AUTOMATIC)
+sub setDayNightRolloAutomaticOn() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
+}
 
+# Schatet Tag/Nacht-Rolladen-Automatic aus (setzt ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT aud DISABLED)
+sub setDayNightRolloAutomaticOff() {
+	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, DISABLED);
+}
 
 1;
