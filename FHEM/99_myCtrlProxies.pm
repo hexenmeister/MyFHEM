@@ -117,16 +117,21 @@ my $devTab;
 # TODO
 
 
+#technisches
 sub myCtrlProxies_Initialize($$);
 
+# Sensoren
 sub myCtrlProxies_getSensor($);
 sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
+# 
 sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
+# Rooms
 sub myCtrlProxies_getRooms();
 sub myCtrlProxies_getActions(;$); # <DevName>
 
+# Action
 sub myCtrlProxies_doAllActions();
 sub myCtrlProxies_doAction($$);
 sub myCtrlProxies_DeviceSetFn($@);
@@ -289,7 +294,7 @@ myCtrlProxies_doAction($$) {
 # Eine bestimmte (Set-)Aktion für ein bestimmtes Gerät ausfuehren.
 # (Commando kann gefiltert und verändert werden, 
 # d.h. ggf. nicht oder anders ausgeführt)
-# Beispiel: Befehl 'schatten' für Rolladen: es wird gfeprüft (für jedes Rollo
+# Beispiel: Befehl 'schatten' für Rolladen: es wird geprüft (für jedes Rollo
 # einzeln) ob die Ausführung notwendig ist (richtige Tageszeit?, Temperatur? 
 # starke Sonneneinstrahlung?, aus richtiger Richtung?)
 # und auch wie stark (wie weit soll Rollo heruntergefahren werden).
