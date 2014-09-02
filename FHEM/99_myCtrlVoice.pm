@@ -78,7 +78,11 @@ sub voiceNotificationConfirm() {
 }
 
 sub voiceDoorbell() {
-  my($since_last, $sinse_l2, $cnt, $cnt_1min)=getGenericCtrlBlock("ctrl_last_haustuer_klingel", "on", 30);
+  #my($since_last, $sinse_l2, $cnt, $cnt_1min)=getGenericCtrlBlock("ctrl_last_haustuer_klingel", "on", 30);
+  
+  my $ret = getGenericCtrlBlock("ctrl_last_haustuer_klingel", "on", 30);
+  my $cnt_1min = $ret->{EQ_ACT_PP_CNT};
+  
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
 	# nur am Tage
   if($hour>=6&&$hour<23) {
@@ -190,16 +194,16 @@ sub speakWetterVorhersage(;$) {
 	
 	my $text = "";
 	if($day==1) {
-		$text = "Heute ist es ";
+		$text = "Wetter heute ";
 	}
 	if($day==2) {
-		$text = "Morgen wird es ";
+		$text = "Morgen ";
 	}
 	if($day==3) {
-		$text = "Uebermorgen wird es ";
+		$text = "Uebermorgen ";
 	}
 	if($day>3) {
-		$text = "Es wird ";
+		$text = "Wetter in ".($day-1)." Tagen ";
 	}	
 	if(defined($t1) && defined($t2) && defined($t3)) {
 	  $text.=$t1.". ";
@@ -245,8 +249,8 @@ sub voiceActAutomaticOn() {
 			if($since_last>=600) {
         speak("Willkommen zurueck!",0);
       }
-      # Dauer nur ansagen, wenn laenger als 30 Min.
-      if($since_last>=1800) {
+      # Dauer nur ansagen, wenn laenger als 15 Min.
+      if($since_last>=900) {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
 		}
@@ -284,8 +288,8 @@ sub voiceActAutomaticOn() {
 			if($since_last>=600) {
         speak("Willkommen!",0);
       }
-      # Dauer nur ansagen, wenn laenger als 30 Min.
-      if($since_last>=1800) {
+      # Dauer nur ansagen, wenn laenger als 15 Min.
+      if($since_last>=900) {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
     }
@@ -315,8 +319,8 @@ sub voiceActAutomaticOn() {
 			if($since_last>=600) {
         speak("Willkommen!",0);
       }
-      # Dauer nur ansagen, wenn laenger als 30 Min.
-      if($since_last>=1800) {
+      # Dauer nur ansagen, wenn laenger als 15 Min.
+      if($since_last>=900) {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
     }
@@ -357,6 +361,8 @@ sub voiceActAutomaticOn() {
     # TODO Versionsangaben: Mit git in /opt/fhem/_Mirror/FHEM: git log -1 --date=short --pretty=format:"%h; %d; %an; %ad; %s" 99_myUtils.pm
 		#        => Ausgabe: 0076531;  (HEAD, origin/master, master); hexenmeister; 2014-08-22; Refactoring, Optimizing, Improvement
 		#                    (Kurzhash; Bransh; Author; Date(iso); Subject)
+		my $cmd="cd ./_Mirror/FHEM/;; git log -1 --date=short --pretty=format:\"%h;; %d;; %an;; %ad;; %s\" 99_myUtils.pm";;qx($cmd);;
+		
   }
   # 6: schweigen
   # 7/8: Kleiner Scherz ;)
