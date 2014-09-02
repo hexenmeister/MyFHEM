@@ -1201,4 +1201,77 @@ sub rundeZahl1($) {
 	return $val;
 }
 
+###############################################################################
+# Schnittmenge, Differenzmenge oder die Vereinigungsmenge 
+# der Elemente zweier Listen erstellen
+# Uebergabe der Parameter als Zeiger!!!
+# Aufruf: 
+#   @a=(...);@b=(...); arraysVergleich(\@a, \@b); #benannte Zeiger mit \
+#   arraysVergleich(["six","seven", "eight"], [6,7,8,9]); #anonyme zeiger
+# Rueckgabe: HASH mit Referenzen auf 3 Arrays und ein Hash:
+#   Vereinigung, Schnittmenge, Different und Hash mit Elementen und deren Anzahl
+# Beispiel: (arraysVergleich(["a","b", "c"], ["c","d","e","f"]))[0] liefert 
+#   die Vereinigung, ...[1], die Schnittmenge etc.
+# Beispiel fuer Zugriffe: ...[0][1]; bei Hash: ...[3]{c} liefert 2.
+# Weil Hashes unsortiert sind, wird die Reihenfolge in den Ergebnisarrays beliebig sein!
+###############################################################################
+sub arraysVergleich($$) {
+	#gewinnen der ganzen arrays:
+  my @array1=@{$_[0]};
+  my @array2=@{$_[1]};
+	
+	#TODO: Reihenfolge behalten (array1):
+	# Union=(@array1, @array2);
+	
+	my (@union, @intersec, @diff, %count);
+  $count{$_}++ for (@array1, @array2);
+  for my $k (keys %count) {
+    push @union, $k;
+    #push @{ $count{int($k)} > 1 ? @intersec : @diff }, $k;
+    if($count{$k} > 1) {push(@intersec, $k);} else {push(@diff, $k);}
+  }
+  
+  return (\@union, \@intersec, \@diff, \%count);
+}
+
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Schnittmenge der Elemente zweier Listen
+# Uebergabe der Parameter als Zeiger!!!
+# Aufruf: 
+#   @a=(...);@b=(...); arraysVergleich(\@a, \@b); #benannte Zeiger mit \
+#   arraysVergleich(["six","seven", "eight"], [6,7,8,9]); #anonyme zeiger
+# Rueckgabe: Array mit den Elementen, der Menge der Ueberschneidung.
+###############################################################################
+sub arraysIntersec($$) {
+	#gewinnen der ganzen arrays:
+  my @array1=@{$_[0]};
+  my @array2=@{$_[1]};
+	
+	#TODO: Reihenfolge behalten (array1):
+	# Union=(@array1, @array2);
+	
+	my (@union, @intersec, @diff, %count);
+  $count{$_}++ for (@array1, @array2);
+  for my $k (keys %count) {
+    push @union, $k;
+    #push @{ $count{int($k)} > 1 ? @intersec : @diff }, $k;
+    if($count{$k} > 1) {push(@intersec, $k);} else {push(@diff, $k);}
+  }
+  
+  return \@intersec;
+}
+
+
+
+
 1;
