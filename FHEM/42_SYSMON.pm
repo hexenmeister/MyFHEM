@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 6381 2014-08-08 21:57:26Z hexenmeister $
+# $Id: 42_SYSMON.pm 6390 2014-08-10 22:06:38Z hexenmeister $
 
 package main;
 
@@ -709,7 +709,9 @@ SYSMON_obtainParameters($$)
 	 
 	# Einmaliges
 	if(!$u_first_mark) {
-	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
+		if(SYSMON_isProcFS($hash)) {
+  	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
+	  }
 	
 	  if(SYSMON_isFB($hash)) {
 	    $map = SYSMON_FBVersionInfo($hash, $map);
@@ -717,7 +719,11 @@ SYSMON_obtainParameters($$)
   }
 
 	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
-  $map = SYSMON_getUptime($hash, $map);
+	if(SYSMON_isProcFS($hash)) {
+    $map = SYSMON_getUptime($hash, $map);
+  } else {
+  	$map = SYSMON_getUptime2($hash, $map);
+  }
   $map = SYSMON_getFHEMUptime($hash, $map);
 
   if($m1 gt 0) { # Nur wenn > 0
@@ -736,8 +742,12 @@ SYSMON_obtainParameters($$)
       if(SYSMON_isCPU1Freq($hash)) {
         $map = SYSMON_getCPU1Freq($hash, $map);
       }
-      $map = SYSMON_getLoadAvg($hash, $map);
-      $map = SYSMON_getCPUProcStat($hash, $map);
+      if(SYSMON_isProcFS($hash)) {
+        $map = SYSMON_getLoadAvg($hash, $map);
+        $map = SYSMON_getCPUProcStat($hash, $map);
+      } else {
+      	#TODO: Ohne ProcFS
+      }
       #$map = SYSMON_getDiskStat($hash, $map);
       
       # Power info (cubietruck)
@@ -911,17 +921,62 @@ SYSMON_getUptime($$)
 	#my $uptime_str = qx(cat /proc/uptime );
 	my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
-  my $idle_percent = $idle/$uptime*100;
+  if(int($uptime)!=0) {
+    my $idle_percent = $idle/$uptime*100;
 
-	$map->{+UPTIME}=sprintf("%d",$uptime);
-	#$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
-	$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+	  $map->{+UPTIME}=sprintf("%d",$uptime);
+	  #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
+	  $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 
-  $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
-	$map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
-	#$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
-
+    $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
+	  $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
+	  #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
+  }
+  
 	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert Zeit seit dem Systemstart. 
+# Alternative Version fuer Systemen ohne procfs (z.B. MACOS)
+#------------------------------------------------------------------------------
+sub
+SYSMON_getUptime2($$)
+{
+	my ($hash, $map) = @_;
+
+#TODO
+  my $uptime = SYSMON_execute($hash,"uptime");
+
+  #$uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
+  $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+)).*load.*: (.*)/ );
+  $uptime = "0 days, $uptime" if( $uptime && !$2);
+
+  
+    my $days = $3?$3:0;
+    my $hours = $4;
+    my $minutes = $5;
+
+    $uptime = $days * 24;
+    $uptime += $hours;
+    $uptime *= 60;
+    $uptime += $minutes;
+    $uptime *= 60;
+  
+ 
+  $map->{+UPTIME}=sprintf("%d",$uptime);
+  $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+
+  my $loadavg=$6;
+  my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
+  $la1 =~ s/,$//; 
+  $la5 =~ s/,$//; 
+  $la1 =~ s/,/./; 
+  $la5 =~ s/,/./; 
+  $la15 =~ s/,/./; 
+	$map->{+LOADAVG}="$la1 $la5 $la15";
+
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1324,21 +1379,27 @@ sub SYSMON_getRamAndSwap($$)
   #my $percentage_ram;
   #my $percentage_swap;
   
-  $total   = $total / 1024;
-  $used    = $used / 1024;
-  $free    = $free / 1024;
-  $buffers = $buffers / 1024;
-  if(defined($cached)) {
-    $cached  = $cached / 1024;
-  } else {
-  	# Bei FritzBox wird dieser Wert nicht ausgageben
-  	$cached  = 0;
+  if($total > 0) {
+  
+    $total   = $total / 1024;
+    $used    = $used / 1024;
+    $free    = $free / 1024;
+    $buffers = $buffers / 1024;
+    if(defined($cached)) {
+      $cached  = $cached / 1024;
+    } else {
+  	  # Bei FritzBox wird dieser Wert nicht ausgageben
+    	$cached  = 0;
+    }
+
+    $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
+  } 
+  else
+  {
+    $ram = "n/a"
   }
-
-  $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
-
   $map->{+RAM} = $ram;
-
+  
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if($total2 > 0)
   {
@@ -1911,6 +1972,17 @@ sub SYSMON_ShowValuesFmt ($$;@)
   return $htmlcode;
 }
 
+my $proc_fs = undef;
+sub
+SYSMON_isProcFS($) {
+	my ($hash) = @_;
+	if(!defined $proc_fs) {
+	  $proc_fs = int(SYSMON_execute($hash, "[ -d /proc/ ] && echo 1 || echo 0"));
+  }
+
+	return $proc_fs;
+}
+
 my $sys_cpu_temp_rpi = undef;
 sub
 SYSMON_isCPUTempRPi($) {
@@ -2089,13 +2161,6 @@ sub SYSMON_PowerBatInfo($$)
   return $map;
 }
 #-------------
-
-# TODO: 
-#  FritzBox: 
-#   run_clock liefert: running: 19 hours 25 days 0 months 0 years (10 starts)
-#   echo ${OEM} liefert: 1und1
-#   /etc/version liefert: 113.06.05 => FritzOS Version 06.05
-#   run_clock -S liefert: FRITZ!Box 7490 (UI)-B-202500-000010-405222-113212-197902 (scheint aber etwas länger zu dauern)
 
 sub
 SYSMON_execute($$)
