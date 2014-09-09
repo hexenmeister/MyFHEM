@@ -1363,6 +1363,8 @@ sub SYSMON_getRamAndSwap($$)
   #my @speicher = qx(free -m);
   my @speicher = SYSMON_execute($hash, "free");
 
+  if(!@speicher) {return $map;}
+    
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
   shift @speicher;
@@ -1633,7 +1635,7 @@ sub SYSMON_getNetworkInfo ($$$)
       my $out_txt = "RX: ".$rx." MB, TX: ".$tx." MB, Total: ".$totalRxTx." MB";
       $map->{$nName} = $out_txt;
 
-      my $lastVal = ReadingsVal($hash->{NAME},$device,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
+      my $lastVal = ReadingsVal($hash->{NAME},$nName,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
       my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
 
       my $d_rx = $rx-$o_rx;
