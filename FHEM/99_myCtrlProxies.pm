@@ -13,11 +13,12 @@ my $rooms;
   $rooms->{wohnzimmer}->{alias}="Wohnzimmer";
   $rooms->{wohnzimmer}->{fhem_name}="1.01_Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
-  $rooms->{wohnzimmer}->{sensors}=("wz_raumsensor","wz_wandthermostat","tt_sensor"); 
-  $rooms->{wohnzimmer}->{sensors_outdoor}=("hg_sensor"); # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
+  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor"];
+  $rooms->{wohnzimmer}->{sensors_outdoor}=["hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
-  $rooms->{wohnzimmer}->{measurements}->{temperature}=("wz_raumsensor:temperature"); 
-  $rooms->{wohnzimmer}->{measurements_outdoor}->{temperature}=("hg_sensor:temperature"); 
+  #ggf. for future use
+  #$rooms->{wohnzimmer}->{measurements}->{temperature}=["wz_raumsensor:temperature"];
+  #$rooms->{wohnzimmer}->{measurements_outdoor}->{temperature}=["hg_sensor:temperature"];
   
 # Sensoren
 my $sensors;
@@ -120,16 +121,26 @@ my $devTab;
 #technisches
 sub myCtrlProxies_Initialize($$);
 
-# Sensoren
-sub myCtrlProxies_getSensor($);
-sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
-
-# 
-sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
 # Rooms
-sub myCtrlProxies_getRooms();
-sub myCtrlProxies_getActions(;$); # <DevName>
+sub myCtrlProxies_getRoom($);
+#sub myCtrlProxies_getRooms(;$); # Räume  nach verschiedenen Kriterien?
+#sub myCtrlProxies_getActions(;$); # <DevName>
+
+sub myCtrlProxies_getRoomSensors($);
+sub myCtrlProxies_getRoomOutdorSensors($);
+
+
+sub myCtrlProxies_getRoomMeasurement($$);
+
+# Sensoren
+sub myCtrlProxies_getSensor($);
+#TODO sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
+
+# 
+#sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
+
+
 
 # Action
 sub myCtrlProxies_doAllActions();
@@ -161,6 +172,62 @@ myCtrlProxies_getSensor($)
 	my ($name) = @_;
 	return $sensors->{$name};
 }
+
+# returns Room-Record by name
+# Parameter: name 
+# record:
+#  X->{name}->{alias}      ="Text zur Anzeige etc.";
+#  X->{name}->{fhem_name} ="Text zur Anzeige etc.";
+# Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
+#  X->{name}->{sensors}   =(<Liste der Namen>);
+#  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
+sub myCtrlProxies_getRoom($) {
+	my ($name) = @_;
+	return $rooms->{$name};
+}
+
+# liefert Liste der Sensors in einem Raum (Array of Hashes)
+# Param: Raumname
+#  Beispiel:  {(myCtrlProxies_getRoomSensors("wohnzimmer"))[0]->{alias}}
+sub myCtrlProxies_getRoomSensors($)
+{
+	my ($roomName) = @_;
+  return myCtrlProxies_getRoomSensors_($roomName,"sensors");	
+}
+
+# liefert Liste der Sensors in einem Raum (Array of Hashes)
+# Param: Raumname
+#  Beispiel:  {(myCtrlProxies_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
+sub myCtrlProxies_getRoomOutdoorSensors($)
+{
+	my ($roomName) = @_;
+  return myCtrlProxies_getRoomSensors_($roomName,"sensors_outdoor");	
+}
+
+# liefert Liste der Sensors in einem Raum (Array of Hashes)
+# Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
+sub myCtrlProxies_getRoomSensors_($$)
+{
+	my ($roomName, $listName) = @_;
+	my $roomRec=myCtrlProxies_getRoom($roomName);
+	return undef unless $roomRec;
+	my $sensorList=$roomRec->{$listName};
+	return undef unless $sensorList;
+	
+  #TEST:return @{$sensorList}[0];
+
+	my @ret;
+	foreach my $sName (@{$sensorList}) {
+		my $sRec = myCtrlProxies_getSensor($sName);
+		push(@ret, \%{$sRec}) if $sRec ;
+	}
+	
+	return @ret;
+}
+
+
+
+
 
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
 sub

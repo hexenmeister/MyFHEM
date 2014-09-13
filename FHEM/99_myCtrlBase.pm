@@ -7,6 +7,8 @@ use warnings;
 use POSIX;
 use Time::Local;
 
+use myCtrlHAL;
+
 sub
 myCtrlBase_Initialize($$)
 {

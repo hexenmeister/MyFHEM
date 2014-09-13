@@ -15,6 +15,16 @@ use constant {
  STATE_NAME_WIN_OPENED => "open", # Status: Fenster /Tuer ofen
  STATE_NAME_WIN_CLOSED => "closed", # Status: Fenster / Tuer zu
  STATE_NAME_WIN_TILTED => "tilted", # Status: Fenster gekippt
+
+};
+
+# --- Konstanten fuer die verwendeten ElementNamen ----------------------------
+use constant {
+  ELEMENT_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
+  ELEMENT_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
+  ELEMENT_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
+  ELEMENT_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
+  ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
 };
 
 sub

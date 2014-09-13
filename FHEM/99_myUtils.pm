@@ -8,14 +8,16 @@ use POSIX;
 use Time::Local;
 #use List::Util qw[min max];
 
+use myCtrlHAL;
+
 # --- Konstanten fuer die verwendeten ElementNamen ----------------------------
-use constant {
-  ELEMENT_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
-  ELEMENT_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
-  ELEMENT_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
-  ELEMENT_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
-  ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
-};
+#use constant {
+#  ELEMENT_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
+#  ELEMENT_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
+#  ELEMENT_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
+#  ELEMENT_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
+#  ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
+#};
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
 use constant {
