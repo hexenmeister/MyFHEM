@@ -20,16 +20,16 @@ use myCtrlHAL;
 #};
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
-use constant {
-  AUTOMATIC    => "Automatik",
-  ENABLED      => "Aktiviert",
-  DISABLED     => "Deaktiviert",
-  #ON          => "Ein",
-  #OFF         => "Aus",
-  PRESENT      => "Anwesend",
-  ABSENT       => "Abwesend",
-  FAR_AWAY     => "Verreist"
-};
+#use constant {
+#  AUTOMATIC    => "Automatik",
+#  ENABLED      => "Aktiviert",
+#  DISABLED     => "Deaktiviert",
+#  #ON          => "Ein",
+#  #OFF         => "Aus",
+#  PRESENT      => "Anwesend",
+#  ABSENT       => "Abwesend",
+#  FAR_AWAY     => "Verreist"
+#};
 
 sub struct2Array($$;@);
 

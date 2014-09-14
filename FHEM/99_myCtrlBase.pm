@@ -248,17 +248,17 @@ sub getGenericCtrlBlock($;$$) {
 	
 	putCtrlData($group, $new_state.",".$dt_dec.",".$ctrl_cnt.",".$ctrl_cnt_last_min.",".($dt_dec-$ctrl_dt).",".$ctrl_cnt_last_pp.",".$ctrl_cnt_last_15min.",".$ctrl_cnt_last_hour.",".$ctrl_cnt_same_day);
 	
-	my %ret;
-	%ret->{SINCE_LAST_SEC}=$dt_dec-$ctrl_dt;
-	%ret->{BETWEEN_2_LAST_SEC}=$ctrl_sec_since;
-	%ret->{EQ_ACT_CNT}=$ctrl_cnt;
-	%ret->{EQ_ACT_PP_CNT}=$ctrl_cnt_last_pp;
-	%ret->{EQ_ACT_1MIN_CNT}=$ctrl_cnt_last_min;
-	%ret->{EQ_ACT_15MIN_CNT}=$ctrl_cnt_last_15min;
-	%ret->{EQ_ACT_1HOUR_CNT}=$ctrl_cnt_last_hour;
-	%ret->{EQ_ACT_SAME_DAY_CNT}=$ctrl_cnt_same_day;
+	my $ret;
+	$ret->{SINCE_LAST_SEC}=$dt_dec-$ctrl_dt;
+	$ret->{BETWEEN_2_LAST_SEC}=$ctrl_sec_since;
+	$ret->{EQ_ACT_CNT}=$ctrl_cnt;
+	$ret->{EQ_ACT_PP_CNT}=$ctrl_cnt_last_pp;
+	$ret->{EQ_ACT_1MIN_CNT}=$ctrl_cnt_last_min;
+	$ret->{EQ_ACT_15MIN_CNT}=$ctrl_cnt_last_15min;
+	$ret->{EQ_ACT_1HOUR_CNT}=$ctrl_cnt_last_hour;
+	$ret->{EQ_ACT_SAME_DAY_CNT}=$ctrl_cnt_same_day;
 	
-	return \%ret;
+	return $ret;
 	
 	# Rueckgabe: Sekunden seit der Letzten Abfrage, Sekunden zw. Abfragen davor, GesamtAnzahl gleiche Aktion, Anzahl letzte Minute (gleiche Aktion)
 	#return (($dt_dec-$ctrl_dt), $ctrl_sec_since, $ctrl_cnt, $ctrl_cnt_last_min);

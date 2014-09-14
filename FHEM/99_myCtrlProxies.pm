@@ -42,7 +42,7 @@ my $sensors;
   $sensors->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
   $sensors->{wz_wandthermostat}->{type}      ="HomeMatic";
   $sensors->{wz_wandthermostat}->{location}  ="wohnzimmer";
-  $sensors->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $sensors->{wz_wandthermostat}->{composite} =["wz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
@@ -127,11 +127,63 @@ sub myCtrlProxies_getRoom($);
 #sub myCtrlProxies_getRooms(;$); # Räume  nach verschiedenen Kriterien?
 #sub myCtrlProxies_getActions(;$); # <DevName>
 
-sub myCtrlProxies_getRoomSensors($);
-sub myCtrlProxies_getRoomOutdorSensors($);
+#sub myCtrlProxies_getRoomSensors($);
+#sub myCtrlProxies_getRoomOutdoorSensors($);
 
+sub myCtrlProxies_getRoomSensorNames($);
+sub myCtrlProxies_getRoomOutdoorSensorNames($);
 
 sub myCtrlProxies_getRoomMeasurement($$);
+
+# Liefert angeforderte Messwerte
+# Param Room-Name, Measurement-Name
+sub myCtrlProxies_getRoomMeasurement($$) {
+	my ($roomName, $measurementName) = @_;
+	 
+	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
+	return undef unless $sensorList;
+	
+	foreach my $sName (@$sensorList) {
+		#TEST: return $sName;
+		if(!defined($sName)) {next;}
+		my $sRec = myCtrlProxies_getSensor($sName);
+		#TEST: return $sRec->{readings}->{temperature}->{reading};
+		my $mRec = myCtrlProxies_getSensorReadingCompositeRecord_intern($sRec, $measurementName);
+		#TEST: return $mRec->{reading};
+		if(defined($mRec)) {
+			# TODO: sub ReadFHEMValue(sRec, readingName)
+			my $mRName = $mRec->{reading};
+			my $sFhemName = $sRec->{fhem_name};
+			if(defined($mRName) && defined($sFhemName)) {
+				return ReadingsVal($sFhemName,$mRName,undef);
+			}
+		}
+	}
+}
+
+
+# Liefert angeforderte Messwerte
+# Param Room-Name, Measurement-Name
+sub myCtrlProxies_getRoomMeasurement_DELETE_ME($$) {
+	my ($roomName, $measurementName) = @_;
+	 
+	my @sensorList = myCtrlProxies_getRoomSensors($roomName);
+	return undef unless @sensorList;
+	
+	foreach my $sRec (@sensorList) {
+		#TEST: return $sRec->{readings}->{temperature}->{reading};
+		my $mRec = myCtrlProxies_getSensorReadingCompositeRecord_intern($sRec, $measurementName);
+		#TEST: return $mRec->{reading};
+		if(defined($mRec)) {
+			# TODO: sub ReadFHEMValue(sRec, readingName)
+			my $mRName = $mRec->{reading};
+			my $sFhemName = $sRec->{fhem_name};
+			if(defined($mRName) && defined($sFhemName)) {
+				return ReadingsVal($sFhemName,$mRName,undef);
+			}
+		}
+	}
+}
 
 # Sensoren
 sub myCtrlProxies_getSensor($);
@@ -186,6 +238,38 @@ sub myCtrlProxies_getRoom($) {
 	return $rooms->{$name};
 }
 
+# liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
+# Param: Raumname
+#  Beispiel:   {myCtrlProxies_getRoomSensorNames("wohnzimmer")->[0]}
+sub myCtrlProxies_getRoomSensorNames($)
+{
+	my ($roomName) = @_;
+  return myCtrlProxies_getRoomSensorNames_($roomName,"sensors");	
+}
+# liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
+# Param: Raumname
+#  Beispiel:  {myCtrlProxies_getRoomSensorNames("wohnzimmer")->[0]}
+sub myCtrlProxies_getRoomOutdoorSensorNames($)
+{
+	my ($roomName) = @_;
+  return myCtrlProxies_getRoomSensorNames_($roomName,"sensors_outdoor");	
+}
+# liefert Liste der Sensors in einem Raum (List der Namen)
+# Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
+sub myCtrlProxies_getRoomSensorNames_($$)
+{
+	my ($roomName, $listName) = @_;
+	my $roomRec=myCtrlProxies_getRoom($roomName);
+	return undef unless $roomRec;
+	my $sensorList=$roomRec->{$listName};
+	return undef unless $sensorList;
+	
+	return $sensorList;
+}
+
+
+
+### TODO: Sind die Methoden, die Hashesliste zurückgeben überhaupt notwendig?
 # liefert Liste der Sensors in einem Raum (Array of Hashes)
 # Param: Raumname
 #  Beispiel:  {(myCtrlProxies_getRoomSensors("wohnzimmer"))[0]->{alias}}
@@ -195,7 +279,7 @@ sub myCtrlProxies_getRoomSensors($)
   return myCtrlProxies_getRoomSensors_($roomName,"sensors");	
 }
 
-# liefert Liste der Sensors in einem Raum (Array of Hashes)
+# liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
 # Param: Raumname
 #  Beispiel:  {(myCtrlProxies_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
 sub myCtrlProxies_getRoomOutdoorSensors($)
@@ -224,11 +308,11 @@ sub myCtrlProxies_getRoomSensors_($$)
 	
 	return @ret;
 }
+# <---------------
 
 
 
-
-
+sub myCtrlProxies_getSensorReadingCompositeRecord_intern($$);
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
 sub
 myCtrlProxies_getSensorReadingCompositeRecord_intern($$)

@@ -27,6 +27,18 @@ use constant {
   ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
 };
 
+# --- Konstanten für die Werte f. Auto, Enabled, Disabled
+use constant {
+  AUTOMATIC    => "Automatik",
+  ENABLED      => "Aktiviert",
+  DISABLED     => "Deaktiviert",
+  #ON          => "Ein",
+  #OFF         => "Aus",
+  PRESENT      => "Anwesend",
+  ABSENT       => "Abwesend",
+  FAR_AWAY     => "Verreist"
+};
+
 sub
 myCtrlHAL_Initialize($$)
 {
