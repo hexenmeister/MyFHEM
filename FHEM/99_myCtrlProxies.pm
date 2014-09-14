@@ -52,6 +52,8 @@ my $sensors;
   $sensors->{wz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
   $sensors->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="°C";
+  $sensors->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
   
   $sensors->{hg_sensor}->{alias}     ="Garten-Sensor";
   $sensors->{hg_sensor}->{fhem_name} ="GSD_1.4";
@@ -144,45 +146,12 @@ sub myCtrlProxies_getRoomMeasurement($$) {
 	return undef unless $sensorList;
 	
 	foreach my $sName (@$sensorList) {
-		#TEST: return $sName;
-		if(!defined($sName)) {next;}
-		my $sRec = myCtrlProxies_getSensor($sName);
-		#TEST: return $sRec->{readings}->{temperature}->{reading};
-		my $mRec = myCtrlProxies_getSensorReadingCompositeRecord_intern($sRec, $measurementName);
-		#TEST: return $mRec->{reading};
-		if(defined($mRec)) {
-			# TODO: sub ReadFHEMValue(sRec, readingName)
-			my $mRName = $mRec->{reading};
-			my $sFhemName = $sRec->{fhem_name};
-			if(defined($mRName) && defined($sFhemName)) {
-				return ReadingsVal($sFhemName,$mRName,undef);
-			}
-		}
+		if(!defined($sName)) {next;} 
+		my $val = myCtrlProxies_getSensorReadingValue($sName, $measurementName);
+		if(defined $val) {return $val;}
 	}
-}
-
-
-# Liefert angeforderte Messwerte
-# Param Room-Name, Measurement-Name
-sub myCtrlProxies_getRoomMeasurement_DELETE_ME($$) {
-	my ($roomName, $measurementName) = @_;
-	 
-	my @sensorList = myCtrlProxies_getRoomSensors($roomName);
-	return undef unless @sensorList;
 	
-	foreach my $sRec (@sensorList) {
-		#TEST: return $sRec->{readings}->{temperature}->{reading};
-		my $mRec = myCtrlProxies_getSensorReadingCompositeRecord_intern($sRec, $measurementName);
-		#TEST: return $mRec->{reading};
-		if(defined($mRec)) {
-			# TODO: sub ReadFHEMValue(sRec, readingName)
-			my $mRName = $mRec->{reading};
-			my $sFhemName = $sRec->{fhem_name};
-			if(defined($mRName) && defined($sFhemName)) {
-				return ReadingsVal($sFhemName,$mRName,undef);
-			}
-		}
-	}
+	return undef;
 }
 
 # Sensoren
@@ -222,6 +191,7 @@ sub
 myCtrlProxies_getSensor($)
 {
 	my ($name) = @_;
+	return undef unless $name;
 	return $sensors->{$name};
 }
 
@@ -254,7 +224,7 @@ sub myCtrlProxies_getRoomOutdoorSensorNames($)
 	my ($roomName) = @_;
   return myCtrlProxies_getRoomSensorNames_($roomName,"sensors_outdoor");	
 }
-# liefert Liste der Sensors in einem Raum (List der Namen)
+# liefert Referenz der Liste der Sensors in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
 sub myCtrlProxies_getRoomSensorNames_($$)
 {
@@ -314,29 +284,35 @@ sub myCtrlProxies_getRoomSensors_($$)
 
 sub myCtrlProxies_getSensorReadingCompositeRecord_intern($$);
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
+# liefert Device und Reading Recors als Array 
 sub
 myCtrlProxies_getSensorReadingCompositeRecord_intern($$)
 {
 	my ($device_record,$reading) = @_;
+	return (undef, undef) unless $device_record;
+	return (undef, undef) unless $reading;
+	
 	my $readings_record = $device_record->{readings};
 	my $single_reading_record = $readings_record->{$reading};
-	return $single_reading_record unless !defined($single_reading_record);
+	return ($device_record, $single_reading_record) if $single_reading_record;
 	
 	# composites verarbeiten
 	# e.g.  $sensors->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); 
 	my $composites = $device_record->{composite};
-	foreach my $composite_name ($composites) {
+
+	foreach my $composite_name (@{$composites}) {
 		my $new_device_record = myCtrlProxies_getSensor($composite_name);
-		my $new_single_reading_record = myCtrlProxies_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
+		my ($new_device_record2, $new_single_reading_record) = myCtrlProxies_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
-			return $new_single_reading_record ;
+			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
 	
-	return undef;
+	return (undef, undef);
 }
 
 # parameters: name, reading name
+# liefert Array mit Device und Reading -Hashes
 # record:
 #  X->{reading} = "<fhem_device_reading_name>";
 #  X->{unit} = "";
@@ -345,10 +321,11 @@ myCtrlProxies_getSensorReadingRecord($$)
 {
 	my ($name, $reading) = @_;
 	my $record = myCtrlProxies_getSensor($name);
+	
 	if(defined($record)) {
     return myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
   }
-	return undef;
+	return (undef, undef);
 }
 
 # parameters: name, reading name
@@ -357,15 +334,28 @@ sub
 myCtrlProxies_getSensorReadingValue($$)
 {
 	my ($name, $reading) = @_;
-	my $record = myCtrlProxies_getSensor($name);
+  # Sensor-Record suchen
+  my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
-    my $single_reading_record = myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
-    if(defined($single_reading_record)) {    
-      my $fhem_name = $record->{fhem_name};
-      my $reading_fhem_name = $single_reading_record->{reading};
-      return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
-    }
-  }
+	  my $fhem_name = $device->{fhem_name};
+    my $reading_fhem_name = $record->{reading};
+
+    return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+	}
+  
+	#my $record = myCtrlProxies_getSensor($name);
+	#if (defined($record)) {
+	#	# Reading Record suchen
+  #  my ($single_reading_device,$single_reading_record) = myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
+  #  if(defined($single_reading_record)) {    
+  #    my $fhem_name = $single_reading_device->{fhem_name};#$record->{fhem_name};
+  #    my $reading_fhem_name = $single_reading_record->{reading};
+  #    #TEST# return $fhem_name.":".$reading_fhem_name;
+  #    
+  #    return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+  #  }
+  #}
+  
 	return undef;
 }
 
@@ -375,7 +365,8 @@ sub
 myCtrlProxies_getSensorReadingUnit($$)
 {
 	my ($name, $reading) = @_;
-	my $record = myCtrlProxies_getSensorReadingRecord($name,$reading);
+	# Suchen Reading Record
+	my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
 	  return $record->{unit};
 	}
