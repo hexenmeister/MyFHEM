@@ -135,27 +135,17 @@ sub myCtrlProxies_getRoom($);
 sub myCtrlProxies_getRoomSensorNames($);
 sub myCtrlProxies_getRoomOutdoorSensorNames($);
 
-sub myCtrlProxies_getRoomMeasurement($$);
+sub myCtrlProxies_getRoomMeasurementRecord($$);
+sub myCtrlProxies_getRoomMeasurementValue($$);
 
-# Liefert angeforderte Messwerte
-# Param Room-Name, Measurement-Name
-sub myCtrlProxies_getRoomMeasurement($$) {
-	my ($roomName, $measurementName) = @_;
-	 
-	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
-	return undef unless $sensorList;
-	
-	foreach my $sName (@$sensorList) {
-		if(!defined($sName)) {next;} 
-		my $val = myCtrlProxies_getSensorReadingValue($sName, $measurementName);
-		if(defined $val) {return $val;}
-	}
-	
-	return undef;
-}
 
 # Sensoren
 sub myCtrlProxies_getSensor($);
+
+sub myCtrlProxies_getSensorValueRecord($$);
+sub myCtrlProxies_getSensorReadingValue($$);
+sub myCtrlProxies_getSensorReadingUnit($$);
+
 #TODO sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
 # 
@@ -174,6 +164,42 @@ sub
 myCtrlProxies_Initialize($$)
 {
   my ($hash) = @_;
+}
+
+# Liefert Record zu der Reading für die angeforderte Messwerte
+# Param Room-Name, Measurement-Name
+# return ReadingsRecord
+sub myCtrlProxies_getRoomMeasurementRecord($$) {
+	my ($roomName, $measurementName) = @_;
+	 
+	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
+	return undef unless $sensorList;
+	
+	foreach my $sName (@$sensorList) {
+		if(!defined($sName)) {next;} 
+		my $rec = myCtrlProxies_getSensorValueRecord($sName, $measurementName);
+		if(defined $rec) {return $rec;}
+	}
+	
+	return undef;
+}
+
+# Liefert angeforderte Messwerte
+# Param Room-Name, Measurement-Name
+# return ReadingsWert
+sub myCtrlProxies_getRoomMeasurementValue($$) {
+	my ($roomName, $measurementName) = @_;
+	 
+	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
+	return undef unless $sensorList;
+	
+	foreach my $sName (@$sensorList) {
+		if(!defined($sName)) {next;} 
+		my $val = myCtrlProxies_getSensorReadingValue($sName, $measurementName);
+		if(defined $val) {return $val;}
+	}
+	
+	return undef;
 }
 
 #------------------------------------------------------------------------------
@@ -328,44 +354,59 @@ myCtrlProxies_getSensorReadingRecord($$)
 	return (undef, undef);
 }
 
+# Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
 # parameters: name, reading name
-# returns current readings value
-sub 
-myCtrlProxies_getSensorReadingValue($$)
+# returns Hash mit Werten zu dem gewuenschten Reading
+# X->{value}
+# X->{unit}
+# X->{alias} # if any
+# X->{fhem_name}
+# X->{reading}
+# X->...
+sub myCtrlProxies_getSensorValueRecord($$)
 {
 	my ($name, $reading) = @_;
-  # Sensor-Record suchen
+  # Sensor/Reading-Record suchen
   my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
 	  my $fhem_name = $device->{fhem_name};
     my $reading_fhem_name = $record->{reading};
 
-    return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+    my $val = ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+    my $ret;
+    $ret->{value}     =$val;
+    $ret->{unit}      =$record->{unit};
+    $ret->{alias}     =$record->{alias};
+    $ret->{fhem_name} =$device->{fhem_name};
+    $ret->{reading}   =$record->{reading};
+    return $ret;
 	}
-  
-	#my $record = myCtrlProxies_getSensor($name);
-	#if (defined($record)) {
-	#	# Reading Record suchen
-  #  my ($single_reading_device,$single_reading_record) = myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
-  #  if(defined($single_reading_record)) {    
-  #    my $fhem_name = $single_reading_device->{fhem_name};#$record->{fhem_name};
-  #    my $reading_fhem_name = $single_reading_record->{reading};
-  #    #TEST# return $fhem_name.":".$reading_fhem_name;
-  #    
-  #    return ReadingsVal($fhem_name,$reading_fhem_name,undef); 
-  #  }
-  #}
-  
 	return undef;
 }
 
+
+# Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
 # parameters: name, reading name
-# returns readings unit
-sub 
-myCtrlProxies_getSensorReadingUnit($$)
+# returns current readings value
+sub myCtrlProxies_getSensorReadingValue($$)
 {
 	my ($name, $reading) = @_;
-	# Suchen Reading Record
+	my $h = myCtrlProxies_getSensorValueRecord($name, $reading);
+	return undef unless $h;
+	return $h->{value};
+}
+
+# Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading das Unit-String aus
+# parameters: name, reading name
+# returns readings unit
+sub myCtrlProxies_getSensorReadingUnit($$)
+{
+	my ($name, $reading) = @_;
+	my $h = myCtrlProxies_getSensorValueRecord($name, $reading);
+	return undef unless $h;
+	return $h->{unit};
+	
+	# Sensor/Reading-Record suchen
 	my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
 	  return $record->{unit};
