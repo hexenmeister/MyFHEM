@@ -11,14 +11,22 @@ use POSIX;
 # Räume
 my $rooms;
   $rooms->{wohnzimmer}->{alias}="Wohnzimmer";
-  $rooms->{wohnzimmer}->{fhem_name}="1.01_Wohnzimmer";
+  $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
   $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor"];
-  $rooms->{wohnzimmer}->{sensors_outdoor}=["hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
+  $rooms->{wohnzimmer}->{sensors_outdoor}=["hg_sensor","vr_luftdruck"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
   #ggf. for future use
   #$rooms->{wohnzimmer}->{measurements}->{temperature}=["wz_raumsensor:temperature"];
   #$rooms->{wohnzimmer}->{measurements_outdoor}->{temperature}=["hg_sensor:temperature"];
+  #$rooms->{wohnzimmer}->{measurements}->{pressure}=["wz_raumsensor:pressure"];
+  #$rooms->{wohnzimmer}->{measurements_outdoor}->{pressure}=["hg_sensor:pressure"];
+  
+  $rooms->{kueche}->{alias}="Küche";
+  $rooms->{kueche}->{fhem_name}="Kueche";
+  $rooms->{kueche}->{sensors}=["ku_raumsensor"];
+  $rooms->{kueche}->{sensors_outdoor}=["hg_sensor","vr_luftdruck"]; 
+    
   
 # Sensoren
 my $sensors;
@@ -30,13 +38,44 @@ my $sensors;
   $sensors->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
   $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="°C";
-  $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="airpress";
+  $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
+  $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{alias}    ="Luftdruck";
   $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx";
+  $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesittät";
+  $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
   $sensors->{wz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
   $sensors->{wz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
   $sensors->{wz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  
+  
+  # idee: 
+  # $sensors->{vr_luftdruck}->{alias}       ="VirtuellerSensor";
+  # $sensors->{vr_luftdruck}->{type}        ="virtuel";
+  # $sensors->{vr_luftdruck}->{readings}->{X}->{ValueFn}     ="max"; #min, summe, average, eigene... bekommt Record, liefert Wert # wenn ValueFn, dann nur deren Wert, keine weitere Logik
+  # $sensors->{vr_luftdruck}->{readings_list} =["X",...]; # für ValueFn?
+  # $sensors->{vr_luftdruck}->{readings}->{pressure} ="device:reading"; # 'Weiterleitung' ? 
+  #
+  $sensors->{test}->{alias}       ="TestSensor";
+  $sensors->{test}->{type}        ="virtuel";
+  #$sensors->{test}->{readings}->{test1}->{ValueFn} = '{my $t=1; my $s=2; max($t,$s)}'; # mit Klammern: Direkt evaluieren, ansonsten als Funktion mit Reading-Hash und Device-Hash aufrufen.
+  $sensors->{test}->{readings}->{test1}->{ValueFn} = 'mytest';
+  $sensors->{test}->{readings}->{test1}->{FnParams} = ["1","2"];
+  $sensors->{test}->{readings}->{test1}->{unit} ="?";
+  $sensors->{test}->{readings}->{test1}->{alias} ="Funktionstest";
+  $sensors->{test}->{readings}->{test2}->{link} ="vr_luftdruck:pressure";
+  # 
+  
+  $sensors->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
+  $sensors->{vr_luftdruck}->{fhem_name} ="EG_WZ_KS01";
+  $sensors->{vr_luftdruck}->{type}      ="HomeMatic compatible";
+  $sensors->{vr_luftdruck}->{location}  ="virtuel";
+  $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{reading}  ="pressure";
+  $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{unit}     ="hPa";
+  $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{alias}     ="Luftdruck";
   
   $sensors->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
   $sensors->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
@@ -46,14 +85,15 @@ my $sensors;
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
   $sensors->{wz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $sensors->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat";
+  $sensors->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
   $sensors->{wz_wandthermostat_climate}->{fhem_name} ="EG_WZ_WT01_Climate";
   $sensors->{wz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
   $sensors->{wz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $sensors->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="°C";
+  $sensors->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
   $sensors->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $sensors->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
   $sensors->{hg_sensor}->{alias}     ="Garten-Sensor";
   $sensors->{hg_sensor}->{fhem_name} ="GSD_1.4";
@@ -62,9 +102,12 @@ my $sensors;
   $sensors->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $sensors->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="°C";
-  $sensors->{hg_sensor}->{readings}->{bat_voltage}  ->{reading}  ="power_main";
-  $sensors->{hg_sensor}->{readings}->{bat_voltage}  ->{unit}     ="V";
+  $sensors->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{hg_sensor}->{readings}->{bat_voltage} ->{reading}  ="power_main";
+  $sensors->{hg_sensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{hg_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{hg_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{hg_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
   $sensors->{tt_sensor}->{alias}     ="Test-Sensor";
   $sensors->{tt_sensor}->{fhem_name} ="GSD_1.1";
@@ -73,10 +116,49 @@ my $sensors;
   $sensors->{tt_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{tt_sensor}->{readings}->{temperature} ->{unit}     ="°C";
   $sensors->{tt_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $sensors->{tt_sensor}->{readings}->{humidity}    ->{unit}     ="°C";
-  $sensors->{tt_sensor}->{readings}->{bat_voltage}  ->{reading}  ="power_main";
-  $sensors->{tt_sensor}->{readings}->{bat_voltage}  ->{unit}     ="V";
+  $sensors->{tt_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{tt_sensor}->{readings}->{bat_voltage}  ->{reading} ="power_main";
+  $sensors->{tt_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
   
+  $sensors->{ku_raumsensor}->{alias}     ="KU Raumsensor";
+  $sensors->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
+  $sensors->{ku_raumsensor}->{type}      ="HomeMatic compatible";
+  $sensors->{ku_raumsensor}->{location}  ="kueche";
+  $sensors->{ku_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{ku_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{ku_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{ku_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{ku_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  $sensors->{ku_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{ku_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesittät";
+  $sensors->{ku_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $sensors->{ku_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{ku_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  
+  
+  
+  
+  $sensors->{um_vh_licht}->{alias}     ="VH Aussensensor";
+  $sensors->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
+  $sensors->{um_vh_licht}->{type}      ="HomeMatic compatible";
+  $sensors->{um_vh_licht}->{location}  ="umwelt";
+  $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{alias}    ="Lichtintesittät";
+  $sensors->{um_vh_licht}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $sensors->{um_vh_licht}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{um_vh_licht}->{readings}->{bat_status}  ->{reading}  ="battery";
+  
+  $sensors->{um_hh_licht}->{alias}     ="HH Aussensensor";
+  $sensors->{um_hh_licht}->{fhem_name} ="UM_HH_KS01";
+  $sensors->{um_hh_licht}->{type}      ="HomeMatic compatible";
+  $sensors->{um_hh_licht}->{location}  ="umwelt";
+  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{alias}    ="Lichtintesittät";
+  $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{um_hh_licht}->{readings}->{bat_status}  ->{reading}  ="battery";
   
 my $actTab;
   $actTab->{"schatten"}->{checkFn}="";
@@ -171,18 +253,44 @@ myCtrlProxies_Initialize($$)
 # return ReadingsRecord
 sub myCtrlProxies_getRoomMeasurementRecord($$) {
 	my ($roomName, $measurementName) = @_;
-	 
-	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
+	return myCtrlProxies_getRoomMeasurementRecord_($roomName, $measurementName, "");
+}
+
+# Liefert Record zu der Reading für die angeforderte Messwerte
+# Param Room-Name, Measurement-Name
+# return ReadingsRecord
+sub myCtrlProxies_getRoomOutdoorMeasurementRecord($$) {
+	my ($roomName, $measurementName) = @_;
+	return myCtrlProxies_getRoomMeasurementRecord_($roomName, $measurementName, "_outdoor");
+}
+
+# Liefert Record zu der Reading für die angeforderte Messwerte und Sensorliste (Internal)
+# Param Room-Name, Measurement-Name, Name der Liste (sensors, sensors_outdoor)
+# return ReadingsRecord
+sub myCtrlProxies_getRoomMeasurementRecord_($$$) {
+	my ($roomName, $measurementName, $listNameSuffix) = @_;
+	my $listName.="sensors".$listNameSuffix;
+	
+	#TODO: EinzelReadings
+	
+	my $sensorList = myCtrlProxies_getRoomSensorNames_($roomName, $listName);	#myCtrlProxies_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
 		my $rec = myCtrlProxies_getSensorValueRecord($sName, $measurementName);
-		if(defined $rec) {return $rec;}
+		if(defined $rec) {
+			my $roomRec=myCtrlProxies_getRoom($roomName);
+			$rec->{room_alias}=$roomRec->{alias};
+			$rec->{room_fhem_name}=$roomRec->{fhem_name};
+			# XXX: ggf. weitere Room Eigenschaften
+			return $rec;
+		}
 	}
 	
 	return undef;
 }
+
 
 # Liefert angeforderte Messwerte
 # Param Room-Name, Measurement-Name
@@ -218,7 +326,9 @@ myCtrlProxies_getSensor($)
 {
 	my ($name) = @_;
 	return undef unless $name;
-	return $sensors->{$name};
+	my $ret = $sensors->{$name};
+	$ret->{name} = $name; # Name hinzufuegen
+	return $ret;
 }
 
 # returns Room-Record by name
@@ -231,7 +341,9 @@ myCtrlProxies_getSensor($)
 #  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
 sub myCtrlProxies_getRoom($) {
 	my ($name) = @_;
-	return $rooms->{$name};
+	my $ret = $rooms->{$name};
+	$ret->{name} = $name; # Name hinzufuegen
+	return $ret;
 }
 
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
@@ -242,6 +354,7 @@ sub myCtrlProxies_getRoomSensorNames($)
 	my ($roomName) = @_;
   return myCtrlProxies_getRoomSensorNames_($roomName,"sensors");	
 }
+
 # liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
 # Param: Raumname
 #  Beispiel:  {myCtrlProxies_getRoomSensorNames("wohnzimmer")->[0]}
@@ -250,6 +363,7 @@ sub myCtrlProxies_getRoomOutdoorSensorNames($)
 	my ($roomName) = @_;
   return myCtrlProxies_getRoomSensorNames_($roomName,"sensors_outdoor");	
 }
+
 # liefert Referenz der Liste der Sensors in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
 sub myCtrlProxies_getRoomSensorNames_($$)
@@ -264,47 +378,44 @@ sub myCtrlProxies_getRoomSensorNames_($$)
 }
 
 
-
-### TODO: Sind die Methoden, die Hashesliste zurückgeben überhaupt notwendig?
-# liefert Liste der Sensors in einem Raum (Array of Hashes)
-# Param: Raumname
-#  Beispiel:  {(myCtrlProxies_getRoomSensors("wohnzimmer"))[0]->{alias}}
-sub myCtrlProxies_getRoomSensors($)
-{
-	my ($roomName) = @_;
-  return myCtrlProxies_getRoomSensors_($roomName,"sensors");	
-}
-
-# liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
-# Param: Raumname
-#  Beispiel:  {(myCtrlProxies_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
-sub myCtrlProxies_getRoomOutdoorSensors($)
-{
-	my ($roomName) = @_;
-  return myCtrlProxies_getRoomSensors_($roomName,"sensors_outdoor");	
-}
-
-# liefert Liste der Sensors in einem Raum (Array of Hashes)
-# Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-sub myCtrlProxies_getRoomSensors_($$)
-{
-	my ($roomName, $listName) = @_;
-	my $roomRec=myCtrlProxies_getRoom($roomName);
-	return undef unless $roomRec;
-	my $sensorList=$roomRec->{$listName};
-	return undef unless $sensorList;
-	
-  #TEST:return @{$sensorList}[0];
-
-	my @ret;
-	foreach my $sName (@{$sensorList}) {
-		my $sRec = myCtrlProxies_getSensor($sName);
-		push(@ret, \%{$sRec}) if $sRec ;
-	}
-	
-	return @ret;
-}
-# <---------------
+#### TODO: Sind die Methoden, die Hashesliste zurückgeben überhaupt notwendig?
+## liefert Liste der Sensors in einem Raum (Array of Hashes)
+## Param: Raumname
+##  Beispiel:  {(myCtrlProxies_getRoomSensors("wohnzimmer"))[0]->{alias}}
+#sub myCtrlProxies_getRoomSensors($)
+#{
+#	my ($roomName) = @_;
+#  return myCtrlProxies_getRoomSensors_($roomName,"sensors");	
+#}
+#
+## liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
+## Param: Raumname
+##  Beispiel:  {(myCtrlProxies_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
+#sub myCtrlProxies_getRoomOutdoorSensors($)
+#{
+#	my ($roomName) = @_;
+#  return myCtrlProxies_getRoomSensors_($roomName,"sensors_outdoor");	
+#}
+#
+## liefert Liste der Sensors in einem Raum (Array of Hashes)
+## Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
+#sub myCtrlProxies_getRoomSensors_($$)
+#{
+#	my ($roomName, $listName) = @_;
+#	my $roomRec=myCtrlProxies_getRoom($roomName);
+#	return undef unless $roomRec;
+#	my $sensorList=$roomRec->{$listName};
+#	return undef unless $sensorList;
+#	
+#	my @ret;
+#	foreach my $sName (@{$sensorList}) {
+#		my $sRec = myCtrlProxies_getSensor($sName);
+#		push(@ret, \%{$sRec}) if $sRec ;
+#	}
+#	
+#	return @ret;
+#}
+## <---------------
 
 
 
@@ -368,22 +479,94 @@ sub myCtrlProxies_getSensorValueRecord($$)
 	my ($name, $reading) = @_;
   # Sensor/Reading-Record suchen
   my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
-	if (defined($record)) {
-	  my $fhem_name = $device->{fhem_name};
-    my $reading_fhem_name = $record->{reading};
+  
+  return myCtrlProxies_getReadingsValueRecord($device, $record);
+  
+	#if (defined($record)) {
+	#  my $fhem_name = $device->{fhem_name};
+  #  my $reading_fhem_name = $record->{reading};
+  #
+  #  my $val = ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+  #  my $ret;
+  #  $ret->{value}     =$val;
+  #  $ret->{unit}      =$record->{unit};
+  #  $ret->{alias}     =$record->{alias};
+  #  $ret->{fhem_name} =$device->{fhem_name};
+  #  $ret->{reading}   =$record->{reading};
+  #  #$ret->{sensor_alias} =$
+  #  $ret->{device_alias} =$device->{alias};
+  #  return $ret;
+	#}
+	#return undef;
+}
 
-    my $val = ReadingsVal($fhem_name,$reading_fhem_name,undef); 
-    my $ret;
-    $ret->{value}     =$val;
+# Nur zum Testen! DELETE ME
+sub mytest($;$) {
+  my($hash,$device) = @_;
+  #return $hash->{FnParams}->[0];
+  #return $hash->{FnParams};
+  my $w = $hash->{FnParams};
+  return join(", ", @$w)." | ".$device->{name};
+}
+
+# Liefert ValueRecord (ermittelter Wert und andere SensorReadingDaten)
+# Param: Device-Hash, Reading-Hash
+# Return: Value-Hash
+sub myCtrlProxies_getReadingsValueRecord($$) {
+	my ($device, $record) = @_;
+	
+	if (defined($record)) {
+		my $val=undef;
+		my $ret;
+		
+		my $link = $record->{link};
+		if($link) {
+			my($sensorName,$readingName) = split(/:/, $link);
+			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
+			return undef unless $readingName;
+			return myCtrlProxies_getSensorValueRecord($sensorName,$readingName);
+		} 
+		
+		my $valueFn =  $record->{ValueFn};
+		if($valueFn) {
+	    if($valueFn=~m/\{.*\}/) {
+	    	# Klammern: direkt evaluieren
+	      $val= eval $valueFn;	
+	    } else {
+	    	no strict "refs";
+        my $r = &{$valueFn}($record,$device);
+        use strict "refs";
+        if(ref $r eq ref {}) {
+        	# wenn Hash
+        	$ret = $r;
+        } else {
+        	# Scalar-Wert annehmen
+        	$val=$r;
+        }
+	    }
+			#TODO
+			#$val="not implemented";
+			
+		}
+		else
+		{
+	    my $fhem_name = $device->{fhem_name};
+      my $reading_fhem_name = $record->{reading};
+
+      $val = ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+    }
+    
+    $ret->{value}     =$val if($val); 
     $ret->{unit}      =$record->{unit};
     $ret->{alias}     =$record->{alias};
     $ret->{fhem_name} =$device->{fhem_name};
     $ret->{reading}   =$record->{reading};
+    #$ret->{sensor_alias} =$
+    $ret->{device_alias} =$device->{alias};
     return $ret;
 	}
 	return undef;
 }
-
 
 # Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
 # parameters: name, reading name
