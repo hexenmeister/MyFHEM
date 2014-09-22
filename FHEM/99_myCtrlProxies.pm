@@ -27,6 +27,16 @@ my $rooms;
   $rooms->{kueche}->{sensors}=["ku_raumsensor"];
   $rooms->{kueche}->{sensors_outdoor}=["hg_sensor","vr_luftdruck"]; 
     
+  $rooms->{umwelt}->{alias}="Umwelt";
+  $rooms->{umwelt}->{fhem_name}="Umwelt";
+  $rooms->{umwelt}->{sensors}=["TODO","um_vh_licht","um_hh_licht"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
+  $rooms->{umwelt}->{sensors_outdoor}=[]; # Keine
+  
+  # EG Flur, HWR, GästeWC, Garage
+  # OG Flur, Bad, Schlafzimmer, Duschbad
+  # DG
+  # Räume ohne Sensoren: Speisekammer, Abstellkammer, Kinderzimmer 1 und 2
+  
   
 # Sensoren
 my $sensors;
@@ -62,7 +72,7 @@ my $sensors;
   $sensors->{test}->{alias}       ="TestSensor";
   $sensors->{test}->{type}        ="virtuel";
   #$sensors->{test}->{readings}->{test1}->{ValueFn} = '{my $t=1; my $s=2; max($t,$s)}'; # mit Klammern: Direkt evaluieren, ansonsten als Funktion mit Reading-Hash und Device-Hash aufrufen.
-  $sensors->{test}->{readings}->{test1}->{ValueFn} = 'mytest';
+  $sensors->{test}->{readings}->{test1}->{ValueFn} = 'senTest';
   $sensors->{test}->{readings}->{test1}->{FnParams} = ["1","2"];
   $sensors->{test}->{readings}->{test1}->{unit} ="?";
   $sensors->{test}->{readings}->{test1}->{alias} ="Funktionstest";
@@ -501,12 +511,12 @@ sub myCtrlProxies_getSensorValueRecord($$)
 }
 
 # Nur zum Testen! DELETE ME
-sub mytest($;$) {
+sub senTest($;$) {
   my($hash,$device) = @_;
   #return $hash->{FnParams}->[0];
   #return $hash->{FnParams};
   my $w = $hash->{FnParams};
-  return join(", ", @$w)." | ".$device->{name};
+  return "Sen. name: '".$device->{name}."', Params: '".join(", ", @$w)."'";
 }
 
 # Liefert ValueRecord (ermittelter Wert und andere SensorReadingDaten)
