@@ -46,17 +46,22 @@ my $sensors;
   $sensors->{wz_raumsensor}->{location}  ="wohnzimmer";
   $sensors->{wz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{wz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $sensors->{wz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
   $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="°C";
+  $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{wz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
   $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $sensors->{wz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
+  $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{act_cycle} ="600"; 
   $sensors->{wz_raumsensor}->{readings}->{pressure}    ->{alias}    ="Luftdruck";
   $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
   $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesittät";
   $sensors->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{wz_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
   $sensors->{wz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
   $sensors->{wz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
   $sensors->{wz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
@@ -479,6 +484,7 @@ myCtrlProxies_getSensorReadingRecord($$)
 # parameters: name, reading name
 # returns Hash mit Werten zu dem gewuenschten Reading
 # X->{value}
+# X->{time} # Timestamp der letzten Value Aenderung
 # X->{unit}
 # X->{alias} # if any
 # X->{fhem_name}
@@ -527,6 +533,7 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 	
 	if (defined($record)) {
 		my $val=undef;
+		my $time=undef;
 		my $ret;
 		
 		my $link = $record->{link};
@@ -563,10 +570,43 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 	    my $fhem_name = $device->{fhem_name};
       my $reading_fhem_name = $record->{reading};
 
-      $val = ReadingsVal($fhem_name,$reading_fhem_name,undef); 
+      $val = ReadingsVal($fhem_name,$reading_fhem_name,undef);
+      $time = ReadingsTimestamp($fhem_name,$reading_fhem_name,undef);
     }
     
-    $ret->{value}     =$val if($val); 
+    $ret->{value}     =$val if($val);
+    # dead or alive?
+    $ret->{status} = 'unknown';
+    my $actCycle = $record->{act_cycle};
+    $actCycle = 0 unless $actCycle;
+    my $iactCycle = int($actCycle);
+    if($actCycle && $iactCycle == 0) {
+      $ret->{status} = 'alive'; # wenn actCycle == 0 immer alive
+    }
+    if($time) {
+      $ret->{time} = $time;
+      if($actCycle && $iactCycle > 0) {
+        my $ttime = dateTime2dec($time);
+        if($ttime && $ttime>0) {
+      	  my $delta = time()-$ttime;
+      	  if($delta>$iactCycle) {
+      	  	$ret->{status} = 'dead';
+      	  } else {
+      	  	$ret->{status} = 'alive';
+      	  }
+        }
+      }
+    }
+    # 'bool' zum Auswerten
+    $ret->{alive} = $ret->{status} eq 'alive';
+    
+    # value_alive nur setzen, wenn Sensor 'alive' ist.
+    if ($ret->{alive}) {
+      $ret->{value_alive} = $ret->{value};
+    } else {
+    	$ret->{value_alive} = undef;
+    }
+    
     $ret->{unit}      =$record->{unit};
     $ret->{alias}     =$record->{alias};
     $ret->{fhem_name} =$device->{fhem_name};
