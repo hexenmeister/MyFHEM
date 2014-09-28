@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.0";
+my $VERSION = "1.9.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -771,7 +771,11 @@ SYSMON_obtainParameters($$)
   if($m2 gt 0) { # Nur wenn > 0
     # M2: ram, swap
     if($refresh_all || ($ref % $m2) eq 0) {
-      $map = SYSMON_getRamAndSwap($hash, $map);
+    	if(SYSMON_isOSX()){
+    	  $map = SYSMON_getRamAndSwapOSX($hash, $map);
+    	} else {
+        $map = SYSMON_getRamAndSwap($hash, $map);
+      }
     }
   }
 
@@ -1389,7 +1393,9 @@ sub SYSMON_getRamAndSwap($$)
   #my @speicher = qx(free -m);
   my @speicher = SYSMON_execute($hash, "free");
 
-  if(!@speicher) {return $map;}
+  if(!@speicher) {
+  	return $map;
+  }
     
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
@@ -1406,8 +1412,6 @@ sub SYSMON_getRamAndSwap($$)
   my $swap;
   #my $percentage_ram;
   #my $percentage_swap;
-  
-  my $NMark = 0;
   
   if($total > 0) {
   
@@ -1426,8 +1430,6 @@ sub SYSMON_getRamAndSwap($$)
   }
   else
   {
-  	# Vermuttlich OSX
-  	$NMark = 1;
     $ram = "n/a";
   }
   $map->{+RAM} = $ram;
@@ -1443,19 +1445,28 @@ sub SYSMON_getRamAndSwap($$)
   }
   else
   {
-  	$NMark = 1;
     $swap = "n/a"
   }
 
   $map->{+SWAP} = $swap;
   
-  $NMark=1;
-  if($NMark) {
-  	# OSX versuchen
-  	$map = SYSMON_getRamAndSwapOSX($hash, $map);
-  }
-
   return $map;
+}
+
+#------------------------------------------------------------------------------
+# Prüft, ob das Host-System OSX ist (darvin).
+#------------------------------------------------------------------------------
+sub SYSMON_isOSX()
+{
+	return $^O eq 'darwin';
+}
+
+#------------------------------------------------------------------------------
+# Prüft, ob das Host-System Linux ist (linux).
+#------------------------------------------------------------------------------
+sub SYSMON_isLinux()
+{
+	return $^O eq 'linux';
 }
 
 #------------------------------------------------------------------------------
@@ -1533,7 +1544,7 @@ sub SYSMON_getRamAndSwapOSX($$)
     $total = $total/1048576;
     my $free = $total-$used;
     my $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used , ($used / $total * 100), $free);
-    Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: RAM:  ".$ram;
+    #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: RAM:  ".$ram;
     $map->{+RAM} = $ram;
   
     my @avm = SYSMON_execute($hash, "sysctl vm.swapusage");
@@ -1632,7 +1643,7 @@ sub SYSMON_getRamAndSwapOSX($$)
       my $free2  = SYSMON_fmtStorageAmount_($3);
       my $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
       $map->{+SWAP} = $swap; 
-      Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: SWAP: ".$swap;
+      #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: SWAP: ".$swap;
     }
   }
   
