@@ -37,6 +37,24 @@ my $rooms;
   # DG
   # Räume ohne Sensoren: Speisekammer, Abstellkammer, Kinderzimmer 1 und 2
   
+# Aktoren
+my $actors;
+  $actors->{wz_rollo_r}->{class}="rollo";
+  $actors->{wz_rollo_r}->{alias}="WZ Rolladen";
+  $actors->{wz_rollo_r}->{fhem_name}="wz_rollo_r";
+  $actors->{wz_rollo_r}->{type}="HomeMatic compatible";
+  $actors->{wz_rollo_r}->{location}="wohnzimmer";
+  $actors->{wz_rollo_r}->{readings}->{level}="level";
+  $actors->{wz_rollo_r}->{actions}->{level}->{set}="pct";
+  $actors->{wz_rollo_r}->{actions}->{level}->{type}="int"; #?
+  $actors->{wz_rollo_r}->{actions}->{level}->{min}="0";    #?
+  $actors->{wz_rollo_r}->{actions}->{level}->{max}="100";  #?
+  $actors->{wz_rollo_r}->{actions}->{level}->{alias}->{hoch}->{value}="100";
+  $actors->{wz_rollo_r}->{actions}->{level}->{alias}->{runter}->{value}="0";
+  $actors->{wz_rollo_r}->{actions}->{level}->{alias}->{halb}->{value}="60";
+  $actors->{wz_rollo_r}->{actions}->{level}->{alias}->{nacht}->{value}="0";
+  $actors->{wz_rollo_r}->{actions}->{level}->{alias}->{schatten}->{valueFn}="TODO";
+  
   
 # Sensoren
 my $sensors;
@@ -249,6 +267,9 @@ sub myCtrlProxies_getSensorReadingUnit($$);
 #sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
 
+#
+
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 # Action
 sub myCtrlProxies_doAllActions();
