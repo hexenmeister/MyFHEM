@@ -9,6 +9,7 @@ use Time::Local;
 
 use constant {
  DEVICE_NAME_TTS    => "tts",
+ DEVICE_NAME_WEATHER => "Wetter",
  DEVICE_NAME_JABBER => "jabber",
  
  ATTR_NAME_DEVLOCATION => "devLocation", # Attribut mit dem Standort zum Vorlesen etc.
