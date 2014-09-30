@@ -9,8 +9,13 @@ use Time::Local;
 
 #use myCtrlHAL;
 
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
+
 use constant {
- NOTIFICATION_CONFIRM => ":sonic-ring.mp3:"
+ NOTIFICATION_CONFIRM1 => ":sonic-ring.mp3:",
+ NOTIFICATION_CONFIRM2 => ":cm/notifications/Argon.ogg:",
+ NOTIFICATION_FAIL => ":cm/notifications/Doink.ogg:",
+ 
 };
 
 sub
@@ -73,8 +78,11 @@ sub speak($;$) {
 	fhem("set ".+DEVICE_NAME_TTS." tts ".prepareTextToSpeak($text));
 }
 
-sub voiceNotificationConfirm() {
-  speak(NOTIFICATION_CONFIRM,0);
+sub voiceNotificationConfirm1() {
+  speak(NOTIFICATION_CONFIRM1,0);
+}
+sub voiceNotificationConfirm2() {
+  speak(NOTIFICATION_CONFIRM2,0);
 }
 
 sub voiceDoorbell() {
@@ -169,13 +177,15 @@ sub speakWetterDaten(;$) {
 	my($art)=@_;
 	if(!defined($art)){$art=1;}
 	# TODO: Sauber / Abstraktionslayer erstellen
-	my $temp = prepareNumToSpeak(rundeZahl1(ReadingsVal("GSD_1.4","temperature","unbekannt")));
+	my $temp = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
 	my $humi = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
 	if($art==0) {
-    speak("Aussentemperatur ".$temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
+    #speak("Aussentemperatur ".$temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
+    speak($temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
   }
   if($art==1) {
-    speak("Die Aussentemperatur betraegt ".$temp." Grad. Die Luftfeuchtigkeit liegt bei ".$humi." Prozent.",0);
+    #speak("Die Aussentemperatur betraegt ".$temp." Grad. Die Luftfeuchtigkeit liegt bei ".$humi." Prozent.",0);
+    speak("Temperatur ".$temp." Grad. Luftfeuchtigkeit ".$humi." Prozent.",0);
   }
 }
 
@@ -188,13 +198,14 @@ sub speakWetterVorhersage(;$) {
 	if(!defined($day)) {$day=2;}
 	
 	# TODO: Sauber / Abstraktionslayer erstellen
-	my $t1= ReadingsVal("Wetter","fc".$day."_condition",undef);
-	my $t2= ReadingsVal("Wetter","fc".$day."_low_c",undef);
-	my $t3= ReadingsVal("Wetter","fc".$day."_high_c",undef);
+	my $t1= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_condition",undef);
+	my $t2= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_low_c",undef);
+	my $t3= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_high_c",undef);
 	
 	my $text = "";
 	if($day==1) {
-		$text = "Wetter heute ";
+		#$text = "Wetter heute ";
+		$text = "Heute ";
 	}
 	if($day==2) {
 		$text = "Morgen ";
@@ -210,10 +221,12 @@ sub speakWetterVorhersage(;$) {
 	  $text.="Temperatur von ".$t2." bis ".$t3." Grad.";
 	  if($day==1) {
 	  	# gefuehlte Temperatur
-	  	my $tg= ReadingsVal("Wetter","wind_chill",undef);
-	  	$text.="Gefuehlte Temperatur aktuell ".$tg." Grad.";
-	  	my $tw= ReadingsVal("Wetter","wind_speed",undef);
-	  	$text.="Windgeschwindigkeit ".$tw." Kilometer pro Stunde.";
+	  	my $tg= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_chill",undef);
+	  	#$text.="Gefuehlte Temperatur aktuell ".$tg." Grad.";
+	  	$text.="Gefuehlte ".$tg." Grad.";
+	  	my $tw= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_speed",undef);
+	  	#$text.="Windgeschwindigkeit ".$tw." Kilometer pro Stunde.";
+	  	$text.="Wind ".$tw." Kilometer pro Stunde.";
 	  }
 	} else {
 		$text="Leider keine Vorhersage verfuegbar.";
@@ -235,7 +248,7 @@ sub voiceActAutomaticOn() {
 	#TODO: Alle Ausgaben umbauen / auslagern / sauber implmentieren
 	#TODO: Spezielle Ansage Texte wenn Zustand geaendert ist: 'Nach Hause mommen'
 	
-	voiceNotificationConfirm();
+	voiceNotificationConfirm1();
 	
 	# Nachtansage
 	if($hour>=23||$hour<3) {
@@ -393,7 +406,7 @@ sub voiceActAutomaticOff() {
   
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   
-  voiceNotificationConfirm(); #TODO ? Anderer Sound als beim 'On'?
+  voiceNotificationConfirm2(); #TODO ? Anderer Sound als beim 'On'?
   
   
   my @wndOpen = getWindowDoorList(+STATE_NAME_WIN_OPENED);
