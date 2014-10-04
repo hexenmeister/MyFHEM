@@ -87,13 +87,13 @@ my $sensors;
   
   # idee: 
   # $sensors->{vr_luftdruck}->{alias}       ="VirtuellerSensor";
-  # $sensors->{vr_luftdruck}->{type}        ="virtuel";
+  # $sensors->{vr_luftdruck}->{type}        ="virtual";
   # $sensors->{vr_luftdruck}->{readings}->{X}->{ValueFn}     ="max"; #min, summe, average, eigene... bekommt Record, liefert Wert # wenn ValueFn, dann nur deren Wert, keine weitere Logik
   # $sensors->{vr_luftdruck}->{readings_list} =["X",...]; # für ValueFn?
   # $sensors->{vr_luftdruck}->{readings}->{pressure} ="device:reading"; # 'Weiterleitung' ? 
   #
   $sensors->{test}->{alias}       ="TestSensor";
-  $sensors->{test}->{type}        ="virtuel";
+  $sensors->{test}->{type}        ="virtual";
   #$sensors->{test}->{readings}->{test1}->{ValueFn} = '{my $t=1; my $s=2; max($t,$s)}'; # mit Klammern: Direkt evaluieren, ansonsten als Funktion mit Reading-Hash und Device-Hash aufrufen.
   $sensors->{test}->{readings}->{test1}->{ValueFn} = 'senTest';
   $sensors->{test}->{readings}->{test1}->{FnParams} = ["1","2"];
@@ -101,11 +101,19 @@ my $sensors;
   $sensors->{test}->{readings}->{test1}->{alias} ="Funktionstest";
   $sensors->{test}->{readings}->{test2}->{link} ="vr_luftdruck:pressure";
   # 
+  $sensors->{virtual_control_sensor}->{alias}       ="Virtuelle Controll-Sammel-Sensor";
+  $sensors->{virtual_control_sensor}->{type}        ="virtual";
+  $sensors->{virtual_control_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "TODO";
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = ["um_vh_licht", "um_hh_licht", "um_vh_bw_licht"]; # Liste der Lichtsensoren zur Auswertung (?)
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
   
+  	
   $sensors->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
   $sensors->{vr_luftdruck}->{fhem_name} ="EG_WZ_KS01";
   $sensors->{vr_luftdruck}->{type}      ="HomeMatic compatible";
-  $sensors->{vr_luftdruck}->{location}  ="virtuel";
+  $sensors->{vr_luftdruck}->{location}  ="virtual";
   $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{reading}  ="pressure";
   $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{unit}     ="hPa";
   $sensors->{vr_luftdruck}->{readings}->{pressure}    ->{alias}     ="Luftdruck";
@@ -193,12 +201,24 @@ my $sensors;
   $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{unit}     ="V";
   $sensors->{um_hh_licht}->{readings}->{bat_status}  ->{reading}  ="battery";
   
+  $sensors->{um_vh_bw_licht}->{alias}     ="Bewegungsmelder (Vorgarten)";
+  $sensors->{um_vh_bw_licht}->{fhem_name} ="UM_VH_HMBL01.Eingang";
+  $sensors->{um_vh_bw_licht}->{type}      ="HomeMatic";
+  $sensors->{um_vh_bw_licht}->{location}  ="umwelt";
+  $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{reading}  ="luminosity";
+  $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{unit}     ="0-200";
+  $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{alias}    ="Helligkeit";
+  $sensors->{um_vh_bw_licht}->{readings}->{battery}     ->{reading}      ="battery";
+  $sensors->{um_vh_bw_licht}->{readings}->{battery}     ->{unit_type}    ="ENUM: ok,low";
+
+#------------------------------------------------------------------------------
 my $actTab;
   $actTab->{"schatten"}->{checkFn}="";
   #$actTab->{"schatten"}->{disabled}="0"; #1=disabled, 0, undef,.. => enabled
-  #$actTab->{"schatten"}->{deviceList}=(); # undef=> alle in devTab, ansonsten nur angegebenen
+  #$actTab->{"schatten"}->{deviceList}=[]; # undef=> alle in devTab, ansonsten nur angegebenen
   $actTab->{"nacht"}->{checkFn}="";
   $actTab->{"test"}->{checkFn}=undef;
+#------------------------------------------------------------------------------
 
 my $devTab;
 # Default.
@@ -214,7 +234,7 @@ my $devTab;
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{valueFilterFn}="{...}"; #nachdem Wert errechnet wurde, prüft nochmal, ob dieser ggf. korrigiert werden soll (Grenzen etc. z.B. bei geöffneter Tür 'schatten' max. auf X% herunterfahren. etc.)
 # Idee: Mehrere Action durch zwischengeschaltete Keys (mehrfach, alphabetisch sortiert): Idee: Wenn hier ein HASH, dann einzelene ausführen, ansonstel ist hier die Fn direkt
 # $devTab->{"bz_rollo"}->{actions}->{schatten}->{enabledFn}->{DoorOpenCheck}="{if(sensorVal($CURRENT_DEVICE, wndOpen)!='closed') {...}}"; # DoorOpenCheck ist ein solcher Key.
-
+#TODO: Statt FHEM-Namen als Keys die Verweise auf actors-Tab verwenden.
   $devTab->{"bz_rollo"}->{valueFns}->{"schatten"}="{if...}";
   $devTab->{"bz_rollo"}->{SetFn}="";
 # Badezimmer (Ost)
