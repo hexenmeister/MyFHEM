@@ -34,14 +34,14 @@ sub putCtrlData($$) {
 	my($key, $val) = @_;
   # Ein Dummy als Container verwenden (ein nicht in Frontent sichtbares Reading speichern)
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
-	setReading(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, $val);
+	setReading(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, $val);
 }
 
 # liefert ein zum einem Key gespeichertes Wert (fuer Steuerungszwecke)
 sub getCtrlData($) {
 	my($key) = @_;
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
-	my $val = ReadingsVal(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, undef);
+	my $val = ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, undef);
 	return $val;
 }
 
@@ -58,12 +58,12 @@ sub automationHeartbeat() {
 	my $lDate = getCtrlData("ctrl_last_automatic_heartbeat_reset");
 	# einmal am Tag zw. 2 und 5 Uhr
 	if($cDate ne $lDate &&  $hms gt "02:00" and $hms lt "05:00") {
-		if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
+		if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
 		  resetAutomatikControls();
     } else {
       # Verreist:
       #  - ZPumpe in Minimal-Modus
-      setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, ABSENT);
+      setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, ABSENT);
     }
     putCtrlData("ctrl_last_automatic_heartbeat_reset", $cDate);
   }
@@ -72,8 +72,8 @@ sub automationHeartbeat() {
   #       dann auch ZPumpe anpassen. Auch fuer Aenderung auf Anwesend/Abwesend
   #
   	# Wenn PRESENCE Automatic, dann auch 
-	  #if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
-		  #setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, ABSENT);
+	  #if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
+		  #setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, ABSENT);
 	  #}
 
 	
@@ -105,21 +105,21 @@ sub automationHeartbeat() {
 # Defaultwerte (AUTOMATIC). Sie soll beim FHEM-Start aufgerufen werden (global:INITIALIZED).
 sub setAllAutomatikControlsDefaults() {
 	# TODO: future: Pruefen, ob z.B. Status "Verreist" bereucksichtigt werden soll
-	if(Value(ELEMENT_NAME_CTRL_BESCHATTUNG) eq "???" ||  ReadingsVal(ELEMENT_NAME_CTRL_BESCHATTUNG,"STATE","???") eq "???") {
-	  setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
+	if(Value(DEVICE_NAME_CTRL_BESCHATTUNG) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"STATE","???") eq "???") {
+	  setValue(DEVICE_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
 	}
 	
-	if(Value(ELEMENT_NAME_CTRL_ANWESENHEIT) eq "???" ||  ReadingsVal(ELEMENT_NAME_CTRL_ANWESENHEIT,"STATE","???") eq "???") {
-    setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
+	if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ANWESENHEIT,"STATE","???") eq "???") {
+    setValue(DEVICE_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
   }
 	#setHomePresence_Present();
 	
-	if(Value(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  ReadingsVal(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT,"STATE","???") eq "???") {
-    setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
+	if(Value(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT,"STATE","???") eq "???") {
+    setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
   }
 	
-	if(Value(ELEMENT_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  ReadingsVal(ELEMENT_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq "???") {
-    setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
+	if(Value(DEVICE_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq "???") {
+    setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
   }
 }
 
@@ -132,7 +132,7 @@ sub resetAutomatikControls() {
 	setHomePresence_Automatic();
 	#setHomePresence_Present();
 	setDayNightRolloAutomaticOn();
-	setValue(ELEMENT_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
+	setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
 }
 
 ###############################################################################
@@ -283,7 +283,7 @@ sub actHaustuerKlingel() {
 
 # Methode für den taster
 # Schatet globale Haus-Automatik ein 
-# (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
+# (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
 sub actHomeAutomaticOn() {
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomaticOn();
@@ -296,7 +296,7 @@ sub actHomeAutomaticOn() {
 
 # Methode für den taster
 # Schatet globale Haus-Automatik aus 
-# (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud DISABLED)
+# (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud DISABLED)
 sub actHomeAutomaticOff() {
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomaticOff(); # ?
@@ -306,46 +306,46 @@ sub actHomeAutomaticOff() {
   
 }
 
-# Schatet Beschattung-Automatik ein (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
+# Schatet Beschattung-Automatik ein (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
 sub setBeschattungAutomaticOn() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
+	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
 }
 
-# Schatet Beschattung-Automatik aus (setzt ELEMENT_NAME_CTRL_BESCHATTUNG aud DISABLED)
+# Schatet Beschattung-Automatik aus (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud DISABLED)
 sub setBeschattungAutomaticOff() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_BESCHATTUNG, DISABLED);
+	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, DISABLED);
 }
 
 # Setzt PRESENCE-Status auf automatic 
 sub setHomePresence_Automatic() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
+	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
 }
 
 # Setzt PRESENCE-Status auf anwesend (jemand ist zuhause)
 sub setHomePresence_Present() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, PRESENT);
+	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, PRESENT);
 }
 
 # Setzt PRESENCE-Status auf abwesend (niemand ist zuhause)
 sub setHomePresence_Absent() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
-  setValue(ELEMENT_NAME_CTRL_ANWESENHEIT, ABSENT);
+  setValue(DEVICE_NAME_CTRL_ANWESENHEIT, ABSENT);
 }
 
-# Schatet Tag/Nacht-Rolladen-Automatik ein (setzt ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT aud AUTOMATIC)
+# Schatet Tag/Nacht-Rolladen-Automatik ein (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT aud AUTOMATIC)
 sub setDayNightRolloAutomaticOn() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
+	setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
 }
 
-# Schatet Tag/Nacht-Rolladen-Automatic aus (setzt ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT aud DISABLED)
+# Schatet Tag/Nacht-Rolladen-Automatic aus (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT aud DISABLED)
 sub setDayNightRolloAutomaticOff() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT, DISABLED);
+	setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, DISABLED);
 }
 
 # TODO: 
