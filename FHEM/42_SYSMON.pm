@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 6618 2014-09-25 19:13:06Z hexenmeister $
+# $Id: 42_SYSMON.pm 6626 2014-09-28 20:37:24Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.9.1";
+my $VERSION = "1.9.2";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -2266,6 +2266,10 @@ sub SYSMON_ShowValuesFmt ($$$;@)
         $rComment = $cur_readings_map->{$rName};
       }
       my $rVal = $map->{$rName};
+      if(!defined $rVal) {
+      	# ggf. userReadings verarbeiten
+      	$rVal = ReadingsVal($name,$rName,undef);
+      }
       if($rName eq DATE) {
       	# Datum anzeigen
   	    $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
