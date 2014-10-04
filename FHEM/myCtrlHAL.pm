@@ -8,9 +8,6 @@ use POSIX;
 use Time::Local;
 
 use constant {
- DEVICE_NAME_TTS    => "tts",
- DEVICE_NAME_WEATHER => "Wetter",
- DEVICE_NAME_JABBER => "jabber",
  
  ATTR_NAME_DEVLOCATION => "devLocation", # Attribut mit dem Standort zum Vorlesen etc.
  STATE_NAME_WIN_OPENED => "open", # Status: Fenster /Tuer ofen
@@ -19,13 +16,17 @@ use constant {
 
 };
 
-# --- Konstanten fuer die verwendeten ElementNamen ----------------------------
+# --- Konstanten fuer die verwendeten Device/Element-Namen (TODO: Element_XXX Umbenennen) ----------------------------
 use constant {
-  ELEMENT_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
-  ELEMENT_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
-  ELEMENT_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
-  ELEMENT_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
-  ELEMENT_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
+	DEVICE_NAME_TTS    => "tts",
+  DEVICE_NAME_WEATHER => "Wetter",
+  DEVICE_NAME_JABBER => "jabber",
+ 
+  DEVICE_NAME_CTRL_ANWESENHEIT    => "T.DU_Ctrl.Anwesenheit",
+  DEVICE_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
+  DEVICE_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
+  DEVICE_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
+  DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
 };
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
