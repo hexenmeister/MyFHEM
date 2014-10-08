@@ -420,13 +420,14 @@ sub voiceActAutomaticOff() {
   
   if($numNotClosed>($numOpen+$numTilted)) {
     # Fenster im undefiniertem Zustand => Problem  mit Sensoren melden
-    $text.="Achtung, ".($numNotClosed-$numOpen-$numTilted)." Fenster in unbekannten Zustand! Bitte ueberpruefen Sie die Sensoren!";
+    $text.="Warnung, ".($numNotClosed-$numOpen-$numTilted)." Fenster in unbekannten Zustand! Bitte ueberpruefen Sie die Sensoren!";
     $flag=1;
   }
   
   if($numOpen>0) {
     # Offene Fenster
-    $text.="Dringende Warnung! Es sind noch ".$numOpen." Fenster offen. ";
+    #$text.="Dringende Warnung! Es sind noch ".$numOpen." Fenster offen. ";
+    $text.="Achtung! ".$numOpen." Fenster offen. ";
     foreach my $d (@wndOpen) {
       $text.=$d." ";
     }
@@ -435,7 +436,8 @@ sub voiceActAutomaticOff() {
   
   if($numTilted>0) {
     # gekippte Fenster
-    $text.="Warnung! Es sind noch ".$numTilted." Fenster gekippt. ";
+    #$text.="Warnung! Es sind noch ".$numTilted." Fenster gekippt. ";
+    $text.="".$numTilted." Fenster gekippt. ";
     foreach my $d (@wndTilted) {
       $text.=$d." ";
     }
@@ -452,7 +454,8 @@ sub voiceActAutomaticOff() {
 	  # Begrueßung nur, wenn laenger als 10 Min.
       if($since_last>=300) {
     	  speakWetterDaten(0);
-        speak("Bis dann!",0);
+        #speak("Bis dann!",0);
+        speak("okey!",0);
       }
 	  }
 	}
@@ -463,7 +466,8 @@ sub voiceActAutomaticOff() {
 	  # Begrueßung nur, wenn laenger als 10 Min.
       if($since_last>=300) {
     	  speakWetterDaten();
-        speak("angenehmen Tag!",0);
+        #speak("angenehmen Tag!",0);
+        speak("registriert!",0);
       }
 	  }
 	}
@@ -474,7 +478,8 @@ sub voiceActAutomaticOff() {
 	    # Begrueßung nur, wenn laenger als 10 Min.
         if($since_last>=300) {
     	  speakWetterDaten();
-          speak("Bis spaeter!",0);
+          #speak("Bis spaeter!",0);
+          speak("okey",0);
         }
       }
     }
