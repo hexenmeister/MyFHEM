@@ -104,10 +104,61 @@ my $sensors;
   $sensors->{virtual_control_sensor}->{alias}       ="Virtuelle Controll-Sammel-Sensor";
   $sensors->{virtual_control_sensor}->{type}        ="virtual";
   $sensors->{virtual_control_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
-  $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "TODO";
-  $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = ["um_vh_licht", "um_hh_licht", "um_vh_bw_licht"]; # Liste der Lichtsensoren zur Auswertung (?)
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "myCtrlProxies_SunValueFn";
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
+  
+  #TODO:
+  sub myCtrlProxies_SunValueFn($$) {
+  	my ($device, $record) = @_;
+  	#my $oRecord=$_[1];
+  	my $senList = $record->{FnParams};
+  	# keine 'dead' Sensoren verwenden. Wenn verschiedene Ergebnisse => Mehrheit entscheidet. Bei Gleichstand => on, alle 'dead' => on
+  	# oldVal (letzter ermittelter Wert) speichern. Je nach oldVal obere oder untere Grenze verwenden
+  	my $oldVal = $record->{oldVal};
+  	$oldVal='on' unless defined $oldVal;
+    my $cnt_on = 0;
+    my $cnt_off = 0;
+    foreach my $a (@{$senList}) {
+    	my $senSpec = $a->[0];
+    	my($sensorName,$readingName) = split(/:/, $senSpec);
+    	my $senLim1 = $a->[1];
+    	my $senLim2 = $a->[2];
+    	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', Lim1/2: '.$senLim1.'/'.$senLim2;
+    	my $sRec = myCtrlProxies_getSensorValueRecord($sensorName,$readingName);
+    	if($sRec->{alive}) {
+    		my $sVal = $sRec->{value};
+    		#Log 3,'>------------>sVal: '.$sVal;
+    		if($oldVal eq 'on') {
+    			#Log 3,">------------>XXX: $sVal / $senLim1";
+    			if($sVal < $senLim1) {
+    				$cnt_off+=1;
+    				# Log 3,'>------------>1.1 oldVal: '.$oldVal." => new: off";
+    			} else {
+    				$cnt_on+=1;
+    				# Log 3,'>------------>1.2 oldVal: '.$oldVal." => new: on";
+    			}
+    		} else {
+    			# oldVal war off
+    			if($sVal > $senLim2) {
+    				$cnt_on+=1;
+    				# Log 3,'>------------>2.1 oldVal: '.$oldVal." => new: on";
+    			} else {
+    				$cnt_off+=1;
+    				# Log 3,'>------------>2.2 oldVal: '.$oldVal." => new: off";
+    			}
+    		}
+    	}
+    }
+    my $newVal = 'on';
+    if($cnt_off>$cnt_on) {$newVal = 'off';}
+    
+    $record->{oldVal}=$newVal;  #TODO: Dauerhaft (Neustartsicher) speichern (Reading?)
+    $record->{oldTime}=time();
+    #Log 3,'>------------> => newVal '.$newVal;
+    return $newVal;
+  }
   
   	
   $sensors->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
@@ -205,7 +256,7 @@ my $sensors;
   $sensors->{um_vh_bw_licht}->{fhem_name} ="UM_VH_HMBL01.Eingang";
   $sensors->{um_vh_bw_licht}->{type}      ="HomeMatic";
   $sensors->{um_vh_bw_licht}->{location}  ="umwelt";
-  $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{reading}  ="luminosity";
+  $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{reading}  ="brightness";
   $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{unit}     ="0-200";
   $sensors->{um_vh_bw_licht}->{readings}->{brightness}  ->{alias}    ="Helligkeit";
   $sensors->{um_vh_bw_licht}->{readings}->{battery}     ->{reading}      ="battery";
@@ -592,7 +643,7 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 	      $val= eval $valueFn;	
 	    } else {
 	    	no strict "refs";
-        my $r = &{$valueFn}($record,$device);
+        my $r = &{$valueFn}($device,$record);
         use strict "refs";
         if(ref $r eq ref {}) {
         	# wenn Hash
@@ -613,15 +664,16 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 
       $val = ReadingsVal($fhem_name,$reading_fhem_name,undef);
       $time = ReadingsTimestamp($fhem_name,$reading_fhem_name,undef);
+      #Log 3,"+++++++++++++++++> Name: ".$fhem_name." Reading: ".$reading_fhem_name." =>VAL:".$val;
     }
     
-    $ret->{value}     =$val if($val);
+    $ret->{value}     =$val if(defined $val);
     # dead or alive?
     $ret->{status} = 'unknown';
     my $actCycle = $record->{act_cycle};
-    $actCycle = 0 unless $actCycle;
+    $actCycle = 0 unless defined $actCycle;
     my $iactCycle = int($actCycle);
-    if($actCycle && $iactCycle == 0) {
+    if(defined $actCycle && $iactCycle == 0) {
       $ret->{status} = 'alive'; # wenn actCycle == 0 immer alive
     }
     if($time) {
