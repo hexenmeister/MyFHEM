@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 6731 2014-10-09 20:08:15Z hexenmeister $
+# $Id: 42_SYSMON.pm 6745 2014-10-12 01:01:38Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.1";
+my $VERSION = "1.9.4.2";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -622,7 +622,7 @@ SYSMON_Attr($$$)
       		InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
       	}
        	#$hash->{LOCAL} = 1;
-  	    SYSMON_Update($hash);
+  	    #SYSMON_Update($hash);
   	    #delete $hash->{LOCAL};
       }
 
