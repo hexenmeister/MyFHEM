@@ -65,7 +65,7 @@ package MYSENSORS;
 
 use Exporter ('import');
 @EXPORT = ();
-@EXPORT_OK = qw(sendMessage);
+@EXPORT_OK = qw(sendClientMessage);
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use strict;
@@ -78,6 +78,7 @@ use Device::MySensors::Message qw(:all);
 
 BEGIN {GP_Import(qw(
   CommandDefine
+  CommandModify
   gettimeofday
   readingsSingleUpdate
   DevIo_OpenDev
@@ -362,6 +363,14 @@ sub matchClient($$) {
     }
   });
   return $found;
+}
+
+sub sendClientMessage($%) {
+  my ($hash,%msg) = @_;
+  $msg{radioId} = $hash->{radioId};
+  $msg{childId} = $hash->{childId};
+  $msg{ack} = 0;
+  sendMessage($hash->{IODev},%msg);
 }
 
 1;

@@ -42,8 +42,7 @@ sub MYSENSORS_NODE_Initialize($) {
   
   $hash->{AttrList} =
     "config:M,I ".
-    "IODev ".
-    $main::readingFnAttributes;
+    "IODev ";
 
   main::LoadModule("MYSENSORS");
 }
@@ -79,7 +78,6 @@ sub Define($$) {
   $hash->{radioId} = $radioId;
   $hash->{childId} = $childId;
   $hash->{sets} = {};
-  $hash->{'.package'} = 'MYSENSORS::NODE';
   AssignIoPort($hash);
 };
 
@@ -108,7 +106,7 @@ sub Attr($$$$) {
   ATTRIBUTE_HANDLER: {
     $attribute eq "config" and do {
       if ($main::initdone) {
-        sendNodeMessage($hash, cmd => C_INTERNAL, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
+        sendClientMessage($hash, cmd => C_INTERNAL, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
       }
       last;
     };
@@ -124,12 +122,10 @@ sub onSetMessage($$) {
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
   variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
-  sendMessage($hash,{
-    radioId => $hash->{radioId},
-    childId => $hash->{childId},
+  sendClientMessage($hash,
     cmd => C_SET, 
     subType => $msg->{subType},
-    payload => ReadingsVal($hash->{NAME},$1,"")}
+    payload => ReadingsVal($hash->{NAME},$1,"")
   );
 }
 
@@ -151,7 +147,7 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_TIME and do {
-      sendNodeMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_TIME, payload => time);
+      sendClientMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_TIME, payload => time);
       Log3 ($hash->{NAME},4,"MYSENSORS_NODE $hash->{name}: update of time requested");
       last;
     };
@@ -173,7 +169,7 @@ sub onInternalMessage($$) {
     };
     $type == I_CONFIG and do {
       #$msg->{ack} = 1;
-      sendNodeMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_CONFIG, payload => AttrVal($hash->{NAME},"config","M"));
+      sendClientMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_CONFIG, payload => AttrVal($hash->{NAME},"config","M"));
       last;
     };
     $type == I_PING and do {
@@ -205,14 +201,6 @@ sub onInternalMessage($$) {
       last;
     };
   }
-}
-
-sub sendNodeMessage($%) {
-  my ($hash,%msg) = @_;
-  $msg{radioId} = $hash->{radioId};
-  $msg{childId} = $hash->{childId};
-  $msg{ack} = 0;
-  sendMessage($hash->{IODev},%msg);
 }
 
 1;

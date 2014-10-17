@@ -42,7 +42,7 @@ sub MYSENSORS_SENSOR_Initialize($) {
   
   $hash->{AttrList} =
     "IODev ".
-    "setVar ".
+    "setCommands ".
     "set_.* ".
     $main::readingFnAttributes;
 
@@ -64,6 +64,7 @@ BEGIN {
   GP_Import(qw(
     CommandDeleteReading
     CommandAttr
+    AttrVal
     readingsSingleUpdate
     AssignIoPort
     Log3
@@ -79,7 +80,7 @@ sub Define($$) {
   $hash->{radioId} = $radioId;
   $hash->{childId} = $childId;
   $hash->{sets} = {};
-  $hash->{'.package'} = 'MYSENSORS::SENSOR';
+  $hash->{setcommands} = {};
   AssignIoPort($hash);
 };
 
@@ -94,9 +95,15 @@ sub Set($$$@) {
     if(!defined($hash->{sets}->{$command}));
   if (@values) {
     my $value = join " ",@values;
+    sendClientMessage($hash, cmd => C_SET, subType => variableTypeToIdx($command), payload => $value);
     readingsSingleUpdate($hash,$command,$value,1);
   } else {
-    readingsSingleUpdate($hash,"state",$command,1);
+    if (defined (my $setcommand = $hash->{setcommands}->{$command})) {
+      sendClientMessage($hash, cmd => C_SET, subType => variableTypeToIdx($setcommand->{var}), payload => $setcommand->{val});
+      readingsSingleUpdate($hash,"state",$command,1);
+    } else {
+      return "$command not defined by attr setCommands";
+    }
   }
   return undef;
 }
@@ -106,15 +113,21 @@ sub Attr($$$$) {
 
   my $hash = $main::defs{$name};
   ATTRIBUTE_HANDLER: {
-    $attribute eq "setVar" and do {
+    $attribute eq "setCommands" and do {
       if ($command eq "set") {
-        foreach my $set (split ("[, \t]+",$value)) {
+        foreach my $setCmd (split ("[, \t]+",$value)) {
+          my ($set,$var,$val) = split (":",$setCmd);
           $hash->{sets}->{$set}="";
+          $hash->{setcommands}->{$set} = {
+            var => $var,
+            val => $val,
+          };
         }
       } else {
-        foreach my $set (split "[, \t]",AttrVal($name,$attribute,"")) {
+        foreach my $set (keys %{$hash->{setcommands}}) {
           delete $hash->{sets}->{$set};
         }
+        $hash->{setcommands} = {};
       }
       last;
     };
@@ -139,13 +152,13 @@ sub onSetMessage($$) {
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
   variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
-  sendMessage($hash,createMsg(
+  sendClientMessage($hash,
     radioId => $hash->{radioId},
     childId => $hash->{childId},
     cmd => C_SET, 
     subType => $msg->{subType},
     payload => ReadingsVal($hash->{NAME},$1,""),
-  ));
+  );
 }
 
 sub onInternalMessage($$) {
