@@ -195,7 +195,7 @@ sub Read {
   Log3 ($name, 5, "MYSENSORS/RAW: $data/$buf");
   $data .= $buf;
 
-  if($data =~ m/\n/) {
+  while ($data =~ m/\n/) {
     my $txt;
     ($txt,$data) = split("\n", $data, 2);
     $txt =~ s/\r//;
