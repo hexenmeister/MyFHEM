@@ -24,8 +24,8 @@
 ##############################################
 
 my %sets = (
-  "start" => [],
-  "stop" => [],
+  "connect" => [],
+  "disconnect" => [],
   "inclusion-mode" => [qw(on off)],
 );
 
@@ -117,11 +117,11 @@ sub Set($@) {
   my $value = $a[2];
 
   COMMAND_HANDLER: {
-    $command eq "start" and do {
+    $command eq "connect" and do {
       Start($hash);
       last;
     };
-    $command eq "stop" and do {
+    $command eq "disconnect" and do {
       Stop($hash);
       last;
     };
@@ -370,13 +370,13 @@ sub sendClientMessage($%) {
 <h3>MYSENSORS</h3>
 <ul>
   <p>connects fhem to <a href="http://MYSENSORS.org">MYSENSORS</a>.</p>
-  <p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> and <a href="#MYSENSORS_BRIDGE">MYSENSORS_BRIDGE</a> clients.<br/>
-     Each <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> acts as a bridge in between an fhem-device and MYSENSORS.<br/>
-     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MYSENSORS/lib/Net/MYSENSORS.pod">Net::MYSENSORS</a>.</p>
+  <p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_NODE">MYSENSORS_NODE</a> and <a href="#MYSENSORS_SENSOR">MYSENSORS_SENSOR</a> clients.<br/>
+     Each <a href="#MYSENSORS_NODE">MYSENSORS_NODE</a> represents a mysensors node.<br/>
+     Each <a href="#MYSENSORS_SENSOR">MYSENSORS_SENSOR</a> represents a sensor attached to a mysensors node.<br/>
   <a name="MYSENSORSdefine"></a>
   <p><b>Define</b></p>
   <ul>
-    <p><code>define &lt;name&gt; MYSENSORS &lt;ip:port&gt;</code></p>
+    <p><code>define &lt;name&gt; MYSENSORS &lt;serial device&gt|&lt;ip:port&gt;</code></p>
     <p>Specifies the MYSENSORS device.</p>
   </ul>
   <a name="MYSENSORSset"></a>
@@ -384,19 +384,27 @@ sub sendClientMessage($%) {
   <ul>
     <li>
       <p><code>set &lt;name&gt; connect</code><br/>
-         (re-)connects the MYSENSORS-device to the MYSENSORS-broker</p>
+         (re-)connects the MYSENSORS-device to the MYSENSORS-gateway</p>
     </li>
     <li>
       <p><code>set &lt;name&gt; disconnect</code><br/>
-         disconnects the MYSENSORS-device from the MYSENSORS-broker</p>
+         disconnects the MYSENSORS-device from the MYSENSORS-gateway</p>
+    </li>
+    <li>
+      <p><code>set &lt;name&gt; inclusion-mode on|off</code><br/>
+         turns the gateways inclusion-mode on or off</p>
     </li>
   </ul>
   <a name="MYSENSORSattr"></a>
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <p>keep-alive<br/>
-         sets the keep-alive time (in seconds).</p>
+      <p>autocreate<br/>
+         enables auto-creation of MYSENSOR_NODE and MYSENSOR_SENSOR-devices on receival of presentation-messages</p>
+    </li>
+    <li>
+      <p>first-sensorid<br/>
+         configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
     </li>
   </ul>
 </ul>
