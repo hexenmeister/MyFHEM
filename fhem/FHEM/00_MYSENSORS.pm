@@ -92,6 +92,12 @@ BEGIN {GP_Import(qw(
   Log3
   ))};
 
+my %sensorAttr = (
+  LIGHT => ['setCommands on:V_LIGHT:1 off:V_LIGHT:0' ],
+  ARDUINO_NODE => [ 'config M' ],
+  ARDUINO_REPEATER_NODE => [ 'config M' ],
+);
+
 sub Define($$) {
   my ( $hash, $def ) = @_;
 
@@ -245,6 +251,11 @@ sub onPresentationMsg($$) {
       my $clientname = "MY_$sensorTypeStr\_$msg->{radioId}_$msg->{childId}";
       CommandDefine(undef,"$clientname $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
       readingsSingleUpdate($main::defs{$clientname},"state","defined after presentation received ok",1);
+      if ($sensorAttr{$sensorTypeStr}) {
+        foreach my $attr (@{$sensorAttr{$sensorTypeStr}}) {
+          CommandAttr(undef,"$clientname $attr");
+        }
+      }
     } else {
       Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg from unknown radioId $msg->{radioId}, childId $msg->{childId}, sensorType $sensorType");
     }
