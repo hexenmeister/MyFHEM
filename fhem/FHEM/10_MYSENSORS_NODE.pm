@@ -157,13 +157,13 @@ sub Attr($$$$) {
 
 sub onSetMessage($$) {
   my ($hash,$msg) = @_;
-  variableTypesToStr($msg->{subType}) =~ /^V_(.+)$/;
+  variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
   readingsSingleUpdate($hash,$1,$msg->{payload},1);
 }
 
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
-  variableTypesToStr($msg->{subType}) =~ /^V_(.+)$/;
+  variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
   sendMessage($hash,createMsg(
     radioId => $hash->{radioId},
     childId => $hash->{childId},

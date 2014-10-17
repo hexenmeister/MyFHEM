@@ -53,7 +53,9 @@ sub MYSENSORS_Initialize($) {
   $hash->{SetFn}    = "MYSENSORS::Set";
   $hash->{NotifyFn} = "MYSENSORS::Notify";
 
-  $hash->{AttrList} = "keep-alive";
+  $hash->{AttrList} = 
+    "keep-alive ".
+    "autocreate";
 }
 
 package MYSENSORS;
@@ -72,6 +74,7 @@ use Device::MySensors::Constants qw(:all);
 use Device::MySensors::Message qw(:all);
 
 BEGIN {GP_Import(qw(
+  CommandDefine
   gettimeofday
   readingsSingleUpdate
   DevIo_OpenDev
@@ -240,7 +243,7 @@ sub onPresentationMsg($$) {
   my $client = matchClient($hash,$msg);
   
   my $sensorType = $msg->{subType};
-  sensorTypesToStr($sensorType) =~ /^S_(.+)$/;
+  sensorTypeToStr($sensorType) =~ /^S_(.+)$/;
   my $sensorTypeStr = $1;
   if ($client) {
     if ($client->{sensorType} != $sensorType) {
@@ -280,7 +283,7 @@ sub onRequestMsg($$) {
 
 sub onInternalMsg($$) {
   my ($hash,$msg) = @_;
-  readingsSingleUpdate($hash,internalMessageTypesToStr($msg->{subType}),$msg->{payload},1);
+  readingsSingleUpdate($hash,internalMessageTypeToStr($msg->{subType}),$msg->{payload},1);
 };
 
 sub onStreamMsg($$) {
