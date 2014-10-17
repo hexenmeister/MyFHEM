@@ -56,9 +56,9 @@ sub MYSENSORS_Initialize($) {
   $hash->{NotifyFn} = "MYSENSORS::Notify";
 
   $hash->{AttrList} = 
-    "keep-alive ".
-    "autocreate";
-    "first-sensorid";
+    "autocreate ".
+    "first-sensorid ".
+    "stateFormat";
 }
 
 package MYSENSORS;
@@ -79,6 +79,7 @@ use Device::MySensors::Message qw(:all);
 BEGIN {GP_Import(qw(
   CommandDefine
   CommandModify
+  CommandAttr
   gettimeofday
   readingsSingleUpdate
   DevIo_OpenDev
@@ -139,29 +140,11 @@ sub Notify($$) {
   }
 }
 
-sub Attr($$$$) {
-  my ($command,$name,$attribute,$value) = @_;
-
-  my $hash = $main::defs{$name};
-  ATTRIBUTE_HANDLER: {
-    $attribute eq "keep-alive" and do {
-      if ($command eq "set") {
-        $hash->{timeout} = $value;
-      } else {
-        $hash->{timeout} = 60;
-      }
-      if ($main::init_done) {
-        Timer($hash);
-      };
-      last;
-    };
-  };
-}
-
 sub Start($) {
   my $hash = shift;
   my ($dev) = split("[ \t]+", $hash->{DEF});
   $hash->{DeviceName} = $dev;
+  CommandAttr(undef, "$hash->{NAME} stateFormat connection") unless AttrVal($hash->{NAME},"stateFormat",undef);
   DevIo_CloseDev($hash);
   return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
 }
@@ -257,14 +240,19 @@ sub onPresentationMsg($$) {
     if ($client->{sensorType} != $sensorType) {
       if (AttrVal($hash->{NAME},"autocreate","")) {
         CommandModify(undef,"$client->{NAME} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
+        readingsSingleUpdate($client,"state","TYPE changed after presentation received for different sensorType $sensorTypeStr",1);
       } else {
         Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg different type $sensorType for $client->{NAME} radioId $msg->{radioId}, childId $msg->{childId}, type $client->{sensorType}");
-        readingsSingleUpdate($client,"error","msg different sensorType $sensorType",1);
+        readingsSingleUpdate($client,"state","presentation received for different sensorType $sensorTypeStr",1);
       }
+    } else {
+      readingsSingleUpdate($client,"state","presentation received ok",1)
     }
   } else {
     if (AttrVal($hash->{NAME},"autocreate","")) {
-      CommandDefine(undef,"MY_$sensorTypeStr\_$msg->{radioId}_$msg->{childId} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
+      my $clientname = "MY_$sensorTypeStr\_$msg->{radioId}_$msg->{childId}";
+      CommandDefine(undef,"$clientname $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
+      readingsSingleUpdate($main::defs{$clientname},"state","defined after presentation received ok",1);
     } else {
       Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg from unknown radioId $msg->{radioId}, childId $msg->{childId}, sensorType $sensorType");
     }

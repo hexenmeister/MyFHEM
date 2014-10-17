@@ -63,8 +63,6 @@ BEGIN {
 
   GP_Import(qw(
     CommandDeleteReading
-    CommandAttr
-    AttrVal
     readingsSingleUpdate
     AssignIoPort
     Log3

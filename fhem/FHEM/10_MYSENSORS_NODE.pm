@@ -37,12 +37,12 @@ sub MYSENSORS_NODE_Initialize($) {
   # Consumer
   $hash->{DefFn}    = "MYSENSORS::NODE::Define";
   $hash->{UndefFn}  = "MYSENSORS::NODE::UnDefine";
-  $hash->{SetFn}    = "MYSENSORS::NODE::Set";
   $hash->{AttrFn}   = "MYSENSORS::NODE::Attr";
   
   $hash->{AttrList} =
     "config:M,I ".
-    "IODev ";
+    "IODev ".
+    "stateFormat";
 
   main::LoadModule("MYSENSORS");
 }
@@ -61,8 +61,6 @@ BEGIN {
 
   GP_Import(qw(
     AttrVal
-    CommandDeleteReading
-    CommandAttr
     readingsSingleUpdate
     AssignIoPort
     Log3
@@ -83,20 +81,6 @@ sub Define($$) {
 
 sub UnDefine($) {
   my ($hash) = @_;
-}
-
-sub Set($$$@) {
-  my ($hash,$name,$command,@values) = @_;
-  return "Need at least one parameters" unless defined $command;
-  return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
-    if(!defined($hash->{sets}->{$command}));
-  if (@values) {
-    my $value = join " ",@values;
-    readingsSingleUpdate($hash,$command,$value,1);
-  } else {
-    readingsSingleUpdate($hash,"state",$command,1);
-  }
-  return undef;
 }
 
 sub Attr($$$$) {
