@@ -191,14 +191,6 @@ sub Read {
     $txt =~ s/\r//;
     my $msg = parseMsg($txt);
     Log3 ($name,5,"MYSENSORS Read: ".dumpMsg($msg));
-    
-#  my $msg = { radioId => $fields[0],
-#                 childId => $fields[1],
-#                 cmd     => $fields[2],
-#                 ack     => 0,
-##                 ack     => $fields[3],    # ack is not (yet) passed with message
-#                 subType => $fields[3],
-#                 payload => $fields[4] };
 
     my $type = $msg->{cmd};
     MESSAGE_TYPE: {
@@ -354,11 +346,11 @@ sub matchClient($$) {
 }
 
 sub sendClientMessage($%) {
-  my ($hash,%msg) = @_;
-  $msg{radioId} = $hash->{radioId};
-  $msg{childId} = $hash->{childId};
+  my ($client,%msg) = @_;
+  $msg{radioId} = $client->{radioId};
+  $msg{childId} = $client->{childId};
   $msg{ack} = 0;
-  sendMessage($hash->{IODev},%msg);
+  sendMessage($client->{IODev},%msg);
 }
 
 1;
