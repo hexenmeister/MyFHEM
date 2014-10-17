@@ -195,46 +195,23 @@ sub onInternalMessage($$) {
 <a name="MYSENSORS_NODE"></a>
 <h3>MYSENSORS_NODE</h3>
 <ul>
-  <p>acts as a fhem-device that is mapped to <a href="http://mqtt.org/">mqtt</a>-topics.</p>
-  <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
-     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.</p>
+  <p>represents a mysensors sensor attached to a mysensor-node</p>
+  <p>requires a <a href="#MYSENSOR">MYSENSOR</a>-device as IODev</p>
   <a name="MYSENSORS_NODEdefine"></a>
   <p><b>Define</b></p>
   <ul>
-    <p><code>define &lt;name&gt; MYSENSORS_NODE</code><br/>
-       Specifies the MQTT device.</p>
-  </ul>
-  <a name="MYSENSORS_NODEset"></a>
-  <p><b>Set</b></p>
-  <ul>
-    <li>
-      <p><code>set &lt;name&gt; &lt;command&gt;</code><br/>
-         sets reading 'state' and publishes the command to topic configured via attr publishSet</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; &lt;h;reading&gt; &lt;value&gt;</code><br/>
-         sets reading &lt;h;reading&gt; and publishes the command to topic configured via attr publishSet_&lt;h;reading&gt;</p>
-    </li>
+    <p><code>define &lt;name&gt; MYSENSORS_NODE &lt;Sensor-type&gt; &lt;node-id&gt; &lt;sensor-id&gt;</code><br/>
+      Specifies the MYSENSOR_NODE device.
+      Sensor-type is on of
+      <li>ARDUINO_NODE</li>
+      <li>ARDUINO_REPEATER_NODE</li></p>
   </ul>
   <a name="MYSENSORS_NODEattr"></a>
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <p><code>attr &lt;name&gt; publishSet [&lt;commands&gt;] &lt;topic&gt;</code><br/>
-         configures set commands that may be used to both set reading 'state' and publish to configured topic</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt;] &lt;topic&gt;</code><br/>
-         configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br/>
-         specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and MYSENSORS_NODE automagically creates readings based on the wildcard-match<br/>
-         e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; &lt;topic&gt;</code><br/>
-         mapps a reading to a specific topic. The reading is updated whenever a message to the configured topic arrives</p>
+      <p><code>attr &lt;name&gt; config [&lt;M|I&gt;]</code><br/>
+         configures metric (M) or inch (I). Defaults to 'M'</p>
     </li>
   </ul>
 </ul>
