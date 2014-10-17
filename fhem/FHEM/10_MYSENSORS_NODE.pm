@@ -41,9 +41,8 @@ sub MYSENSORS_NODE_Initialize($) {
   $hash->{AttrFn}   = "MYSENSORS::NODE::Attr";
   
   $hash->{AttrList} =
+    "config:M,I ".
     "IODev ".
-    "setVar ".
-    "set_.* ".
     $main::readingFnAttributes;
 
   main::LoadModule("MYSENSORS");
@@ -58,36 +57,11 @@ use GPUtils qw(:all);
 use Device::MySensors::Constants qw(:all);
 use Device::MySensors::Message qw(:all);
 
-our %sets = (
-  'S_DOOR'  => {},
-  'S_MOTION'  => {},
-  'S_SMOKE'  => {},
-  'S_LIGHT'  => {'V_LIGHT' => ['0','1']},
-  'S_DIMMER'  => {},
-  'S_COVER'  => {},
-  'S_TEMP'  => {},
-  'S_HUM'  => {},
-  'S_BARO'  => {},
-  'S_WIND' => {},
-  'S_RAIN'  => {},
-  'S_UV'  => {},
-  'S_WEIGHT'  => {},
-  'S_POWER'  => {},
-  'S_HEATER'  => {},
-  'S_DISTANCE'  => {},
-  'S_LIGHT_LEVEL'  => {},
-  'S_ARDUINO_NODE' => {},
-  'S_ARDUINO_REPEATER_NODE' => {},
-  'S_LOCK' => {},
-  'S_IR' => {},
-  'S_WATER' => {},
-  'S_AIR_QUALITY' => {},
-);
-
 BEGIN {
   MYSENSORS->import(qw(:all));
 
   GP_Import(qw(
+    AttrVal
     CommandDeleteReading
     CommandAttr
     readingsSingleUpdate
@@ -132,24 +106,9 @@ sub Attr($$$$) {
 
   my $hash = $main::defs{$name};
   ATTRIBUTE_HANDLER: {
-    $attribute eq "setVar" and do {
-      if ($command eq "set") {
-        foreach my $set (split ("[, \t]+",$value)) {
-          $hash->{sets}->{$set}="";
-        }
-      } else {
-        foreach my $set (split "[, \t]",AttrVal($name,$attribute,"")) {
-          delete $hash->{sets}->{$set};
-        }
-      }
-      last;
-    };
-    $attribute =~ /^set_(.+)/ and do {
-      if ($command eq "set") {
-        $hash->{sets}->{$1}=join(",",split ("[, \t]+",$value));
-      } else {
-        CommandDeleteReading(undef,"$hash->{NAME} $1");
-        delete $hash->{sets}->{$1};
+    $attribute eq "config" and do {
+      if ($main::initdone) {
+        sendNodeMessage($hash, cmd => C_INTERNAL, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
       }
       last;
     };
@@ -165,18 +124,94 @@ sub onSetMessage($$) {
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
   variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
-  sendMessage($hash,createMsg(
+  sendMessage($hash,{
     radioId => $hash->{radioId},
     childId => $hash->{childId},
     cmd => C_SET, 
     subType => $msg->{subType},
-    payload => ReadingsVal($hash->{NAME},$1,""),
-  ));
+    payload => ReadingsVal($hash->{NAME},$1,"")}
+  );
 }
+
+#  my $msg = { radioId => $fields[0],
+#                 childId => $fields[1],
+#                 cmd     => $fields[2],
+#                 ack     => 0,
+##                 ack     => $fields[3],    # ack is not (yet) passed with message
+#                 subType => $fields[3],
+#                 payload => $fields[4] };
 
 sub onInternalMessage($$) {
   my ($hash,$msg) = @_;
-  $hash->{internalMessageTypeToStr($msg->{subType})} = $msg->{payload};
+  my $type = $msg->{subType};
+  my $typeStr = internalMessageTypeToStr($type);
+  INTERNALMESSAGE: {
+    $type == I_BATTERY_LEVEL and do {
+      readingsSingleUpdate($hash,"batterylevel",$msg->{payload},1);
+      last;
+    };
+    $type == I_TIME and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_VERSION and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_ID_REQUEST and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_ID_RESPONSE and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_INCLUSION_MODE and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_CONFIG and do {
+      #$msg->{ack} = 1;
+      sendNodeMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_CONFIG, payload => AttrVal($hash->{NAME},"config","M"));
+      last;
+    };
+    $type == I_PING and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_PING_ACK and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_LOG_MESSAGE and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_CHILDREN and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_SKETCH_NAME and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_SKETCH_VERSION and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_REBOOT and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+  }
+}
+
+sub sendNodeMessage($%) {
+  my ($hash,%msg) = @_;
+  $msg{radioId} = $hash->{radioId};
+  $msg{childId} = $hash->{childId};
+  $msg{ack} = 0;
+  sendMessage($hash->{IODev},%msg);
 }
 
 1;

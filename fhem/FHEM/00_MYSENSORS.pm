@@ -24,8 +24,9 @@
 ##############################################
 
 my %sets = (
-  "connect" => "",
-  "disconnect" => "",
+  "start" => [],
+  "stop" => [],
+  "inclusion-mode" => [qw(on off)],
 );
 
 my %gets = (
@@ -106,18 +107,22 @@ sub Undef($) {
 sub Set($@) {
   my ($hash, @a) = @_;
   return "Need at least one parameters" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
+  return "Unknown argument $a[1], choose one of " . join(" ", map {@{$sets{$_}} ? $_.':'.join ',', @{$sets{$_}} : $_} sort keys %sets)
     if(!defined($sets{$a[1]}));
   my $command = $a[1];
   my $value = $a[2];
 
   COMMAND_HANDLER: {
-    $command eq "connect" and do {
+    $command eq "start" and do {
       Start($hash);
       last;
     };
-    $command eq "disconnect" and do {
+    $command eq "stop" and do {
       Stop($hash);
+      last;
+    };
+    $command eq "inclusion-mode" and do {
+      sendMessage($hash,radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_INCLUSION_MODE, payload => $value eq 'on' ? 1 : 0);
       last;
     };
   };
@@ -160,7 +165,6 @@ sub Start($) {
 
 sub Stop($) {
   my $hash = shift;
-  send_disconnect($hash);
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
   readingsSingleUpdate($hash,"connection","disconnected",1);
@@ -284,7 +288,23 @@ sub onRequestMsg($$) {
 
 sub onInternalMsg($$) {
   my ($hash,$msg) = @_;
-  if (my $client = matchClient($hash,$msg)) {
+  if ($msg->{radioId} == 0 and $msg->{childId} == 0) { #msg from gateway
+    my $type = $msg->{subType};
+    SUBTYPE: {
+      $type == I_INCLUSION_MODE and do {
+        readingsSingleUpdate($hash,'inclusion-mode',$msg->{payload} == 0 ? 'off' : 'on',1);
+        last;
+      };
+      $type == I_STARTUP_COMPLETE and do {
+        readingsSingleUpdate($hash,'connection','startup complete',1);
+        last;
+      };
+      $type == I_LOG_MESSAGE and do {
+        readingsSingleUpdate($hash,'log-message',$msg->{payload},1);
+        Log3($hash->{NAME},4,"MYSENSORS gateway $hash->{NAME}: $msg->{payload}");
+      }
+    }
+  } elsif (my $client = matchClient($hash,$msg)) {
     MYSENSORS::NODE::onInternalMessage($client,$msg);
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring internal-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
@@ -295,8 +315,11 @@ sub onStreamMsg($$) {
   my ($hash,$msg) = @_;
 };
 
-sub sendMessage($$) {
-  my ($hash,$msg) = @_;
+sub sendMessage($%) {
+  my ($hash,%msg) = @_;
+  my $txt = createMsg(%msg);
+  Log3 ($hash->{NAME},5,"MYSENSORS send: ".dumpMsg(\%msg));
+  DevIo_SimpleWrite($hash,"$txt\n");
 };
 
 sub matchClient($$) {

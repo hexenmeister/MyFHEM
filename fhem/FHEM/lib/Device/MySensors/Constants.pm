@@ -75,26 +75,27 @@ sub variableTypeToIdx($) {
 
 #-- Internal messages
 use constant {
-  I_BATTERY_LEVEL  => 0,
-  I_TIME           => 1,
-  I_VERSION        => 2,
-  I_ID_REQUEST     => 3,
-  I_ID_RESPONSE    => 4,
-  I_INCLUSION_MODE => 5,
-  I_CONFIG         => 6,
-  I_PING           => 7,
-  I_PING_ACK       => 8,
-  I_LOG_MESSAGE    => 9,
-  I_CHILDREN       => 10,
-  I_SKETCH_NAME    => 11,
-  I_SKETCH_VERSION => 12,
-  I_REBOOT         => 13,
+  I_BATTERY_LEVEL    => 0,
+  I_TIME             => 1,
+  I_VERSION          => 2,
+  I_ID_REQUEST       => 3,
+  I_ID_RESPONSE      => 4,
+  I_INCLUSION_MODE   => 5,
+  I_CONFIG           => 6,
+  I_PING             => 7,
+  I_PING_ACK         => 8,
+  I_LOG_MESSAGE      => 9,
+  I_CHILDREN         => 10,
+  I_SKETCH_NAME      => 11,
+  I_SKETCH_VERSION   => 12,
+  I_REBOOT           => 13,
+  I_STARTUP_COMPLETE => 14.
 };
 
 use constant internalMessageTypes => qw{ I_BATTERY_LEVEL I_TIME I_VERSION I_ID_REQUEST I_ID_RESPONSE
         I_INCLUSION_MODE I_CONFIG I_PING I_PING_ACK
         I_LOG_MESSAGE I_CHILDREN I_SKETCH_NAME I_SKETCH_VERSION
-        I_REBOOT };
+        I_REBOOT I_STARTUP_COMPLETE };
 
 sub internalMessageTypeToStr($) {
   (internalMessageTypes)[shift];
