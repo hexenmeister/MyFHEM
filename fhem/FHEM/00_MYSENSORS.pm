@@ -53,10 +53,11 @@ sub MYSENSORS_Initialize($) {
   $hash->{DefFn}    = "MYSENSORS::Define";
   $hash->{UndefFn}  = "MYSENSORS::Undef";
   $hash->{SetFn}    = "MYSENSORS::Set";
+  $hash->{AttrFn}   = "MYSENSORS::Attr";
   $hash->{NotifyFn} = "MYSENSORS::Notify";
 
   $hash->{AttrList} = 
-    "autocreate ".
+    "autocreate:1 ".
     "first-sensorid ".
     "stateFormat";
 }
@@ -133,9 +134,26 @@ sub Set($@) {
     };
     $command eq "inclusion-mode" and do {
       sendMessage($hash,radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_INCLUSION_MODE, payload => $value eq 'on' ? 1 : 0);
+      $hash->{'inclusion-mode'} = $value eq 'on' ? 1 : 0;
       last;
     };
   };
+}
+
+sub Attr($$$$) {
+  my ($command,$name,$attribute,$value) = @_;
+
+  my $hash = $main::defs{$name};
+  ATTRIBUTE_HANDLER: {
+    $attribute eq "autocreate" and do {
+      if ($main::init_done) {
+        my $mode = $command eq "set" ? 1 : 0;
+        sendMessage($hash,radioId => $hash->{radioId}, childId => $hash->{childId}, ack => 0, subType => I_INCLUSION_MODE, payload => $mode);
+        $hash->{'inclusion-mode'} = $mode;
+      }
+      last;
+    };
+  }
 }
 
 sub Notify($$) {
@@ -169,6 +187,7 @@ sub Ready($) {
 
 sub Init($) {
   my $hash = shift;
+  $hash->{'inclusion-mode'} = AttrVal($hash->{NAME},"autocreate",0);
   readingsSingleUpdate($hash,"connection","connected",1);
   Timer($hash);
   return undef;
@@ -236,7 +255,7 @@ sub onPresentationMsg($$) {
   my $module = ($sensorType == S_ARDUINO_NODE or $sensorType == S_ARDUINO_REPEATER_NODE) ? 'MYSENSORS_NODE' : 'MYSENSORS_SENSOR';
   if ($client) {
     if ($client->{sensorType} != $sensorType) {
-      if (AttrVal($hash->{NAME},"autocreate","")) {
+      if ($hash->{'inclusion-mode'}) {
         CommandModify(undef,"$client->{NAME} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
         readingsSingleUpdate($client,"state","TYPE changed after presentation received for different sensorType $sensorTypeStr",1);
       } else {
@@ -247,7 +266,7 @@ sub onPresentationMsg($$) {
       readingsSingleUpdate($client,"state","presentation received ok",1)
     }
   } else {
-    if (AttrVal($hash->{NAME},"autocreate","")) {
+    if ($hash->{'inclusion-mode'}) {
       my $clientname = "MY_$sensorTypeStr\_$msg->{radioId}_$msg->{childId}";
       CommandDefine(undef,"$clientname $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
       readingsSingleUpdate($main::defs{$clientname},"state","defined after presentation received ok",1);
@@ -295,7 +314,13 @@ sub onInternalMsg($$) {
   if ($address == 0 or $address == 255) { #msg to or from gateway
     TYPE: {
       $type == I_INCLUSION_MODE and do {
-        readingsSingleUpdate($hash,'inclusion-mode',$msg->{payload} == 0 ? 'off' : 'on',1);
+        if (AttrVal($hash->{NAME},"autocreate",0)) { #if autocreate is switched on, keep gateways inclusion-mode active
+          if ($msg->{payload} == 0) {
+            sendMessage($hash,radioId => $msg->{radioId}, childId => $msg->{childId}, ack => 0, subType => I_INCLUSION_MODE, payload => 1);
+          }
+        } else {
+          $hash->{'inclusion-mode'} = $msg->{payload};
+        }
         last;
       };
       $type == I_STARTUP_COMPLETE and do {
@@ -303,8 +328,7 @@ sub onInternalMsg($$) {
         last;
       };
       $type == I_LOG_MESSAGE and do {
-        readingsSingleUpdate($hash,'log-message',$msg->{payload},1);
-        Log3($hash->{NAME},4,"MYSENSORS gateway $hash->{NAME}: $msg->{payload}");
+        Log3($hash->{NAME},5,"MYSENSORS gateway $hash->{NAME}: $msg->{payload}");
         last;
       };
       $type == I_ID_REQUEST and do {
