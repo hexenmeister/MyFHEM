@@ -245,10 +245,11 @@ sub onPresentationMsg($$) {
   my $sensorType = $msg->{subType};
   sensorTypeToStr($sensorType) =~ /^S_(.+)$/;
   my $sensorTypeStr = $1;
+  my $module = ($sensorType == S_ARDUINO_NODE or $sensorType == S_ARDUINO_REPEATER_NODE) ? 'MYSENSORS_NODE' : 'MYSENSORS_SENSOR';
   if ($client) {
     if ($client->{sensorType} != $sensorType) {
       if (AttrVal($hash->{NAME},"autocreate","")) {
-        CommandModify(undef,"$client->{NAME} MYSENSORS_NODE $sensorTypeStr $msg->{radioId} $msg->{childId}");
+        CommandModify(undef,"$client->{NAME} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
       } else {
         Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg different type $sensorType for $client->{NAME} radioId $msg->{radioId}, childId $msg->{childId}, type $client->{sensorType}");
         readingsSingleUpdate($client,"error","msg different sensorType $sensorType",1);
@@ -256,7 +257,7 @@ sub onPresentationMsg($$) {
     }
   } else {
     if (AttrVal($hash->{NAME},"autocreate","")) {
-      CommandDefine(undef,"MySensor_$sensorTypeStr\_$msg->{radioId}_$msg->{childId} MYSENSORS_NODE $sensorTypeStr $msg->{radioId} $msg->{childId}");
+      CommandDefine(undef,"MySensor_$sensorTypeStr\_$msg->{radioId}_$msg->{childId} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
     } else {
       Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg from unknown radioId $msg->{radioId}, childId $msg->{childId}, sensorType $sensorType");
     }
@@ -266,7 +267,7 @@ sub onPresentationMsg($$) {
 sub onSetMsg($$) {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
-    MYSENSORS::NODE::onSetMessage($client,$msg);
+    $client->{'.package'}->onSetMessage($client,$msg);
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring set-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
@@ -275,7 +276,7 @@ sub onSetMsg($$) {
 sub onRequestMsg($$) {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
-    MYSENSORS::NODE::onRequestMessage($client,$msg);
+    $client->{'.package'}->onRequestMessage($client,$msg);
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring req-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
@@ -283,7 +284,11 @@ sub onRequestMsg($$) {
 
 sub onInternalMsg($$) {
   my ($hash,$msg) = @_;
-  readingsSingleUpdate($hash,internalMessageTypeToStr($msg->{subType}),$msg->{payload},1);
+  if (my $client = matchClient($hash,$msg)) {
+    MYSENSORS::NODE::onInternalMessage($client,$msg);
+  } else {
+    Log3($hash->{NAME},3,"MYSENSORS: ignoring internal-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
+  }
 };
 
 sub onStreamMsg($$) {

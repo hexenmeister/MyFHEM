@@ -30,15 +30,15 @@ my %gets = (
   "version"   => "",
 );
 
-sub MYSENSORS_NODE_Initialize($) {
+sub MYSENSORS_SENSOR_Initialize($) {
 
   my $hash = shift @_;
 
   # Consumer
-  $hash->{DefFn}    = "MYSENSORS::NODE::Define";
-  $hash->{UndefFn}  = "MYSENSORS::NODE::UnDefine";
-  $hash->{SetFn}    = "MYSENSORS::NODE::Set";
-  $hash->{AttrFn}   = "MYSENSORS::NODE::Attr";
+  $hash->{DefFn}    = "MYSENSORS::SENSOR::Define";
+  $hash->{UndefFn}  = "MYSENSORS::SENSOR::UnDefine";
+  $hash->{SetFn}    = "MYSENSORS::SENSOR::Set";
+  $hash->{AttrFn}   = "MYSENSORS::SENSOR::Attr";
   
   $hash->{AttrList} =
     "IODev ".
@@ -49,7 +49,7 @@ sub MYSENSORS_NODE_Initialize($) {
   main::LoadModule("MYSENSORS");
 }
 
-package MYSENSORS::NODE;
+package MYSENSORS::SENSOR;
 
 use strict;
 use warnings;
@@ -57,32 +57,6 @@ use GPUtils qw(:all);
 
 use Device::MySensors::Constants qw(:all);
 use Device::MySensors::Message qw(:all);
-
-our %sets = (
-  'S_DOOR'  => {},
-  'S_MOTION'  => {},
-  'S_SMOKE'  => {},
-  'S_LIGHT'  => {'V_LIGHT' => ['0','1']},
-  'S_DIMMER'  => {},
-  'S_COVER'  => {},
-  'S_TEMP'  => {},
-  'S_HUM'  => {},
-  'S_BARO'  => {},
-  'S_WIND' => {},
-  'S_RAIN'  => {},
-  'S_UV'  => {},
-  'S_WEIGHT'  => {},
-  'S_POWER'  => {},
-  'S_HEATER'  => {},
-  'S_DISTANCE'  => {},
-  'S_LIGHT_LEVEL'  => {},
-  'S_ARDUINO_NODE' => {},
-  'S_ARDUINO_REPEATER_NODE' => {},
-  'S_LOCK' => {},
-  'S_IR' => {},
-  'S_WATER' => {},
-  'S_AIR_QUALITY' => {},
-);
 
 BEGIN {
   MYSENSORS->import(qw(:all));
@@ -105,7 +79,7 @@ sub Define($$) {
   $hash->{radioId} = $radioId;
   $hash->{childId} = $childId;
   $hash->{sets} = {};
-  $hash->{'.package'} = 'MYSENSORS::NODE';
+  $hash->{'.package'} = 'MYSENSORS::SENSOR';
   AssignIoPort($hash);
 };
 
