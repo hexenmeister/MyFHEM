@@ -151,7 +151,8 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_TIME and do {
-      $hash->{$typeStr} = $msg->{payload};
+      sendNodeMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_TIME, payload => time);
+      Log3 ($hash->{NAME},4,"MYSENSORS_NODE $hash->{name}: update of time requested");
       last;
     };
     $type == I_VERSION and do {

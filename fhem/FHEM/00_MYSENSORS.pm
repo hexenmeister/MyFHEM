@@ -35,6 +35,7 @@ my %gets = (
 
 my @clients = qw(
   MYSENSORS_NODE
+  MYSENSORS_SENSOR
 );
 
 sub MYSENSORS_Initialize($) {
@@ -57,6 +58,7 @@ sub MYSENSORS_Initialize($) {
   $hash->{AttrList} = 
     "keep-alive ".
     "autocreate";
+    "first-sensorid";
 }
 
 package MYSENSORS;
@@ -261,7 +263,7 @@ sub onPresentationMsg($$) {
     }
   } else {
     if (AttrVal($hash->{NAME},"autocreate","")) {
-      CommandDefine(undef,"MySensor_$sensorTypeStr\_$msg->{radioId}_$msg->{childId} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
+      CommandDefine(undef,"MY_$sensorTypeStr\_$msg->{radioId}_$msg->{childId} $module $sensorTypeStr $msg->{radioId} $msg->{childId}");
     } else {
       Log3($hash->{NAME},3,"MYSENSORS: ignoring presentation-msg from unknown radioId $msg->{radioId}, childId $msg->{childId}, sensorType $sensorType");
     }
@@ -271,7 +273,11 @@ sub onPresentationMsg($$) {
 sub onSetMsg($$) {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
-    $client->{'.package'}->onSetMessage($client,$msg);
+    if ($client->{TYPE} eq 'MYSENSORS_NODE') {
+      MYSENSORS::NODE::onSetMessage($client,$msg);
+    } else {
+      MYSENSORS::SENSOR::onSetMessage($client,$msg);
+    }
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring set-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
@@ -280,7 +286,11 @@ sub onSetMsg($$) {
 sub onRequestMsg($$) {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
-    $client->{'.package'}->onRequestMessage($client,$msg);
+    if ($client->{TYPE} eq 'MYSENSORS_NODE') {
+      MYSENSORS::NODE::onRequestMessage($client,$msg);
+    } else {
+      MYSENSORS::SENSOR::onRequestMessage($client,$msg);
+    }
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring req-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
@@ -288,9 +298,10 @@ sub onRequestMsg($$) {
 
 sub onInternalMsg($$) {
   my ($hash,$msg) = @_;
-  if ($msg->{radioId} == 0 and $msg->{childId} == 0) { #msg from gateway
-    my $type = $msg->{subType};
-    SUBTYPE: {
+  my $address = $msg->{radioId};
+  my $type = $msg->{subType};
+  if ($address == 0 or $address == 255) { #msg to or from gateway
+    TYPE: {
       $type == I_INCLUSION_MODE and do {
         readingsSingleUpdate($hash,'inclusion-mode',$msg->{payload} == 0 ? 'off' : 'on',1);
         last;
@@ -302,12 +313,28 @@ sub onInternalMsg($$) {
       $type == I_LOG_MESSAGE and do {
         readingsSingleUpdate($hash,'log-message',$msg->{payload},1);
         Log3($hash->{NAME},4,"MYSENSORS gateway $hash->{NAME}: $msg->{payload}");
-      }
+        last;
+      };
+      $type == I_ID_REQUEST and do {
+        my %nodes = map {$_ => 1} (AttrVal($hash->{NAME},"first-sensorid",20) ... 254);
+        GP_ForallClients($hash,sub {
+          my $client = shift;
+          delete $nodes{$client->{radioId}};
+        });
+        if (keys %nodes) {
+          my $newid = (keys %nodes)[0];
+          sendMessage($hash,radioId => 255, childId => 255, cmd => C_INTERNAL, ack => 0, subType => I_ID_RESPONSE, payload => $newid);
+          Log3($hash->{NAME},4,"MYSENSORS $hash->{NAME} assigned new nodeid $newid");
+        } else {
+          Log3($hash->{NAME},4,"MYSENSORS $hash->{NAME} cannot assign new nodeid");
+        }
+        last;
+      };
     }
   } elsif (my $client = matchClient($hash,$msg)) {
     MYSENSORS::NODE::onInternalMessage($client,$msg);
   } else {
-    Log3($hash->{NAME},3,"MYSENSORS: ignoring internal-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
+    Log3($hash->{NAME},3,"MYSENSORS: ignoring internal-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".internalMessageTypeToStr($msg->{subType}));
   }
 };
 
