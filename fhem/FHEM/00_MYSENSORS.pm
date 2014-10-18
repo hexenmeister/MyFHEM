@@ -93,9 +93,48 @@ BEGIN {GP_Import(qw(
   ))};
 
 my %sensorAttr = (
-  LIGHT => ['setCommands on:V_LIGHT:1 off:V_LIGHT:0' ],
-  ARDUINO_NODE => [ 'config M' ],
+  ARDUINO_NODE          => [ 'config M' ],
   ARDUINO_REPEATER_NODE => [ 'config M' ],
+  TEMP        => ['map_TEMP temperature'],
+  HUM         => ['map_HUM humidity'],
+  LIGHT       => ['setCommands on:V_LIGHT:1 off:V_LIGHT:0' ],
+  DIMMER      => [],
+  PRESSURE    => ['map_PRESSURE pressure'],
+  FORECAST    => [],
+  RAIN        => [],
+  RAINRATE    => [],
+  WIND        => [],
+  GUST        => [],
+  DIRECTION   => [],
+  UV          => [],
+  WEIGHT      => [],
+  DISTANCE    => [],
+  IMPEDANCE   => [],
+  ARMED       => [],
+  TRIPPED     => [],
+  WATT        => [],
+  KWH         => [],
+  SCENE_ON    => [],
+  SCENE_OFF   => [],
+  HEATER      => [],
+  HEATER_SW   => [],
+  LIGHT_LEVEL => ['map_HUM brightness'],
+  VAR1        => [],
+  VAR2        => [],
+  VAR3        => [],
+  VAR4        => [],
+  VAR5        => [],
+  UP          => [],
+  DOWN        => [],
+  STOP        => [],
+  IR_SEND     => [],
+  IR_RECEIVE  => [],
+  FLOW        => [],
+  VOLUME      => [],
+  LOCK_STATUS => [],
+  DUST_LEVEL	=> [],
+  VOLTAGE	    => [],
+  CURRENT     => [],
 );
 
 sub Define($$) {
@@ -338,7 +377,7 @@ sub sendMessage($%) {
   my ($hash,%msg) = @_;
   my $txt = createMsg(%msg);
   Log3 ($hash->{NAME},5,"MYSENSORS send: ".dumpMsg(\%msg));
-  DevIo_SimpleWrite($hash,"$txt\n");
+  DevIo_SimpleWrite($hash,"$txt\n", undef);
 };
 
 sub matchClient($$) {
