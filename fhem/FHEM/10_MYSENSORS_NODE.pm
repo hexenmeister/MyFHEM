@@ -26,6 +26,9 @@
 use strict;
 use warnings;
 
+my %sets = (
+);
+
 my %gets = (
   "version"   => "",
 );
@@ -37,6 +40,7 @@ sub MYSENSORS_NODE_Initialize($) {
   # Consumer
   $hash->{DefFn}    = "MYSENSORS::NODE::Define";
   $hash->{UndefFn}  = "MYSENSORS::NODE::UnDefine";
+  $hash->{SetFn}    = "MYSENSORS::NODE::Set";
   $hash->{AttrFn}   = "MYSENSORS::NODE::Attr";
   
   $hash->{AttrList} =
@@ -75,12 +79,41 @@ sub Define($$) {
   $hash->{sensorType} = sensorTypeToIdx("S_$sensorType");
   $hash->{radioId} = $radioId;
   $hash->{childId} = $childId;
-  $hash->{sets} = {};
+  if ($hash->{sensorType} == S_ARDUINO_REPEATER_NODE) {
+    $hash->{sets} = { 
+        'time'  => [],
+        'clear' => [],
+      };
+  } else {
+    $hash->{sets} = {
+        'time'  => [],
+      };
+  }
   AssignIoPort($hash);
 };
 
 sub UnDefine($) {
   my ($hash) = @_;
+}
+
+sub Set($@) {
+  my ($hash, @a) = @_;
+  return "Need at least one parameters" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", map {@{$hash->{sets}->{$_}} ? $_.':'.join ',', @{$hash->{sets}->{$_}} : $_} sort keys %{$hash->{sets}})
+    if(!defined($hash->{sets}->{$a[1]}));
+  my $command = $a[1];
+  my $value = $a[2];
+
+  COMMAND_HANDLER: {
+    $command eq "clear" and do {
+      sendClientMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_CHILDREN, payload => "C");
+      last;
+    };
+    $command eq "time" and do {
+      sendClientMessage($hash,cmd => C_INTERNAL, akk => 0, subType => I_TIME, payload => time);
+      last;
+    }
+  }
 }
 
 sub Attr($$$$) {
@@ -89,7 +122,7 @@ sub Attr($$$$) {
   my $hash = $main::defs{$name};
   ATTRIBUTE_HANDLER: {
     $attribute eq "config" and do {
-      if ($main::initdone) {
+      if ($main::init_done) {
         sendClientMessage($hash, cmd => C_INTERNAL, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
       }
       last;
@@ -113,14 +146,6 @@ sub onRequestMessage($$) {
   );
 }
 
-#  my $msg = { radioId => $fields[0],
-#                 childId => $fields[1],
-#                 cmd     => $fields[2],
-#                 ack     => 0,
-##                 ack     => $fields[3],    # ack is not (yet) passed with message
-#                 subType => $fields[3],
-#                 payload => $fields[4] };
-
 sub onInternalMessage($$) {
   my ($hash,$msg) = @_;
   my $type = $msg->{subType};
@@ -128,6 +153,7 @@ sub onInternalMessage($$) {
   INTERNALMESSAGE: {
     $type == I_BATTERY_LEVEL and do {
       readingsSingleUpdate($hash,"batterylevel",$msg->{payload},1);
+      Log3 ($hash->{NAME},4,"MYSENSORS_NODE $hash->{name}: batterylevel $msg->{payload}");
       last;
     };
     $type == I_TIME and do {
@@ -152,8 +178,8 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_CONFIG and do {
-      #$msg->{ack} = 1;
       sendClientMessage($hash,cmd => C_INTERNAL, ack => 0, subType => I_CONFIG, payload => AttrVal($hash->{NAME},"config","M"));
+      Log3 ($hash->{NAME},4,"MYSENSORS_NODE $hash->{name}: respond to config-request");
       last;
     };
     $type == I_PING and do {
@@ -169,7 +195,8 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_CHILDREN and do {
-      $hash->{$typeStr} = $msg->{payload};
+      readingsSingleUpdate($hash,"state","routingtable cleared",1);
+      Log3 ($hash->{NAME},4,"MYSENSORS_NODE $hash->{name}: routingtable cleared");
       last;
     };
     $type == I_SKETCH_NAME and do {
