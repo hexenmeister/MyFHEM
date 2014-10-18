@@ -44,6 +44,7 @@ sub MYSENSORS_SENSOR_Initialize($) {
     "IODev ".
     "setCommands ".
     "set_.* ".
+    "map_.* ".
     $main::readingFnAttributes;
 
   main::LoadModule("MYSENSORS");
@@ -78,6 +79,7 @@ sub Define($$) {
   $hash->{radioId} = $radioId;
   $hash->{childId} = $childId;
   $hash->{sets} = {};
+  $hash->{mappings} = {};
   $hash->{setcommands} = {};
   AssignIoPort($hash);
 };
@@ -94,11 +96,11 @@ sub Set($$$@) {
   if (@values) {
     my $value = join " ",@values;
     sendClientMessage($hash, cmd => C_SET, subType => variableTypeToIdx($command), payload => $value);
-    readingsSingleUpdate($hash,$command,$value,1);
+    readingsSingleUpdate($hash,mapReadings($hash,$command),$value,1);
   } else {
     if (defined (my $setcommand = $hash->{setcommands}->{$command})) {
       sendClientMessage($hash, cmd => C_SET, subType => variableTypeToIdx($setcommand->{var}), payload => $setcommand->{val});
-      readingsSingleUpdate($hash,"state",$command,1);
+      readingsSingleUpdate($hash,"state",mapReadings($hash,$command),1);
     } else {
       return "$command not defined by attr setCommands";
     }
@@ -138,13 +140,22 @@ sub Attr($$$$) {
       }
       last;
     };
+    $attribute =~ /^map_(.+)/ and do {
+      if ($command eq "set") {
+        $hash->{mappings}->{$1}=join(",",split ("[, \t]+",$value));
+      } else {
+        CommandDeleteReading(undef,"$hash->{NAME} $1");
+        delete $hash->{mappings}->{$1};
+      }
+      last;
+    };
   }
 }
 
 sub onSetMessage($$) {
   my ($hash,$msg) = @_;
   variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
-  readingsSingleUpdate($hash,$1,$msg->{payload},1);
+  readingsSingleUpdate($hash,mapReadings($hash,$1),$msg->{payload},1);
 }
 
 sub onRequestMessage($$) {
@@ -162,6 +173,16 @@ sub onRequestMessage($$) {
 sub onInternalMessage($$) {
   my ($hash,$msg) = @_;
   $hash->{internalMessageTypeToStr($msg->{subType})} = $msg->{payload};
+}
+
+sub mapReadings($$) {
+	my($hash, $rName) = @_;
+	
+	if(defined($hash->{mappings}->{$rName})) {
+		return $hash->{mappings}->{$rName};
+	}
+	
+	return $rName;
 }
 
 1;
@@ -227,6 +248,11 @@ sub onInternalMessage($$) {
       <p><code>attr &lt;name&gt; set_&lt;reading&gt; [&lt;values&gt;]</code><br/>
          configures reading that may be used to both set 'reading' and send C_SET-messages to the sensors<br/>
          E.g.: <code>attr xxx set_V_LIGHT 0 1</code></p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; map_&lt;reading&gt; [&lt;new reading name&gt;]</code><br/>
+         configures reading user names that should be used instead of technical names<br/>
+         E.g.: <code>attr xxx map_TEMP temperature</code></p>
     </li>
   </ul>
 </ul>
