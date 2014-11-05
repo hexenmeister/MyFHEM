@@ -281,6 +281,12 @@ sub actHaustuerKlingel() {
 	voiceDoorbell();
 }
 
+sub actPIRVorgarten() {
+	#Halloween TEMP
+	voiceHalloween(3);
+}
+
+
 # Methode für den taster
 # Schatet globale Haus-Automatik ein 
 # (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
@@ -328,12 +334,16 @@ sub setHomePresence_Automatic() {
 sub setHomePresence_Present() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
 	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, PRESENT);
+	#Halloween TEMP
+	voiceHalloween(1);
 }
 
 # Setzt PRESENCE-Status auf abwesend (niemand ist zuhause)
 sub setHomePresence_Absent() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
   setValue(DEVICE_NAME_CTRL_ANWESENHEIT, ABSENT);
+  #Halloween TEMP
+	voiceHalloween(2);
 }
 
 # Schatet Tag/Nacht-Rolladen-Automatik ein (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT aud AUTOMATIC)
