@@ -29,9 +29,9 @@ myCtrlVoice_Initialize($$)
 # Ersetzt Umlaute (ä=ae etc.)
 ###############################################################################
 sub prepareTextToSpeak($) {
-	my($text) = @_;
-	# TODO
-	return $text;
+  my($text) = @_;
+  # TODO
+  return $text;
 }
 
 ######################################################
@@ -47,35 +47,35 @@ sub prepareTextToSpeak($) {
 #       (ggf. spaeter adaptiv durch ermitteln der Zimmerlautstaerke)
 ######################################################
 sub speak($;$) {
-	my($text,$volume)=@_;
-	if(defined ($volume)) {
-		if(int($volume) >=1) {
+  my($text,$volume)=@_;
+  if(defined ($volume)) {
+    if(int($volume) >=1) {
       fhem("set ".+DEVICE_NAME_TTS." volume ".$volume);
     } else {
-    	if(int($volume) == 0) {
-    	# Adaptiv 
-    	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-    	# 5 - sehr leise
-    	# 10 - ok
-    	# 50 - gut hoerbar
-    	# 100 - default / gut laut
-    	#
-    	# 20:00 - 22:00 => 10
-    	# 22:00 - 05:00 =>  5
-    	# 05:00 - 07:00 => 10
-    	# 07:00 - 08:00 => 50
-    	# 08:00 - 20:00 => 100
-    	if ($hour>=20 && $hour<22) {$volume=18}
-    	if ($hour>=22 || $hour<5)  {$volume=8}
-    	if ($hour>=5  && $hour<7)  {$volume=15}
-    	if ($hour>=7  && $hour<8)  {$volume=40}
-    	if ($hour>=8  && $hour<20)  {$volume=100}
-    	
-    	fhem("set ".+DEVICE_NAME_TTS." volume ".$volume);
+      if(int($volume) == 0) {
+      # Adaptiv 
+      my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+      # 5 - sehr leise
+      # 10 - ok
+      # 50 - gut hoerbar
+      # 100 - default / gut laut
+      #
+      # 20:00 - 22:00 => 10
+      # 22:00 - 05:00 =>  5
+      # 05:00 - 07:00 => 10
+      # 07:00 - 08:00 => 50
+      # 08:00 - 20:00 => 100
+      if ($hour>=20 && $hour<22) {$volume=18}
+      if ($hour>=22 || $hour<5)  {$volume=8}
+      if ($hour>=5  && $hour<7)  {$volume=15}
+      if ($hour>=7  && $hour<8)  {$volume=40}
+      if ($hour>=8  && $hour<20)  {$volume=100}
+      
+      fhem("set ".+DEVICE_NAME_TTS." volume ".$volume);
       }
     }
   }
-	fhem("set ".+DEVICE_NAME_TTS." tts ".prepareTextToSpeak($text));
+  fhem("set ".+DEVICE_NAME_TTS." tts ".prepareTextToSpeak($text));
 }
 
 sub voiceNotificationConfirm1() {
@@ -92,21 +92,29 @@ sub voiceDoorbell() {
   my $cnt_1min = $ret->{EQ_ACT_PP_CNT};
   
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-	# nur am Tage
+  
+  voiceHalloween(0);
+  # nur am Halloween-Abend ab 16:00
+  #if($month==9 && $mday==31 && $hour>=16 && $hour<23) {
+  # #halloween-TEMP
+  # speak(":halloween/schrei.ogg:",100);
+  #}
+  
+  # nur am Tage
   if($hour>=6&&$hour<23) {
-  	# 0: ---
-  	# 1: ---
-  	# 2: ? Hundegebell ?
-  	# 3: 
-  	# 4: 
-  	# Wer klingelt da Sturm?
-  	
-  	
-  	if($cnt_1min==0) {
-			# NOP
+    # 0: ---
+    # 1: ---
+    # 2: ? Hundegebell ?
+    # 3: 
+    # 4: 
+    # Wer klingelt da Sturm?
+    
+    
+    if($cnt_1min==0) {
+      # NOP
     }
-  	if($cnt_1min==1) {
-			# NOP
+    if($cnt_1min==1) {
+      # NOP
     }
     if($cnt_1min==2) {
       speak(":hund1.mp3:",100);
@@ -125,10 +133,10 @@ sub voiceDoorbell() {
 # Ersetzt Kommas und Punkte durch das Wort 'Komma'.
 ###############################################################################
 sub prepareNumToSpeak($) {
-	my($text) = @_;
-	$text =~ s/\./Komma/g;
+  my($text) = @_;
+  $text =~ s/\./Komma/g;
   $text =~ s/,/Komma/g;
-	return $text;
+  return $text;
 }
 
 
@@ -142,18 +150,18 @@ sub sec2DauerSprache($){
   my $s = $r - $m*60;
   my $text="";
   if($d==1) {
-  	$text.="Ein Tag ";
+    $text.="Ein Tag ";
     #return sprintf("Ein Tag, %d Stunden und %d Minuten",$d,$h,$m);
   }
   if($d>1) {
-  	$text.=$d." Tage ";
+    $text.=$d." Tage ";
     #return sprintf("%d Tage, %d Stunden und %d Minuten",$d,$h,$m);
   }
   if($h==1) {
-  	$text.="eine Stunde ";
+    $text.="eine Stunde ";
   }
   if($h>1) {
-  	$text.=$h." Stunden ";
+    $text.=$h." Stunden ";
   }
   if($m==1) {
     $text.="eine Minute ";
@@ -162,7 +170,7 @@ sub sec2DauerSprache($){
     $text.=$m." Minuten ";
   }
   if($d==0 && $h==0 && $m==0) {
-  	$text=$s." Sekunden";
+    $text=$s." Sekunden";
   }
   return $text;
 }
@@ -174,12 +182,12 @@ sub sec2DauerSprache($){
 #         0: Kurzansage, 1: Normal
 ###############################################################################
 sub speakWetterDaten(;$) {
-	my($art)=@_;
-	if(!defined($art)){$art=1;}
-	# TODO: Sauber / Abstraktionslayer erstellen
-	my $temp = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
-	my $humi = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
-	if($art==0) {
+  my($art)=@_;
+  if(!defined($art)){$art=1;}
+  # TODO: Sauber / Abstraktionslayer erstellen
+  my $temp = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
+  my $humi = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
+  if($art==0) {
     #speak("Aussentemperatur ".$temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
     speak($temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
   }
@@ -194,111 +202,111 @@ sub speakWetterDaten(;$) {
 #  Parameter: Tag: Zahl 1-5 (1-heute, 2-morgen,...) Defaul=2
 ###############################################################################
 sub speakWetterVorhersage(;$) {
-	my ($day) = @_;
-	if(!defined($day)) {$day=2;}
-	
-	# TODO: Sauber / Abstraktionslayer erstellen
-	my $t1= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_condition",undef);
-	my $t2= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_low_c",undef);
-	my $t3= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_high_c",undef);
-	
-	my $text = "";
-	if($day==1) {
-		#$text = "Wetter heute ";
-		$text = "Heute ";
-	}
-	if($day==2) {
-		$text = "Morgen ";
-	}
-	if($day==3) {
-		$text = "Uebermorgen ";
-	}
-	if($day>3) {
-		$text = "Wetter in ".($day-1)." Tagen ";
-	}	
-	if(defined($t1) && defined($t2) && defined($t3)) {
-	  $text.=$t1.". ";
-	  $text.="Temperatur von ".$t2." bis ".$t3." Grad.";
-	  if($day==1) {
-	  	# gefuehlte Temperatur
-	  	my $tg= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_chill",undef);
-	  	#$text.="Gefuehlte Temperatur aktuell ".$tg." Grad.";
-	  	$text.="Gefuehlte ".$tg." Grad.";
-	  	my $tw= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_speed",undef);
-	  	#$text.="Windgeschwindigkeit ".$tw." Kilometer pro Stunde.";
-	  	$text.="Wind ".$tw." Kilometer pro Stunde.";
-	  }
-	} else {
-		$text="Leider keine Vorhersage verfuegbar.";
-	}
-	
-	speak($text,0);
+  my ($day) = @_;
+  if(!defined($day)) {$day=2;}
+  
+  # TODO: Sauber / Abstraktionslayer erstellen
+  my $t1= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_condition",undef);
+  my $t2= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_low_c",undef);
+  my $t3= ReadingsVal(+DEVICE_NAME_WEATHER,"fc".$day."_high_c",undef);
+  
+  my $text = "";
+  if($day==1) {
+    #$text = "Wetter heute ";
+    $text = "Heute ";
+  }
+  if($day==2) {
+    $text = "Morgen ";
+  }
+  if($day==3) {
+    $text = "Uebermorgen ";
+  }
+  if($day>3) {
+    $text = "Wetter in ".($day-1)." Tagen ";
+  } 
+  if(defined($t1) && defined($t2) && defined($t3)) {
+    $text.=$t1.". ";
+    $text.="Temperatur von ".$t2." bis ".$t3." Grad.";
+    if($day==1) {
+      # gefuehlte Temperatur
+      my $tg= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_chill",undef);
+      #$text.="Gefuehlte Temperatur aktuell ".$tg." Grad.";
+      $text.="Gefuehlte ".$tg." Grad.";
+      my $tw= ReadingsVal(+DEVICE_NAME_WEATHER,"wind_speed",undef);
+      #$text.="Windgeschwindigkeit ".$tw." Kilometer pro Stunde.";
+      $text.="Wind ".$tw." Kilometer pro Stunde.";
+    }
+  } else {
+    $text="Leider keine Vorhersage verfuegbar.";
+  }
+  
+  speak($text,0);
 }
 
 sub voiceActAutomaticOn() {
-	# Hier (Sprach)Meldungen:
-	# Konzept: ein "Knopf-Bedienung": 
-	#   Auswertung: vorheriger Zustand.
-	#    Wenn Zustand unverändert: Tageszeitabhängige Meldungen
-	#    Auswertung: Wann war dieser Knopf zuletzt gedrueckt? Wie oft?
-	my($since_last, $sinse_l2, $cnt, $cnt_1min)=getHomeAutomaticCtrlBlock("on");
-	
-	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-	#$hour=5; # XXX Test
-	#TODO: Alle Ausgaben umbauen / auslagern / sauber implmentieren
-	#TODO: Spezielle Ansage Texte wenn Zustand geaendert ist: 'Nach Hause mommen'
-	
-	voiceNotificationConfirm1();
-	
-	# Nachtansage
-	if($hour>=23||$hour<3) {
-		# 0: 
-		# 1: GuteNachtWunsch, ZirkPumpe
-		# 2: Wetter
-		# 3: Wetterprognose fuer den nächsten Tag (Uhrzeit beanchten: vor/ nach 24:00)
-		# 
-		if($cnt_1min==0) {
-		  # Begrueßung nur, wenn laenger als 10 Min.
-			if($since_last>=600) {
+  # Hier (Sprach)Meldungen:
+  # Konzept: ein "Knopf-Bedienung": 
+  #   Auswertung: vorheriger Zustand.
+  #    Wenn Zustand unverändert: Tageszeitabhängige Meldungen
+  #    Auswertung: Wann war dieser Knopf zuletzt gedrueckt? Wie oft?
+  my($since_last, $sinse_l2, $cnt, $cnt_1min)=getHomeAutomaticCtrlBlock("on");
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  #$hour=5; # XXX Test
+  #TODO: Alle Ausgaben umbauen / auslagern / sauber implmentieren
+  #TODO: Spezielle Ansage Texte wenn Zustand geaendert ist: 'Nach Hause mommen'
+  
+  voiceNotificationConfirm1();
+  
+  # Nachtansage
+  if($hour>=23||$hour<3) {
+    # 0: 
+    # 1: GuteNachtWunsch, ZirkPumpe
+    # 2: Wetter
+    # 3: Wetterprognose fuer den nächsten Tag (Uhrzeit beanchten: vor/ nach 24:00)
+    # 
+    if($cnt_1min==0) {
+      # Begrueßung nur, wenn laenger als 10 Min.
+      if($since_last>=600) {
         speak("Willkommen zurueck!",0);
       }
       # Dauer nur ansagen, wenn laenger als 15 Min.
       if($since_last>=900) {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
-		}
-		if($cnt_1min==1) {
-			# Nicht zu oft wiederholen
+    }
+    if($cnt_1min==1) {
+      # Nicht zu oft wiederholen
       speak("Gute Nacht!",0);
       
-	    # ZirkPumpe kurz anwerfen	
-	    # TODO: Sauber / Abstraktionslayer
+      # ZirkPumpe kurz anwerfen 
+      # TODO: Sauber / Abstraktionslayer
       fhem("set EG_HA_SA01.Zirkulationspumpe on-for-timer 120");
     } 
     if($cnt_1min==2) {
       speakWetterDaten();
     }
     if($cnt_1min==3) {
-    	if($hour<=23) {
-    		# fuer morgen
+      if($hour<=23) {
+        # fuer morgen
         speakWetterVorhersage(2);
       } else {
-      	# fuer jetzt
+        # fuer jetzt
         speakWetterVorhersage(1);
       }
     }
     
-	}
-	
-	# Morgensansage
-	if($hour>=3&&$hour<10) {
-		# 0: Begrueßung
-		# 1: Begrueßung, Wetterdaten
-		# 2: Wetterprognose
-		# 3: Wiederholen: Wetter und Prognose
-		if($cnt_1min==0) {
-			# Begrueßung nur, wenn laenger als 10 Min.
-			if($since_last>=600) {
+  }
+  
+  # Morgensansage
+  if($hour>=3&&$hour<10) {
+    # 0: Begrueßung
+    # 1: Begrueßung, Wetterdaten
+    # 2: Wetterprognose
+    # 3: Wiederholen: Wetter und Prognose
+    if($cnt_1min==0) {
+      # Begrueßung nur, wenn laenger als 10 Min.
+      if($since_last>=600) {
         speak("Willkommen!",0);
       }
       # Dauer nur ansagen, wenn laenger als 15 Min.
@@ -306,8 +314,8 @@ sub voiceActAutomaticOn() {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
     }
-		if($cnt_1min==1) {
-			# Nicht zu oft wiederholen
+    if($cnt_1min==1) {
+      # Nicht zu oft wiederholen
       speak("Guten Morgen!",0);
       speakWetterDaten();
     } 
@@ -323,13 +331,13 @@ sub voiceActAutomaticOn() {
   
   # Tagesansage
   if($hour>=10&&$hour<23) {
-  	# 0: Begruessung
-  	# 1: Begrueßung, Wetter
-  	# 2: Wetterprognose (nur bis 14 Uhr?), sonst Aktuelles Wetter
-  	# 3: Wiederholen: Wetter und Prognose
-  	if($cnt_1min==0) {
-			# Begrueßung nur, wenn laenger als 10 Min.
-			if($since_last>=600) {
+    # 0: Begruessung
+    # 1: Begrueßung, Wetter
+    # 2: Wetterprognose (nur bis 14 Uhr?), sonst Aktuelles Wetter
+    # 3: Wiederholen: Wetter und Prognose
+    if($cnt_1min==0) {
+      # Begrueßung nur, wenn laenger als 10 Min.
+      if($since_last>=600) {
         speak("Willkommen!",0);
       }
       # Dauer nur ansagen, wenn laenger als 15 Min.
@@ -337,17 +345,17 @@ sub voiceActAutomaticOn() {
         speak("Abwesenheitsdauer: ".sec2DauerSprache($since_last),0);
       }
     }
-  	if($cnt_1min==1) {
-			# Nicht zu oft wiederholen
+    if($cnt_1min==1) {
+      # Nicht zu oft wiederholen
       speak("Hallo!",0);
       speakWetterDaten();
     }
     if($cnt_1min==2) {
-    	if($hour<15) {
-    		# fuer jetzt
+      if($hour<15) {
+        # fuer jetzt
         speakWetterVorhersage(1);
       } else {
-      	# fuer morgen
+        # fuer morgen
         speakWetterVorhersage(2);
       }
     }
@@ -355,10 +363,10 @@ sub voiceActAutomaticOn() {
       speak("Ok, nochmal!.",0);
       speakWetterDaten(0);
       if($hour<15) {
-    		# fuer jetzt
+        # fuer jetzt
         speakWetterVorhersage(1);
       } else {
-      	# fuer morgen
+        # fuer morgen
         speakWetterVorhersage(2);
       }
     }    
@@ -372,10 +380,10 @@ sub voiceActAutomaticOn() {
   if($cnt_1min==6) {
     speak("Hi! Ich bin Lea. Ich bin fuer die Ueberwachung und Steuerung zustaendig.",0);
     # TODO Versionsangaben: Mit git in /opt/fhem/_Mirror/FHEM: git log -1 --date=short --pretty=format:"%h; %d; %an; %ad; %s" 99_myUtils.pm
-		#        => Ausgabe: 0076531;  (HEAD, origin/master, master); hexenmeister; 2014-08-22; Refactoring, Optimizing, Improvement
-		#                    (Kurzhash; Bransh; Author; Date(iso); Subject)
-		my $cmd="cd ./_Mirror/FHEM/;; git log -1 --date=short --pretty=format:\"%h;; %d;; %an;; %ad;; %s\" 99_myUtils.pm";;qx($cmd);;
-		
+    #        => Ausgabe: 0076531;  (HEAD, origin/master, master); hexenmeister; 2014-08-22; Refactoring, Optimizing, Improvement
+    #                    (Kurzhash; Bransh; Author; Date(iso); Subject)
+    my $cmd="cd ./_Mirror/FHEM/;; git log -1 --date=short --pretty=format:\"%h;; %d;; %an;; %ad;; %s\" 99_myUtils.pm";;qx($cmd);;
+    
   }
   # 6: schweigen
   # 7/8: Kleiner Scherz ;)
@@ -386,14 +394,14 @@ sub voiceActAutomaticOn() {
     speak("Mit dir spreche ich nicht mehr!",0);
   }
   
-	if($cnt>0) {
-		# wiederholte Aktion (by Aenderung waere cnt=0).
-		# Die gleich nacheinander folgende Aufrufe sind bereit oben verarbeitet.
-		# Hier koennen davon unabhaengende Sacher erledigt werden.
-		# Z.B. ZirkPumpe etc.
-		# TODO
-	}
-	# TODO
+  if($cnt>0) {
+    # wiederholte Aktion (by Aenderung waere cnt=0).
+    # Die gleich nacheinander folgende Aufrufe sind bereit oben verarbeitet.
+    # Hier koennen davon unabhaengende Sacher erledigt werden.
+    # Z.B. ZirkPumpe etc.
+    # TODO
+  }
+  # TODO
 }
 
 sub voiceActAutomaticOff() {
@@ -449,35 +457,35 @@ sub voiceActAutomaticOff() {
 
   if(!$flag) {
   # Nachtansage
-	if($hour>=23||$hour<3) {
-	  if($cnt_1min==0) {
-	  # Begrueßung nur, wenn laenger als 10 Min.
+  if($hour>=23||$hour<3) {
+    if($cnt_1min==0) {
+    # Begrueßung nur, wenn laenger als 10 Min.
       if($since_last>=300) {
-    	  speakWetterDaten(0);
+        speakWetterDaten(0);
         #speak("Bis dann!",0);
         speak("okey!",0);
       }
-	  }
-	}
-	
-	# Morgensansage
-	if($hour>=3&&$hour<10) {
-		if($cnt_1min==0) {
-	  # Begrueßung nur, wenn laenger als 10 Min.
+    }
+  }
+  
+  # Morgensansage
+  if($hour>=3&&$hour<10) {
+    if($cnt_1min==0) {
+    # Begrueßung nur, wenn laenger als 10 Min.
       if($since_last>=300) {
-    	  speakWetterDaten();
+        speakWetterDaten();
         #speak("angenehmen Tag!",0);
         speak("registriert!",0);
       }
-	  }
-	}
-	
-	# Tagesansage
+    }
+  }
+  
+  # Tagesansage
     if($hour>=10&&$hour<23) {
-  	  if($cnt_1min==0) {
-	    # Begrueßung nur, wenn laenger als 10 Min.
+      if($cnt_1min==0) {
+      # Begrueßung nur, wenn laenger als 10 Min.
         if($since_last>=300) {
-    	  speakWetterDaten();
+        speakWetterDaten();
           #speak("Bis spaeter!",0);
           speak("okey",0);
         }
@@ -489,5 +497,40 @@ sub voiceActAutomaticOff() {
 
 # TODO:
 
+
+# TEMP
+
+#Halloween TEMP
+my $hltmp=1;
+sub voiceHalloween($) {
+  my ($mode) = @_;
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  # nur am Halloween-Abend ab 16:00
+  if($month==9 && $mday==31 && $hour>=16 && $hour<23) {
+    
+    # Schrei (Tuerklingel)
+    if($mode eq "0") {
+      speak(":halloween/schrei.ogg:",100);
+    }
+    
+    # Hexenlache
+    if($mode eq "1") {
+      $hltmp+=1;
+      if($hltmp > 2) {$hltmp=1;} 
+      speak(":halloween/lache".$hltmp.".ogg:",100);
+    }
+  
+    # Tuerknarren
+    if($mode eq "2") {
+      speak(":halloween/tuer_knarrt.wav:",100);
+    }
+  
+    # Bewegungsmelder Vorgarten
+    if($mode eq "3") {
+      speak(":halloween/klopfen.wav:",100);
+    }
+  }
+}
 
 1;
