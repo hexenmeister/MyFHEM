@@ -14,7 +14,7 @@ my $rooms;
   $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
   $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor"];
-  $rooms->{wohnzimmer}->{sensors_outdoor}=["hg_sensor","vr_luftdruck"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
+  $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
   #ggf. for future use
   #$rooms->{wohnzimmer}->{measurements}->{temperature}=["wz_raumsensor:temperature"];
@@ -25,17 +25,33 @@ my $rooms;
   $rooms->{kueche}->{alias}="Küche";
   $rooms->{kueche}->{fhem_name}="Kueche";
   $rooms->{kueche}->{sensors}=["ku_raumsensor","eg_ku_fk01"];
-  $rooms->{kueche}->{sensors_outdoor}=["hg_sensor","vr_luftdruck"]; 
+  $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht","hg_sensor"]; 
     
   $rooms->{umwelt}->{alias}="Umwelt";
   $rooms->{umwelt}->{fhem_name}="Umwelt";
-  $rooms->{umwelt}->{sensors}=["hg_sensor","um_vh_licht","um_hh_licht","um_vh_owts01"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
+  $rooms->{umwelt}->{sensors}=["hg_sensor","um_vh_licht","um_hh_licht","um_vh_owts01","vr_luftdruck"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
   $rooms->{umwelt}->{sensors_outdoor}=[]; # Keine
   
   $rooms->{eg_flur}->{alias}="Flur EG";
   $rooms->{eg_flur}->{fhem_name}="EG_Flur";
   $rooms->{eg_flur}->{sensors}=["eg_fl_raumsensor",""];
-  $rooms->{eg_flur}->{sensors_outdoor}=[]; # Keine
+  $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  
+  $rooms->{og_flur}->{alias}="Flur OG";
+  $rooms->{og_flur}->{fhem_name}="OG_Flur";
+  $rooms->{og_flur}->{sensors}=["of_sensor",""];
+  $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  
+  $rooms->{garage}->{alias}="Garage";
+  $rooms->{garage}->{fhem_name}="Garage";
+  $rooms->{garage}->{sensors}=[]; # TODO
+  $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  
+  $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
+  $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
+  $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor",""]; # TODO: Fensterkontakt, Thermostat
+  $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"];
+  
   
   # EG Flur, HWR, GästeWC, Garage
   # OG Flur, Bad, Schlafzimmer, Duschbad
@@ -111,6 +127,50 @@ my $sensors;
   $sensors->{eg_fl_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
   $sensors->{eg_fl_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
   
+  $sensors->{og_fl_raumsensor}->{alias}     ="OG Flur Raumsensor";
+  $sensors->{og_fl_raumsensor}->{fhem_name} ="OG_FL_KS01";
+  $sensors->{og_fl_raumsensor}->{type}      ="HomeMatic compatible";
+  $sensors->{og_fl_raumsensor}->{location}  ="og_flur";
+  $sensors->{og_fl_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{og_fl_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{og_fl_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $sensors->{og_fl_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  $sensors->{og_fl_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{og_fl_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{og_fl_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $sensors->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $sensors->{og_fl_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  $sensors->{og_fl_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{og_fl_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{og_fl_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
+  $sensors->{og_fl_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $sensors->{og_fl_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{og_fl_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+
+  $sensors->{sz_raumsensor}->{alias}     ="Schlafzimmer Raumsensor";
+  $sensors->{sz_raumsensor}->{fhem_name} ="OG_SZ_KS01";
+  $sensors->{sz_raumsensor}->{type}      ="HomeMatic compatible";
+  $sensors->{sz_raumsensor}->{location}  ="schlafzimmer";
+  $sensors->{sz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{sz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{sz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $sensors->{sz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  $sensors->{sz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{sz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{sz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $sensors->{sz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{sz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{sz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $sensors->{sz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  $sensors->{sz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{sz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{sz_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
+  $sensors->{sz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $sensors->{sz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $sensors->{sz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+
   # idee: 
   # $sensors->{vr_luftdruck}->{alias}       ="VirtuellerSensor";
   # $sensors->{vr_luftdruck}->{type}        ="virtual";
@@ -218,9 +278,12 @@ my $sensors;
   $sensors->{hg_sensor}->{type}      ="GSD";
   $sensors->{hg_sensor}->{location}  ="garten";
   $sensors->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{hg_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
   $sensors->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{hg_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
   $sensors->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
   $sensors->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{hg_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
   $sensors->{hg_sensor}->{readings}->{bat_voltage} ->{reading}  ="power_main";
   $sensors->{hg_sensor}->{readings}->{bat_voltage} ->{unit}     ="V";
   $sensors->{hg_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
@@ -244,9 +307,24 @@ my $sensors;
   $sensors->{tt_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $sensors->{tt_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
-  
-  
-  
+  $sensors->{of_sensor}->{alias}     ="OG Flur Sensor";
+  $sensors->{of_sensor}->{fhem_name} ="GSD_1.3";
+  $sensors->{of_sensor}->{type}      ="GSD";
+  $sensors->{of_sensor}->{location}  ="og_flur";
+  $sensors->{of_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{of_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $sensors->{of_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{of_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  $sensors->{of_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{of_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{of_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $sensors->{of_sensor}->{readings}->{bat_voltage}  ->{reading} ="power_main";
+  $sensors->{of_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
+  $sensors->{of_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{of_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{of_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+
+
   $sensors->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $sensors->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
   $sensors->{ku_raumsensor}->{type}      ="HomeMatic compatible";
@@ -343,7 +421,49 @@ my $sensors;
   $sensors->{eg_ku_fk01}->{readings}->{state}        ->{reading}   ="state";
   $sensors->{eg_ku_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $sensors->{eg_ku_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
+  #TODO: Mapping f. Zustaende: closed => geschlossen?
   
+  $sensors->{eg_wz_fk01}->{alias}     ="Fensterkontakt";
+  $sensors->{eg_wz_fk01}->{fhem_name} ="EG_WZ_FK01.Fenster";
+  $sensors->{eg_wz_fk01}->{type}      ="HomeMatic";
+  $sensors->{eg_wz_fk01}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
+  $sensors->{eg_wz_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
+  $sensors->{eg_wz_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
+  $sensors->{eg_wz_fk01}->{readings}->{cover}        ->{reading}   ="temperature";
+  $sensors->{eg_wz_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
+  $sensors->{eg_wz_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
+  $sensors->{eg_wz_fk01}->{readings}->{state}        ->{reading}   ="state";
+  $sensors->{eg_wz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
+  $sensors->{eg_wz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
+  
+  $sensors->{eg_wz_tk01}->{alias}     ="Terrassentürkontakt Links";
+  $sensors->{eg_wz_tk01}->{fhem_name} ="wz_fenster_l";
+  $sensors->{eg_wz_tk01}->{type}      ="HomeMatic";
+  $sensors->{eg_wz_tk01}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_tk01}->{readings}->{bat_status}   ->{reading}   ="battery";
+  $sensors->{eg_wz_tk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
+  $sensors->{eg_wz_tk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
+  $sensors->{eg_wz_tk01}->{readings}->{cover}        ->{reading}   ="temperature";
+  $sensors->{eg_wz_tk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
+  $sensors->{eg_wz_tk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
+  $sensors->{eg_wz_tk01}->{readings}->{state}        ->{reading}   ="state";
+  $sensors->{eg_wz_tk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
+  $sensors->{eg_wz_tk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
+
+  $sensors->{eg_wz_tk02}->{alias}     ="Terrassentürkontakt Recht";
+  $sensors->{eg_wz_tk02}->{fhem_name} ="wz_fenster_r";
+  $sensors->{eg_wz_tk02}->{type}      ="HomeMatic";
+  $sensors->{eg_wz_tk02}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_tk02}->{readings}->{bat_status}   ->{reading}   ="battery";
+  $sensors->{eg_wz_tk02}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
+  $sensors->{eg_wz_tk02}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
+  $sensors->{eg_wz_tk02}->{readings}->{cover}        ->{reading}   ="temperature";
+  $sensors->{eg_wz_tk02}->{readings}->{cover}        ->{alias}     ="Coverzustand";
+  $sensors->{eg_wz_tk02}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
+  $sensors->{eg_wz_tk02}->{readings}->{state}        ->{reading}   ="state";
+  $sensors->{eg_wz_tk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
+  $sensors->{eg_wz_tk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
   
 #------------------------------------------------------------------------------
 my $actTab;
