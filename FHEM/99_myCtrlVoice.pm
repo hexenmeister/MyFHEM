@@ -1,5 +1,5 @@
 ##############################################
-# $Id$
+# $Id: 99_myCtrlVoice.pm 0000 2014-11-10 00:00:00Z hexenmeister $ 
 package main;
 
 use strict;
@@ -48,6 +48,11 @@ sub prepareTextToSpeak($) {
 ######################################################
 sub speak($;$) {
   my($text,$volume)=@_;
+  
+  #DEBUG:
+  #Log3 "MyVoiceModul", 3, $text;
+  #return;
+  
   if(defined ($volume)) {
     if(int($volume) >=1) {
       fhem("set ".+DEVICE_NAME_TTS." volume ".$volume);
@@ -243,7 +248,13 @@ sub speakWetterVorhersage(;$) {
   speak($text,0);
 }
 
-sub voiceActAutomaticOn() {
+#
+# Universal Benutzer-Event: 
+#   Kommt nach Hause, Drückt knopf...
+#   Abhängig von Umstaenden sollen verschiedene (moeglichst zu der Situation passende)
+#   Meldungen ausgegeben werden.
+#
+sub voiceActGenericUserEvent() {
   # Hier (Sprach)Meldungen:
   # Konzept: ein "Knopf-Bedienung": 
   #   Auswertung: vorheriger Zustand.
@@ -404,7 +415,10 @@ sub voiceActAutomaticOn() {
   # TODO
 }
 
-sub voiceActAutomaticOff() {
+#
+# BenutzerEvent: Benutzer geht aus dem Haus
+# 
+sub voiceActLeaveHome() {
   # Hier (Sprach)Meldungen:
   # Konzept: ein "Knopf-Bedienung": 
   #   Auswertung: vorheriger Zustand.
@@ -434,20 +448,50 @@ sub voiceActAutomaticOff() {
   
   if($numOpen>0) {
     # Offene Fenster
-    #$text.="Dringende Warnung! Es sind noch ".$numOpen." Fenster offen. ";
-    $text.="Achtung! ".$numOpen." Fenster offen. ";
+    if($numOpen==1) {
+      #$text.="Dringende Warnung! Es ist noch ein Fenster offen. ";
+      $text.="Achtung! ein Fenster offen. ";
+    } else {
+      #$text.="Dringende Warnung! Es sind noch ".$numOpen." Fenster offen. ";
+      $text.="Achtung! ".$numOpen." Fenster offen. ";
+    }
+    
+    my $cnt=0;
     foreach my $d (@wndOpen) {
-      $text.=$d." ";
+      $text.=$d;
+      $cnt+=1;
+      if($cnt<($numOpen-1)) {
+        $text.=", ";
+      } elsif ($cnt==($numOpen-1)) {
+      	$text.=" und ";
+      } else {
+      	$text.=". ";
+      }
     }
     $flag=1;
   }
   
   if($numTilted>0) {
     # gekippte Fenster
-    #$text.="Warnung! Es sind noch ".$numTilted." Fenster gekippt. ";
-    $text.="".$numTilted." Fenster gekippt. ";
+    if($numTilted==1) {
+      #$text.="Warnung! Es ist noch ein Fenster gekippt. ";
+      $text.="Ein Fenster gekippt. ";
+    } else {
+      #$text.="Warnung! Es sind noch ".$numTilted." Fenster gekippt. ";
+      $text.="".$numTilted." Fenster gekippt. ";    	
+    }
+    
+    $cnt=0;
     foreach my $d (@wndTilted) {
-      $text.=$d." ";
+      $text.=$d;
+      $cnt+=1;
+      if($cnt<($numTilted-1)) {
+        $text.=", ";
+      } elsif ($cnt==($numTilted-1)) {
+      	$text.=" und ";
+      } else {
+      	$text.=". ";
+      }
     }
     $flag=1;
   }

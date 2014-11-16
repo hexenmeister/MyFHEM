@@ -6,13 +6,17 @@ use strict;
 use warnings;
 use POSIX;
 use Time::Local;
+use Time::HiRes qw(gettimeofday);
 
 use myCtrlHAL;
 
+my $mhash;
+
 sub
-myCtrlBase_Initialize($$)
+myCtrlBase_Initialize($)
 {
   my ($hash) = @_;
+  $mhash = $hash;
 }
 
 # --- Automatik und Steuerung -------------------------------------------------
@@ -296,7 +300,7 @@ sub actHomeAutomaticOn() {
 	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
 	
 	# Hier (Sprach)Meldungen
-	voiceActAutomaticOn();
+	voiceActGenericUserEvent();
 
 }
 
@@ -308,7 +312,7 @@ sub actHomeAutomaticOff() {
 	setBeschattungAutomaticOff(); # ?
 	
 	# Hier (Sprach)Meldungen
-	voiceActAutomaticOff();
+	voiceActLeaveHome();
   
 }
 
@@ -359,6 +363,15 @@ sub setDayNightRolloAutomaticOff() {
 }
 
 # TODO: 
+my $sheduled;
+sub sheduleAction($$;$) {
+	my($timeOffset, $fn, $arg)=@_;
+	
+	my $now = gettimeofday();
+	my $ntime = $now+$timeOffset;
+	
+	#TODO InternalTimer
+}
 
 
 1;
