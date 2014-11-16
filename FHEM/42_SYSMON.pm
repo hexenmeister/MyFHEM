@@ -23,14 +23,14 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 6759 2014-10-12 21:31:50Z hexenmeister $
+# $Id: 42_SYSMON.pm 6970 2014-11-14 20:01:35Z hexenmeister $
 
 package main;
 
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.2";
+my $VERSION = "1.9.4.5";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -932,6 +932,7 @@ SYSMON_getUserDefined($$$$)
 	logF($hash, "SYSMON_getUserDefined", "Name=[$uName] Cmd=[$uCmd]");
 	
 	my $out_str = SYSMON_execute($hash, $uCmd);
+  chomp $out_str;
 	$map->{$uName} = $out_str;
 	
 	return $map;
@@ -2533,8 +2534,7 @@ sub SYSMON_PowerAcInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
-  
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
   return $map;
 }
 
@@ -2557,7 +2557,7 @@ sub SYSMON_PowerUsbInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
   
   return $map;
 }
@@ -2585,7 +2585,7 @@ sub SYSMON_PowerBatInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current $d_capacity";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, capacity: ".$d_capacity." %";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W, "."capacity: ".$d_capacity." %";
   
   if($d_present eq "1") {
     # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
@@ -2858,6 +2858,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
         Example:<br>
     		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+    		The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
     </li>
     <br>    
   <br>
@@ -3410,6 +3411,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
         Beispiel:<br>
     		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+    		Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
     </li>
     <br>    
   <br>
