@@ -11,13 +11,87 @@ use Time::HiRes qw(gettimeofday);
 use myCtrlHAL;
 
 my $mhash;
+my $timerParam;
 
+# Initialisierung
 sub
 myCtrlBase_Initialize($)
 {
   my ($hash) = @_;
   $mhash = $hash;
+  
+  $hash->{UndefFn} = "myCtrlBase_Undef";
+
+  my $next = int(gettimeofday()) +1; 
+  # Parameter fuer die HauptZeitschleife
+  $timerParam -> {'next'} = $next;
+  # Parameter fuer Heartbeat-Methode
+  $timerParam -> {'haertbeat_last'} = $next;
+  $timerParam -> {'haertbeat_interval'} = 60;
+  InternalTimer($next, 'myCtrlBase_ProcessTimer', $timerParam, 0);
+  Log 2, "AutomationControlBase: initialized";
+  return $hash;
 }
+
+# interne Verarbeitung der periodischen Aufrufen (Steuerung)
+sub
+myCtrlBase_ProcessTimer(@)
+{
+  my $param = shift;
+  my $now = gettimeofday();
+  
+  if ($now > $timerParam -> {'haertbeat_last'} + $timerParam -> {'haertbeat_interval'}) {
+    $timerParam -> {'haertbeat_last'} = $now;
+    # Wichtig ist, dass die Heartbeat-Methode moeglichst schnell ist.
+    automationHeartbeat();
+  }
+  
+  # TODO: Geplante Funktionen pruefen/ausfrufen
+  #no strict "refs";
+  #&{$fn}($arg);
+  #use strict "refs";
+  
+  
+  $param -> {'next'} = int($now) +1;
+  InternalTimer($param -> {'next'}, 'myCtrlBase_ProcessTimer', $param, 0);
+}
+
+my %scheduled;
+my $nexttime;
+my $schedcnt;
+# Plant ein gegebene Funktion zur Ausfuehrung.
+# Params: 
+#   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
+#   fn:  Funktion
+#   arg: Parameter (array), die an die angegebene Funktion beim Aufruf uebergeben werden
+sub
+schedule($$$)
+{
+	my ($tim, $fn, $arg) = @_;
+	
+	if(!defined($tim) || !defined($fn)) {
+		return;
+	}
+	
+	my $now = gettimeofday();
+  $tim+=$now;
+  
+  $scheduled{$schedcnt}{TRIGGERTIME} = $tim;
+  $scheduled{$schedcnt}{FN} = $fn;
+  $scheduled{$schedcnt}{ARG} = $arg;
+  $schedcnt++;
+  $nextat = $tim if(!$nexttime || $nexttime > $tim);
+}
+
+# Clean up
+sub
+myCtrlBase_Undef($$)
+{
+  RemoveInternalTimer($timerParam -> {'next'});
+  Log 2, "AutomationControlBase: clean-up";
+  return undef;
+}
+
 
 # --- Automatik und Steuerung -------------------------------------------------
 # wird beim Start von FHEM aufgerufen (notify global:INITIALIZED)
@@ -55,6 +129,8 @@ sub automationHeartbeat() {
 	#  - Wenn nicht 'Verrreist', dann Zirkulation, Beschattung, 
 	#    Tag/Nachtsteuerung (Rolladen), Presence wieder auf Automatik setzen.
 	#  - ...
+	
+	#Log 3, "AutomationControlBase: Heartbeat";
 	
 	my $hms = CurrentTime();
 	my $cDate = CurrentDate(); 
