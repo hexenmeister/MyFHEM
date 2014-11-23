@@ -46,11 +46,8 @@ myCtrlBase_ProcessTimer(@)
     automationHeartbeat();
   }
   
-  # TODO: Geplante Funktionen pruefen/ausfrufen
-  #no strict "refs";
-  #&{$fn}($arg);
-  #use strict "refs";
-  
+  # Geplante Funktionen pruefen/ausfrufen
+  handleScheduled();
   
   $param -> {'next'} = int($now) +1;
   InternalTimer($param -> {'next'}, 'myCtrlBase_ProcessTimer', $param, 0);
@@ -58,29 +55,149 @@ myCtrlBase_ProcessTimer(@)
 
 my %scheduled;
 my $nexttime;
-my $schedcnt;
+my $schedcnt=0;
+
+#####################################
+# Return the time to the next event (or undef if there is none)
+# and call each function which was scheduled for this time
+sub
+handleScheduled() {
+  return undef if(!$nexttime);
+
+  my $now = gettimeofday();
+  return ($nexttime-$now) if($now < $nexttime);
+
+  $now += 0.01;# need to cover min delay at least
+  $nexttime = 0;
+  # Check the internal list: unnamed
+  foreach my $i (sort { $scheduled{unnamed}{$a}{TRIGGERTIME} <=>
+                        $scheduled{unnamed}{$b}{TRIGGERTIME} } keys %{$scheduled{unnamed}}) {
+    my $tim = $scheduled{unnamed}{$i}{TRIGGERTIME};
+    my $fn = $scheduled{unnamed}{$i}{FN};
+    my $arg = $scheduled{unnamed}{$i}{ARG};
+    if(!defined($tim) || !defined($fn)) {
+      delete($scheduled{unnamed}{$i});
+      next;
+    } elsif($tim <= $now) {
+      no strict "refs";
+      if(defined($arg)) {
+        &{$fn}($arg);
+      } else {
+      	eval($fn);
+      }
+      use strict "refs";
+      delete($scheduled{unnamed}{$i});
+    } else {
+      $nexttime = $tim if(!$nexttime || $nexttime > $tim);
+    }
+  }
+  
+  # Check the internal list: named
+  foreach my $i (sort { $scheduled{named}{$a}{TRIGGERTIME} <=>
+                        $scheduled{named}{$b}{TRIGGERTIME} } keys %{$scheduled{named}}) {
+    my $tim = $scheduled{named}{$i}{TRIGGERTIME};
+    my $fn = $scheduled{named}{$i}{FN};
+    my $arg = $scheduled{named}{$i}{ARG};
+    if(!defined($tim) || !defined($fn)) {
+      delete($scheduled{named}{$i});
+      next;
+    } elsif($tim <= $now) {
+      no strict "refs";
+      if(defined($arg)) {
+        &{$fn}($arg);
+      } else {
+      	eval($fn);
+      }
+      use strict "refs";
+      delete($scheduled{named}{$i});
+    } else {
+      $nexttime = $tim if(!$nexttime || $nexttime > $tim);
+    }
+  }
+
+  return undef if(!$nexttime);
+  $now = gettimeofday(); # possibly some tasks did timeout in the meantime
+                         # we will cover them 
+  return ($now+ 0.01 < $nexttime) ? ($nexttime-$now) : 0.01;
+}
+
 # Plant ein gegebene Funktion zur Ausfuehrung.
 # Params: 
 #   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
 #   fn:  Funktion
+# Opt. Params:
 #   arg: Parameter (array), die an die angegebene Funktion beim Aufruf uebergeben werden
+#        Werden Parameter definiert, wird Funktionsaufruf verwendet, ansonsten eval()!
+#        Damit können nicht nur Funktionsnamen, sondern auch Anwesungen verwendet werden.
+#   ID_Name: Wenn angegeben, wird die ggf. bereits vorhandene Planung mit dem 
+#            gleichen Namen entweder dadurch ersetzt oder die erneute Definition 
+#            wird ignoriert.
+#   mode: 0 (default): die zweite Definition wird verwofen, solange eine 
+#            gleichnamige bereits existiert
+#         1: die zweite Definition ersetzt die erste. Dadurch wird die Planzeit ggf. verändert.
+#            Aber auch ggf. die Funktion und Argumente.
+#         2: die laengste Zeit der beiden Definitionen wird genommen. 
+#            Auch die Fn und die Parameter werden von dem "Gewinner" genommen.
 sub
-schedule($$$)
+schedule($$;$$$)
 {
-	my ($tim, $fn, $arg) = @_;
+	my ($tim, $fn, $arg, $nameID, $nMode) = @_;
 	
 	if(!defined($tim) || !defined($fn)) {
 		return;
 	}
 	
+	if(defined($nameID) && !defined($nMode)) {
+		$nMode=0; # default
+	}
+	
+	if(!defined($schedcnt)) {
+		$schedcnt = 0;
+	}
+	
 	my $now = gettimeofday();
   $tim+=$now;
   
-  $scheduled{$schedcnt}{TRIGGERTIME} = $tim;
-  $scheduled{$schedcnt}{FN} = $fn;
-  $scheduled{$schedcnt}{ARG} = $arg;
-  $schedcnt++;
-  $nextat = $tim if(!$nexttime || $nexttime > $tim);
+  if(defined($nameID)) {
+  	Log 3, "schedule: named mode";
+  	if(defined($scheduled{named}{$nameID})) {
+  		if($nMode == 0) {
+  			# ignore second definition
+  		  $tim = $scheduled{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
+  			Log 3, "schedule: definition allready exists, ignore new (mode 0)";
+  		} elsif ($nMode == 1) {
+  			Log 3, "schedule: definition allready exists, update (mode 1)";
+  			# update first definition
+  			$scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
+        $scheduled{named}{$nameID}{FN} = $fn;
+        $scheduled{named}{$nameID}{ARG} = $arg;
+  		} else {
+  			# update first definition else ignore
+  			Log 3, "schedule: definition allready exists, check time (mode 2)";
+        if($scheduled{named}{$nameID}{TRIGGERTIME} < $tim) {
+        	Log 3, "schedule: new time later then old, update (mode 2) => $scheduled{named}{$nameID}{TRIGGERTIME} vs. $tim";
+  			  $scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
+          $scheduled{named}{$nameID}{FN} = $fn;
+          $scheduled{named}{$nameID}{ARG} = $arg;
+  			} else {
+  				Log 3, "schedule: new time earlier then old, ignore (mode 2) => $scheduled{named}{$nameID}{TRIGGERTIME} vs. $tim";
+  				$tim = $scheduled{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
+  			}
+  		}
+  	} else {
+  		Log 3, "schedule: new definition";
+      $scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
+      $scheduled{named}{$nameID}{FN} = $fn;
+      $scheduled{named}{$nameID}{ARG} = $arg;
+    }
+  } else {
+  	Log 3, "schedule: unnamed mode";
+    $scheduled{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
+    $scheduled{unnamed}{$schedcnt}{FN} = $fn;
+    $scheduled{unnamed}{$schedcnt}{ARG} = $arg;
+    $schedcnt++;
+  }
+  $nexttime = $tim if(!$nexttime || $nexttime > $tim);
 }
 
 # Clean up
