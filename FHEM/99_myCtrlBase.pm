@@ -43,17 +43,17 @@ myCtrlBase_ProcessTimer(@)
   if ($now > $timerParam -> {'haertbeat_last'} + $timerParam -> {'haertbeat_interval'}) {
     $timerParam -> {'haertbeat_last'} = $now;
     # Wichtig ist, dass die Heartbeat-Methode moeglichst schnell ist.
-    automationHeartbeat();
+    myCtrlBase_automationHeartbeat();
   }
   
   # Geplante Funktionen pruefen/ausfrufen
-  handleScheduled();
+  myCtrlBase_handleScheduledTasks();
   
   $param -> {'next'} = int($now) +1;
   InternalTimer($param -> {'next'}, 'myCtrlBase_ProcessTimer', $param, 0);
 }
 
-my %scheduled;
+my %scheduledTasks;
 my $nexttime;
 my $schedcnt=0;
 
@@ -61,7 +61,7 @@ my $schedcnt=0;
 # Return the time to the next event (or undef if there is none)
 # and call each function which was scheduled for this time
 sub
-handleScheduled() {
+myCtrlBase_handleScheduledTasks() {
   return undef if(!$nexttime);
 
   my $now = gettimeofday();
@@ -70,46 +70,56 @@ handleScheduled() {
   $now += 0.01;# need to cover min delay at least
   $nexttime = 0;
   # Check the internal list: unnamed
-  foreach my $i (sort { $scheduled{unnamed}{$a}{TRIGGERTIME} <=>
-                        $scheduled{unnamed}{$b}{TRIGGERTIME} } keys %{$scheduled{unnamed}}) {
-    my $tim = $scheduled{unnamed}{$i}{TRIGGERTIME};
-    my $fn = $scheduled{unnamed}{$i}{FN};
-    my $arg = $scheduled{unnamed}{$i}{ARG};
+  foreach my $i (sort { $scheduledTasks{unnamed}{$a}{TRIGGERTIME} <=>
+                        $scheduledTasks{unnamed}{$b}{TRIGGERTIME} } keys %{$scheduledTasks{unnamed}}) {
+    my $tim = $scheduledTasks{unnamed}{$i}{TRIGGERTIME};
+    my $fn = $scheduledTasks{unnamed}{$i}{FN};
+    my $arg = $scheduledTasks{unnamed}{$i}{ARG};
     if(!defined($tim) || !defined($fn)) {
-      delete($scheduled{unnamed}{$i});
+      delete($scheduledTasks{unnamed}{$i});
       next;
     } elsif($tim <= $now) {
       no strict "refs";
       if(defined($arg)) {
-        &{$fn}($arg);
+        eval {
+        	&{$fn}($arg);
+        };
+        #Log (3, "scheduled task ($i) error: $@") if $@;
       } else {
       	eval($fn);
+      	#Log (3, "scheduled task ($i) error: $@") if $@;
       }
+      Log (3, "scheduled task ($i) error: $@") if $@;
       use strict "refs";
-      delete($scheduled{unnamed}{$i});
+      delete($scheduledTasks{unnamed}{$i});
     } else {
       $nexttime = $tim if(!$nexttime || $nexttime > $tim);
     }
   }
   
   # Check the internal list: named
-  foreach my $i (sort { $scheduled{named}{$a}{TRIGGERTIME} <=>
-                        $scheduled{named}{$b}{TRIGGERTIME} } keys %{$scheduled{named}}) {
-    my $tim = $scheduled{named}{$i}{TRIGGERTIME};
-    my $fn = $scheduled{named}{$i}{FN};
-    my $arg = $scheduled{named}{$i}{ARG};
+  foreach my $i (sort { $scheduledTasks{named}{$a}{TRIGGERTIME} <=>
+                        $scheduledTasks{named}{$b}{TRIGGERTIME} } keys %{$scheduledTasks{named}}) {
+    my $tim = $scheduledTasks{named}{$i}{TRIGGERTIME};
+    my $fn = $scheduledTasks{named}{$i}{FN};
+    my $arg = $scheduledTasks{named}{$i}{ARG};
     if(!defined($tim) || !defined($fn)) {
-      delete($scheduled{named}{$i});
+      delete($scheduledTasks{named}{$i});
       next;
     } elsif($tim <= $now) {
       no strict "refs";
       if(defined($arg)) {
-        &{$fn}($arg);
+        eval {
+        	&{$fn}($arg);
+        };
+        #Log (3, "scheduled task ($i) error: $@") if $@;
       } else {
       	eval($fn);
+      	#Log (3, "scheduled task ($i) error: $@") if $@;
       }
+      Log (3, "scheduled task ($i) error: $@") if $@;
       use strict "refs";
-      delete($scheduled{named}{$i});
+      delete($scheduledTasks{named}{$i});
     } else {
       $nexttime = $tim if(!$nexttime || $nexttime > $tim);
     }
@@ -121,7 +131,7 @@ handleScheduled() {
   return ($now+ 0.01 < $nexttime) ? ($nexttime-$now) : 0.01;
 }
 
-# Plant ein gegebene Funktion zur Ausfuehrung.
+# Plant eine gegebene Funktion zur Ausfuehrung ein.
 # Params: 
 #   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
 #   fn:  Funktion
@@ -139,7 +149,7 @@ handleScheduled() {
 #         2: die laengste Zeit der beiden Definitionen wird genommen. 
 #            Auch die Fn und die Parameter werden von dem "Gewinner" genommen.
 sub
-schedule($$;$$$)
+scheduleTask($$;$$$)
 {
 	my ($tim, $fn, $arg, $nameID, $nMode) = @_;
 	
@@ -159,45 +169,88 @@ schedule($$;$$$)
   $tim+=$now;
   
   if(defined($nameID)) {
-  	Log 3, "schedule: named mode";
-  	if(defined($scheduled{named}{$nameID})) {
+  	#Log 3, "schedule: named mode";
+  	if(defined($scheduledTasks{named}{$nameID})) {
   		if($nMode == 0) {
   			# ignore second definition
-  		  $tim = $scheduled{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
-  			Log 3, "schedule: definition allready exists, ignore new (mode 0)";
+  		  $tim = $scheduledTasks{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
+  			#Log 3, "schedule: definition allready exists, ignore new (mode 0)";
   		} elsif ($nMode == 1) {
-  			Log 3, "schedule: definition allready exists, update (mode 1)";
+  			#Log 3, "schedule: definition allready exists, update (mode 1)";
   			# update first definition
-  			$scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
-        $scheduled{named}{$nameID}{FN} = $fn;
-        $scheduled{named}{$nameID}{ARG} = $arg;
+  			$scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
+        $scheduledTasks{named}{$nameID}{FN} = $fn;
+        $scheduledTasks{named}{$nameID}{ARG} = $arg;
   		} else {
   			# update first definition else ignore
-  			Log 3, "schedule: definition allready exists, check time (mode 2)";
-        if($scheduled{named}{$nameID}{TRIGGERTIME} < $tim) {
-        	Log 3, "schedule: new time later then old, update (mode 2) => $scheduled{named}{$nameID}{TRIGGERTIME} vs. $tim";
-  			  $scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
-          $scheduled{named}{$nameID}{FN} = $fn;
-          $scheduled{named}{$nameID}{ARG} = $arg;
+  			#Log 3, "schedule: definition allready exists, check time (mode 2)";
+        if($scheduledTasks{named}{$nameID}{TRIGGERTIME} < $tim) {
+        	#Log 3, "schedule: new time later then old, update (mode 2) => $scheduledTasks{named}{$nameID}{TRIGGERTIME} vs. $tim";
+  			  $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
+          $scheduledTasks{named}{$nameID}{FN} = $fn;
+          $scheduledTasks{named}{$nameID}{ARG} = $arg;
   			} else {
-  				Log 3, "schedule: new time earlier then old, ignore (mode 2) => $scheduled{named}{$nameID}{TRIGGERTIME} vs. $tim";
-  				$tim = $scheduled{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
+  				#Log 3, "schedule: new time earlier then old, ignore (mode 2) => $scheduledTasks{named}{$nameID}{TRIGGERTIME} vs. $tim";
+  				$tim = $scheduledTasks{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
   			}
   		}
   	} else {
-  		Log 3, "schedule: new definition";
-      $scheduled{named}{$nameID}{TRIGGERTIME} = $tim;
-      $scheduled{named}{$nameID}{FN} = $fn;
-      $scheduled{named}{$nameID}{ARG} = $arg;
+  		#Log 3, "schedule: new definition";
+      $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
+      $scheduledTasks{named}{$nameID}{FN} = $fn;
+      $scheduledTasks{named}{$nameID}{ARG} = $arg;
     }
   } else {
-  	Log 3, "schedule: unnamed mode";
-    $scheduled{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
-    $scheduled{unnamed}{$schedcnt}{FN} = $fn;
-    $scheduled{unnamed}{$schedcnt}{ARG} = $arg;
+  	#Log 3, "schedule: unnamed mode";
+    $scheduledTasks{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
+    $scheduledTasks{unnamed}{$schedcnt}{FN} = $fn;
+    $scheduledTasks{unnamed}{$schedcnt}{ARG} = $arg;
     $schedcnt++;
   }
   $nexttime = $tim if(!$nexttime || $nexttime > $tim);
+  
+  return $tim;
+}
+
+###############################################################################
+# Listet die geplanten Task auf.
+# Params:
+#   mode: 0: Alle; 1: unnamed tasks only; 2: named tasks only
+###############################################################################
+sub listScheduledTasks(;$) {
+	my($mode) = @_;
+	
+	$mode = 0 unless defined($mode);
+	
+	my $ret="";
+	
+	#unnamed
+	if($mode==0 || $mode==1) {
+		foreach my $i (sort { $scheduledTasks{unnamed}{$a}{TRIGGERTIME} <=>
+                        $scheduledTasks{unnamed}{$b}{TRIGGERTIME} } keys %{$scheduledTasks{unnamed}}) {
+      my $tim = $scheduledTasks{unnamed}{$i}{TRIGGERTIME};
+      my $fn = $scheduledTasks{unnamed}{$i}{FN};
+      my $arg = $scheduledTasks{unnamed}{$i}{ARG};      
+      $ret.= sprintf("%10d: %s [%-40s] (%s)\n",
+                     $i, strftime("%d.%m.%Y %H:%M:%S", localtime($tim)),
+                     $fn,defined($arg)?join(', ', @$arg):"");
+    }
+	}
+	
+	#named
+	if($mode==0 || $mode==2) {
+		foreach my $i (sort { $scheduledTasks{named}{$a}{TRIGGERTIME} <=>
+                        $scheduledTasks{named}{$b}{TRIGGERTIME} } keys %{$scheduledTasks{named}}) {
+      my $tim = $scheduledTasks{named}{$i}{TRIGGERTIME};
+      my $fn = $scheduledTasks{named}{$i}{FN};
+      my $arg = $scheduledTasks{named}{$i}{ARG};      
+      $ret.= sprintf("%10s: %s [%-40s] (%s)\n",
+                     $i, strftime("%d.%m.%Y %H:%M:%S", localtime($tim)),
+                     $fn,defined($arg)?join(', ', @$arg):"");
+    }
+	}
+	
+	return $ret;
 }
 
 # Clean up
@@ -241,7 +294,7 @@ sub getCtrlData($) {
 }
 
 # wird regelmaessig (minuetlich) aufgerufen (AT)
-sub automationHeartbeat() {
+sub myCtrlBase_automationHeartbeat() {
 	# nach Bedarf (nachts) Automatik wieder aktivieren:
 	#  - Wenn nicht 'Verrreist', dann Zirkulation, Beschattung, 
 	#    Tag/Nachtsteuerung (Rolladen), Presence wieder auf Automatik setzen.
@@ -553,17 +606,6 @@ sub setDayNightRolloAutomaticOn() {
 sub setDayNightRolloAutomaticOff() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
 	setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, DISABLED);
-}
-
-# TODO: 
-my $sheduled;
-sub sheduleAction($$;$) {
-	my($timeOffset, $fn, $arg)=@_;
-	
-	my $now = gettimeofday();
-	my $ntime = $now+$timeOffset;
-	
-	#TODO InternalTimer
 }
 
 

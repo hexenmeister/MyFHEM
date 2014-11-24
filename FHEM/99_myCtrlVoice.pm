@@ -28,9 +28,57 @@ myCtrlVoice_Initialize($$)
 # Bereitet Texte zur Ansage auf.
 # Ersetzt Umlaute (ä=ae etc.)
 ###############################################################################
-sub prepareTextToSpeak($) {
+sub myCtrlVoice_prepareTextToSpeak($) {
   my($text) = @_;
   # TODO
+  return $text;
+}
+
+###############################################################################
+# Bereitet Zahlen zur Ansage auf.
+# Ersetzt Kommas und Punkte durch das Wort 'Komma'.
+###############################################################################
+sub myCtrlVoice_prepareNumToSpeak($) {
+  my($text) = @_;
+  $text =~ s/\./Komma/g;
+  $text =~ s/,/Komma/g;
+  return $text;
+}
+
+###############################################################################
+# Ausrechnet aus der Zahl der Sekunden Ansage in Stunden und Minuten
+###############################################################################
+sub sec2DauerSprache($){
+  my ($t) = @_;
+  my $d = int($t/86400); # Tage
+  my $h = int(($t - ($d*86400))/3600); #int($t/3600);
+  my $r = $t - ($h*3600);
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  my $text="";
+  if($d==1) {
+    $text.="Ein Tag ";
+    #return sprintf("Ein Tag, %d Stunden und %d Minuten",$d,$h,$m);
+  }
+  if($d>1) {
+    $text.=$d." Tage ";
+    #return sprintf("%d Tage, %d Stunden und %d Minuten",$d,$h,$m);
+  }
+  if($h==1) {
+    $text.="eine Stunde ";
+  }
+  if($h>1) {
+    $text.=$h." Stunden ";
+  }
+  if($m==1) {
+    $text.="eine Minute ";
+  } 
+  if($m>1) {
+    $text.=$m." Minuten ";
+  }
+  if($d==0 && $h==0 && $m==0) {
+    $text=$s." Sekunden";
+  }
   return $text;
 }
 
@@ -80,16 +128,27 @@ sub speak($;$) {
       }
     }
   }
-  fhem("set ".+DEVICE_NAME_TTS." tts ".prepareTextToSpeak($text));
+  fhem("set ".+DEVICE_NAME_TTS." tts ".myCtrlVoice_prepareTextToSpeak($text));
 }
 
+###############################################################################
+# Bestaetigungston 1
+###############################################################################
 sub voiceNotificationConfirm1() {
   speak(NOTIFICATION_CONFIRM1,0);
 }
+###############################################################################
+# Bestaetigungston 2
+###############################################################################
 sub voiceNotificationConfirm2() {
   speak(NOTIFICATION_CONFIRM2,0);
 }
 
+# --- User Methods ------------------------------------------------------------
+
+###############################################################################
+# act: Tuerklingen
+###############################################################################
 sub voiceDoorbell() {
   #my($since_last, $sinse_l2, $cnt, $cnt_1min)=getGenericCtrlBlock("ctrl_last_haustuer_klingel", "on", 30);
   
@@ -134,54 +193,6 @@ sub voiceDoorbell() {
 }
 
 ###############################################################################
-# Bereitet Zahlen zur Ansage auf.
-# Ersetzt Kommas und Punkte durch das Wort 'Komma'.
-###############################################################################
-sub prepareNumToSpeak($) {
-  my($text) = @_;
-  $text =~ s/\./Komma/g;
-  $text =~ s/,/Komma/g;
-  return $text;
-}
-
-
-# Ausrechnet aus der Zahl der Sekunden Ansage in Stunden und Minuten
-sub sec2DauerSprache($){
-  my ($t) = @_;
-  my $d = int($t/86400); # Tage
-  my $h = int(($t - ($d*86400))/3600); #int($t/3600);
-  my $r = $t - ($h*3600);
-  my $m = int($r/60);
-  my $s = $r - $m*60;
-  my $text="";
-  if($d==1) {
-    $text.="Ein Tag ";
-    #return sprintf("Ein Tag, %d Stunden und %d Minuten",$d,$h,$m);
-  }
-  if($d>1) {
-    $text.=$d." Tage ";
-    #return sprintf("%d Tage, %d Stunden und %d Minuten",$d,$h,$m);
-  }
-  if($h==1) {
-    $text.="eine Stunde ";
-  }
-  if($h>1) {
-    $text.=$h." Stunden ";
-  }
-  if($m==1) {
-    $text.="eine Minute ";
-  } 
-  if($m>1) {
-    $text.=$m." Minuten ";
-  }
-  if($d==0 && $h==0 && $m==0) {
-    $text=$s." Sekunden";
-  }
-  return $text;
-}
-
-
-###############################################################################
 # Sagt Wetterdaten an
 #  Param: Art: Variante der Aussage:
 #         0: Kurzansage, 1: Normal
@@ -190,8 +201,8 @@ sub speakWetterDaten(;$) {
   my($art)=@_;
   if(!defined($art)){$art=1;}
   # TODO: Sauber / Abstraktionslayer erstellen
-  my $temp = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
-  my $humi = prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
+  my $temp = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
+  my $humi = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
   if($art==0) {
     #speak("Aussentemperatur ".$temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
     speak($temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
@@ -248,12 +259,12 @@ sub speakWetterVorhersage(;$) {
   speak($text,0);
 }
 
-#
+###############################################################################
 # Universal Benutzer-Event: 
 #   Kommt nach Hause, Drückt knopf...
 #   Abhängig von Umstaenden sollen verschiedene (moeglichst zu der Situation passende)
 #   Meldungen ausgegeben werden.
-#
+###############################################################################
 sub voiceActGenericUserEvent() {
   # Hier (Sprach)Meldungen:
   # Konzept: ein "Knopf-Bedienung": 
@@ -415,9 +426,9 @@ sub voiceActGenericUserEvent() {
   # TODO
 }
 
-#
+###############################################################################
 # BenutzerEvent: Benutzer geht aus dem Haus
-# 
+###############################################################################
 sub voiceActLeaveHome() {
   # Hier (Sprach)Meldungen:
   # Konzept: ein "Knopf-Bedienung": 
@@ -542,9 +553,11 @@ sub voiceActLeaveHome() {
 # TODO:
 
 
-# TEMP
+# --- Situative/temporaere Steuerung ------------------------------------------
 
-#Halloween TEMP
+###############################################################################
+# Halloween 
+###############################################################################
 my $hltmp=1;
 sub voiceHalloween($) {
   my ($mode) = @_;

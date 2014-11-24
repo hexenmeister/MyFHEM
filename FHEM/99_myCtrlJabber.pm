@@ -17,15 +17,25 @@ myCtrlJabber_Initialize($$)
   my ($hash) = @_;
 }
 
-
 ######################################################
 # Meldung per Jabber senden
 ######################################################
 sub
-sendJabberMessage($$)
+myCtrlJabber_sendJabberMessage($$)
 {
   my($rcp, $msg) = @_;
   fhem("set ".+DEVICE_NAME_JABBER." msg $rcp $msg");
+}
+
+######################################################
+# Test only
+######################################################
+sub
+sendJabberEcho()
+{
+  my $lastsender=ReadingsVal(+DEVICE_NAME_JABBER,"LastSenderJID","0");
+  my $lastmsg=ReadingsVal(+DEVICE_NAME_JABBER,"LastMessage","0");
+  fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " Echo: ".$lastmsg);
 }
 
 ######################################################
@@ -35,11 +45,14 @@ sub
 sendMeJabberMessage($)
 {
 	my($msg) = @_;
-	sendJabberMessage(+MY_JABBER_ADDR, $msg);
+	myCtrlJabber_sendJabberMessage(+MY_JABBER_ADDR, $msg);
 }
+
+#--- User Methods -------------------------------------------------------------
 
 ######################################################
 # Statusdaten an mein Handy per Jabber senden
+# Wird aus Config per at taglich aufgerufen.
 ######################################################
 sub
 sendMeStatusMsg()
@@ -74,6 +87,7 @@ sendJabberAnswer()
   
   my $newmsg;
   if($cmd eq "status") {
+  	#TODO
   	#Log 3, "Jabber: CMD: Status";
   	$newmsg.= "Status: \r\n";
   	my $owtStatus = checkOWTHERMTimeOut();
@@ -136,20 +150,10 @@ sendJabberAnswer()
   if(defined($newmsg)) {
     fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " ".$newmsg);
   } else {
-  	fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " Unbekanter Befehl: ".$lastmsg);
+  	fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender. 
+  	     " Unbekanter Befehl: ".$lastmsg);
   }
 }
-
-######################################################
-# Test
-######################################################
-sub
-sendJabberEcho()
-{
-  my $lastsender=ReadingsVal(+DEVICE_NAME_JABBER,"LastSenderJID","0");
-  my $lastmsg=ReadingsVal(+DEVICE_NAME_JABBER,"LastMessage","0");
-  fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " Echo: ".$lastmsg);
-} 
 
 
 1;
