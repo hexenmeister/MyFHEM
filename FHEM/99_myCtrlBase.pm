@@ -10,6 +10,14 @@ use Time::HiRes qw(gettimeofday);
 
 use myCtrlHAL;
 
+sub putCtrlData($$);
+sub getCtrlData($);
+sub getGenericCtrlBlock($;$$);
+
+sub scheduleTask($$;$$$);
+sub listScheduledTasks(;$);
+
+
 my $mhash;
 my $timerParam;
 
@@ -21,6 +29,8 @@ myCtrlBase_Initialize($)
   $mhash = $hash;
   
   $hash->{UndefFn} = "myCtrlBase_Undef";
+
+  myCtrlBase_loadAllScheduledTaskData();
 
   my $next = int(gettimeofday()) +1; 
   # Parameter fuer die HauptZeitschleife
@@ -77,6 +87,7 @@ myCtrlBase_handleScheduledTasks() {
     my $arg = $scheduledTasks{unnamed}{$i}{ARG};
     if(!defined($tim) || !defined($fn)) {
       delete($scheduledTasks{unnamed}{$i});
+      myCtrlBase_removeScheduledTaskData("n".$i);
       next;
     } elsif($tim <= $now) {
       no strict "refs";
@@ -92,6 +103,7 @@ myCtrlBase_handleScheduledTasks() {
       Log (3, "scheduled task ($i) error: $@") if $@;
       use strict "refs";
       delete($scheduledTasks{unnamed}{$i});
+      myCtrlBase_removeScheduledTaskData("n".$i);
     } else {
       $nexttime = $tim if(!$nexttime || $nexttime > $tim);
     }
@@ -105,6 +117,7 @@ myCtrlBase_handleScheduledTasks() {
     my $arg = $scheduledTasks{named}{$i}{ARG};
     if(!defined($tim) || !defined($fn)) {
       delete($scheduledTasks{named}{$i});
+      myCtrlBase_removeScheduledTaskData($i);
       next;
     } elsif($tim <= $now) {
       no strict "refs";
@@ -120,6 +133,7 @@ myCtrlBase_handleScheduledTasks() {
       Log (3, "scheduled task ($i) error: $@") if $@;
       use strict "refs";
       delete($scheduledTasks{named}{$i});
+      myCtrlBase_removeScheduledTaskData($i);
     } else {
       $nexttime = $tim if(!$nexttime || $nexttime > $tim);
     }
@@ -181,6 +195,7 @@ scheduleTask($$;$$$)
   			$scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
         $scheduledTasks{named}{$nameID}{FN} = $fn;
         $scheduledTasks{named}{$nameID}{ARG} = $arg;
+        myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   		} else {
   			# update first definition else ignore
   			#Log 3, "schedule: definition allready exists, check time (mode 2)";
@@ -189,9 +204,11 @@ scheduleTask($$;$$$)
   			  $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
           $scheduledTasks{named}{$nameID}{FN} = $fn;
           $scheduledTasks{named}{$nameID}{ARG} = $arg;
+          myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   			} else {
   				#Log 3, "schedule: new time earlier then old, ignore (mode 2) => $scheduledTasks{named}{$nameID}{TRIGGERTIME} vs. $tim";
   				$tim = $scheduledTasks{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
+  				myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   			}
   		}
   	} else {
@@ -199,13 +216,18 @@ scheduleTask($$;$$$)
       $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
       $scheduledTasks{named}{$nameID}{FN} = $fn;
       $scheduledTasks{named}{$nameID}{ARG} = $arg;
+      myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
     }
   } else {
   	#Log 3, "schedule: unnamed mode";
     $scheduledTasks{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
     $scheduledTasks{unnamed}{$schedcnt}{FN} = $fn;
     $scheduledTasks{unnamed}{$schedcnt}{ARG} = $arg;
+    myCtrlBase_saveScheduledTaskData("n".$schedcnt,$scheduledTasks{unnamed}{$nameID});
     $schedcnt++;
+    if($schedcnt>9999999999999999) {
+    	$schedcnt=0;
+    }
   }
   $nexttime = $tim if(!$nexttime || $nexttime > $tim);
   
@@ -258,23 +280,23 @@ sub
 myCtrlBase_Undef($$)
 {
   RemoveInternalTimer($timerParam -> {'next'});
+  myCtrlBase_saveAllScheduledTaskData();
   Log 2, "AutomationControlBase: clean-up";
   return undef;
 }
 
-
-# --- Automatik und Steuerung -------------------------------------------------
-# wird beim Start von FHEM aufgerufen (notify global:INITIALIZED)
-sub notifierFn_FHEM_Start() {
-	sendMeJabberMessage('Service Message: FHEM gestartet');
-	setAllAutomatikControlsDefaults();
-	# ggf. Weiteres...
+# liefert gewuenschte Reading zu dem gegebenen Element
+sub myCtrlBase_setReading($$$) {
+  my($devName, $rName, $val) = @_;
+  #fhem("setreading ".$devName." ".$rName." ".$val);
+  CommandSetReading("setreading", $devName." ".$rName." ".$val);
 }
 
-# wird beim Shutdown aufgrufen (notify global:SHUTDOWN)
-sub notifierFn_FHEM_Shutdown() {
-	sendMeJabberMessage('Service Message: FHEM faehrt herunter');
-	# ggf. Weiteres...
+# liefert angegenen Reading zu dem gegebenen Element
+sub myCtrlBase_deleteReading($$) {
+  my($devName, $rName) = @_;
+  #fhem("deletereading ".$devName." ".$rName);
+  CommandDeleteReading("deletereading", $devName." ".$rName);
 }
 
 # speichert (Restart-sicher) ein Key/Value-Paar (fuer Steuerungszwecke)
@@ -282,107 +304,67 @@ sub putCtrlData($$) {
 	my($key, $val) = @_;
   # Ein Dummy als Container verwenden (ein nicht in Frontent sichtbares Reading speichern)
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
-	setReading(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, $val);
+	myCtrlBase_setReading(DEVICE_NAME_CTRL_STORE, $key, $val);
 }
 
-# liefert ein zum einem Key gespeichertes Wert (fuer Steuerungszwecke)
+# liefert ein zum einem Key gespeicherten Wert (fuer Steuerungszwecke)
 sub getCtrlData($) {
 	my($key) = @_;
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
-	my $val = ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, $key, undef);
+	my $val = ReadingsVal(DEVICE_NAME_CTRL_STORE, $key, undef);
 	return $val;
 }
 
-# wird regelmaessig (minuetlich) aufgerufen (AT)
-sub myCtrlBase_automationHeartbeat() {
-	# nach Bedarf (nachts) Automatik wieder aktivieren:
-	#  - Wenn nicht 'Verrreist', dann Zirkulation, Beschattung, 
-	#    Tag/Nachtsteuerung (Rolladen), Presence wieder auf Automatik setzen.
-	#  - ...
-	
-	#Log 3, "AutomationControlBase: Heartbeat";
-	
-	my $hms = CurrentTime();
-	my $cDate = CurrentDate(); 
+# entfernt den Key und den gespeicherten Wert
+sub removeCtrlData($) {
+	my($key) = @_;
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
-	my $lDate = getCtrlData("ctrl_last_automatic_heartbeat_reset");
-	# einmal am Tag zw. 2 und 5 Uhr
-	if($cDate ne $lDate &&  $hms gt "02:00" and $hms lt "05:00") {
-		if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
-		  resetAutomatikControls();
-    } else {
-      # Verreist:
-      #  - ZPumpe in Minimal-Modus
-      setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, ABSENT);
-    }
-    putCtrlData("ctrl_last_automatic_heartbeat_reset", $cDate);
-  }
-  
-  # TODO: Wenn sich der Wert der Anwesenheit auf Auto geaendert hat (nur bei einer Aenderung!), 
-  #       dann auch ZPumpe anpassen. Auch fuer Aenderung auf Anwesend/Abwesend
-  #
-  	# Wenn PRESENCE Automatic, dann auch 
-	  #if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
-		  #setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, ABSENT);
-	  #}
-
-	
-	# Wenn in WZ Licht laenger als 3 Minuten an ist 
-	#   && Licht-Außen < 170? && Rolladen offen > 90 
-	#  => dann WZ Rolladen auf 30 %. Bei Terrassentueren nur wenn sie beide zu sind 
-	# TODO: HAL
-	my $lName="EG_WZ_DA01_Licht_Rechts_Sw";
-	my $llevel=ReadingsVal($lName,"level","0");
-	my $lthr=170;
-	my $ctrlBlockName="ctrl_last_RL_WZ_Light";
-	# TODO
-	
-	#{
-	#	my $lName="EG_WZ_DA01_Licht_Rechts_Sw";; my $llevel=ReadingsVal($lName,"level","0");; 
-	#	my $lthr=$llevel>20?170:130;; my $self="NN_RL_CTRL_SZ_Dn";; 
-	#	my $li = ReadingsVal("UM_VH_HMBL01.Eingang", "brightness", "180");; 
-	#	if ($li < $lthr &&  $hms gt "17:00" and $hms lt "23:30") {notGreaterThen("sz_rollo", "30");;}
-	# {notGreaterThen("wz_rollo_l", 0);;notGreaterThen("wz_rollo_r", 0, ('wz_fenster_l', 'wz_fenster_r'));;fhem("attr ".$self." my_control ".$dt);;}}
-	#	} 
-	
-	
-	# TODO
-	
-	
+	myCtrlBase_deleteReading(DEVICE_NAME_CTRL_STORE, $key);
 }
 
-# Diese Methode setzt bei Bedarf die SteuerungsControlls (Dummies) auf 
-# Defaultwerte (AUTOMATIC). Sie soll beim FHEM-Start aufgerufen werden (global:INITIALIZED).
-sub setAllAutomatikControlsDefaults() {
-	# TODO: future: Pruefen, ob z.B. Status "Verreist" bereucksichtigt werden soll
-	if(Value(DEVICE_NAME_CTRL_BESCHATTUNG) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"STATE","???") eq "???") {
-	  setValue(DEVICE_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
-	}
-	
-	if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ANWESENHEIT,"STATE","???") eq "???") {
-    setValue(DEVICE_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
-  }
-	#setHomePresence_Present();
-	
-	if(Value(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT,"STATE","???") eq "???") {
-    setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
-  }
-	
-	if(Value(DEVICE_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq "???") {
-    setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
-  }
+## speichert (Restart-sicher) ein Key/Value-Paar (fuer Steuerungszwecke)
+#sub removeCtrlData($) {
+#	my($key) = @_;
+#  # Ein Dummy als Container verwenden (ein nicht in Frontent sichtbares Reading speichern)
+#	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
+#	deleteReading(DEVICE_NAME_CTRL_STORE, $key);
+#}
+
+# speichert ein scheduledTask
+sub myCtrlBase_saveScheduledTaskData($$) {
+	my($key, $val) = @_;
+	#TODO: Umformen
+	my $tim = %{$val}->{TRIGGERTIME};
+  my $fn = %{$val}->{FN};
+  my $arg = %{$val}->{ARG};      
+  my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn.'|'.(defined($arg)?join(', ', @$arg):"");
+  #TODO: Pruefen, ob mit Funktionen mit Parameter auch funktioniert.
+  #ERROR: Ausgabe falsch
+	putCtrlData("ctrl_scheduled_task_".$key, $txt);
 }
 
-# Diese Methode setzt nachts die SteuerungsControlls (Dummies) auf 
-# Defaultwerte (AUTOMATIC). Sie soll jede Nacht zu einem Definierten Zeitpunkt
-# aufgerufen werden. Damit wird erreicht, dass alle Uebersteuerungen irgendwann 
-# in einen normalen Zustand uebergehen.
-sub resetAutomatikControls() {
-	setBeschattungAutomaticOn();
-	setHomePresence_Automatic();
-	#setHomePresence_Present();
-	setDayNightRolloAutomaticOn();
-	setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
+# laedt Daten zu einem scheduledTask
+sub myCtrlBase_loadScheduledTaskData($) {
+	my($key) = @_;
+	my $val = getCtrlData("ctrl_scheduled_task_".$key);
+	#TODO: Umformen, Hash zurueck geben
+	return $val;
+}
+
+# loescht die gespeicherten Daten zu einem scheduledTask
+sub myCtrlBase_removeScheduledTaskData($) {
+	my($key) = @_;
+	removeCtrlData("ctrl_scheduled_task_".$key);
+}
+
+# speichert alle Tasks
+sub myCtrlBase_saveAllScheduledTaskData() {
+	#TODO
+}
+
+# laedt alle Tasks
+sub myCtrlBase_loadAllScheduledTaskData() {
+	#TODO
 }
 
 ###############################################################################
@@ -514,99 +496,12 @@ sub getGenericCtrlBlock($;$$) {
 	#return (($dt_dec-$ctrl_dt), $ctrl_sec_since, $ctrl_cnt, $ctrl_cnt_last_min);
 }
 
-# Controlblock fuer HomeAutomatic-Schalter
-# Parameter: Neuer Zustand
-sub getHomeAutomaticCtrlBlock($) {
-	my($key)=@_;
-	#return getGenericCtrlBlock("ctrl_last_global_automatic_change", $key);
-	my $ret = getGenericCtrlBlock("ctrl_last_global_automatic_change", $key);
-	
-	return ($ret->{SINCE_LAST_SEC}, $ret->{BETWEEN_2_LAST_SEC}, $ret->{EQ_ACT_CNT}, $ret->{EQ_ACT_PP_CNT});
+
+# --- Automatik und Steuerung -------------------------------------------------
+
+# wird regelmaessig (minuetlich) aufgerufen (AT)
+sub myCtrlBase_automationHeartbeat() {
+	automationHeartbeat(); # weiterleiten
 }
-
-# Methode für Benachrichtigung beim Klingeln an der Haustuer
-sub actHaustuerKlingel() {
-	#TODO: HAL
-	sendMeJabberMessage("Tuerklingel am ".ReadingsTimestamp('KlingelIn','reading',''));
-	voiceDoorbell();
-}
-
-sub actPIRVorgarten() {
-	#Halloween TEMP
-	voiceHalloween(3);
-}
-
-
-# Methode für den taster
-# Schatet globale Haus-Automatik ein 
-# (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
-sub actHomeAutomaticOn() {
-	# Derzeit keine globale Automatik, daher delegieren
-	setBeschattungAutomaticOn();
-	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
-	
-	# Hier (Sprach)Meldungen
-	voiceActGenericUserEvent();
-
-}
-
-# Methode für den taster
-# Schatet globale Haus-Automatik aus 
-# (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud DISABLED)
-sub actHomeAutomaticOff() {
-	# Derzeit keine globale Automatik, daher delegieren
-	setBeschattungAutomaticOff(); # ?
-	
-	# Hier (Sprach)Meldungen
-	voiceActLeaveHome();
-  
-}
-
-# Schatet Beschattung-Automatik ein (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud AUTOMATIC)
-sub setBeschattungAutomaticOn() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, AUTOMATIC);
-}
-
-# Schatet Beschattung-Automatik aus (setzt DEVICE_NAME_CTRL_BESCHATTUNG aud DISABLED)
-sub setBeschattungAutomaticOff() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, DISABLED);
-}
-
-# Setzt PRESENCE-Status auf automatic 
-sub setHomePresence_Automatic() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
-}
-
-# Setzt PRESENCE-Status auf anwesend (jemand ist zuhause)
-sub setHomePresence_Present() {
-	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, PRESENT);
-	#Halloween TEMP
-	voiceHalloween(1);
-}
-
-# Setzt PRESENCE-Status auf abwesend (niemand ist zuhause)
-sub setHomePresence_Absent() {
-	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
-  setValue(DEVICE_NAME_CTRL_ANWESENHEIT, ABSENT);
-  #Halloween TEMP
-	voiceHalloween(2);
-}
-
-# Schatet Tag/Nacht-Rolladen-Automatik ein (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT aud AUTOMATIC)
-sub setDayNightRolloAutomaticOn() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
-}
-
-# Schatet Tag/Nacht-Rolladen-Automatic aus (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT aud DISABLED)
-sub setDayNightRolloAutomaticOff() {
-	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, DISABLED);
-}
-
 
 1;

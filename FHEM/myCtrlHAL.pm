@@ -26,7 +26,9 @@ use constant {
   DEVICE_NAME_GC_ANWESENHEIT      => "GC_Abwesend",
   DEVICE_NAME_CTRL_ZIRK_PUMPE     => "T.DU_Ctrl.ZP_Mode",
   DEVICE_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
-  DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen" # reserved for future use
+  DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen", # reserved for future use
+  # Element, dessen Readings persistenten Steuerungsdaten speichern. Es ist eigentlich egel, an welchen Device/Element diese landen.
+  DEVICE_NAME_CTRL_STORE => "T.DU_Ctrl.Rolladen" 
 };
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
