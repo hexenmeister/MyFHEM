@@ -1,0 +1,35 @@
+# Created by FHEM/98_SVG.pm, 2014-07-01 23:45:18
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+#set ytics ("weg" 0, "da" 1)
+#set ytics ("0" 0, "1" 1, "0" 2, "1" 3, "0" 4, "1" 5)
+#set y2tics ("0" 0, "1" 1, "0" 2, "1" 3, "0" 4, "1" 5)
+#set y2tics 
+set y2tics ()
+set ytics ()
+
+set grid ytics
+set ylabel "Anwesenheit"
+set y2label ""
+set yrange [-1:6]
+set y2range [-1:6]
+
+#logProxy FileLog:<SPEC1>,predict:4:PRESENCE_HOME.Handy_Alex::($fld[3]+4)
+#logProxy FileLog:<SPEC1>,predict:4:PRESENCE_HOME.Handy_Petra::($fld[3]+2)
+#logProxy FileLog:<SPEC1>,predict:4:PRESENCE_HOME.Laptop_Alex::$fld[3]==1?1:0
+#logProxy ConstY:1.5
+#logProxy ConstY:3.5
+
+#-#FileLog 4:PRESENCE_HOME.Handy_Alex::($fld[3]+4)
+#-#FileLog 4:PRESENCE_HOME.Handy_Petra::($fld[3]+2)
+#-#FileLog 4:PRESENCE_HOME.Laptop_Alex::$fld[3]==1?1:0
+
+plot "<IN>" using 1:2 axes x1y1 title 'Alex' ls l2 lw 1.5 with fsteps,\
+     "<IN>" using 1:2 axes x1y1 title 'Petra' ls l1 lw 1.5 with fsteps,\
+     "<IN>" using 1:2 axes x1y1 title 'Think04' ls l5 lw 1.5 with fsteps,\
+     "<IN>" using 1:2 axes x1y1 title '' ls l7 lw 0.5 with dots,\
+     "<IN>" using 1:2 axes x1y1 title '' ls l7 lw 0.5 with lines
