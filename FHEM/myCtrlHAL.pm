@@ -28,7 +28,17 @@ use constant {
   DEVICE_NAME_CTRL_BESCHATTUNG    => "T.DU_Ctrl.Beschattung",
   DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT => "T.DU_Ctrl.Rolladen", # reserved for future use
   # Element, dessen Readings persistenten Steuerungsdaten speichern. Es ist eigentlich egel, an welchen Device/Element diese landen.
-  DEVICE_NAME_CTRL_STORE => "T.DU_Ctrl.Rolladen" 
+  DEVICE_NAME_CTRL_STORE => "T.DU_Ctrl.Rolladen",
+  
+  DEVICE_NAME_FK_WZ1  => "EG_WZ_FK01.Fenster",
+  DEVICE_NAME_FK_WZ2l => "wz_fenster_l",
+  DEVICE_NAME_FK_WZ2r => "wz_fenster_r",
+  DEVICE_NAME_FK_KU1  => "EG_KU_FK01.Fenster",
+  DEVICE_NAME_FK_BZ1  => "OG_BZ_FK01.Fenster",
+  DEVICE_NAME_FK_SZ1  => "OG_SZ_FK01.Fenster",
+  DEVICE_NAME_FK_KA1l => "", # Paulas Zimmer
+  DEVICE_NAME_FK_KA1r => "", # Paulas Zimmer
+  DEVICE_NAME_FK_KB1  => "", # Hannas Zimmer
 };
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
