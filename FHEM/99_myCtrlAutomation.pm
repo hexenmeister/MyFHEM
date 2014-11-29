@@ -13,7 +13,7 @@ require "$attr{global}{modpath}/FHEM/99_myCtrlBase.pm";
 #require "$attr{global}{modpath}/FHEM/99_myCtrlVoice.pm";
 
 sub
-myCtrlAutomation_Initialize($$)
+myCtrlAutomation_Initialize($)
 {
   my ($hash) = @_;
   Log 2, "AutomationControlUser: initialized";
@@ -49,10 +49,70 @@ sub actHaustuerKlingel() {
 	voiceDoorbell();
 }
 
+# Benachrichtigungen von PIR vor der Eingangstuer.
 sub actPIRVorgarten() {
 	#Halloween TEMP
 	voiceHalloween(3);
 }
+
+# Benachrichtigungen von Fensterkontakten (open/closed/tilted)
+# Params:
+#   Device: Name des Ausloesers
+#   Event: open/closed/tilted
+# Moegliche Werte (HM): 
+#   battery: ok / battery: low
+#   open / closed /  tilted
+#   contact: open (to ccu) / .. closed, tlted (to XXX)
+#   alive: yes
+#   cover: open / cover: closed
+#   
+sub actFenster($$) {
+	my ($deviceName, $event) = @_;
+	#Log 3, "Window event: $deviceName => $event";
+	#TODO: Aenderung prüefen und nur dann die Methoden rufen, da bei jedem Event Statusinfos uebertragen werden. Auch ggf. mehrmals, also debounce (erste Meldung senden)
+	my $le = lc($event);
+	if($le=~/^(open|closed|tilted)$/) {
+		# Doppelte Meldungen innerhalb kurzer Zeit (1s) unterdruecken.
+		if(debounce("state-".$deviceName."-".$le,1)) {
+		  actFensterStatus($deviceName, $le);
+	  }
+	} elsif($le=~/cover:\s+(\S+)/) {
+		if(debounce("sabotage-".$deviceName."-".$le,1)) {
+  		actFensterSabotageKontakt($deviceName, $1);
+  	}
+	}# elsif($le=~/battery:\s+(\S+)/) {
+	#	actFensterBatteryMsg($deviceName, $1);
+	#} #<-Batterienmeldungen besser alle zusammenfassen (ueber alle Geraete)
+	
+}
+
+sub actFensterStatus($$) {
+	my ($deviceName, $event) = @_;
+	Log 3, ">Fenster: $deviceName => $event";
+	# TODO
+  scheduleTask(1.5,"actFensterStatusLetzeKurzzeitAktion('$deviceName', '$event')",undef,"state-".$deviceName,2);
+  #my @a= [$deviceName, $event];
+  #scheduleTask(1.5,"actFensterStatusLetzeKurzzeitAktion",@a,"state-".$deviceName,2);
+}
+
+sub actFensterStatusLetzeKurzzeitAktion($$) {
+	my ($deviceName, $event) = @_;
+	Log 3, "--->Fenster: $deviceName => $event";
+	
+}
+
+sub actFensterSabotageKontakt($$) {
+	my ($deviceName, $event) = @_;
+	Log 3, ">Fenster Sabotagekontakt: $deviceName => $event";
+	# TODO
+
+}
+
+#sub actFensterBatteryMsg($$) {
+#	my ($deviceName, $event) = @_;
+#	Log 3, "Fenster Battery: $deviceName => $event";
+#	# TODO  
+#}
 
 # Methode für den taster
 # Schatet globale Haus-Automatik ein 
