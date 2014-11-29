@@ -150,7 +150,7 @@ myCtrlBase_handleScheduledTasks() {
 #   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
 #   fn:  Funktion
 # Opt. Params:
-#   arg: Parameter (array), die an die angegebene Funktion beim Aufruf uebergeben werden
+#   arg: Parameter, die an die angegebene Funktion beim Aufruf uebergeben werden
 #        Werden Parameter definiert, wird Funktionsaufruf verwendet, ansonsten eval()!
 #        Damit können nicht nur Funktionsnamen, sondern auch Anwesungen verwendet werden.
 #   ID_Name: Wenn angegeben, wird die ggf. bereits vorhandene Planung mit dem 
@@ -223,7 +223,7 @@ scheduleTask($$;$$$)
     $scheduledTasks{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
     $scheduledTasks{unnamed}{$schedcnt}{FN} = $fn;
     $scheduledTasks{unnamed}{$schedcnt}{ARG} = $arg;
-    myCtrlBase_saveScheduledTaskData("n".$schedcnt,$scheduledTasks{unnamed}{$nameID});
+    myCtrlBase_saveScheduledTaskData("n".$schedcnt,$scheduledTasks{unnamed}{$schedcnt});
     $schedcnt++;
     if($schedcnt>9999999999999999) {
     	$schedcnt=0;
@@ -339,7 +339,6 @@ sub myCtrlBase_saveScheduledTaskData($$) {
   my $arg = %{$val}->{ARG};      
   my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn.'|'.(defined($arg)?join(', ', @$arg):"");
   #TODO: Pruefen, ob mit Funktionen mit Parameter auch funktioniert.
-  #ERROR: Ausgabe falsch
 	putCtrlData("ctrl_scheduled_task_".$key, $txt);
 }
 
