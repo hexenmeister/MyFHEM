@@ -198,7 +198,7 @@ my $ctrlTable_Normal;
  $ctrlTable_Normal->{on}->{MAX_TEMP_DELTA_SPEICHER_RUECKFLUSS} = 10;
  $ctrlTable_Normal->{on}->{MIN_TEMP_REUCKFLUSS} = 35;
  $ctrlTable_Normal->{on}->{MAX_TEMP_DELTA_ENTNAHME_RUECKFLUSS} = 3;
- $ctrlTable_Normal->{on}->{MIN_TIME_BEFORE_CHANGE_MINUTES} = 7;
+ $ctrlTable_Normal->{on}->{MIN_TIME_BEFORE_CHANGE_MINUTES} = 5;
  $ctrlTable_Normal->{on}->{MAX_TIME_BEFORE_CHANGE_MINUTES} = 20;
  
 my $ctrlTable_Reduced;
@@ -888,13 +888,13 @@ SetTempList_Heizung_OG_Wohnzimmer()
  {
  	  my($mo, $di, $mi, $do, $fr, $sa, $so);
  	   	  
- 	  $mo = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 22.0 22:00 21.5 24:00 21.0";
- 	  $di = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 22.0 22:00 21.5 24:00 21.0";
- 	  $mi = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 22.0 22:00 21.5 24:00 21.0";
- 	  $do = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 22.0 22:00 21.5 24:00 21.0";
- 	  $fr = "01:00 20.0 06:30 18.0 10:00 21.0 15:00 22.0 22:00 21.5 24:00 21.0";
- 	  $sa = "02:00 20.0 06:30 18.0 23:00 22.5 24:00 21.0";
- 	  $so = "02:00 20.0 06:30 18.0 23:00 22.5 24:00 21.0";
+ 	  $mo = "01:00 20.0 06:30 19.0 10:00 21.5 15:00 21.0 22:00 21.5 24:00 21.0";
+ 	  $di = "01:00 20.0 06:30 19.0 10:00 21.5 15:00 21.0 22:00 21.5 24:00 21.0";
+ 	  $mi = "01:00 20.0 06:30 19.0 10:00 21.5 15:00 21.0 22:00 21.5 24:00 21.0";
+ 	  $do = "01:00 20.0 06:30 19.0 10:00 21.5 15:00 21.0 22:00 21.5 24:00 21.0";
+ 	  $fr = "01:00 20.0 06:30 19.0 10:00 21.5 15:00 21.0 22:00 21.5 24:00 21.0";
+ 	  $sa = "02:00 20.0 06:30 19.0 23:00 22.5 24:00 21.0";
+ 	  $so = "02:00 20.0 06:30 19.0 23:00 22.5 24:00 21.0";
  	  
     SetTempList_Heizung("EG_WZ_WT01_Climate", $mo, $di, $mi, $do, $fr, $sa, $so);
     SetTempList_Heizung("EG_WZ_TT01_Clima", $mo, $di, $mi, $do, $fr, $sa, $so);
