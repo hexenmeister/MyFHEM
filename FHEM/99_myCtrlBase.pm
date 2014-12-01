@@ -15,8 +15,11 @@ sub getCtrlData($);
 sub getGenericCtrlBlock($;$$);
 
 sub scheduleTask($$;$$$);
+sub scheduleStoredTask($$;$$);
 sub listScheduledTasks(;$);
 
+#-------
+sub myCtrlBase_scheduleTask($$$;$$$);
 
 my $mhash;
 my $timerParam;
@@ -150,8 +153,9 @@ myCtrlBase_handleScheduledTasks() {
 #   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
 #   fn:  Funktion
 # Opt. Params:
-#   arg: Parameter, die an die angegebene Funktion beim Aufruf uebergeben werden
-#        Werden Parameter definiert, wird Funktionsaufruf verwendet, ansonsten eval()!
+#   arg: Parameter, der an die angegebene Funktion beim Aufruf uebergeben wird
+#        Es kann nur einen geben, mehrere sollen per Referenz (Array, Hash...) uebergeben werden.
+#        Wird ein Parameter definiert, wird Funktionsaufruf verwendet, ansonsten eval()!
 #        Damit können nicht nur Funktionsnamen, sondern auch Anwesungen verwendet werden.
 #   ID_Name: Wenn angegeben, wird die ggf. bereits vorhandene Planung mit dem 
 #            gleichen Namen entweder dadurch ersetzt oder die erneute Definition 
@@ -163,9 +167,60 @@ myCtrlBase_handleScheduledTasks() {
 #         2: die laengste Zeit der beiden Definitionen wird genommen. 
 #            Auch die Fn und die Parameter werden von dem "Gewinner" genommen.
 sub
-scheduleTask($$;$$$)
-{
+scheduleTask($$;$$$) {
 	my ($tim, $fn, $arg, $nameID, $nMode) = @_;
+	return myCtrlBase_scheduleTask(0, $tim, $fn, $arg, $nameID, $nMode);
+}
+
+# Plant eine gegebene Funktion zur Ausfuehrung ein. 
+# Task kann keine extra Parameter enthalten, alles soll im String mitgegeben werden.
+# Beispiel: "meineFunktion('parameter',123)"
+# Die Ausführung wird Neustart-sicher gespeichert. 
+# (Bei einem harten unmittelbaren Serverabsturz kann das jedoch nicht garantiert werden.)
+#
+# Params: 
+#   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
+#   fn:  Funktion (Aufrufstring ggf. mit parametern)
+# Opt. Params:
+#   ID_Name: Wenn angegeben, wird die ggf. bereits vorhandene Planung mit dem 
+#            gleichen Namen entweder dadurch ersetzt oder die erneute Definition 
+#            wird ignoriert.
+#   mode: 0 (default): die zweite Definition wird verwofen, solange eine 
+#            gleichnamige bereits existiert
+#         1: die zweite Definition ersetzt die erste. Dadurch wird die Planzeit ggf. verändert.
+#            Aber auch ggf. die Funktion und Argumente.
+#         2: die laengste Zeit der beiden Definitionen wird genommen. 
+#            Auch die Fn und die Parameter werden von dem "Gewinner" genommen.
+sub
+scheduleStoredTask($$;$$) {
+	my ($tim, $fn, $nameID, $nMode) = @_;
+	return myCtrlBase_scheduleTask(1, $tim, $fn, undef, $nameID, $nMode);
+}
+
+# Interne Funktion
+# Plant eine gegebene Funktion zur Ausfuehrung ein.
+# Params: 
+#   stored: Task restartsicher speichern (1), oder nicht (0).
+#        Nur möglich, wenn keine Funktionsargumente genutzt werden.
+#   tim: Zeit in Sekunden, nach der Ablauf soll die Funktion aufgerufen werden
+#   fn:  Funktion
+# Opt. Params:
+#   arg: Parameter, der an die angegebene Funktion beim Aufruf uebergeben wird
+#        Es kann nur einen geben, mehrere sollen per Referenz (Array, Hash...) uebergeben werden.
+#        Wird ein Parameter definiert, wird Funktionsaufruf verwendet, ansonsten eval()!
+#        Damit können nicht nur Funktionsnamen, sondern auch Anwesungen verwendet werden.
+#   ID_Name: Wenn angegeben, wird die ggf. bereits vorhandene Planung mit dem 
+#            gleichen Namen entweder dadurch ersetzt oder die erneute Definition 
+#            wird ignoriert.
+#   mode: 0 (default): die zweite Definition wird verwofen, solange eine 
+#            gleichnamige bereits existiert
+#         1: die zweite Definition ersetzt die erste. Dadurch wird die Planzeit ggf. verändert.
+#            Aber auch ggf. die Funktion und Argumente.
+#         2: die laengste Zeit der beiden Definitionen wird genommen. 
+#            Auch die Fn und die Parameter werden von dem "Gewinner" genommen.
+sub myCtrlBase_scheduleTask($$$;$$$)
+{
+	my ($stored, $tim, $fn, $arg, $nameID, $nMode) = @_;
 	
 	if(!defined($tim) || !defined($fn)) {
 		return;
@@ -195,6 +250,7 @@ scheduleTask($$;$$$)
   			$scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
         $scheduledTasks{named}{$nameID}{FN} = $fn;
         $scheduledTasks{named}{$nameID}{ARG} = $arg;
+        $scheduledTasks{named}{$nameID}{STORED} = $stored;
         myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   		} else {
   			# update first definition else ignore
@@ -204,11 +260,12 @@ scheduleTask($$;$$$)
   			  $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
           $scheduledTasks{named}{$nameID}{FN} = $fn;
           $scheduledTasks{named}{$nameID}{ARG} = $arg;
+          $scheduledTasks{named}{$nameID}{STORED} = $stored;
           myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   			} else {
   				#Log 3, "schedule: new time earlier then old, ignore (mode 2) => $scheduledTasks{named}{$nameID}{TRIGGERTIME} vs. $tim";
   				$tim = $scheduledTasks{named}{$nameID}{TRIGGERTIME}; # Wichtig fuer die Berechnung der naechsten Ausfuehrungszeit
-  				myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
+  				#myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
   			}
   		}
   	} else {
@@ -216,6 +273,7 @@ scheduleTask($$;$$$)
       $scheduledTasks{named}{$nameID}{TRIGGERTIME} = $tim;
       $scheduledTasks{named}{$nameID}{FN} = $fn;
       $scheduledTasks{named}{$nameID}{ARG} = $arg;
+      $scheduledTasks{named}{$nameID}{STORED} = $stored;
       myCtrlBase_saveScheduledTaskData($nameID,$scheduledTasks{named}{$nameID});
     }
   } else {
@@ -223,6 +281,7 @@ scheduleTask($$;$$$)
     $scheduledTasks{unnamed}{$schedcnt}{TRIGGERTIME} = $tim;
     $scheduledTasks{unnamed}{$schedcnt}{FN} = $fn;
     $scheduledTasks{unnamed}{$schedcnt}{ARG} = $arg;
+    $scheduledTasks{unnamed}{$schedcnt}{STORED} = $stored;
     myCtrlBase_saveScheduledTaskData("n".$schedcnt,$scheduledTasks{unnamed}{$schedcnt});
     $schedcnt++;
     if($schedcnt>9999999999999999) {
@@ -333,13 +392,16 @@ sub removeCtrlData($) {
 # speichert ein scheduledTask
 sub myCtrlBase_saveScheduledTaskData($$) {
 	my($key, $val) = @_;
-	#TODO: Umformen
-	my $tim = %{$val}->{TRIGGERTIME};
-  my $fn = %{$val}->{FN};
-  my $arg = %{$val}->{ARG};      
-  my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn.'|'.(defined($arg)?join(', ', @$arg):"");
-  #TODO: Pruefen, ob mit Funktionen mit Parameter auch funktioniert.
-	putCtrlData("ctrl_scheduled_task_".$key, $txt);
+	if(%{$val}->{STORED}) {
+  	#TODO: Umformen
+	  my $tim = %{$val}->{TRIGGERTIME};
+    my $fn = %{$val}->{FN};
+    #my $arg = %{$val}->{ARG};      
+    #Mit Parametern geht das so infach nicht
+    #my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn.'|'.(defined($arg)?join(', ', @$arg):"");
+    my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn;
+	  putCtrlData("ctrl_scheduled_task_".$key, $txt);
+	}
 }
 
 # laedt Daten zu einem scheduledTask
@@ -372,6 +434,20 @@ sub myCtrlBase_loadAllScheduledTaskData() {
 #            Key: Neuer Zustand.
 #            Zeitangabe in Sekunden: Fuer diese Zeit wird die Anzahl der Aktionen
 #                   der gleichen Gruppe/Key berechnet. Default = 60 (1 Min).
+#            sequenceKey: String mit einem Wert, der für die Sequence-(Reihe) 
+#                         Erkennung verwendet werden kann. 
+#                         Wenn undef, wird ggf. bereits gespeicherte Reihe geloescht.
+#                         Wenn angegeben, wird der Wert an die vorhandene Reihe
+#                         angehaengt und die (ganze) Reihe zurueckgegeben.
+#                         Die Reihe besteht aus den letzten N (s.u.) Keys incl.
+#                         der gemessenen Abständen dazwischen (in Sekunden).
+#            sequenceCnt: Maximale Länge der Sequenz 
+#                         (Der Rest (aelteste Werte) wird abgeschnitten).
+#                         Wenn nicht angegeben, wird auf den Wert EQ_ACT_PP_CNT
+#                         gekuerzt. Damit wird die max. Zeitliche Dauer 
+#                         fuer die Sequence begrenzt (N Sekunden, s.o.)
+#                         Es werden auch max. soviele Werte gespeichert.
+#
 # Return: HASH:
 #  SINCE_LAST_SEC     => Zeit seit der letzten Aktion der gleichen Gruppe
 #  BETWEEN_2_LAST_SEC => Zeit zw. der letzten und der vorletzten Aktion der Gruppe
@@ -381,14 +457,14 @@ sub myCtrlBase_loadAllScheduledTaskData() {
 #  EQ_ACT_15MIN_CNT   => -/- 15
 #  EQ_ACT_1HOUR_CNT
 #  EQ_ACT_SAME_DAY_CNT=> Anzahl der Ereignisse an dem selben Tag (nicht 24 Stunden)
-#
-# alt: Return:    Array: [Zeit seit der letzten Aktion der gleichen Gruppe,
-#                    Zeit zw. der letzten und der vorletzten Aktion der Gruppe,
-#                    Anzahl der Ereignisse der gleichen Gruppe UND Key,
-#                    Anzahl der Ereignisse der gleichen Gruppe UND Key in letzten N Sekunden]
+#  SEQUENCE           => Reihe der angegebenen Keys mit den Zeitwerten (Sec) zw. den Ereignissen
+#                        Beispiel: 0:Key1;1.5:Key2;1:Key1 
+#                        (erste zahl ist ohne Bedeutung und soll ignoriert werden 
+#                        (Zeit der vergangenen Ereignissen))
+# TODO: Sequenz kuerzen.
 ###############################################################################
-sub getGenericCtrlBlock($;$$) {
-	my($group, $new_state, $last_time_diff)=@_;
+sub getGenericCtrlBlock($;$$$$) {
+	my($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt)=@_;
 	if(!defined($last_time_diff)) {$last_time_diff=60;}
 	if(!defined($new_state)) {$new_state="X";} # Wenn State nicht definiert, irgendwas definiertes nehmen
 	my $ctrl_gl_au = getCtrlData($group);
@@ -404,9 +480,15 @@ sub getGenericCtrlBlock($;$$) {
 	my $ctrl_cnt_last_hour = 0;
 	my $ctrl_cnt_same_day = 0;
 	
+	my $ctrl_sequence = "";
+	
 	if(defined($ctrl_gl_au)) {
 		# Last used state, Date, Count (eq Key), Cnt last min, cnt between 2 last actions, cnt last N
-		($ctrl_state, $ctrl_dt, $ctrl_cnt, $ctrl_cnt_last_min, $ctrl_sec_since, $ctrl_cnt_last_pp, $ctrl_cnt_last_15min, $ctrl_cnt_last_hour, $ctrl_cnt_same_day)  = split(/,/,$ctrl_gl_au);
+		($ctrl_state, $ctrl_dt, 
+     $ctrl_cnt, $ctrl_cnt_last_min, 
+     $ctrl_sec_since, $ctrl_cnt_last_pp, 
+     $ctrl_cnt_last_15min, $ctrl_cnt_last_hour, 
+     $ctrl_cnt_same_day, $ctrl_sequence)  = split(/,/,$ctrl_gl_au);
 	} else {
 		$ctrl_cnt=0;
 		$ctrl_cnt_last_min = 0;
@@ -415,18 +497,25 @@ sub getGenericCtrlBlock($;$$) {
 		$ctrl_cnt_last_15min = 0;
 		$ctrl_cnt_same_day = 0;
   	$ctrl_state=undef;
-  	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-	  $month+=1, $year+=1900;
-	  $ctrl_dt = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+  	#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	  #$month+=1, $year+=1900;
+	  #$ctrl_dt = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	  $ctrl_dt = gettimeofday();
+	  #$ctrl_dt=int(($ctrl_dt+0.5)*10)/10;
+	  #Log 3, ">>> ".$ctrl_dt;
 	}
 	
 	# Aktuelle Zeitangaben	
 	my $c_date = CurrentDate();
 	my $c_time = CurrentTime();
-	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
 	my ($lsec,$lmin,$lhour,$lmday,$lmonth,$lyear,$lwday,$lyday,$lisdst) = localtime($ctrl_dt);
-	$month+=1, $year+=1900;
-	my $dt_dec = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	#$month+=1, $year+=1900;
+	#my $dt_dec = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	my $dt_dec = gettimeofday();
+	#$dt_dec=int(($dt_dec+0.5)*10)/10;
+	#Log 3, "<<< ".$dt_dec;
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($dt_dec);
 	
 	$ctrl_cnt_last_min=int($ctrl_cnt_last_min);
 	$ctrl_cnt_last_pp = int($ctrl_cnt_last_pp);
@@ -476,11 +565,42 @@ sub getGenericCtrlBlock($;$$) {
 	  # Gesamtcounter
 	  $ctrl_cnt+=1;	
   }
-	
-	putCtrlData($group, $new_state.",".$dt_dec.",".$ctrl_cnt.",".$ctrl_cnt_last_min.",".($dt_dec-$ctrl_dt).",".$ctrl_cnt_last_pp.",".$ctrl_cnt_last_15min.",".$ctrl_cnt_last_hour.",".$ctrl_cnt_same_day);
+  
+  # Runden: 2 Nachkommastellen (abschneiden)
+  $dt_dec=int($dt_dec*100)/100;
+  $ctrl_dt=int($ctrl_dt*100)/100;
+  
+  my $ctrl_last_since = $dt_dec-$ctrl_dt;
+  #Log 3, "_____________> ".$dt_dec." - ".$ctrl_dt." > ".$ctrl_last_since;
+  ##$ctrl_last_since=int(($ctrl_last_since*10)+0.5)/10;
+  # Runden: 2 Nachkommastellen (abschneiden)
+  $ctrl_last_since=int(($ctrl_last_since*100))/100;
+  ##$dt_dec=int(($dt_dec+0.5)*100)/100;
+  ##$ctrl_dt=int(($ctrl_dt+0.5)*10)/10;
+  #Log 3, "-------------> ".$dt_dec." - ".$ctrl_dt." > ".$ctrl_last_since;
+  
+  if(defined($sequenceKey)) {
+  	# Bengrentze Laenge: angegeben, oder die Anzahl der Ereignisse in der angegebener Periode
+  	if(!defined($sequenceCnt)) {$sequenceCnt = $ctrl_cnt_last_pp;}
+  	# Neuen Schluessel hinzufuegen incl. Zeit seit dem letzten Ereignis
+    if($ctrl_sequence ne "") {$ctrl_sequence.=";";}
+    $ctrl_sequence.=$ctrl_last_since.":".$sequenceKey;
+    # Auf die benoetigte Anzahl kuerzen
+    # TODO
+  } else {
+  	# Sequence entfernen
+  	$ctrl_sequence="";
+  }
+
+	putCtrlData($group, 
+	            $new_state.",".$dt_dec.",".
+	            $ctrl_cnt.",".$ctrl_cnt_last_min.",".
+	            $ctrl_last_since.",".$ctrl_cnt_last_pp.",".
+	            $ctrl_cnt_last_15min.",".$ctrl_cnt_last_hour.",".
+	            $ctrl_cnt_same_day.",".$ctrl_sequence);
 	
 	my $ret;
-	$ret->{SINCE_LAST_SEC}=$dt_dec-$ctrl_dt;
+	$ret->{SINCE_LAST_SEC}=$ctrl_last_since;
 	$ret->{BETWEEN_2_LAST_SEC}=$ctrl_sec_since;
 	$ret->{EQ_ACT_CNT}=$ctrl_cnt;
 	$ret->{EQ_ACT_PP_CNT}=$ctrl_cnt_last_pp;
@@ -488,11 +608,34 @@ sub getGenericCtrlBlock($;$$) {
 	$ret->{EQ_ACT_15MIN_CNT}=$ctrl_cnt_last_15min;
 	$ret->{EQ_ACT_1HOUR_CNT}=$ctrl_cnt_last_hour;
 	$ret->{EQ_ACT_SAME_DAY_CNT}=$ctrl_cnt_same_day;
+	$ret->{SEQUENCE}=$ctrl_sequence;
 	
 	return $ret;
+}
+
+sub test_getGenericCtrlBlock() {
+	my $d;
+	$d = getGenericCtrlBlock("TESTX");
+	$d = getGenericCtrlBlock("TEST");
+	#Log 3,"1.1:".$d->{SINCE_LAST_SEC};
+	sleep(1.7);
+	$d = getGenericCtrlBlock("TEST");
+	#Log 3,"1.2:".$d->{SINCE_LAST_SEC};
 	
-	# Rueckgabe: Sekunden seit der Letzten Abfrage, Sekunden zw. Abfragen davor, GesamtAnzahl gleiche Aktion, Anzahl letzte Minute (gleiche Aktion)
-	#return (($dt_dec-$ctrl_dt), $ctrl_sec_since, $ctrl_cnt, $ctrl_cnt_last_min);
+	
+	$d = getGenericCtrlBlock("TEST",undef, 0, undef, 0);
+  #Log 3,"1:".$d->{SEQUENCE};
+  $d = getGenericCtrlBlock("TEST",undef, 60, "SH", 10);
+	#Log 3,"2:".$d->{SEQUENCE};
+	sleep(1);
+	$d = getGenericCtrlBlock("TEST",undef, 60, "SH", 10);
+	#Log 3,"3:".$d->{SEQUENCE};
+	sleep(1);
+	$d = getGenericCtrlBlock("TEST",undef, 60, "LN", 10);
+	#Log 3,"4:".$d->{SEQUENCE};
+	sleep(2);
+	$d = getGenericCtrlBlock("TEST",undef, 60, "SH", 10);
+	Log 3,"5:".$d->{SEQUENCE};
 }
 
 
