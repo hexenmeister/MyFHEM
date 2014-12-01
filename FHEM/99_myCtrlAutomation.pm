@@ -7,8 +7,8 @@ use warnings;
 use POSIX;
 use Time::Local;
 
-#use myCtrlHAL;
-require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
+use myCtrlHAL;
+#require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 require "$attr{global}{modpath}/FHEM/99_myCtrlBase.pm";
 #require "$attr{global}{modpath}/FHEM/99_myCtrlVoice.pm";
 
@@ -91,14 +91,15 @@ sub actFensterStatus($$) {
 	Log 3, ">Fenster: $deviceName => $event";
 	# TODO
   scheduleTask(1.5,"actFensterStatusLetzeKurzzeitAktion('$deviceName', '$event')",undef,"state-".$deviceName,2);
-  #my @a= [$deviceName, $event];
-  #scheduleTask(1.5,"actFensterStatusLetzeKurzzeitAktion",@a,"state-".$deviceName,2);
+  #scheduleTask(1.5,"actFensterStatusLetzeKurzzeitAktion",\($deviceName, $event),"state-".$deviceName,2);
+  # Stored muss nicht sein, da je nur sehr kurze Zeitspanne (nach einem Restart waere je abgelaufen)
+  #scheduleStoredTask(1.5,"actFensterStatusLetzeKurzzeitAktion('$deviceName', '$event')","state-".$deviceName,2);
 }
 
 sub actFensterStatusLetzeKurzzeitAktion($$) {
 	my ($deviceName, $event) = @_;
 	Log 3, "--->Fenster: $deviceName => $event";
-	
+	#Log 3, "--->Fenster: $deviceName->[0]::$deviceName->[1]";
 }
 
 sub actFensterSabotageKontakt($$) {
