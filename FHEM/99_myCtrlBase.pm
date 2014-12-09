@@ -12,7 +12,8 @@ use myCtrlHAL;
 
 sub putCtrlData($$);
 sub getCtrlData($);
-sub getGenericCtrlBlock($;$$);
+sub getGenericCtrlBlock($;$$$$$);
+sub previewGenericCtrlBlock($;$$$$);
 
 sub scheduleTask($$;$$$);
 sub scheduleStoredTask($$;$$);
@@ -392,10 +393,10 @@ sub removeCtrlData($) {
 # speichert ein scheduledTask
 sub myCtrlBase_saveScheduledTaskData($$) {
 	my($key, $val) = @_;
-	if(%{$val}->{STORED}) {
+	if($val->{STORED}) {
   	#TODO: Umformen
-	  my $tim = %{$val}->{TRIGGERTIME};
-    my $fn = %{$val}->{FN};
+	  my $tim = $val->{TRIGGERTIME};
+    my $fn = $val->{FN};
     #my $arg = %{$val}->{ARG};      
     #Mit Parametern geht das so infach nicht
     #my $txt= strftime("%d.%m.%Y_%H:%M:%S", localtime($tim)).'|'.$fn.'|'.(defined($arg)?join(', ', @$arg):"");
@@ -447,7 +448,9 @@ sub myCtrlBase_loadAllScheduledTaskData() {
 #                         gekuerzt. Damit wird die max. Zeitliche Dauer 
 #                         fuer die Sequence begrenzt (N Sekunden, s.o.)
 #                         Es werden auch max. soviele Werte gespeichert.
-#
+#            preview:     wenn angegeben und true (=1), dann wird nichts gespeichert.
+#                         Der Sinn ist, nachzusehen, wie der Stand ist, 
+#                         ohne ihn zu veraendern.
 # Return: HASH:
 #  SINCE_LAST_SEC     => Zeit seit der letzten Aktion der gleichen Gruppe
 #  BETWEEN_2_LAST_SEC => Zeit zw. der letzten und der vorletzten Aktion der Gruppe
@@ -462,48 +465,18 @@ sub myCtrlBase_loadAllScheduledTaskData() {
 #                        (erste zahl ist ohne Bedeutung und soll ignoriert werden 
 #                        (Zeit der vergangenen Ereignissen))
 # TODO: Sequenz kuerzen.
+#  LAST_STATE         => Letzter gespeicherte Key.
 ###############################################################################
-sub getGenericCtrlBlock($;$$$$) {
-	my($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt)=@_;
+sub getGenericCtrlBlock($;$$$$$) {
+	my($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt, $preview)=@_;
 	if(!defined($last_time_diff)) {$last_time_diff=60;}
 	if(!defined($new_state)) {$new_state="X";} # Wenn State nicht definiert, irgendwas definiertes nehmen
-	my $ctrl_gl_au = getCtrlData($group);
-	# Format: [zustand on|off...],[datum/zeit decimal (sec)],[counter],[counter_last_min],[sekunden seit letzter aktion]
-	my $ctrl_cnt=0;
-	my $ctrl_state=undef;
-	my $ctrl_dt = undef;
-	my $ctrl_cnt_last_min = 0;
-	my $ctrl_cnt_last_pp = 0;
-	my $ctrl_sec_since = 0;
 	
-	my $ctrl_cnt_last_15min = 0;
-	my $ctrl_cnt_last_hour = 0;
-	my $ctrl_cnt_same_day = 0;
-	
-	my $ctrl_sequence = "";
-	
-	if(defined($ctrl_gl_au)) {
-		# Last used state, Date, Count (eq Key), Cnt last min, cnt between 2 last actions, cnt last N
-		($ctrl_state, $ctrl_dt, 
+	my ($ctrl_state, $ctrl_dt, 
      $ctrl_cnt, $ctrl_cnt_last_min, 
      $ctrl_sec_since, $ctrl_cnt_last_pp, 
      $ctrl_cnt_last_15min, $ctrl_cnt_last_hour, 
-     $ctrl_cnt_same_day, $ctrl_sequence)  = split(/,/,$ctrl_gl_au);
-	} else {
-		$ctrl_cnt=0;
-		$ctrl_cnt_last_min = 0;
-		$ctrl_cnt_last_pp = 0;
-		$ctrl_cnt_last_hour = 0;
-		$ctrl_cnt_last_15min = 0;
-		$ctrl_cnt_same_day = 0;
-  	$ctrl_state=undef;
-  	#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-	  #$month+=1, $year+=1900;
-	  #$ctrl_dt = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
-	  $ctrl_dt = gettimeofday();
-	  #$ctrl_dt=int(($ctrl_dt+0.5)*10)/10;
-	  #Log 3, ">>> ".$ctrl_dt;
-	}
+     $ctrl_cnt_same_day, $ctrl_sequence) = parseCtrlData($group);
 	
 	# Aktuelle Zeitangaben	
 	my $c_date = CurrentDate();
@@ -523,7 +496,7 @@ sub getGenericCtrlBlock($;$$$$) {
 	$ctrl_cnt_same_day = int($ctrl_cnt_same_day);
 	$ctrl_cnt_last_15min = int($ctrl_cnt_last_15min);
 	$ctrl_sec_since=int($ctrl_sec_since);
-	if($new_state ne $ctrl_state) {
+	if(!defined($ctrl_state) || $new_state ne $ctrl_state) {
 	  $ctrl_cnt = 0;
 	  $ctrl_cnt_last_min = 0;
 	  $ctrl_cnt_last_pp = 0;
@@ -592,12 +565,14 @@ sub getGenericCtrlBlock($;$$$$) {
   	$ctrl_sequence="";
   }
 
-	putCtrlData($group, 
+  if(!$preview) {
+  	putCtrlData($group, 
 	            $new_state.",".$dt_dec.",".
 	            $ctrl_cnt.",".$ctrl_cnt_last_min.",".
 	            $ctrl_last_since.",".$ctrl_cnt_last_pp.",".
 	            $ctrl_cnt_last_15min.",".$ctrl_cnt_last_hour.",".
 	            $ctrl_cnt_same_day.",".$ctrl_sequence);
+	}
 	
 	my $ret;
 	$ret->{SINCE_LAST_SEC}=$ctrl_last_since;
@@ -609,18 +584,79 @@ sub getGenericCtrlBlock($;$$$$) {
 	$ret->{EQ_ACT_1HOUR_CNT}=$ctrl_cnt_last_hour;
 	$ret->{EQ_ACT_SAME_DAY_CNT}=$ctrl_cnt_same_day;
 	$ret->{SEQUENCE}=$ctrl_sequence;
+	$ret->{LAST_STATE}=$ctrl_state;
 	
 	return $ret;
+}
+
+# Zerlegt den String, der zu der gegebener Gruppe gefunden wurde, in seine EInzelteile
+# Wenn nichts gefunden, werden default-Werte geliefert.
+sub parseCtrlData($) {
+	my($group)=@_;
+	
+	my $ctrl_gl_au = getCtrlData($group);
+	# Format: [zustand on|off...],[datum/zeit decimal (sec)],[counter],[counter_last_min],
+	#         [sekunden seit letzter aktion],[Anzahl in der letzten Periode],
+	#         [Anzahl seit 15 Min],[Anzahl seit 1 Std.],[Anzahl gleicher tag],
+	#         [Sequence]
+	my $ctrl_cnt=0;
+	my $ctrl_state="";
+	my $ctrl_dt = undef;
+	my $ctrl_cnt_last_min = 0;
+	my $ctrl_cnt_last_pp = 0;
+	my $ctrl_sec_since = 0;
+	
+	my $ctrl_cnt_last_15min = 0;
+	my $ctrl_cnt_last_hour = 0;
+	my $ctrl_cnt_same_day = 0;
+	
+	my $ctrl_sequence = "";
+	
+	if(defined($ctrl_gl_au)) {
+		# Last used state, Date, Count (eq Key), Cnt last min, cnt between 2 last actions, cnt last N
+		($ctrl_state, $ctrl_dt, 
+     $ctrl_cnt, $ctrl_cnt_last_min, 
+     $ctrl_sec_since, $ctrl_cnt_last_pp, 
+     $ctrl_cnt_last_15min, $ctrl_cnt_last_hour, 
+     $ctrl_cnt_same_day, $ctrl_sequence)  = split(/,/,$ctrl_gl_au);
+	} else {
+		$ctrl_cnt=0;
+		$ctrl_cnt_last_min = 0;
+		$ctrl_cnt_last_pp = 0;
+		$ctrl_cnt_last_hour = 0;
+		$ctrl_cnt_last_15min = 0;
+		$ctrl_cnt_same_day = 0;
+  	$ctrl_state=undef;
+  	#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	  #$month+=1, $year+=1900;
+	  #$ctrl_dt = dateTime2dec($year."-".$month."-".$mday." ".$hour.":".$min.":".$sec);
+	  $ctrl_dt = gettimeofday();
+	  #$ctrl_dt=int(($ctrl_dt+0.5)*10)/10;
+	  #Log 3, ">>> ".$ctrl_dt;
+	}
+	
+	return ($ctrl_state, $ctrl_dt, 
+     $ctrl_cnt, $ctrl_cnt_last_min, 
+     $ctrl_sec_since, $ctrl_cnt_last_pp, 
+     $ctrl_cnt_last_15min, $ctrl_cnt_last_hour, 
+     $ctrl_cnt_same_day, $ctrl_sequence);
+}
+
+# Macht die gleichen Berechnungen, wie getGenericCtrlBlock, 
+# veraendert aber den gespeicherten Zustand nicht.
+sub previewGenericCtrlBlock($;$$$$) {
+	my($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt)=@_;
+	return getGenericCtrlBlock($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt,1)
 }
 
 sub test_getGenericCtrlBlock() {
 	my $d;
 	$d = getGenericCtrlBlock("TESTX");
 	$d = getGenericCtrlBlock("TEST");
-	#Log 3,"1.1:".$d->{SINCE_LAST_SEC};
+	Log 3,"1.1:".$d->{SINCE_LAST_SEC};
 	sleep(1.7);
 	$d = getGenericCtrlBlock("TEST");
-	#Log 3,"1.2:".$d->{SINCE_LAST_SEC};
+	Log 3,"1.2:".$d->{SINCE_LAST_SEC};
 	
 	
 	$d = getGenericCtrlBlock("TEST",undef, 0, undef, 0);
