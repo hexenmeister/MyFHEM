@@ -88,6 +88,19 @@ sub getWindowDoorList($;$) {
  return @ret;
 }
 
+# Liefert Liste aller Fenster (Namen). Keine Terrassentueren.
+# Festdefinierte Liste, muss ggf. angepasst werden.
+sub getAllWindowNames() {
+	return [DEVICE_NAME_FK_WZ1,  
+	        DEVICE_NAME_FK_KU1,  DEVICE_NAME_FK_BZ1,  DEVICE_NAME_FK_SZ1,
+          DEVICE_NAME_FK_KA1l, DEVICE_NAME_FK_KA1r, DEVICE_NAME_FK_KB1];
+}
+
+# Liefert Liste aller Fenster (Namen).
+# Festdefinierte Liste, muss ggf. angepasst werden.
+sub getGardenDoors() {
+	return [DEVICE_NAME_FK_WZ2l, DEVICE_NAME_FK_WZ2r];
+}
 
 # TODO:
 
