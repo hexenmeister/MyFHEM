@@ -86,6 +86,11 @@ sub actFenster($$) {
 	
 }
 
+# Benachrichtigung ueber die Aenderung des Status eines Fensters
+# Params:
+#   Device: Name des Ausloesers
+#   Event:  open/closed/tilted
+#
 sub actFensterStatus($$) {
 	my ($deviceName, $event) = @_;
 	Log 3, ">Fenster: $deviceName => $event";
@@ -96,12 +101,30 @@ sub actFensterStatus($$) {
   #scheduleStoredTask(1.5,"actFensterStatusLetzeKurzzeitAktion('$deviceName', '$event')","state-".$deviceName,2);
 }
 
+# Benachrichtigung ueber die Aenderung des Status eines Fensters
+# Es werden ueber einen kurzen Zeitraim die Meldungen gesammelt 
+# und hier landen nur die letzten innerhalb dieser Zeit
+# (s. Methode actFensterStatus)
+# Params:
+#   Device: Name des Ausloesers
+#   Event:  open/closed/tilted
+#
 sub actFensterStatusLetzeKurzzeitAktion($$) {
 	my ($deviceName, $event) = @_;
 	Log 3, "--->Fenster: $deviceName => $event";
 	#Log 3, "--->Fenster: $deviceName->[0]::$deviceName->[1]";
+	
+	# Fenster-Status speichern (Zeitraum: Tag, auch Sequence (fuer alle Faelle) speichern, letzte 10?)
+	getGenericCtrlBlock("ctrl_last_window_state_".$deviceName, $event, 86400, $event, 10);
+	
 }
 
+# Benachrichtigung Sabotagekontakt eines Fensters 
+# (Oeffnung/Schliessung des Batteriefaches)
+# Params:
+#   Device: Name des Ausloesers
+#   Event:  open/closed/tilted
+#
 sub actFensterSabotageKontakt($$) {
 	my ($deviceName, $event) = @_;
 	Log 3, ">Fenster Sabotagekontakt: $deviceName => $event";
@@ -288,12 +311,33 @@ sub automationHeartbeat() {
 	#	} 
 	
 	# TODO
+	
+	# Ueberpruefen, ob Fenser zu lange offen sind etc.
+	my $wnds = getAllWindowNames();
+	foreach my $wnd (@{$wnds}) {
+		if($wnd ne "") {
+      checkFensterZustand($wnd);
+    }
+	}
+	# TODO: Terrassentueren
+	
+	# TODO: Eingangstuer
 }
 
 # --- User Methods ------------------------------------------------------------
 
 # TODO
 
+sub checkFensterZustand($) {
+	my($deviceName) = @_;
+	my $wstruct = previewGenericCtrlBlock("ctrl_last_window_state_".$deviceName);
+	
+	my $dauer = $wstruct ->{SINCE_LAST_SEC};
+  my $zustand = $wstruct ->{LAST_STATE};
+  
+  # TODO
+  # Wenn Offen und laenger als X? und kalt, dann Warnung
+}
 
 ###############################################################################
 1;
