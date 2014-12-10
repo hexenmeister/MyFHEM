@@ -14,6 +14,7 @@ sub putCtrlData($$);
 sub getCtrlData($);
 sub getGenericCtrlBlock($;$$$$$);
 sub previewGenericCtrlBlock($;$$$$);
+sub removeGenericCtrlBlock($);
 
 sub scheduleTask($$;$$$);
 sub scheduleStoredTask($$;$$);
@@ -368,6 +369,7 @@ sub putCtrlData($$) {
 }
 
 # liefert ein zum einem Key gespeicherten Wert (fuer Steuerungszwecke)
+# TODO: In Schnitstellenschicht verlagern
 sub getCtrlData($) {
 	my($key) = @_;
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
@@ -589,7 +591,14 @@ sub getGenericCtrlBlock($;$$$$$) {
 	return $ret;
 }
 
-# Zerlegt den String, der zu der gegebener Gruppe gefunden wurde, in seine EInzelteile
+# Entfernt den ControlBlock fuer die Gruppe
+#   Param: Group: Gruppe
+sub removeGenericCtrlBlock($) {
+	my($group)=@_;
+	removeCtrlData($group);
+}
+
+# Zerlegt den String, der zu der gegebener Gruppe gefunden wurde, in seine Einzelteile
 # Wenn nichts gefunden, werden default-Werte geliefert.
 sub parseCtrlData($) {
 	my($group)=@_;
