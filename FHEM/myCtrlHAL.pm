@@ -88,6 +88,20 @@ sub getWindowDoorList($;$) {
  return @ret;
 }
 
+# Liefert Standort zum Geraert
+#   Param: Name: FHEM-Name des Geraetes
+#          Default: Wird zurueckgegben, wenn nicht gefunden/bekannt, oder wenn keine Location definiert
+# TODO: Umstellen: Dev-Array benutzen
+sub getDeviceLocation($;$) {
+	my($deviceName,$default)=@_;
+	my $dName = $defs{$deviceName}{NAME};
+  if(defined($dName)) {
+    my $dAlias = AttrVal($dName,+ATTR_NAME_DEVLOCATION,undef);
+    return $dAlias;
+  }
+  return undef;
+}
+
 # Liefert Liste aller Fenster (Namen). Keine Terrassentueren.
 # Festdefinierte Liste, muss ggf. angepasst werden.
 sub getAllWindowNames() {
@@ -100,6 +114,24 @@ sub getAllWindowNames() {
 # Festdefinierte Liste, muss ggf. angepasst werden.
 sub getGardenDoors() {
 	return [DEVICE_NAME_FK_WZ2l, DEVICE_NAME_FK_WZ2r];
+}
+
+# Prueft, ob der uebergebener Status 'closed' ist.
+sub isWindowStateClosed($) {
+	my($state)=@_;
+	return $state eq STATE_NAME_WIN_CLOSED
+}
+
+# Prueft, ob der uebergebener Status 'opened' ist.
+sub isWindowStateOpned($) {
+	my($state)=@_;
+	return $state eq STATE_NAME_WIN_OPENED
+}
+
+# Prueft, ob der uebergebener Status 'tilted' ist.
+sub isWindowStateTilted($) {
+	my($state)=@_;
+	return $state eq STATE_NAME_WIN_TILTED
 }
 
 # TODO:
