@@ -561,7 +561,12 @@ sub getGenericCtrlBlock($;$$$$$) {
     if($ctrl_sequence ne "") {$ctrl_sequence.=";";}
     $ctrl_sequence.=$ctrl_last_since.":".$sequenceKey;
     # Auf die benoetigte Anzahl kuerzen
-    # TODO
+    my @sarr = split(/;/,$ctrl_sequence);
+    # Letzte N nehmen
+    my $slng = scalar(@sarr);
+    my $alng = $sequenceCnt<$slng?$sequenceCnt:$slng;
+    @sarr= @sarr[$slng-$alng..$slng-1];
+    $ctrl_sequence=join(';', @sarr); 
   } else {
   	# Sequence entfernen
   	$ctrl_sequence="";
