@@ -15,6 +15,9 @@ use constant {
  NOTIFICATION_CONFIRM1 => ":sonic-ring.mp3:",
  NOTIFICATION_CONFIRM2 => ":cm/notifications/Argon.ogg:",
  NOTIFICATION_FAIL => ":cm/notifications/Doink.ogg:",
+ NOTIFICATION_MSG_INFO1 => ":cm/notifications/Merope.ogg:",
+ NOTIFICATION_MSG_INFO2 => ":cm/notifications/pixiedust.ogg:",
+ NOTIFICATION_MSG_WARN => ":cm/notifications/Naughty.ogg:",
  
 };
 
@@ -134,14 +137,50 @@ sub speak($;$) {
 ###############################################################################
 # Bestaetigungston 1
 ###############################################################################
-sub voiceNotificationConfirm1() {
-  speak(NOTIFICATION_CONFIRM1,0);
+sub voiceNotificationConfirm1(;$) {
+	my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_CONFIRM1,$volume);
 }
 ###############################################################################
 # Bestaetigungston 2
 ###############################################################################
-sub voiceNotificationConfirm2() {
-  speak(NOTIFICATION_CONFIRM2,0);
+sub voiceNotificationConfirm2(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_CONFIRM2,$volume);
+}
+###############################################################################
+# Ton: Fehlgeschlagen
+###############################################################################
+sub voiceNotificationFail(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_FAIL,$volume);
+}
+###############################################################################
+# Ton Infomeldung 1
+###############################################################################
+sub voiceNotificationMsgInfo1(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_MSG_INFO1,$volume);
+}
+###############################################################################
+# Ton Infomeldung 2
+###############################################################################
+sub voiceNotificationMsgInfo2(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_MSG_INFO2,$volume);
+}
+###############################################################################
+# Ton WanrMeldung
+###############################################################################
+sub voiceNotificationMsgWarn(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_MSG_WARN,$volume);
 }
 
 # --- User Methods ------------------------------------------------------------
