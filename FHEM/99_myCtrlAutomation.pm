@@ -313,12 +313,17 @@ sub automationHeartbeat() {
 	# TODO
 	
 	# Ueberpruefen, ob Fenser zu lange offen sind etc.
+	# TODO: Mehrere Fenster gleichzeitig ueberpruefen: 
+	# z.B. wenn mehrere offen sind, soll nicht nacheinander mehrere Meldungen 
+	# darueber ausgegeben werden, sonder zusammengefast
+	# Idee: Alle offenen ermitteln, dann bewerten, welche davon genannt werden sollen
 	my $wnds = getAllWindowNames();
 	foreach my $wnd (@{$wnds}) {
 		if($wnd ne "") {
       checkFensterZustand($wnd);
     }
-	}
+	} 
+	
 	# TODO: Terrassentueren
 	
 	# TODO: Eingangstuer
@@ -336,7 +341,30 @@ sub checkFensterZustand($) {
   my $zustand = $wstruct ->{LAST_STATE};
   
   # TODO
-  # Wenn Offen und laenger als X? und kalt, dann Warnung
+  # Wenn Offen und laenger als X? und kalt draussen, dann Warnung
+  my $wcb = previewGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
+	my $msgzeit = $wcb ->{SINCE_LAST_SEC};
+	my $msgcnt = $wcb ->{EQ_ACT_CNT};
+	
+	Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName.", Zustand: ".$zustand.", Dauer: ".$dauer.", LastMsgTime: ".$msgzeit.", MsgCnt: ".$msgcnt;
+	
+	if($zustand ne STATE_NAME_WIN_CLOSED) { # Wenn nicht zu
+  	if($msgcnt<5 && ($msgcnt==0 || $msgzeit>600)) { # sein min. 10 Min keine Meldung, oder gar keine Meldung, aber nicht mehr als N Mal
+  		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
+      if($dauer>1200) { # 20 Min
+  	    # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
+    	  # Alarm wenn kalt im Zimmer?
+  	    #TODO
+  	    getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
+  	    voiceNotificationMsgWarn(100);
+  	    speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",100);
+      }
+    }
+  } else {
+  	# Fenster zu, Meldungen-ControlBlock resetten
+  	removeGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg");
+  	#getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","off");
+  }
 }
 
 ###############################################################################
