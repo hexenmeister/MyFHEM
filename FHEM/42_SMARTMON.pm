@@ -176,8 +176,13 @@ sub SMARTMON_refreshReadings($) {
 
     }
     
-    #TODO Alle anderen Readings entfernen
-        
+    # Alle anderen Readings entfernen
+    foreach my $rName (sort keys %{$hash->{READINGS}}) {
+    	if(!defined($map->{$rName})) {
+        delete $hash->{READINGS}->{$rName};
+    	}
+    }
+     
   }
 
   readingsEndUpdate($hash,1);	
@@ -203,12 +208,12 @@ sub SMARTMON_obtainParameters($) {
   	delete $map->{"overall_health_test"};
   }
   
-  $map = readSmartData($hash, $map);
+  $map = getSmartDataReadings($hash, $map);
   
   return $map;
 }
 
-sub readSmartData($$) {
+sub getSmartDataReadings($$) {
   my ($hash, $map) = @_;
   
   # SMART Data
@@ -239,7 +244,23 @@ sub readSmartData($$) {
   # 200 Multi_Zone_Error_Rate   0x0008   100   253   000    Old_age   Offline      -       0
 
 
-  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
+  my $dmap = readSmartData($hash);
+  foreach my $id (sort keys %{$dmap}) {
+  	my $rName = $dmap->{$id}->{name};
+  	my $raw   = $dmap->{$id}->{raw};
+  	$map->{$rName} = "$raw";
+  }
+  
+	# TODO
+	
+	return $map;
+}
+
+sub readSmartData($) {
+	my ($hash) = @_;
+	my $map;
+	
+	my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
 	SMARTMON_Log($hash, 5, "device data: ".Dumper(@dev_data));
 	if(defined($dev_data[0])) {
 		while(scalar(@dev_data)>0) {
@@ -253,16 +274,24 @@ sub readSmartData($$) {
 					shift @dev_data;
 					
 					if(defined($d_attr_name)) {
-            $map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
+            #$map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
+            $map->{$d_id}->{name}    = $d_attr_name;
+            $map->{$d_id}->{flag}    = $d_flag;
+            $map->{$d_id}->{value}   = $d_value;
+            $map->{$d_id}->{worst}   = $d_worst;
+            $map->{$d_id}->{thresh}  = $d_thresh;
+            $map->{$d_id}->{type}    = $d_type;
+            $map->{$d_id}->{updated} = $d_updated;
+            $map->{$d_id}->{failed}  = $d_when_failed;
+            $map->{$d_id}->{raw}     = $d_raw_value;
           }
 				}
 			}
 		}
 	}
 	
-	# TODO
-	
-}
+	return $map;
+} 
 
 sub SMARTMON_execute($$)
 {
