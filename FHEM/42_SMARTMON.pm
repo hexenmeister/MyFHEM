@@ -34,8 +34,15 @@ my $VERSION = "0.0.0.1";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
-sub
-SMARTMON_Initialize($)
+sub SMARTMON_refreshReadings($);
+sub SMARTMON_obtainParameters($);
+sub SMARTMON_getSmartDataReadings($$);
+sub SMARTMON_interpretKnownData($$$);
+sub SMARTMON_readSmartData($);
+sub SMARTMON_execute($$);
+
+
+sub SMARTMON_Initialize($)
 {
   my ($hash) = @_;
 
@@ -148,6 +155,7 @@ sub SMARTMON_Update($@)
 
 }
 
+# Alle Readings neuerstellen
 sub SMARTMON_refreshReadings($) {
 	my ($hash) = @_;
 	
@@ -188,6 +196,7 @@ sub SMARTMON_refreshReadings($) {
   readingsEndUpdate($hash,1);	
 }
 
+# Alle Readings erstellen
 sub SMARTMON_obtainParameters($) {
 	my ($hash) = @_;
 	SMARTMON_Log($hash, 5, "Obtain parameters");
@@ -196,9 +205,7 @@ sub SMARTMON_obtainParameters($) {
   # /usr/sbin/smartctl in /etc/sudoers aufnehmen
   # fhem ALL=(ALL) NOPASSWD: [...,] /usr/sbin/smartctl 
   # Natuerlich muss der user auch der Gruppe "sudo" angehören.
-  
-  # TODO: In Methoden auslagern
-  
+    
 	# Health	
 	my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H ".$hash->{DEVICE}." | grep 'test result:'");
 	SMARTMON_Log($hash, 5, "health: $dev_health");
@@ -208,17 +215,48 @@ sub SMARTMON_obtainParameters($) {
   	delete $map->{"overall_health_test"};
   }
   
-  $map = getSmartDataReadings($hash, $map);
+  $map = SMARTMON_getSmartDataReadings($hash, $map);
   
   return $map;
 }
 
-sub getSmartDataReadings($$) {
+# Readings zu gelesenen RAW-Daten
+sub SMARTMON_getSmartDataReadings($$) {
   my ($hash, $map) = @_;
   
-  # SMART Data
+  # S.M.A.R.T. RAW-Daten auslesen
+  my $dmap = SMARTMON_readSmartData($hash);
   
-  # smartctl 5.41 2011-06-09 r3365 [armv7l-linux-3.4.98-sun7i+] (local build)
+  # Bekannte Werte einspielen # TODO
+  # per Referenz uebergeben!
+  my $done_map = SMARTMON_interpretKnownData($hash, \%{$dmap}, \%{$map});
+
+  # restlichen RAW-Werte ggf. einspielen # TODO: Abschaltbar machen
+  foreach my $id (sort keys %{$dmap}) {
+  	# nur wenn noch nicht frueher interpretiert werden. # TODO ggf zuschaltbar machen (als RAW-Anzeige)
+  	if(!defined($done_map->{$id})) {
+  		my $m = $dmap->{$id};
+      my $rName = $m->{name};
+      #my $raw   = $dmap->{$id}->{raw};
+      $map->{sprintf("%03d_%s",$id,$rName)} = 
+         sprintf("Flag: %s Val: %s Worst: %s Thresh: %s Type: %s Updated: %s When_Failed: %s Raw: %s",
+                 $m->{flag},$m->{value},$m->{worst},$m->{thresh},$m->{type},
+                 $m->{updated},$m->{failed},$m->{raw});
+    }
+  }
+  
+	# TODO
+	
+	return $map;
+}
+
+# Readings zu bekannten Werten erstellen
+sub SMARTMON_interpretKnownData($$$) {
+	my ($hash, $dmap, $map) = @_;
+	my $known;
+	#$map->{TEST}="TestX";
+	
+	# smartctl 5.41 2011-06-09 r3365 [armv7l-linux-3.4.98-sun7i+] (local build)
   # Copyright (C) 2002-11 by Bruce Allen, http://smartmontools.sourceforge.net
   # 
   # === START OF READ SMART DATA SECTION ===
@@ -243,20 +281,56 @@ sub getSmartDataReadings($$) {
   # 199 UDMA_CRC_Error_Count    0x0032   200   200   000    Old_age   Always       -       0
   # 200 Multi_Zone_Error_Rate   0x0008   100   253   000    Old_age   Offline      -       0
 
+  
+	if($dmap->{3}) {
+  	$map->{spin_up_time} = $dmap->{3}->{raw};
+  	$known->{3}="";
+  }
+  if($dmap->{4}) {
+  	$map->{start_stop_count} = $dmap->{4}->{raw};
+  	$known->{4}="";
+  }
+  if($dmap->{9}) {
+  	$map->{power_on_hours} = $dmap->{9}->{raw};
+  	$map->{power_on_text} = SMARTMON_hour2Dauer($dmap->{9}->{raw});
+  	$known->{9}="";
+  }  
 
-  my $dmap = readSmartData($hash);
-  foreach my $id (sort keys %{$dmap}) {
-  	my $rName = $dmap->{$id}->{name};
-  	my $raw   = $dmap->{$id}->{raw};
-  	$map->{$rName} = "$raw";
+
+  if($dmap->{190}) {
+  	$map->{airflow_temperature} = $dmap->{190}->{raw};
+  	$known->{190}="";
+  }
+  if($dmap->{194}) {
+  	$map->{temperature} = $dmap->{194}->{raw};
+  	$known->{194}="";
   }
   
 	# TODO
-	
-	return $map;
+  
+  return $known;
 }
 
-sub readSmartData($) {
+# Ausrechnet aus der Zahl der Sekunden Anzeige in Tagen:Stunden:Minuten:Sekunden.
+sub SMARTMON_sec2Dauer($){
+  my ($t) = @_;
+  my $d = int($t/86400);
+  my $r = $t-($d*86400);
+  my $h = int($r/3600);
+     $r = $r - ($h*3600);
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  return sprintf("%02d Tage %02d Std. %02d Min. %02d Sec.",$d,$h,$m,$s);
+}
+
+# Ausrechnet aus der Zahl der Stunden Anzeige in Tagen:Stunden:Minuten:Sekunden.
+sub SMARTMON_hour2Dauer($){
+  my ($t) = @_;
+  return SMARTMON_sec2Dauer($t*3600);
+}
+
+# liest RAW-Daten
+sub SMARTMON_readSmartData($) {
 	my ($hash) = @_;
 	my $map;
 	
@@ -293,15 +367,14 @@ sub readSmartData($) {
 	return $map;
 } 
 
-sub SMARTMON_execute($$)
-{
+# BS-Befehl ausfuehren
+sub SMARTMON_execute($$) {
 	my ($hash, $cmd) = @_;
 	
 	SMARTMON_Log($hash, 5, "Execute: $cmd");
 	
   return qx($cmd);
 }
-
 
 1;
 
