@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "0.0.0.1";
+my $VERSION = "0.5.0.0";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -38,7 +38,9 @@ sub SMARTMON_refreshReadings($);
 sub SMARTMON_obtainParameters($);
 sub SMARTMON_getSmartDataReadings($$);
 sub SMARTMON_interpretKnownData($$$);
-sub SMARTMON_readSmartData($);
+sub SMARTMON_readSmartData($;$);
+sub SMARTMON_sec2Dauer($);
+sub SMARTMON_hour2Dauer($);
 sub SMARTMON_execute($$);
 
 
@@ -52,8 +54,8 @@ sub SMARTMON_Initialize($)
   $hash->{UndefFn}  = "SMARTMON_Undefine";
   $hash->{GetFn}    = "SMARTMON_Get";
   #$hash->{SetFn}    = "SMARTMON_Set";
-  #$hash->{AttrFn}   = "SMARTMON_Attr";
-  $hash->{AttrList} = "disable:0,1 ".$readingFnAttributes;
+  $hash->{AttrFn}   = "SMARTMON_Attr";
+  $hash->{AttrList} = "show_raw:0,1,2 disable:0,1 include ".$readingFnAttributes;
 }
 
 sub SMARTMON_Log($$$) {
@@ -140,9 +142,56 @@ sub SMARTMON_Get($@)
   return "Unknown argument $cmd, choose one of update:noArg version:noArg";
 }
 
-sub SMARTMON_Update($@)
+sub SMARTMON_Attr($$$) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  Log 5, "SMARTMON Attr: $cmd $name $attrName $attrVal";
+
+  my $hash = $main::defs{$name};
+  
+  $attrVal= "" unless defined($attrVal);
+  my $orig = AttrVal($name, $attrName, "");
+
+  if( $cmd eq "set" ) {# set, del
+    if( $orig ne $attrVal ) {
+      
+      $attr{$name}{$attrName} = $attrVal;
+      
+    	if($attrName eq "disable") {
+        # NOP
+      }
+      
+      if($attrName eq "show_raw") {
+        SMARTMON_refreshReadings($hash);  
+      }
+      
+      if($attrName eq "include") {
+        SMARTMON_refreshReadings($hash);  
+      }
+      
+      #return $attrName ." set to ". $attrVal;
+      return undef;
+    }
+  }
+  
+  if( $cmd eq "del" ) {# set, 
+    if($attrName eq "show_raw") {
+    	delete $attr{$name}{$attrName};
+      SMARTMON_refreshReadings($hash);  
+    }
+    
+    if($attrName eq "include") {
+    	delete $attr{$name}{$attrName};
+      SMARTMON_refreshReadings($hash);  
+    }
+  }
+  
+  return;
+}
+
+sub SMARTMON_Update($)
 {
-  my ($hash, $refresh_all) = @_;
+  my ($hash) = @_;
 
   SMARTMON_Log($hash, 5, "Update");
   
@@ -152,7 +201,6 @@ sub SMARTMON_Update($@)
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SMARTMON_Update", $hash, 1);
   
   SMARTMON_refreshReadings($hash);
-
 }
 
 # Alle Readings neuerstellen
@@ -165,8 +213,7 @@ sub SMARTMON_refreshReadings($) {
 	
   readingsBeginUpdate($hash);
   
-  if( AttrVal($name, "disable", "") eq "1" )
-  {
+  if( AttrVal($name, "disable", "") eq "1" ) {
   	SMARTMON_Log($hash, 5, "Update disabled");
   	$hash->{STATE} = "Inactive";
   } else {
@@ -224,24 +271,39 @@ sub SMARTMON_obtainParameters($) {
 sub SMARTMON_getSmartDataReadings($$) {
   my ($hash, $map) = @_;
   
-  # S.M.A.R.T. RAW-Daten auslesen
-  my $dmap = SMARTMON_readSmartData($hash);
+  my $name = $hash->{NAME};
   
-  # Bekannte Werte einspielen # TODO
+  # Attribut lesen, splitten, als Keys eines Hashes setzen
+  my $t_include = AttrVal($name, "include", undef);
+  my %h_include;
+  if(defined($t_include)) {
+    my @a_include = split(/,\s*/, trim($t_include));
+    %h_include = map { int($_) => 1 } @a_include; # 1 oder 001 soll gleichwertig sein
+  }
+  
+  # S.M.A.R.T. RAW-Daten auslesen
+  my $dmap = SMARTMON_readSmartData($hash, defined($t_include)?\%h_include:undef);
+  
+  # Bekannte Werte einspielen
   # per Referenz uebergeben!
   my $done_map = SMARTMON_interpretKnownData($hash, \%{$dmap}, \%{$map});
 
-  # restlichen RAW-Werte ggf. einspielen # TODO: Abschaltbar machen
-  foreach my $id (sort keys %{$dmap}) {
-  	# nur wenn noch nicht frueher interpretiert werden. # TODO ggf zuschaltbar machen (als RAW-Anzeige)
-  	if(!defined($done_map->{$id})) {
-  		my $m = $dmap->{$id};
-      my $rName = $m->{name};
-      #my $raw   = $dmap->{$id}->{raw};
-      $map->{sprintf("%03d_%s",$id,$rName)} = 
-         sprintf("Flag: %s Val: %s Worst: %s Thresh: %s Type: %s Updated: %s When_Failed: %s Raw: %s",
-                 $m->{flag},$m->{value},$m->{worst},$m->{thresh},$m->{type},
-                 $m->{updated},$m->{failed},$m->{raw});
+  # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar
+  my $sr = AttrVal($name, "show_raw", "2");
+  if( $sr eq "1" || $sr eq "2" ) {
+    foreach my $id (sort keys %{$dmap}) {
+    	# nur wenn noch nicht frueher interpretiert werden, 
+    	# oder wenn explizit erwuenscht (Attribut show_raw) 
+  	  if(!defined($done_map->{$id}) || $sr eq "2") {
+  	  	my $m = $dmap->{$id};
+        my $rName = $m->{name};
+        #my $raw   = $dmap->{$id}->{raw};
+        $map->{sprintf("%03d_%s",$id,$rName)} = 
+           sprintf("Flag: %s Val: %s Worst: %s Thresh: %s ".
+                   "Type: %s Updated: %s When_Failed: %s Raw: %s",
+                   $m->{flag},$m->{value},$m->{worst},$m->{thresh},$m->{type},
+                   $m->{updated},$m->{failed},$m->{raw});
+      }
     }
   }
   
@@ -330,8 +392,12 @@ sub SMARTMON_hour2Dauer($){
 }
 
 # liest RAW-Daten
-sub SMARTMON_readSmartData($) {
-	my ($hash) = @_;
+# Params: 
+#  HASH: Device-HASH 
+#  Include-HASH: Wenn definiert,werden nur die ID zurueckgegeben, die in 
+#   diesem HASH enthalten sind.
+sub SMARTMON_readSmartData($;$) {
+	my ($hash, $include) = @_;
 	my $map;
 	
 	my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
@@ -347,17 +413,19 @@ sub SMARTMON_readSmartData($) {
 					    = split(/\s+/, trim($dev_data[0]));
 					shift @dev_data;
 					
-					if(defined($d_attr_name)) {
-            #$map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
-            $map->{$d_id}->{name}    = $d_attr_name;
-            $map->{$d_id}->{flag}    = $d_flag;
-            $map->{$d_id}->{value}   = $d_value;
-            $map->{$d_id}->{worst}   = $d_worst;
-            $map->{$d_id}->{thresh}  = $d_thresh;
-            $map->{$d_id}->{type}    = $d_type;
-            $map->{$d_id}->{updated} = $d_updated;
-            $map->{$d_id}->{failed}  = $d_when_failed;
-            $map->{$d_id}->{raw}     = $d_raw_value;
+					if(!defined($include) || defined($include->{$d_id})) {
+					  if(defined($d_attr_name)) {
+              #$map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
+              $map->{$d_id}->{name}    = $d_attr_name;
+              $map->{$d_id}->{flag}    = $d_flag;
+              $map->{$d_id}->{value}   = $d_value;
+              $map->{$d_id}->{worst}   = $d_worst;
+              $map->{$d_id}->{thresh}  = $d_thresh;
+              $map->{$d_id}->{type}    = $d_type;
+              $map->{$d_id}->{updated} = $d_updated;
+              $map->{$d_id}->{failed}  = $d_when_failed;
+              $map->{$d_id}->{raw}     = $d_raw_value;
+            }
           }
 				}
 			}
