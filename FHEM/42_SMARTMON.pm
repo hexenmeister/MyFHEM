@@ -113,6 +113,7 @@ sub SMARTMON_Undefine($$)
 
 sub SMARTMON_Get($@)
 {
+	# http://www.linux-community.de/Internal/Artikel/Print-Artikel/LinuxUser/2004/10/Die-Zuverlaessigkeit-von-Festplatten-ueberwachen-mit-smartmontools
   my ($hash, @a) = @_;
 
   my $name = $a[0];
@@ -132,14 +133,40 @@ sub SMARTMON_Get($@)
   	return undef;
   }
 
+  if($cmd eq "list")
+  {
+  	if(@a<3) {return "$name: get list needs at least one parameter"; }
+  	my $subcmd=$a[2];
+  	my $t;
+  	if($subcmd eq "info") {
+  		my $tdev = $hash->{DEVICE};
+  		if(@a>3) {$tdev=$a[3];}
+  	  $t = SMARTMON_execute($hash, "sudo smartctl -i ".$tdev);
+  	}
+  	if($subcmd eq "data") {
+  		my $tdev = $hash->{DEVICE};
+  		if(@a>3) {$tdev=$a[3];}
+  	  $t = SMARTMON_execute($hash, "sudo smartctl -A ".$tdev);
+  	}
+  	if($subcmd eq "health") {
+  		my $tdev = $hash->{DEVICE};
+  		if(@a>3) {$tdev=$a[3];}
+  	  $t = SMARTMON_execute($hash, "sudo smartctl -H ".$tdev);
+  	}
+  	if($subcmd eq "devices") {
+  	  $t = SMARTMON_execute($hash, "sudo smartctl --scan");
+  	}
+  	
+  	if(!$t) {return "unknown parameter";}
+  	return $t;
+  }
+  
   if($cmd eq "version")
   {
   	return $VERSION;
   }
   
-  #DEVICE SCAN:  sudo smartctl --scan
-
-  return "Unknown argument $cmd, choose one of update:noArg version:noArg";
+  return "Unknown argument $cmd, choose one of update:noArg version:noArg list:devices,info,data,health";
 }
 
 sub SMARTMON_Attr($$$) {
@@ -283,15 +310,22 @@ sub SMARTMON_getSmartDataReadings($$) {
   
   # S.M.A.R.T. RAW-Daten auslesen
   my $dmap = SMARTMON_readSmartData($hash, defined($t_include)?\%h_include:undef);
-  
+  #$dmap->{1}->{failed}="FAILING_NOW";
   # Bekannte Werte einspielen
   # per Referenz uebergeben!
   my $done_map = SMARTMON_interpretKnownData($hash, \%{$dmap}, \%{$map});
 
-  # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar
-  my $sr = AttrVal($name, "show_raw", "2");
-  if( $sr eq "1" || $sr eq "2" ) {
-    foreach my $id (sort keys %{$dmap}) {
+  my $cnt_oldage=0;
+  my $cnt_prefail=0;
+  my $sr = AttrVal($name, "show_raw", "0");
+  foreach my $id (sort keys %{$dmap}) {
+  	# warnings zaehlen
+  	if($dmap->{$id}->{failed} ne "-") {
+  		if($dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
+  		if($dmap->{$id}->{type} eq "Old_age") {$cnt_oldage++;}
+  	}
+    # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar  	
+  	if( $sr eq "1" || $sr eq "2" ) {
     	# nur wenn noch nicht frueher interpretiert werden, 
     	# oder wenn explizit erwuenscht (Attribut show_raw) 
   	  if(!defined($done_map->{$id}) || $sr eq "2") {
@@ -307,8 +341,8 @@ sub SMARTMON_getSmartDataReadings($$) {
     }
   }
   
-	# TODO
-	
+  $map->{warnings}="Pre-fail: $cnt_prefail Old_age: $cnt_oldage";
+  	
 	return $map;
 }
 
@@ -346,26 +380,37 @@ sub SMARTMON_interpretKnownData($$$) {
   
 	if($dmap->{3}) {
   	$map->{spin_up_time} = $dmap->{3}->{raw};
-  	$known->{3}="";
+  	$known->{3}=1;
   }
   if($dmap->{4}) {
   	$map->{start_stop_count} = $dmap->{4}->{raw};
-  	$known->{4}="";
+  	$known->{4}=1;
+  }
+  if($dmap->{5}) {
+  	$map->{reallocated_sector_count} = $dmap->{5}->{raw};
+  	$known->{5}=1;
   }
   if($dmap->{9}) {
   	$map->{power_on_hours} = $dmap->{9}->{raw};
   	$map->{power_on_text} = SMARTMON_hour2Dauer($dmap->{9}->{raw});
-  	$known->{9}="";
-  }  
-
+  	$known->{9}=1;
+  }
+  if($dmap->{10}) {
+  	$map->{spin_retry_count} = $dmap->{10}->{raw};
+  	$known->{10}=1;
+  }
+  if($dmap->{12}) {
+  	$map->{power_cycle_count} = $dmap->{12}->{raw};
+  	$known->{12}=1;
+  }
 
   if($dmap->{190}) {
   	$map->{airflow_temperature} = $dmap->{190}->{raw};
-  	$known->{190}="";
+  	$known->{190}=1;
   }
   if($dmap->{194}) {
   	$map->{temperature} = $dmap->{194}->{raw};
-  	$known->{194}="";
+  	$known->{194}=1;
   }
   
 	# TODO
@@ -453,69 +498,81 @@ sub SMARTMON_execute($$) {
 <a name="SMARTMON"></a>
 <h3>SMARTMON</h3>
 <ul>
-This module provides ...
+  This module is a FHEM frontend to the Linux tool smartctl.
+  It provides various information on the SMART System of the hard drive.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SMARTMON &lt;device&gt; [interval]</code><br>
+    <code>define &lt;name&gt; SMARTMON &lt;device&gt; [&lt;Interval&gt;]</code><br>
+    <br>
+    This statement creates a new SMARTMON instance.
+    The parameters specify a device to be monitored and the update interval in minutes.<br>
     <br>
     
-This statement creates a new SMARTMON instance. The parameters ...
+    Example: <code>define sm SMARTMON /dev/sda 60</code>
+    <br>
+  <br>
 
   <b>Readings:</b>
   <br><br>
   <ul>
-    <li>...<br>
-        ...
+    <li>overall_health_test<br>
+        Specifies the general condition of the HDD (PASSED or FAILED).
     </li>
-    <br>    
-  <br>
+    <br>
+    <li>warnings<br>
+        Specifies the number of stored alerts.
+    </li>
+    <br>
+    Furthermore, the available SMART parameters can be displayed as Readings (RAW and / or (partially) interpreted).
   </ul>
-
-  Sample output:<br>
-  <ul>
-...
-  </ul><br>
+  <br>
 
   <b>Get:</b><br><br>
     <ul>
-    <li>...<br>
-    ...
+    <li>version<br>
+    Displays the module version.
     </li>
     <br>
-    </ul><br>
-
-  <b>Set:</b><br><br>
-    <ul>
-    <li>...<br>
-       ...
+    <li>update<br>
+    Updates all readings.
+    </li>
+    <br>
+    <li>list<br>
+    Displays various information:
+     <ul>
+      <li>devices:<br>List of available devices in the system.</li>
+     </ul><br>
+     <ul>
+      <li>info:<br>Information about the current device.</li>
+     </ul><br>
+     <ul>
+      <li>data:<br>List of SMART parameters for the current device.</li>
+     </ul><br>
+     <ul>
+      <li>health:<br>Information about overall health status for the device.</li>
+     </ul><br>
+     For the Last 3 commands can also be another Device specified (as an additional parameter).
     </li>
     <br>
     </ul><br>
 
   <b>Attributes:</b><br><br>
     <ul>
-    <li>...<br>
-    ...<br>
+    <li>show_raw<br>
+    Valid values: 0: no RAW Readings (default), 1: show all, are not included in interpreted Readings, 2: show all.
+    </li>
+    <br>
+    <li>include<br>
+    Comma separated list of IDs for desired SMART parameters. If nothing passed, all available values are displayed.
+    </li>
+    <br>
+    <li>disable<br>
+    Valid values: 0: Module active (default), 1: module is disabled (no updates).
     </li>
     <br>
     </ul><br>
-
-  <b>Examples:</b><br><br>
-    <ul>
-    <code>
-      # Modul-Definition<br>
-      define sysmon SMARTMON ...<br>
-      ...<br>
-      <br>
-      # Log<br>
-      define FileLog_smartmon FileLog ./log/smartmon-%Y-%m.log smartmon<br>
-      attr FileLog_smartmon group SYSTEM<br>
-      <br>
-
-    </code>
-    </ul>
-
+    For more information see cmartctrl documentation.
   </ul>
 <!-- ================================ -->
 
@@ -525,63 +582,81 @@ This statement creates a new SMARTMON instance. The parameters ...
 <a name="SMARTMON"></a>
 <h3>SMARTMON</h3>
 <ul>
-  Dieses Modul liefert diverse Informationen ...
+  Dieses Modul ist ein FHEM-Frontend zu dem Linux-Tool smartctl. 
+  Es liefert diverse Informationen zu dem S.M.A.R.T. System einer Festplatte.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SMARTMON ...</code><br>
+    <code>define &lt;name&gt; SMARTMON &lt;device&gt; [&lt;Interval&gt;]</code><br>
     <br>
     Diese Anweisung erstellt eine neue SMARTMON-Instanz.
-    Die Parameter ...<br>
+    Die Parameter geben ein zu &uuml;berwachenden Ger&auml;t und den Aktualisierungsinterval in Minuten an.<br>
     <br>
     
-    </ul>
+    Beispiel: <code>define sm SMARTMON /dev/sda 60</code>
+    <br>
   <br>
 
   <b>Readings:</b>
   <br><br>
   <ul>
-    <li>...<br>
-        ...
+    <li>overall_health_test<br>
+        Gibt den allgemeinen Zustand der Platte an. Kann PASSED oder FAILED sein.
     </li>
-  <br>
+    <br>
+    <li>warnings<br>
+        Gibt die Anzahl der vermerkten Warnungen an.
+    </li>
+    <br>
+    Weiterhin k&ouml;nnen die verf&uuml;gbaren SMART-Parameter als Readings angezeigt werden (RAW und/oder (teilweise) interpretiert).
   </ul>
-
-  Beispiel-Ausgabe:<br>
-  <ul>
-...
-  </ul><br>
+  <br>
 
   <b>Get:</b><br><br>
     <ul>
-    <li>...<br>
-    ...
+    <li>version<br>
+    Zeigt die verwendete Modul-Version an.
     </li>
     <br>
-    </ul><br>
-
-  <b>Set:</b><br><br>
-    <ul>
-    <li>...<br>
-    ...
+    <li>update<br>
+    Veranlasst die Aktualisierung der gelesenen Parameter.
+    </li>
+    <br>
+    <li>list<br>
+    Zeigt verschiedenen Informationen an:
+     <ul>
+      <li>devices:<br>Liste der im System verf&uuml;gbaren Ger&auml;ten.</li>
+     </ul><br>
+     <ul>
+      <li>info:<br>Information zu dem aktuellen Ger&auml;t.</li>
+     </ul><br>
+     <ul>
+      <li>data:<br>Liste der SMART-Parameter zu dem aktuellen Ger&auml;t.</li>
+     </ul><br>
+     <ul>
+      <li>health:<br>Information zu dem allgemeinen Gesundheitsstatus f&uuml;r das verwendete Ger&auml;t.</li>
+     </ul><br>
+     F&uuml;r letzten 3 Befehle kann auch noch ein anderes Ger&auml;t als zus&auml;tzliche Parameter mitgegeben werden.
     </li>
     <br>
     </ul><br>
 
   <b>Attributes:</b><br><br>
     <ul>
-    <li>...<br>
-    ...
+    <li>show_raw<br>
+    G&uuml;ltige Werte: 0: keine RAW-Readings anzeigen (default), 1: alle anzeigen, die nicht in interpretierten Readings enthalten sind, 2: alle anzeigen.
+    </li>
+    <br>
+    <li>include<br>
+    Kommaseparierte Liste der IDs gew&uuml;nschten SMART-Parameter. Wenn nichts angegeben, werden alle verf&uuml;gbaren angezeigt.
+    </li>
+    <br>
+    <li>disable<br>
+    G&uuml;ltige Werte: 0: Modul aktiv (default), 1: Modul deaktiviert (keine Aktualisierungen).
     </li>
     <br>
     </ul><br>
-
-  <b>Beispiele:</b><br><br>
-    <ul>
-    <code>
-      ...
-    </code>
-    </ul>
+    F&uuml;r weitere Informationen wird die cmartctrl-Dokumentation empfohlen.
 
   </ul>
 
