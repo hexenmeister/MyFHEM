@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "0.5.0.0";
+my $VERSION = "0.9.0.1";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -39,6 +39,7 @@ sub SMARTMON_obtainParameters($);
 sub SMARTMON_getSmartDataReadings($$);
 sub SMARTMON_interpretKnownData($$$);
 sub SMARTMON_readSmartData($;$);
+sub SMARTMON_readDeviceData($%);
 sub SMARTMON_sec2Dauer($);
 sub SMARTMON_hour2Dauer($);
 sub SMARTMON_execute($$);
@@ -87,9 +88,9 @@ sub SMARTMON_Define($$)
   $hash->{DEVICE} = $a[2];
   if(int(@a)>=4)
   {
-  	$hash->{INTERVAL} = $a[3]*60;
+    $hash->{INTERVAL} = $a[3]*60;
   } else {
-  	$hash->{INTERVAL} = $DEFAULT_INTERVAL*60;
+    $hash->{INTERVAL} = $DEFAULT_INTERVAL*60;
   }
 
   $hash->{STATE} = "Initialized";
@@ -113,7 +114,7 @@ sub SMARTMON_Undefine($$)
 
 sub SMARTMON_Get($@)
 {
-	# http://www.linux-community.de/Internal/Artikel/Print-Artikel/LinuxUser/2004/10/Die-Zuverlaessigkeit-von-Festplatten-ueberwachen-mit-smartmontools
+  # http://www.linux-community.de/Internal/Artikel/Print-Artikel/LinuxUser/2004/10/Die-Zuverlaessigkeit-von-Festplatten-ueberwachen-mit-smartmontools
   my ($hash, @a) = @_;
 
   my $name = $a[0];
@@ -129,41 +130,41 @@ sub SMARTMON_Get($@)
 
   if($cmd eq "update")
   {
-  	SMARTMON_refreshReadings($hash);
-  	return undef;
+    SMARTMON_refreshReadings($hash);
+    return undef;
   }
 
   if($cmd eq "list")
   {
-  	if(@a<3) {return "$name: get list needs at least one parameter"; }
-  	my $subcmd=$a[2];
-  	my $t;
-  	if($subcmd eq "info") {
-  		my $tdev = $hash->{DEVICE};
-  		if(@a>3) {$tdev=$a[3];}
-  	  $t = SMARTMON_execute($hash, "sudo smartctl -i ".$tdev);
-  	}
-  	if($subcmd eq "data") {
-  		my $tdev = $hash->{DEVICE};
-  		if(@a>3) {$tdev=$a[3];}
-  	  $t = SMARTMON_execute($hash, "sudo smartctl -A ".$tdev);
-  	}
-  	if($subcmd eq "health") {
-  		my $tdev = $hash->{DEVICE};
-  		if(@a>3) {$tdev=$a[3];}
-  	  $t = SMARTMON_execute($hash, "sudo smartctl -H ".$tdev);
-  	}
-  	if($subcmd eq "devices") {
-  	  $t = SMARTMON_execute($hash, "sudo smartctl --scan");
-  	}
-  	
-  	if(!$t) {return "unknown parameter";}
-  	return $t;
+    if(@a<3) {return "$name: get list needs at least one parameter"; }
+    my $subcmd=$a[2];
+    my $t;
+    if($subcmd eq "info") {
+      my $tdev = $hash->{DEVICE};
+      if(@a>3) {$tdev=$a[3];}
+      $t = SMARTMON_execute($hash, "sudo smartctl -i ".$tdev);
+    }
+    if($subcmd eq "data") {
+      my $tdev = $hash->{DEVICE};
+      if(@a>3) {$tdev=$a[3];}
+      $t = SMARTMON_execute($hash, "sudo smartctl -A ".$tdev);
+    }
+    if($subcmd eq "health") {
+      my $tdev = $hash->{DEVICE};
+      if(@a>3) {$tdev=$a[3];}
+      $t = SMARTMON_execute($hash, "sudo smartctl -H ".$tdev);
+    }
+    if($subcmd eq "devices") {
+      $t = SMARTMON_execute($hash, "sudo smartctl --scan");
+    }
+    
+    if(!$t) {return "unknown parameter";}
+    return $t;
   }
   
   if($cmd eq "version")
   {
-  	return $VERSION;
+    return $VERSION;
   }
   
   return "Unknown argument $cmd, choose one of update:noArg version:noArg list:devices,info,data,health";
@@ -172,11 +173,12 @@ sub SMARTMON_Get($@)
 sub SMARTMON_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
+  $attrVal= "" unless defined($attrVal);
+  
   Log 5, "SMARTMON Attr: $cmd $name $attrName $attrVal";
 
   my $hash = $main::defs{$name};
   
-  $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
 
   if( $cmd eq "set" ) {# set, del
@@ -184,7 +186,7 @@ sub SMARTMON_Attr($$$) {
       
       $attr{$name}{$attrName} = $attrVal;
       
-    	if($attrName eq "disable") {
+      if($attrName eq "disable") {
         # NOP
       }
       
@@ -203,12 +205,12 @@ sub SMARTMON_Attr($$$) {
   
   if( $cmd eq "del" ) {# set, 
     if($attrName eq "show_raw") {
-    	delete $attr{$name}{$attrName};
+      delete $attr{$name}{$attrName};
       SMARTMON_refreshReadings($hash);  
     }
     
     if($attrName eq "include") {
-    	delete $attr{$name}{$attrName};
+      delete $attr{$name}{$attrName};
       SMARTMON_refreshReadings($hash);  
     }
   }
@@ -232,61 +234,61 @@ sub SMARTMON_Update($)
 
 # Alle Readings neuerstellen
 sub SMARTMON_refreshReadings($) {
-	my ($hash) = @_;
-	
-	SMARTMON_Log($hash, 5, "Refresh readings");
-	
-	my $name = $hash->{NAME};
-	
+  my ($hash) = @_;
+  
+  SMARTMON_Log($hash, 5, "Refresh readings");
+  
+  my $name = $hash->{NAME};
+  
   readingsBeginUpdate($hash);
   
   if( AttrVal($name, "disable", "") eq "1" ) {
-  	SMARTMON_Log($hash, 5, "Update disabled");
-  	$hash->{STATE} = "Inactive";
+    SMARTMON_Log($hash, 5, "Update disabled");
+    $hash->{STATE} = "Inactive";
   } else {
-	  # Parameter holen
+    # Parameter holen
     my $map = SMARTMON_obtainParameters($hash);
-	  
+    
     $hash->{STATE} = "Active";
 
     foreach my $aName (keys %{$map}) {
-  	  my $value = $map->{$aName};
-  	  # Nur aktualisieren, wenn ein gueltiges Value vorliegt
-  	  if(defined $value) {
-  	    readingsBulkUpdate($hash,$aName,$value);
-  	  }
+      my $value = $map->{$aName};
+      # Nur aktualisieren, wenn ein gueltiges Value vorliegt
+      if(defined $value) {
+        readingsBulkUpdate($hash,$aName,$value);
+      }
 
     }
     
     # Alle anderen Readings entfernen
     foreach my $rName (sort keys %{$hash->{READINGS}}) {
-    	if(!defined($map->{$rName})) {
+      if(!defined($map->{$rName})) {
         delete $hash->{READINGS}->{$rName};
-    	}
+      }
     }
      
   }
 
-  readingsEndUpdate($hash,1);	
+  readingsEndUpdate($hash,1); 
 }
 
 # Alle Readings erstellen
 sub SMARTMON_obtainParameters($) {
-	my ($hash) = @_;
-	SMARTMON_Log($hash, 5, "Obtain parameters");
-	my $map;
+  my ($hash) = @_;
+  SMARTMON_Log($hash, 5, "Obtain parameters");
+  my $map;
 
   # /usr/sbin/smartctl in /etc/sudoers aufnehmen
   # fhem ALL=(ALL) NOPASSWD: [...,] /usr/sbin/smartctl 
   # Natuerlich muss der user auch der Gruppe "sudo" angehören.
     
-	# Health	
-	my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H ".$hash->{DEVICE}." | grep 'test result:'");
-	SMARTMON_Log($hash, 5, "health: $dev_health");
-	if($dev_health=~m/test\s+result:\s+(\S+).*/) {
+  # Health  
+  my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H ".$hash->{DEVICE}." | grep 'test result:'");
+  SMARTMON_Log($hash, 5, "health: $dev_health");
+  if($dev_health=~m/test\s+result:\s+(\S+).*/) {
     $map->{"overall_health_test"} = $1;
   } else {
-  	delete $map->{"overall_health_test"};
+    delete $map->{"overall_health_test"};
   }
   
   $map = SMARTMON_getSmartDataReadings($hash, $map);
@@ -319,17 +321,17 @@ sub SMARTMON_getSmartDataReadings($$) {
   my $cnt_prefail=0;
   my $sr = AttrVal($name, "show_raw", "0");
   foreach my $id (sort keys %{$dmap}) {
-  	# warnings zaehlen
-  	if($dmap->{$id}->{failed} ne "-") {
-  		if($dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
-  		if($dmap->{$id}->{type} eq "Old_age") {$cnt_oldage++;}
-  	}
-    # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar  	
-  	if( $sr eq "1" || $sr eq "2" ) {
-    	# nur wenn noch nicht frueher interpretiert werden, 
-    	# oder wenn explizit erwuenscht (Attribut show_raw) 
-  	  if(!defined($done_map->{$id}) || $sr eq "2") {
-  	  	my $m = $dmap->{$id};
+    # warnings zaehlen
+    if($dmap->{$id}->{failed} ne "-") {
+      if($dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
+      if($dmap->{$id}->{type} eq "Old_age") {$cnt_oldage++;}
+    }
+    # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar   
+    if( $sr eq "1" || $sr eq "2" ) {
+      # nur wenn noch nicht frueher interpretiert werden, 
+      # oder wenn explizit erwuenscht (Attribut show_raw) 
+      if(!defined($done_map->{$id}) || $sr eq "2") {
+        my $m = $dmap->{$id};
         my $rName = $m->{name};
         #my $raw   = $dmap->{$id}->{raw};
         $map->{sprintf("%03d_%s",$id,$rName)} = 
@@ -342,17 +344,46 @@ sub SMARTMON_getSmartDataReadings($$) {
   }
   
   $map->{warnings}="Pre-fail: $cnt_prefail Old_age: $cnt_oldage";
-  	
-	return $map;
+  
+  SMARTMON_readDeviceData($hash, \%{$map});
+    
+  return $map;
+}
+
+sub SMARTMON_readDeviceData($%) {
+  my ($hash, $map) = @_;
+  
+  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -i ".$hash->{DEVICE});
+  SMARTMON_Log($hash, 5, "device data: ".Dumper(@dev_data));
+  if(defined($dev_data[0])) {
+    while(scalar(@dev_data)>0) {
+      my $line = $dev_data[0];
+      shift @dev_data;
+      my($k,$v) = split(/:\s*/,$line);
+      if($k eq "Device Model") {
+        $hash->{DEVICE_MODEL}=$v;
+      }
+      if($k eq "Serial Number") {
+        $hash->{DEVICE_SERIAL}=$v;
+      }
+      if($k eq "Firmware Version") {
+        $hash->{DEVICE_FIRMARE}=$v;
+      }
+      if($k eq "User Capacity") {
+        $hash->{DEVICE_CAPACITY}=$v;
+      }
+    }
+  }
+  
 }
 
 # Readings zu bekannten Werten erstellen
 sub SMARTMON_interpretKnownData($$$) {
-	my ($hash, $dmap, $map) = @_;
-	my $known;
-	#$map->{TEST}="TestX";
-	
-	# smartctl 5.41 2011-06-09 r3365 [armv7l-linux-3.4.98-sun7i+] (local build)
+  my ($hash, $dmap, $map) = @_;
+  my $known;
+  #$map->{TEST}="TestX";
+  
+  # smartctl 5.41 2011-06-09 r3365 [armv7l-linux-3.4.98-sun7i+] (local build)
   # Copyright (C) 2002-11 by Bruce Allen, http://smartmontools.sourceforge.net
   # 
   # === START OF READ SMART DATA SECTION ===
@@ -378,42 +409,42 @@ sub SMARTMON_interpretKnownData($$$) {
   # 200 Multi_Zone_Error_Rate   0x0008   100   253   000    Old_age   Offline      -       0
 
   
-	if($dmap->{3}) {
-  	$map->{spin_up_time} = $dmap->{3}->{raw};
-  	$known->{3}=1;
+  if($dmap->{3}) {
+    $map->{spin_up_time} = $dmap->{3}->{raw};
+    $known->{3}=1;
   }
   if($dmap->{4}) {
-  	$map->{start_stop_count} = $dmap->{4}->{raw};
-  	$known->{4}=1;
+    $map->{start_stop_count} = $dmap->{4}->{raw};
+    $known->{4}=1;
   }
   if($dmap->{5}) {
-  	$map->{reallocated_sector_count} = $dmap->{5}->{raw};
-  	$known->{5}=1;
+    $map->{reallocated_sector_count} = $dmap->{5}->{raw};
+    $known->{5}=1;
   }
   if($dmap->{9}) {
-  	$map->{power_on_hours} = $dmap->{9}->{raw};
-  	$map->{power_on_text} = SMARTMON_hour2Dauer($dmap->{9}->{raw});
-  	$known->{9}=1;
+    $map->{power_on_hours} = $dmap->{9}->{raw};
+    $map->{power_on_text} = SMARTMON_hour2Dauer($dmap->{9}->{raw});
+    $known->{9}=1;
   }
   if($dmap->{10}) {
-  	$map->{spin_retry_count} = $dmap->{10}->{raw};
-  	$known->{10}=1;
+    $map->{spin_retry_count} = $dmap->{10}->{raw};
+    $known->{10}=1;
   }
   if($dmap->{12}) {
-  	$map->{power_cycle_count} = $dmap->{12}->{raw};
-  	$known->{12}=1;
+    $map->{power_cycle_count} = $dmap->{12}->{raw};
+    $known->{12}=1;
   }
 
   if($dmap->{190}) {
-  	$map->{airflow_temperature} = $dmap->{190}->{raw};
-  	$known->{190}=1;
+    $map->{airflow_temperature} = $dmap->{190}->{raw};
+    $known->{190}=1;
   }
   if($dmap->{194}) {
-  	$map->{temperature} = $dmap->{194}->{raw};
-  	$known->{194}=1;
+    $map->{temperature} = $dmap->{194}->{raw};
+    $known->{194}=1;
   }
   
-	# TODO
+  # TODO
   
   return $known;
 }
@@ -442,24 +473,24 @@ sub SMARTMON_hour2Dauer($){
 #  Include-HASH: Wenn definiert,werden nur die ID zurueckgegeben, die in 
 #   diesem HASH enthalten sind.
 sub SMARTMON_readSmartData($;$) {
-	my ($hash, $include) = @_;
-	my $map;
-	
-	my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
-	SMARTMON_Log($hash, 5, "device data: ".Dumper(@dev_data));
-	if(defined($dev_data[0])) {
-		while(scalar(@dev_data)>0) {
-			shift @dev_data;
-			if(scalar(@dev_data)>0 && $dev_data[0]=~m/ID#.*/) {
-			  shift @dev_data;
-				while(scalar(@dev_data)>0) {
-					my ($d_id, $d_attr_name, $d_flag, $d_value, $d_worst, $d_thresh, 
-					    $d_type, $d_updated, $d_when_failed, $d_raw_value) 
-					    = split(/\s+/, trim($dev_data[0]));
-					shift @dev_data;
-					
-					if(!defined($include) || defined($include->{$d_id})) {
-					  if(defined($d_attr_name)) {
+  my ($hash, $include) = @_;
+  my $map;
+  
+  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
+  SMARTMON_Log($hash, 5, "device SMART data: ".Dumper(@dev_data));
+  if(defined($dev_data[0])) {
+    while(scalar(@dev_data)>0) {
+      shift @dev_data;
+      if(scalar(@dev_data)>0 && $dev_data[0]=~m/ID#.*/) {
+        shift @dev_data;
+        while(scalar(@dev_data)>0) {
+          my ($d_id, $d_attr_name, $d_flag, $d_value, $d_worst, $d_thresh, 
+              $d_type, $d_updated, $d_when_failed, $d_raw_value) 
+              = split(/\s+/, trim($dev_data[0]));
+          shift @dev_data;
+          
+          if(!defined($include) || defined($include->{$d_id})) {
+            if(defined($d_attr_name)) {
               #$map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
               $map->{$d_id}->{name}    = $d_attr_name;
               $map->{$d_id}->{flag}    = $d_flag;
@@ -472,20 +503,20 @@ sub SMARTMON_readSmartData($;$) {
               $map->{$d_id}->{raw}     = $d_raw_value;
             }
           }
-				}
-			}
-		}
-	}
-	
-	return $map;
+        }
+      }
+    }
+  }
+  
+  return $map;
 } 
 
 # BS-Befehl ausfuehren
 sub SMARTMON_execute($$) {
-	my ($hash, $cmd) = @_;
-	
-	SMARTMON_Log($hash, 5, "Execute: $cmd");
-	
+  my ($hash, $cmd) = @_;
+  
+  SMARTMON_Log($hash, 5, "Execute: $cmd");
+  
   return qx($cmd);
 }
 
