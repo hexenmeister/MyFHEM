@@ -465,7 +465,12 @@ sub SMARTMON_sec2Dauer($){
 # Ausrechnet aus der Zahl der Stunden Anzeige in Tagen:Stunden:Minuten:Sekunden.
 sub SMARTMON_hour2Dauer($){
   my ($t) = @_;
-  return SMARTMON_sec2Dauer($t*3600);
+  #return SMARTMON_sec2Dauer($t*3600);
+  my $d=int($t/24);
+  $t = $t-($d*24);
+  my $y=int($d/365);
+  $d = $d-($y*365);
+  return sprintf("%d Jahre %d Tage %d Std.",$y,$d,$t);
 }
 
 # liest RAW-Daten
