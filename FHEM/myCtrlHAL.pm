@@ -38,7 +38,7 @@ use constant {
   DEVICE_NAME_FK_SZ1  => "OG_SZ_FK01.Fenster",
   DEVICE_NAME_FK_KA1l => "", # Paulas Zimmer
   DEVICE_NAME_FK_KA1r => "", # Paulas Zimmer
-  DEVICE_NAME_FK_KB1  => "", # Hannas Zimmer
+  DEVICE_NAME_FK_KB1  => "OG_KB_FK01.Fenster", # Hannas Zimmer
 };
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
