@@ -1275,5 +1275,38 @@ sub arraysIntersec($$) {
 
 
 
+#####Icon Download#####
+sub
+icondl
+{
+	my $dllink = shift;
+	my $reticon = "";
+	my $subicon = "";
+	#$reticon .= qx(wget -T 5 -N --directory-prefix=/opt/fhem/www/images/weather/ --user-agent='Mozilla/5.0 Firefox/4.0.1' '$dllink');
+	$subicon = substr $dllink,51,-4;
+	return $subicon;
+}
+
+# alle Proplanta Icons laden
+sub ppicondl {
+	my $b="http://www.proplanta.de/wetterdaten/images/symbole/";
+	foreach my $i (1..14) {
+		icondl($b."t".$i.".gif");
+	}
+	foreach my $i (1..14) {
+		icondl($b."n".$i.".gif");
+	}
+	foreach my $i (0..10) {
+		icondl($b."w".$i.".gif");
+	}
+	foreach my $i (27..34) {
+		icondl($b."w".$i.".gif");
+	}
+	fhem("set WEB rereadicons");
+	fhem("set WEBout rereadicons");
+	fhem("set WEBphone rereadicons");
+	fhem("set WEBtablet rereadicons");
+}
+
 
 1;
