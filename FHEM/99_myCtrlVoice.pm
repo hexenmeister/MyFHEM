@@ -589,7 +589,45 @@ sub voiceActLeaveHome() {
 
 }
 
+# Bewegung im Vorgarten: InfoTon : nicht zu oft hintereinander abspielen
+sub voiceBewegungVorgarten() {
+	if(debounce("voice-pir-vorgarten",60)) {
+		speak(":sonar-ping0.mp3:",40);
+	}
+}
+
+# Morgendliche Begruessung ausgeloest durch BW-Melder im EG_Flur
+sub voiceMorningGreeting() {
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  # nur morgens zw. 5 und 10 Uhr
+  if($hour>=5 && $hour<=10) {
+  	# nur, wenn seit 4:30 Uhr keine Bewegung festgestellt wurde und mindest dauer zw. 
+  	my $ret = previewGenericCtrlBlock("ctrl_last_pir_eg_fl");
+    # Zeit (jetzt), wenn das Ereignis kam (duerfte sehr klein sein < 2 Sec.)
+    my $zeit_x = $ret->{SINCE_LAST_SEC}; 
+    # nur, wenn das letzte Ereigniss nicht zu lange her liegt (macht ja irgendwann keinen Sinn mehr)
+    # also 10 Sekunden
+    if($zeit_x<10) {
+      # Zeit, als das vorletzte Ereignis kam (also, das, was uns interessiert)
+      my $zeit_seit_s = $ret->{BETWEEN_2_LAST_SEC};
+      my $zeit_jetzt_s = $hour*60+$sec;
+      # Zeit in Sekunden seit Mitternacht, als die Letzte Aktion kam
+      my $zeit_act_s = $zeit_jetzt_s-$zeit_seit_s-$zeit_x;
+      # muss kleiner gleich 4,5*60*60 sein (4 Uhr) = 16200
+      if($zeit_act_s<16200) {
+      	speak("Guten Morgen!",0);
+      	# TODO: ggf. Wetter vorlesen.
+      	return 1;
+      }
+    }
+    #TEST/REMOVEIT#{previewGenericCtrlBlock("ctrl_last_pir_eg_fl")->{BETWEEN_2_LAST_SEC}+previewGenericCtrlBlock("ctrl_last_pir_eg_fl")->{SINCE_LAST_SEC}}
+  }
+  return 0;
+}
+
+
 # TODO:
+
 
 
 # --- Situative/temporaere Steuerung ------------------------------------------
@@ -608,6 +646,7 @@ sub voiceHalloween($) {
     # Schrei (Tuerklingel)
     if($mode eq "0") {
       speak(":halloween/schrei.ogg:",100);
+      return 1;
     }
     
     # Hexenlache
@@ -615,18 +654,23 @@ sub voiceHalloween($) {
       $hltmp+=1;
       if($hltmp > 2) {$hltmp=1;} 
       speak(":halloween/lache".$hltmp.".ogg:",100);
+      return 1;
     }
   
     # Tuerknarren
     if($mode eq "2") {
       speak(":halloween/tuer_knarrt.wav:",100);
+      return 1;
     }
   
     # Bewegungsmelder Vorgarten
     if($mode eq "3") {
       speak(":halloween/klopfen.wav:",100);
+      return 1;
     }
   }
+  
+  return 0;
 }
 
 1;
