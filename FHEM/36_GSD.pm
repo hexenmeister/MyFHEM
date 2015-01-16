@@ -398,7 +398,7 @@ sub GSD_Initialize($)
   # 202-255 reserved / internal
   #
   # --- 202 --- power supply : main ----------------------
-  $data{GSCONF}{202}{ReadingName} = "power_main";
+  $data{GSCONF}{202}{ReadingName} = "batteryLevel";
   $data{GSCONF}{202}{DataLength} = 2;
   $data{GSCONF}{202}{CorrFactor} = 0.001;
   # --- 203-205 reserved / power supply
