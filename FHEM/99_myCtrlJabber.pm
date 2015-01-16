@@ -66,7 +66,7 @@ sendMeStatusMsg()
 	$msg=$msg."\n  West: ";
 	$msg=$msg."T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
 	$msg=$msg." H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
-	$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "power_main", "---")." V";
+	$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
 	
 	sendMeJabberMessage($msg);
 }
