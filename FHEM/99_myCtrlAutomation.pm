@@ -51,8 +51,18 @@ sub actHaustuerKlingel() {
 
 # Benachrichtigungen von PIR vor der Eingangstuer.
 sub actPIRVorgarten() {
-	#Halloween TEMP
-	voiceHalloween(3);
+	#Halloween Sonderschaltung
+	if(!voiceHalloween(3)) {
+	  #wenn die Halloween-Schaltung inaktiv
+	  # anderen SOund abspielen
+	  voiceBewegungVorgarten();
+	}
+}
+
+# Benachrichtigungen von PIR im EG Flur.
+sub actPIR_EGFlur() {
+	getGenericCtrlBlock("ctrl_last_pir_eg_fl");
+	voiceMorningGreeting();
 }
 
 # Benachrichtigungen von Fensterkontakten (open/closed/tilted)
@@ -349,15 +359,30 @@ sub checkFensterZustand($) {
 	Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName.", Zustand: ".$zustand.", Dauer: ".$dauer.", LastMsgTime: ".$msgzeit.", MsgCnt: ".$msgcnt;
 	
 	if($zustand ne STATE_NAME_WIN_CLOSED) { # Wenn nicht zu
-  	if($msgcnt<5 && ($msgcnt==0 || $msgzeit>600)) { # sein min. 10 Min keine Meldung, oder gar keine Meldung, aber nicht mehr als N Mal
-  		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
-      if($dauer>1200) { # 20 Min
-  	    # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
-    	  # Alarm wenn kalt im Zimmer?
-  	    #TODO
-  	    getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
-  	    voiceNotificationMsgWarn(100);
-  	    speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",100);
+		if($zustand eq STATE_NAME_WIN_TILTED) {
+			# Wenn gekippt
+			if($msgcnt<1 && ($msgcnt==0 || $msgzeit>600)) { # wenn 10 Min keine Meldung
+    		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
+        if($dauer>1800) { # einmalig nach 30 Minuten warnen
+  	      # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
+    	    # Alarm wenn kalt im Zimmer?
+  	      #TODO
+  	      getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
+  	      voiceNotificationMsgWarn(100);
+  	      speak("Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten gekippt!",0);
+        }
+      }
+		} else {
+    	if($msgcnt<4 && ($msgcnt==0 || $msgzeit>600)) { # sein min. 10 Min keine Meldung, oder gar keine Meldung, aber nicht mehr als N Mal
+    		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
+        if($dauer>1200) { # 20 Min
+  	      # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
+    	    # Alarm wenn kalt im Zimmer?
+  	      #TODO
+  	      getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
+  	      voiceNotificationMsgWarn(100);
+  	      speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",100);
+        }
       }
     }
   } else {
