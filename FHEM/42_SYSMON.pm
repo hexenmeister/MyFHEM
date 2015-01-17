@@ -3052,6 +3052,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     If results of the long-running operations required, these should be set up as a CRON job and store results as a text file.<br><br>
     Example: Display of package updates for the operating system:<br>
     cron-Job:<br>
+    <code> sudo apt-get update 2>/dev/null >/dev/null</code>
     <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
     <br>
     <code>uder-defined</code> attribute<br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br>
@@ -3614,6 +3615,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     und in FHEM nur die davor gespeicherten Ausgaben visualisiert.<br><br>
     Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebssystem:<br>
     In einem cron-Job wird folgendes t&auml;glich ausgef&uuml;hrt: <br>
+    <code> sudo apt-get update 2>/dev/null >/dev/null</code>
     <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
     <br>
     Das Attribute <code>uder-defined</code> wird auf <br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br> gesetzt.
