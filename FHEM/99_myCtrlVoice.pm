@@ -600,7 +600,7 @@ sub voiceBewegungVorgarten() {
 sub voiceMorningGreeting() {
 	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   # nur morgens zw. 5 und 10 Uhr
-  if($hour>=5 && $hour<=10) {
+  if($hour>=5 && $hour<10) {
   	# nur, wenn seit 4:30 Uhr keine Bewegung festgestellt wurde und mindest dauer zw. 
   	my $ret = previewGenericCtrlBlock("ctrl_last_pir_eg_fl");
     # Zeit (jetzt), wenn das Ereignis kam (duerfte sehr klein sein < 2 Sec.)
@@ -610,9 +610,11 @@ sub voiceMorningGreeting() {
     if($zeit_x<10) {
       # Zeit, als das vorletzte Ereignis kam (also, das, was uns interessiert)
       my $zeit_seit_s = $ret->{BETWEEN_2_LAST_SEC};
-      my $zeit_jetzt_s = $hour*60+$sec;
+      my $zeit_jetzt_s = $hour*3600+$min*60+$sec;
       # Zeit in Sekunden seit Mitternacht, als die Letzte Aktion kam
       my $zeit_act_s = $zeit_jetzt_s-$zeit_seit_s-$zeit_x;
+      Log3 "MyVoiceModul", 3, ">>>>>>>>>>>>>> X:$zeit_x | zeit_act_s:$zeit_act_s |> zeit_jetzt_s:$zeit_jetzt_s | zeit_seit_s:$zeit_seit_s";
+      #                        >>>>>>>>>>>>>> X:0 | zeit_act_s:35755 |> zeit_jetzt_s:35860 | zeit_seit_s:105
       # muss kleiner gleich 4,5*60*60 sein (4 Uhr) = 16200
       if($zeit_act_s<16200) {
       	speak("Guten Morgen!",0);
