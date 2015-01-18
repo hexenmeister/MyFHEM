@@ -1308,5 +1308,75 @@ sub ppicondl {
 	fhem("set WEBtablet rereadicons");
 }
 
+# Proplanta Vorhersage mit logProxy Hilfsroutine
+sub logProxy_proplanta2Plot($$$$) {
+	my ($device, $fcValue, $from, $to) = @_;
+	my @rl;
+	
+	return undef if( !$device );
+
+	if( defined($defs{$device}) ) {
+		if( $defs{$device}{TYPE} eq "PROPLANTA" ) {
+			@rl = sort( grep /^fc.*_${fcValue}..$/,keys %{$defs{$device}{READINGS}} );
+			return undef if( !@rl );
+		} else {
+			Log3 undef, 2, "logProxy_proplanta2Plot: $device is not a PROPLANTA device";
+			return undef;
+		}
+	}
+
+	my $fromsec = SVG_time_to_sec($from);
+	my $tosec   = SVG_time_to_sec($to);
+	my $sec = $fromsec;
+	my ($h,$fcDay,$mday,$mon,$year);
+	my $timestamp;
+    
+	my $reading;
+	my $value;
+	my $prev_value;
+	my $min = 999999;
+	my $max = -999999;
+	my $ret = "";
+
+	# while not end of plot range reached
+	while(($sec < $tosec) && @rl) {
+		#remember previous value for start of plot range
+		$prev_value = $value;
+
+		$reading = shift @rl;
+                $reading =~ m/^fc([\d]+)_${fcValue}([\d]+)$/;
+                $fcDay = $1;
+                $h = $2;
+		$value = ReadingsVal($device,$reading,undef);
+        
+		($mday,$mon,$year) = split('\.',ReadingsVal($device,"fc".$fcDay."_date",undef));
+		$timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $year, $mon, $mday, $h, 0, 0);
+		$sec = SVG_time_to_sec($timestamp);
+        
+		# skip all values before start of plot range
+		next if( SVG_time_to_sec($timestamp) < $fromsec );
+
+		# add first value at start of plot range
+		if( !$ret && $prev_value ) {
+		$min = $prev_value if( $prev_value < $min );
+		$max = $prev_value if( $prev_value > $max );
+		$ret .= "$from $prev_value\n";
+		}
+
+		# done if after end of plot range
+		last if( SVG_time_to_sec($timestamp) > $tosec );
+
+		$min = $value if( $value < $min );
+		$max = $value if( $value > $max );
+
+		# add actual controll point
+		$ret .= "$timestamp $value\n";
+	}
+	return ($ret,$min,$max,$prev_value);
+}
+# -----------------------------------------------------------------------------
+
+
+
 
 1;
