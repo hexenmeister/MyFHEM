@@ -22,9 +22,9 @@ set y3range [2:5]
 #FileLog 4:temperature\x3a:0:
 #FileLog 4:humidity\x3a:0:
 #FileLog 4:dewpoint\x3a:0:
-#FileLog 4:power_main\x3a:0:
+#FileLog 4:batteryLevel\x3a:0:
 
 plot "<IN>" using 1:2 axes x1y2 title 'Temperature' ls l0 lw 2 with lines,\
      "<IN>" using 1:2 axes x1y1 title 'Humidity' ls l2fill lw 0.5 with lines,\
      "<IN>" using 1:2 axes x1y2 title 'Taupunkt' ls l8 lw 2 with lines,\
-     "<IN>" using 1:2 axes x1y3 title 'PowerSupply' ls l1 lw 2 with lines
+     "<IN>" using 1:2 axes x1y3 title 'Batterie' ls l1 lw 2 with lines
