@@ -30,7 +30,9 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.7";
+use Blocking;
+
+my $VERSION = "1.9.5.0";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -156,7 +158,7 @@ SYSMON_setInterval($@)
 }
 
 
-my $cur_readings_map;
+#my $cur_readings_map; => $hash->{helper}{cur_readings_map}
 sub
 SYSMON_updateCurrentReadingsMap($) {
 	my ($hash) = @_;
@@ -452,7 +454,7 @@ $rMap->{"io_sda_raw"}         = "TEST";
 $rMap->{"io_sda_diff"}         = "TEST";
 $rMap->{"io_sda"}         = "TEST";
 
-  $cur_readings_map = $rMap;
+  $hash->{helper}{cur_readings_map} = $rMap;
   return $rMap;
 }
 
@@ -465,7 +467,7 @@ SYSMON_getObsoleteReadingsMap($) {
 	
 	#return $rMap; # TODO TEST
 	
-	if(!defined($cur_readings_map)) {
+	if(!defined($hash->{helper}{cur_readings_map})) {
 	  SYSMON_updateCurrentReadingsMap($hash);
   }
 
@@ -474,7 +476,7 @@ SYSMON_getObsoleteReadingsMap($) {
   foreach my $aName (@cKeys) {
     if(defined ($aName)) {
     	# alles hinzufuegen, was nicht in der Aktuellen Liste ist
-    	if(!defined($cur_readings_map->{$aName})) {
+    	if(!defined($hash->{helper}{cur_readings_map}->{$aName})) {
     		#Log 3, "SYSMON>>>>>>>>>>>>>>>>> SYSMON_getObsoleteReadingsMap >>> $aName";
     		$rMap->{$aName} = 1;
     	}
@@ -492,6 +494,10 @@ SYSMON_Undefine($$)
   logF($hash, "Undefine", "");
 
   RemoveInternalTimer($hash);
+  
+  BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} )
+      if exists $hash->{helper}{READOUT_RUNNING_PID}; 
+  
   return undef;
 }
 
@@ -637,7 +643,7 @@ SYSMON_Attr($$$)
   return;
 }
 
-my $u_first_mark = undef;
+#my $u_first_mark = undef;
 
 sub
 SYSMON_Update($@)
@@ -653,52 +659,142 @@ SYSMON_Update($@)
     InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 1);
   }
 
-  readingsBeginUpdate($hash);
-
   if( AttrVal($name, "disable", "") eq "1" )
   {
   	logF($hash, "Update", "disabled");
   	$hash->{STATE} = "Inactive";
   } else {
-	  # Beim ersten mal alles aktualisieren!
-	  if(!$u_first_mark) {
+  	# Beim ersten mal alles aktualisieren!
+	  if(!$hash->{helper}{u_first_mark}) {
 	    $refresh_all = 1;
 	  }
 
-	  # Parameter holen
-    my $map = SYSMON_obtainParameters($hash, $refresh_all);
+    if(1) {
+      # direkt call
+      
+      # Parameter holen
+      my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
-    # Mark setzen 
-    if(!$u_first_mark) {
-	    $u_first_mark = 1;
-	  }
+      # Mark setzen 
+      if(!$hash->{helper}{u_first_mark}) {
+	      $hash->{helper}{u_first_mark} = 1;
+	    }
 	  
-    $hash->{STATE} = "Active";
-    #my $state = $map->{LOADAVG};
-    #readingsBulkUpdate($hash,"state",$state);
-
-    foreach my $aName (keys %{$map}) {
-  	  my $value = $map->{$aName};
-  	  # Nur aktualisieren, wenn ein gueltiges Value vorliegt
-  	  if(defined $value) {
-  	    readingsBulkUpdate($hash,$aName,$value);
-  	  }
-
+      SYSMON_updateReadings($hash,$map);
+      $hash->{STATE} = "Active";
+    } else {
+      # blocking call
+      if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) ) {
+        logF($hash, "blockingCall", "Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID});
+        BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} ); 
+        delete($hash->{helper}{READOUT_RUNNING_PID});
+      }
+      
+      $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall("SYSMON_blockingCall", $name, "SYSMON_blockingFinish", 55, "SYSMON_blockingAbort", $hash);
     }
-    
-    # Nicht mehr benoetigte Readings loeschen
-    my $omap = SYSMON_getObsoleteReadingsMap($hash);
-    foreach my $aName (keys %{$omap}) {
-    	delete $defs{$name}{READINGS}{$aName};
-	  }
-    
+      
   }
 
-  readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);
 }
 
+sub SYSMON_blockingCall($$) {
+	my ($name, $refresh_all) = @_;
+	my $hash = $main::defs{$name};
+	logF($hash, "blockingCall", "");
+	
+	my $map = SYSMON_obtainParameters($hash, $refresh_all);
+	
+	# Device-Name mitnehmen
+  my $ret = "name|".$name;
+  # to String
+  foreach my $aName (keys %{$map}) {
+    my $value = $map->{$aName};
+    # Nur wenn ein gueltiges Value vorliegt
+    if(defined $value) {
+    	$ret.="|".$aName."|".$value;
+    }
+  }
+  
+  return $ret;
+}
+
+sub SYSMON_test() {
+  my $map;
+  
+  my $name="TESTNAME";
+  
+  $map->{test1}="val1";
+  $map->{test2}="val2";
+  $map->{test3}="val3";
+  
+  my $ret = "name|".$name;
+  # TODO to ret String
+  foreach my $aName (keys %{$map}) {
+    my $value = $map->{$aName};
+    # Nur wenn ein gueltiges Value vorliegt
+    if(defined $value) {
+    	$ret.="|".$aName."|".$value;
+    }
+  }
+  return $ret;
+}
+
+sub SYSMON_blockingAbort($) {
+	my ($hash) = @_;
+	logF($hash, "blockingAbort", "");
+	$hash->{STATE} = "Error";
+	delete($hash->{helper}{READOUT_RUNNING_PID});
+}
+
+sub SYSMON_blockingFinish($) {
+	my ($map_str) = @_;
+	
+	my $map;
+	# TODO: to map
+	
+	
+	my $name=$map->{name};
+	delete $map->{name};
+	
+	my $hash = $main::defs{$name};
+	logF($hash, "blockingFinish", "");
+	# Mark setzen 
+  if(!$hash->{helper}{u_first_mark}) {
+	  $hash->{helper}{u_first_mark} = 1;
+	}
+	delete($hash->{helper}{READOUT_RUNNING_PID});
+	
+	SYSMON_updateReadings($hash,$map);
+	$hash->{STATE} = "Active";
+}
+
+sub SYSMON_updateReadings($$) {
+	my ($hash,$map) = @_;
+	logF($hash, "updateReadings", "");
+  my $name = $hash->{NAME};
+  
+  readingsBeginUpdate($hash);
+    
+  foreach my $aName (keys %{$map}) {
+    my $value = $map->{$aName};
+    # Nur aktualisieren, wenn ein gueltiges Value vorliegt
+    if(defined $value) {
+      readingsBulkUpdate($hash,$aName,$value);
+    }
+  }
+    
+  # Nicht mehr benoetigte Readings loeschen
+  my $omap = SYSMON_getObsoleteReadingsMap($hash);
+  foreach my $aName (keys %{$omap}) {
+  	delete $defs{$name}{READINGS}{$aName};
+	}
+
+  readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
+}
+
+
 # Schattenmap mit den zuletzt gesammelten Werten (merged)
-my %shadow_map;
+#my %shadow_map;
 sub
 SYSMON_obtainParameters($$)
 {
@@ -721,7 +817,7 @@ SYSMON_obtainParameters($$)
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
 	 
 	# Einmaliges
-	if(!$u_first_mark) {
+	if(!$hash->{helper}{u_first_mark}) {
 	  # Perl version
 	  $map->{+PERL_VERSION} = "$]";
 	  
@@ -898,7 +994,10 @@ SYSMON_obtainParameters($$)
   
   # Aktuelle Werte in ShattenHash mergen
   my %hashT = %{$map};
+  #@shadow_map{ keys %hashT } = values %hashT;
+  my %shadow_map;
   @shadow_map{ keys %hashT } = values %hashT;
+  $hash->{helper}{shadow_map} = \%shadow_map;
 
   return $map;
 }
@@ -907,18 +1006,22 @@ SYSMON_obtainParameters($$)
 # Liefert gesammelte Werte ( = Readings)
 # Parameter: array der gewuenschten keys (Readings names)
 # Beispiele:
-#   {(SYSMON_getValues())->{'fs_root'}}
-#   {(SYSMON_getValues(("cpu_freq","cpu_temp")))->{"cpu_temp"}}
-#   {join(" ", keys (SYSMON_getValues()))}
-#   {join(" ", keys (SYSMON_getValues(("cpu_freq","cpu_temp"))))}
+#   {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}
+#   {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}
+#   {join(" ", values (SYSMON_getValues("sysmon")))}
+#   {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}
 #------------------------------------------------------------------------------
 sub
-SYSMON_getValues(;@)
+SYSMON_getValues($;@)
 {
-	my @filter_keys = @_;
+  my ($name,@filter_keys) = @_;
+  
+  my $hash = $main::defs{$name};
+  my %shadow_map = %{$hash->{helper}{shadow_map}};
 	if(scalar(@filter_keys)>0) {
 		my %clean_hash;
-    @clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
+    #@clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
+		@clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
     return \%clean_hash;
 	}
 	# alles liefern
@@ -941,13 +1044,13 @@ SYSMON_getUserDefined($$$$)
 	return $map;
 }
 
-my $sys_cpu_core_num = undef;
+#my $sys_cpu_core_num = undef;
 sub
 SYSMON_getCPUCoreNum($)
 {
 	my ($hash) = @_;
 	
-	return $sys_cpu_core_num if $sys_cpu_core_num;
+	return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
 	
 	# nur wenn verfuegbar
 	if(SYSMON_isSysCpuNum($hash)) {
@@ -955,16 +1058,16 @@ SYSMON_getCPUCoreNum($)
 	  if(defined($str)) {
 		  if($str ne "") {
         if(int($str)!=0) {
-        	$sys_cpu_core_num = int($str)+1;
-	 	      return $sys_cpu_core_num;
+        	$hash->{helper}{sys_cpu_core_num} = int($str)+1;
+	 	      return $hash->{helper}{sys_cpu_core_num};
   	    }
       }
     }
   }
   
   # Default / unbekannt
-  $sys_cpu_core_num = 1;
-  return $sys_cpu_core_num;
+  $hash->{helper}{sys_cpu_core_num} = 1;
+  return $hash->{helper}{sys_cpu_core_num};
 }
 
 #------------------------------------------------------------------------------
@@ -2299,9 +2402,9 @@ sub SYSMON_ShowValuesFmt ($$$;@)
 	  }
 	  # bei der Benutzung mit CloneDummies ist $cur_readings_map nicht unbedingt definiert
 	  @dataDescription = (DATE,
-	                      #CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.": ".$deg."C", 
+	                      #CPU_TEMP.":".$hash->{helper}{cur_readings_map}->{+CPU_TEMP}.": ".$deg."C", 
 	                      CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
-	                      #CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.": "."MHz", 
+	                      #CPU_FREQ.":".$hash->{helper}{cur_readings_map}->{+CPU_FREQ}.": "."MHz", 
 	                      CPU_FREQ.":"."CPU frequency".": "."MHz", 
 	                      CPU_BOGOMIPS,
 	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
@@ -2377,7 +2480,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   	my($rName, $rComment, $rPostfix) = split(/:/, $_);
   	if(defined $rName) {
   	  if(!defined $rComment) {
-        $rComment = $cur_readings_map->{$rName};
+        $rComment = $hash->{helper}{cur_readings_map}->{$rName};
       }
       my $rVal = $map->{$rName};
       if(!defined $rVal) {
@@ -2429,48 +2532,48 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   return $htmlcode;
 }
 
-my $proc_fs = undef;
+#my $proc_fs = undef;
 sub
 SYSMON_isProcFS($) {
 	my ($hash) = @_;
-	if(!defined $proc_fs) {
-	  $proc_fs = int(SYSMON_execute($hash, "[ -d /proc/ ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{proc_fs}) {
+	  $hash->{helper}{proc_fs} = int(SYSMON_execute($hash, "[ -d /proc/ ] && echo 1 || echo 0"));
   }
 
-	return $proc_fs;
+	return $hash->{helper}{proc_fs};
 }
 
-my $sys_cpu_temp_rpi = undef;
+#my $sys_cpu_temp_rpi = undef;
 sub
 SYSMON_isCPUTempRPi($) {
 	my ($hash) = @_;
-	if(!defined $sys_cpu_temp_rpi) {
-	  $sys_cpu_temp_rpi = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_cpu_temp_rpi}) {
+	  $hash->{helper}{sys_cpu_temp_rpi} = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
   }
 
-	return $sys_cpu_temp_rpi;
+	return $hash->{helper}{sys_cpu_temp_rpi};
 }
 
-my $sys_cpu_temp_bbb = undef;
+#my $sys_cpu_temp_bbb = undef;
 sub
 SYSMON_isCPUTempBBB($) {
 	my ($hash) = @_;
-	if(!defined $sys_cpu_temp_bbb) {
-	  $sys_cpu_temp_bbb = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/temp1_input ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_cpu_temp_bbb}) {
+	  $hash->{helper}{sys_cpu_temp_bbb} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/temp1_input ] && echo 1 || echo 0"));
   }
 
-	return $sys_cpu_temp_bbb;
+	return $hash->{helper}{sys_cpu_temp_bbb};
 }
 
-my $sys_cpu_freq_rpi_bbb = undef;
+#my $sys_cpu_freq_rpi_bbb = undef;
 sub
 SYSMON_isCPUFreqRPiBBB($) {
 	my ($hash) = @_;
-	if(!defined $sys_cpu_freq_rpi_bbb) {
-	  $sys_cpu_freq_rpi_bbb = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_cpu_freq_rpi_bbb}) {
+	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
   }
 
-	return $sys_cpu_freq_rpi_bbb;
+	return $hash->{helper}{sys_cpu_freq_rpi_bbb};
 }
 
 # DUMMY
@@ -2479,70 +2582,70 @@ sub SYSMON_isCPUTempFB($) {
 	return SYSMON_isFB($hash);
 }
 
-my $sys_cpu1_freq = undef;
+#my $sys_cpu1_freq = undef;
 sub
 SYSMON_isCPU1Freq($) {
 	my ($hash) = @_;
-	if(!defined $sys_cpu1_freq) {
-	  $sys_cpu1_freq = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_cpu1_freq}) {
+	  $hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
   }
 
-	return $sys_cpu1_freq;
+	return $hash->{helper}{sys_cpu1_freq};
 }
 
-my $sys_fb = undef;
+#my $sys_fb = undef;
 sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
-	if(!defined $sys_fb) {
-	  $sys_fb = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_fb}) {
+	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
   } 
-	return $sys_fb;
+	return $hash->{helper}{sys_fb};
 }
 
 #-Power-------
-my $sys_power_ac = undef;
+#my $sys_power_ac = undef;
 sub
 SYSMON_isSysPowerAc($) {
 	my ($hash) = @_;
-	if(!defined $sys_power_ac) {
-	  $sys_power_ac = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/ac/online ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_power_ac}) {
+	  $hash->{helper}{sys_power_ac} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/ac/online ] && echo 1 || echo 0"));
   }
 
-	return $sys_power_ac;
+	return $hash->{helper}{sys_power_ac};
 }
 
-my $sys_power_usb = undef;
+#my $sys_power_usb = undef;
 sub
 SYSMON_isSysPowerUsb($) {
 	my ($hash) = @_;
-	if(!defined $sys_power_usb) {
-	  $sys_power_usb = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/usb/online ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_power_usb}) {
+	  $hash->{helper}{sys_power_usb} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/usb/online ] && echo 1 || echo 0"));
   }
 
-	return $sys_power_usb;
+	return $hash->{helper}{sys_power_usb};
 }
 
-my $sys_power_bat = undef;
+#my $sys_power_bat = undef;
 sub
 SYSMON_isSysPowerBat($) {
 	my ($hash) = @_;
-	if(!defined $sys_power_bat) {
-	  $sys_power_bat = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/battery/online ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_power_bat}) {
+	  $hash->{helper}{sys_power_bat} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/battery/online ] && echo 1 || echo 0"));
   }
 
-	return $sys_power_bat;
+	return $hash->{helper}{sys_power_bat};
 }
 
-my $sys_cpu_num = undef;
+#my $sys_cpu_num = undef;
 sub
 SYSMON_isSysCpuNum($) {
 	my ($hash) = @_;
-	if(!defined $sys_cpu_num) {
-	  $sys_cpu_num = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/kernel_max ] && echo 1 || echo 0"));
+	if(!defined $hash->{helper}{sys_cpu_num}) {
+	  $hash->{helper}{sys_cpu_num} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/kernel_max ] && echo 1 || echo 0"));
   }
 
-	return $sys_cpu_num;
+	return $hash->{helper}{sys_cpu_num};
 }
 
 sub SYSMON_PowerAcInfo($$)
@@ -3124,9 +3227,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     According to SYSMON_ShowValuesHTMLTitled, but formatted as plain text.<br>
     </ul><br>
     
-  <b>Reading values with perl: SYSMON_getValues([&lt;array of desired keys&gt;])</b><br><br>
+  <b>Reading values with perl: SYSMON_getValues(&lt;name&gt;[, &lt;array of desired keys&gt;])</b><br><br>
     <ul>
     Returns a hash ref with desired values. If no array is passed, all values are returned.<br>
+    {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
+    {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
+    {join(" ", values (SYSMON_getValues("sysmon")))}<br>
+    {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
     </ul><br>
 
   <b>Examples:</b><br><br>
@@ -3693,9 +3800,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Wie SYSMON_ShowValuesText, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
     </ul><br>
     
-    <b>Readings-Werte mit Perl lesen: SYSMON_getValues([&lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
+    <b>Readings-Werte mit Perl lesen: SYSMON_getValues(&lt;name&gt;[, &lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
     <ul>
     Liefert ein Hash-Ref mit den gew&uuml;nschten Werten. Wenn keine Liste (array) &uuml;bergeben wird, werden alle Werte geliefert.<br>
+    {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
+    {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
+    {join(" ", values (SYSMON_getValues("sysmon")))}<br>
+    {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
     </ul><br>
 
   <b>Beispiele:</b><br><br>
