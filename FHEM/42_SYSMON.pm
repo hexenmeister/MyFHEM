@@ -91,7 +91,7 @@ SYSMON_Initialize($)
 {
   my ($hash) = @_;
 
-  Log 5, "SYSMON Initialize";
+  SYSMON_Log($hash, 5, "");
 
   $hash->{DefFn}    = "SYSMON_Define";
   $hash->{UndefFn}  = "SYSMON_Undefine";
@@ -613,7 +613,8 @@ SYSMON_Attr($$$)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
-  Log 5, "SYSMON Attr: $cmd $name $attrName $attrVal";
+  my $hash = $main::defs{$name};
+  SYSMON_Log($hash, 5, "SYSMON Attr: $cmd $name ".$attrName?$attrName:''." $attrVal");
 
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
@@ -621,7 +622,6 @@ SYSMON_Attr($$$)
   if( $cmd eq "set" ) {# set, del
     if( $orig ne $attrVal ) {
 
-      my $hash = $main::defs{$name};
     	if($attrName eq "disable")
       {
         RemoveInternalTimer($hash);
@@ -648,11 +648,13 @@ SYSMON_Attr($$$)
 #my $u_first_mark = undef;
 
 sub
-SYSMON_Update($@)
+SYSMON_Update($;$)
 {
   my ($hash, $refresh_all) = @_;
+  
+  $refresh_all="0" unless defined $refresh_all;
 
-  SYSMON_Log($hash, 5, "refresh_all: $refresh_all");
+  SYSMON_Log($hash, 5, "refresh_all: ".$refresh_all);
 
   my $name = $hash->{NAME};
 
@@ -671,7 +673,7 @@ SYSMON_Update($@)
 	    $refresh_all = 1;
 	  }
 
-    if(!AttrVal($name, "nonblocking", 0)) {
+    if(!AttrVal($name, "nonblocking", 1)) {
       # direkt call
       
       # Parameter holen
@@ -692,17 +694,18 @@ SYSMON_Update($@)
         delete($hash->{helper}{READOUT_RUNNING_PID});
       }
       
-      $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall("SYSMON_blockingCall", $name, "SYSMON_blockingFinish", 55, "SYSMON_blockingAbort", $hash);
+      $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall("SYSMON_blockingCall", $name."|".$refresh_all, "SYSMON_blockingFinish", 55, "SYSMON_blockingAbort", $hash);
     }
       
   }
 
 }
 
-sub SYSMON_blockingCall($$) {
-	my ($name, $refresh_all) = @_;
+sub SYSMON_blockingCall($) {
+	my ($tparam) = @_;
+	my ($name, $refresh_all) = split(/\|/,$tparam);
 	my $hash = $main::defs{$name};
-	SYSMON_Log($hash, 5, "$name, $refresh_all");
+	SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
 	
 	my $map = SYSMON_obtainParameters($hash, $refresh_all);
 	
@@ -721,6 +724,12 @@ sub SYSMON_blockingCall($$) {
 }
 
 sub SYSMON_test() {
+	
+	#foreach my $d (sort keys %defs) {
+  #  my $h = $defs{$d};
+  #  if(defined ($h->{TYPE})) {} else {return $d."-".Dumper($h);}
+  #}
+	
   my $map;
   
   my $name="TESTNAME";
@@ -1410,7 +1419,7 @@ SYSMON_getDiskStat_intern($$$)
 	
 	my ($d1, $d2, $pName, $nf1, $nf2, $nf3, $nf4, $nf5, $nf6, $nf7, $nf8, $nf9, $nf10, $nf11) = split(/\s+/, trim($entry));
 	
-	Log 3, "SYSMON-DEBUG-IOSTAT:   ".$pName." = ".$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11;
+	SYSMON_Log($hash, 5, "SYSMON-DEBUG-IOSTAT:   ".$pName." = ".$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11);
 	
 	# Nur nicht-null-Werte
 	if($nf1 eq "0") {
@@ -1430,13 +1439,13 @@ SYSMON_getDiskStat_intern($$$)
   #$map->{"iostat_test"}="TEST";
 	my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
 	if(defined($lastVal)) {
-  	Log 3, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal;
+  	SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal);
   }
 	if(defined $lastVal) {
 		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
 		my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
 	  
-	  Log 3, "SYSMON-DEBUG-IOSTAT:   X: ".$pName." = ".$af1." ".$af2." ".$af3." ".$af4." ".$af5." ".$af6." ".$af7." ".$af8." ".$af9." ".$af10." ".$af11;
+	  SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   X: ".$pName." = ".$af1." ".$af2." ".$af3." ".$af4." ".$af5." ".$af6." ".$af7." ".$af8." ".$af9." ".$af10." ".$af11);
 	  
 	  my $sectorsRead;
 	  my $sectorsWritten;
@@ -2795,6 +2804,7 @@ sub SYSMON_Log($$$) {
    $sub =~ s/SMARTMON_//;
 
    my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   $instName="" unless $instName;
    Log3 $hash, $loglevel, "SMARTMON $instName: $sub.$xline " . $text;
 }
 
