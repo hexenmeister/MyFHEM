@@ -108,7 +108,7 @@ SYSMON_Define($$)
 {
   my ($hash, $def) = @_;
 
-  logF($hash, "Define", "$def");
+  SYSMON_Log($hash, 5, "$def");
 
   my @a = split("[ \t][ \t]*", $def);
 
@@ -493,7 +493,7 @@ SYSMON_Undefine($$)
 {
   my ($hash, $arg) = @_;
 
-  logF($hash, "Undefine", "");
+  SYSMON_Log($hash, 5, "$arg");
 
   RemoveInternalTimer($hash);
   
@@ -512,13 +512,13 @@ SYSMON_Get($@)
 
   if(@a < 2)
   {
-  	logF($hash, "Get", "@a: get needs at least one parameter");
+  	SYSMON_Log($hash, 3, "@a: get needs at least one parameter");
     return "$name: get needs at least one parameter";
   }
 
   my $cmd= $a[1];
 
-  logF($hash, "Get", "@a");
+  SYSMON_Log($hash, 5, "@a");
 
   if($cmd eq "update")
   {
@@ -565,18 +565,18 @@ SYSMON_Set($@)
 
   if(@a < 2)
   {
-  	logF($hash, "Set", "@a: set needs at least one parameter");
+  	SYSMON_Log($hash, 3, "@a: set needs at least one parameter");
     return "$name: set needs at least one parameter";
   }
 
   my $cmd= $a[1];
 
-  logF($hash, "Set", "@a");
+  SYSMON_Log($hash, 5, "@a");
 
   if($cmd eq "interval_multipliers")
   {
   	if(@a < 3) {
-  		logF($hash, "Set", "$name: not enought parameters");
+  		SYSMON_Log($hash, 3, "$name: not enought parameters");
       return "$name: not enought parameters";
   	}
 
@@ -652,7 +652,7 @@ SYSMON_Update($@)
 {
   my ($hash, $refresh_all) = @_;
 
-  logF($hash, "Update", "");
+  SYSMON_Log($hash, 5, "refresh_all: $refresh_all");
 
   my $name = $hash->{NAME};
 
@@ -663,7 +663,7 @@ SYSMON_Update($@)
 
   if( AttrVal($name, "disable", "") eq "1" )
   {
-  	logF($hash, "Update", "disabled");
+  	SYSMON_Log($hash, 5, "disabled");
   	$hash->{STATE} = "Inactive";
   } else {
   	# Beim ersten mal alles aktualisieren!
@@ -687,7 +687,7 @@ SYSMON_Update($@)
     } else {
       # blocking call
       if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) ) {
-        logF($hash, "blockingCall", "Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID});
+        SYSMON_Log($hash, 5, "blockingCall: Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID});
         BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} ); 
         delete($hash->{helper}{READOUT_RUNNING_PID});
       }
@@ -702,7 +702,7 @@ SYSMON_Update($@)
 sub SYSMON_blockingCall($$) {
 	my ($name, $refresh_all) = @_;
 	my $hash = $main::defs{$name};
-	logF($hash, "blockingCall", "");
+	SYSMON_Log($hash, 5, "$name, $refresh_all");
 	
 	my $map = SYSMON_obtainParameters($hash, $refresh_all);
 	
@@ -752,7 +752,7 @@ sub SYSMON_test() {
 
 sub SYSMON_blockingAbort($) {
 	my ($hash) = @_;
-	logF($hash, "blockingAbort", "");
+	SYSMON_Log($hash, 5, "");
 	$hash->{STATE} = "Error";
 	delete($hash->{helper}{READOUT_RUNNING_PID});
 }
@@ -770,7 +770,7 @@ sub SYSMON_blockingFinish($) {
 	delete $map->{name};
 	
 	my $hash = $main::defs{$name};
-	logF($hash, "blockingFinish", "");
+	SYSMON_Log($hash, 5, $map_str);
 	# Mark setzen 
   if(!$hash->{helper}{u_first_mark}) {
 	  $hash->{helper}{u_first_mark} = 1;
@@ -783,7 +783,7 @@ sub SYSMON_blockingFinish($) {
 
 sub SYSMON_updateReadings($$) {
 	my ($hash,$map) = @_;
-	logF($hash, "updateReadings", "");
+	SYSMON_Log($hash, 5, "");
   my $name = $hash->{NAME};
   
   readingsBeginUpdate($hash);
@@ -992,7 +992,7 @@ SYSMON_obtainParameters($$)
        # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
        my $ud = $_;
 	     my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $ud);
-	     logF($hash, "User-Defined Reading", "[$uName][$uInterval][$uComment][$uCmd]");
+	     SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd]");
 	     if(defined $uCmd) { # Also, wenn alle Parameter vorhanden
 	     	 my $iInt = int($uInterval);
 	     	 if($iInt>0) {
@@ -1048,7 +1048,7 @@ sub
 SYSMON_getUserDefined($$$$)
 {
 	my ($hash, $map, $uName, $uCmd) = @_;
-	logF($hash, "SYSMON_getUserDefined", "Name=[$uName] Cmd=[$uCmd]");
+	SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
 	
 	my $out_str = SYSMON_execute($hash, $uCmd);
   chomp $out_str;
@@ -1850,7 +1850,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 {
 	my ($hash, $map, $fs) = @_;
 	
-	logF($hash, "SYSMON_getFileSystemInfo", "get $fs");
+	SYSMON_Log($hash, 5, "get $fs");
 	
 	# Neue Syntax: benannte Filesystems: <name>:<definition>
 	my($fName, $fDef, $fComment) = split(/:/, $fs);
@@ -1861,12 +1861,12 @@ sub SYSMON_getFileSystemInfo ($$$)
   #my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
   my $disk = "df ".$fs." -m 2>/dev/null";
   
-  logF($hash, "SYSMON_getFileSystemInfo", "exec $disk");
+  SYSMON_Log($hash, 5, "exec $disk");
 
   #my @filesystems = qx($disk);
   my @filesystems = SYSMON_execute($hash, $disk);
   
-  logF($hash, "SYSMON_getFileSystemInfo", "recieved ".scalar(scalar(@filesystems))." lines");
+  SYSMON_Log($hash, 5, "recieved ".scalar(scalar(@filesystems))." lines");
   
   # - DEBUG -
   #if($fs eq "/test") {
@@ -1884,9 +1884,9 @@ sub SYSMON_getFileSystemInfo ($$$)
   #if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
   if(defined($filesystems[0])) {
-  	logF($hash, "SYSMON_getFileSystemInfo", "recieved line0 $filesystems[0]");
+  	SYSMON_Log($hash, 5, "recieved line0 $filesystems[0]");
   } else {
-  	logF($hash, "SYSMON_getFileSystemInfo", "recieved empty line");
+  	SYSMON_Log($hash, 5, "recieved empty line");
   }
 
   shift @filesystems;
@@ -1902,22 +1902,22 @@ sub SYSMON_getFileSystemInfo ($$$)
   return $map unless int(@filesystems)>0;
   #if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
   
-  logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
+  SYSMON_Log($hash, 5, "analyse line $filesystems[0] for $fs");
   
   #if (!($filesystems[0]=~ /$fs\s*$/)){ shift @filesystems; }
   if (!($filesystems[0]=~ /$fs$/)){ 
     shift @filesystems; 
     if(int(@filesystems)>0) {
-      logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
+      SYSMON_Log($hash, 5, "analyse line $filesystems[0] for $fs");
     }
   } else {
-  	logF($hash, "SYSMON_getFileSystemInfo", "pattern ($fs) found");
+  	SYSMON_Log($hash, 5, "pattern ($fs) found");
   }
   #if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   #if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
   if (int(@filesystems)>0 && $filesystems[0]=~ /$fs$/)
   {
-  	logF($hash, "SYSMON_getFileSystemInfo", "use line $filesystems[0]");
+  	SYSMON_Log($hash, 5, "use line $filesystems[0]");
   	
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     $percentage_used =~ /^(.+)%$/;
@@ -1948,7 +1948,7 @@ sub SYSMON_getFileSystemInfo ($$$)
 sub SYSMON_getNetworkInfo ($$$)
 {
 	my ($hash, $map, $device) = @_;
-	logF($hash, "SYSMON_getNetworkInfo", "get $device");
+	SYSMON_Log($hash, 5, "get $device");
 	my($nName, $nDef) = split(/:/, $device);
 	if(!defined $nDef) {
 	  $nDef = $nName;
@@ -2116,7 +2116,7 @@ sub SYSMON_getFBWLANState($$)
 {
 	my ($hash, $map) = @_;
 	
-	#logF($hash, "SYSMON_getFBWLANState", "");
+	#SYSMON_Log($hash, 5, "");
 	
 	$map->{+FB_WLAN_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/ap_enabled",1);
 	
@@ -2131,7 +2131,7 @@ sub SYSMON_getFBWLANGuestState($$)
 {
 	my ($hash, $map) = @_;
 	
-	#logF($hash, "SYSMON_getFBWLANGuestState", "");
+	#SYSMON_Log($hash, 5, "");
 	
 	$map->{+FB_WLAN_GUEST_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/guest_ap_enabled",1);
 	
@@ -2213,7 +2213,7 @@ sub SYSMON_acquireInfo_intern($$;$)
 {
 	my ($hash, $cmd, $art) = @_;
 	
-	logF($hash, "SYSMON_acquireInfo_intern", "cmd: ".$cmd);
+	SYSMON_Log($hash, 5, "cmd: ".$cmd);
 	
 	my $str = trim(SYSMON_execute($hash, $cmd));
 	my $ret;
@@ -2779,11 +2779,23 @@ sub SYSMON_decode_time_diff($)
 # Logging: Funkrionsaufrufe
 #   Parameter: HASH, Funktionsname, Message
 #------------------------------------------------------------------------------
-sub logF($$$)
-{
-	my ($hash, $fname, $msg) = @_;
-  #Log 5, "SYSMON $fname (".$hash->{NAME}."): $msg";
-  Log 5, "SYSMON $fname $msg";
+#sub logF($$$)
+#{
+#	my ($hash, $fname, $msg) = @_;
+#  #Log 5, "SYSMON $fname (".$hash->{NAME}."): $msg";
+#  Log 5, "SYSMON $fname $msg";
+#}
+
+sub SYSMON_Log($$$) {
+   my ( $hash, $loglevel, $text ) = @_;
+   my $xline       = ( caller(0) )[2];
+   
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/SMARTMON_//;
+
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   Log3 $hash, $loglevel, "SMARTMON $instName: $sub.$xline " . $text;
 }
 
 #sub trim($)
