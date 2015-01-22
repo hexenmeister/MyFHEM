@@ -32,6 +32,8 @@ use warnings;
 
 use Blocking;
 
+use Data::Dumper;
+
 my $VERSION = "1.9.5.0";
 
 use constant {
@@ -96,7 +98,7 @@ SYSMON_Initialize($)
   $hash->{GetFn}    = "SYSMON_Get";
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
-  $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 ".
+  $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -669,7 +671,7 @@ SYSMON_Update($@)
 	    $refresh_all = 1;
 	  }
 
-    if(1) {
+    if(!AttrVal($name, "nonblocking", 0)) {
       # direkt call
       
       # Parameter holen
@@ -727,8 +729,10 @@ sub SYSMON_test() {
   $map->{test2}="val2";
   $map->{test3}="val3";
   
+  #return Dumper($map);
+  
   my $ret = "name|".$name;
-  # TODO to ret String
+  # to ret String
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
@@ -736,6 +740,13 @@ sub SYSMON_test() {
     	$ret.="|".$aName."|".$value;
     }
   }
+  
+  my @ta = split(/\|/,$ret);
+  #return Dumper(@ta);
+	my %map2 = @ta;
+	
+  return Dumper(\%map2);
+  
   return $ret;
 }
 
@@ -750,8 +761,10 @@ sub SYSMON_blockingFinish($) {
 	my ($map_str) = @_;
 	
 	my $map;
-	# TODO: to map
-	
+	# to map
+	my @ta = split(/\|/,$map_str);
+	my %tm = @ta;
+	$map = \%tm;
 	
 	my $name=$map->{name};
 	delete $map->{name};
