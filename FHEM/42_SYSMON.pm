@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 7153 2014-12-06 22:23:17Z hexenmeister $
+# $Id: 42_SYSMON.pm 7680 2015-01-23 21:13:45Z hexenmeister $
 
 package main;
 
@@ -840,6 +840,7 @@ SYSMON_obtainParameters($$)
 	 
 	# Einmaliges
 	if(!$hash->{helper}{u_first_mark}) {
+		#TODO: nur local
 	  # Perl version
 	  $map->{+PERL_VERSION} = "$]";
 	  
@@ -858,6 +859,7 @@ SYSMON_obtainParameters($$)
   } else {
   	$map = SYSMON_getUptime2($hash, $map);
   }
+  #TODO: nur local
   $map = SYSMON_getFHEMUptime($hash, $map);
 
   if($m1 gt 0) { # Nur wenn > 0
