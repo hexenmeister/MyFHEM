@@ -714,6 +714,13 @@ sub SYSMON_blockingCall($) {
 	
 	# Device-Name mitnehmen
   my $ret = "name|".$name;
+  
+  my $msg = $hash->{helper}{error_msg};
+	if($msg) {
+		# Problem mit der Verbindung
+		return $ret."|error|".$msg;
+	}
+
   # to String
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
@@ -764,9 +771,9 @@ sub SYSMON_test() {
 
 sub SYSMON_blockingAbort($) {
 	my ($hash) = @_;
-	SYSMON_Log($hash, 5, "");
-	$hash->{STATE} = "Error";
 	delete($hash->{helper}{READOUT_RUNNING_PID});
+	SYSMON_Log($hash, 5, "");
+	$hash->{STATE} = "Error: Blocking call aborted (timeout)";
 }
 
 sub SYSMON_blockingFinish($) {
@@ -782,12 +789,20 @@ sub SYSMON_blockingFinish($) {
 	delete $map->{name};
 	
 	my $hash = $main::defs{$name};
+	delete($hash->{helper}{READOUT_RUNNING_PID});
+	
 	SYSMON_Log($hash, 5, $map_str);
 	# Mark setzen 
   if(!$hash->{helper}{u_first_mark}) {
 	  $hash->{helper}{u_first_mark} = 1;
 	}
-	delete($hash->{helper}{READOUT_RUNNING_PID});
+	
+	my $msg = $map->{error};
+	if($msg) {
+		# Im Fehlerfall State ebtsprechend setzen und nichts aktualisieren.
+		$hash->{STATE} = "Error: ".$msg;
+		return;
+	}
 	
 	SYSMON_updateReadings($hash,$map);
 	$hash->{STATE} = "Active";
@@ -2948,9 +2963,13 @@ sub SYSMON_Exec($$)
    if ($mode eq 'telnet') {
       unless (defined $telnet)
       {
-         return undef
-            if (SYSMON_Open_Connection($hash));
-         $openedTelnet = 1;
+        my $msg = SYSMON_Open_Connection($hash);
+        $hash->{helper}{error_msg}=$msg;
+        if ($msg) {
+          return undef;
+        }
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
       }
       my @retVal = SYSMON_Exec_Remote($hash, $cmd);
       SYSMON_Close_Connection ( $hash ) if $openedTelnet;
