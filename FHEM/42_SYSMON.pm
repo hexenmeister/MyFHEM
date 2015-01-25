@@ -726,6 +726,9 @@ sub SYSMON_blockingCall($) {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	# Zeichen maskieren
+    	$value=~s/#/§²§/g;
+    	$value=~s/\|/§³§/g;
     	$ret.="|".$aName."|".$value;
     }
   }
@@ -756,6 +759,7 @@ sub SYSMON_test() {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	$value=~s/#/§²§/g;
     	$ret.="|".$aName."|".$value;
     }
   }
@@ -819,6 +823,9 @@ sub SYSMON_updateReadings($$) {
     my $value = $map->{$aName};
     # Nur aktualisieren, wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	# Maskierte Zeichen zuruechersetzen
+    	$value=~s/§²§/#/g;
+    	$value=~s/§³§/\|/g;
       readingsBulkUpdate($hash,$aName,$value);
     }
   }
@@ -1028,11 +1035,18 @@ SYSMON_obtainParameters($$)
 	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
 	     	   if($update_ud) {
 	     	 	   $map = SYSMON_getUserDefined($hash, $map, $uName, $uCmd);
+	     	   } else {
+	     	     SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd] out of refresh interval");
 	     	   }
 	       }
 	    }
     }
   }
+  
+  #TEST
+  #my $rt = "#";
+  #$rt=~s/#/[]/g;
+  #$map->{SYS_TEST}=$rt;
   
   # Aktuelle Werte in ShattenHash mergen
   my %hashT = %{$map};
@@ -1081,7 +1095,9 @@ SYSMON_getUserDefined($$$$)
 	
 	my $out_str = SYSMON_execute($hash, $uCmd);
   chomp $out_str;
+  #$out_str=~s/#/§²§/g;
 	$map->{$uName} = $out_str;
+	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
 	return $map;
 }
