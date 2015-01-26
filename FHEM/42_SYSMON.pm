@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "1.9.5.0";
+my $VERSION = "2.0.0.0";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -102,6 +102,7 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
+                      "mode:local,telnet remote_host remote_port remote_user remote_password ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -173,7 +174,10 @@ SYSMON_updateCurrentReadingsMap($) {
   # Map aktueller Namen erstellen
 	
 	# Feste Werte
-	$rMap->{+PERL_VERSION}       = "Perl Version";
+	my $mode = AttrVal( $name, 'mode', 'local');
+	if($mode eq 'local'){
+	  $rMap->{+PERL_VERSION}       = "Perl Version";
+  }
 	$rMap->{+DATE}               = "Date";
 	$rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
 	if(SYSMON_isCPUFreqRPiBBB($hash)) {
@@ -621,9 +625,14 @@ SYSMON_Attr($$$)
 
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
+  
+  if($attrName eq "mode" || $attrName eq "remote_host" || $attrName eq "remote_port" ) {
+    delete($hash->{helper});
+  }
 
-  if( $cmd eq "set" ) {# set, del
-    if( $orig ne $attrVal ) {
+  if( $orig ne $attrVal ) {
+    
+    if( $cmd eq "set" ) {# set, del  
 
     	if($attrName eq "disable")
       {
@@ -863,11 +872,14 @@ SYSMON_obtainParameters($$)
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
 	 
+	my $mode = AttrVal( $name, 'mode', 'local');
 	# Einmaliges
 	if(!$hash->{helper}{u_first_mark}) {
-		#TODO: nur local
-	  # Perl version
-	  $map->{+PERL_VERSION} = "$]";
+		# nur lokal abfragen (macht remote keinen Sinn)
+		if ($mode eq 'local') {
+	    # Perl version
+	    $map->{+PERL_VERSION} = "$]";
+	  }
 	  
 		if(SYSMON_isProcFS($hash)) {
   	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
@@ -884,8 +896,11 @@ SYSMON_obtainParameters($$)
   } else {
   	$map = SYSMON_getUptime2($hash, $map);
   }
-  #TODO: nur local
-  $map = SYSMON_getFHEMUptime($hash, $map);
+  
+  # nur lokal abfragen
+  if ($mode eq 'local') {
+    $map = SYSMON_getFHEMUptime($hash, $map);
+  }
 
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
@@ -1093,9 +1108,18 @@ SYSMON_getUserDefined($$$$)
 	my ($hash, $map, $uName, $uCmd) = @_;
 	SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
 	
-	my $out_str = SYSMON_execute($hash, $uCmd);
-  chomp $out_str;
-  #$out_str=~s/#/§²§/g;
+	my @out_arr = SYSMON_execute($hash, $uCmd);
+	
+	my $out_str = "";
+	foreach my $k (@out_arr) {
+		chomp($k);
+		$out_str.=$k." ";
+	}
+	#my $out_str = join(" ",@out_arr);
+	##my $out_str = SYSMON_execute($hash, $uCmd);
+  ##chomp $out_str;
+  #$out_str=~s/\n/ /g;
+  #$out_str=~s/\r/ /g;
 	$map->{$uName} = $out_str;
 	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
@@ -2590,6 +2614,37 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   return $htmlcode;
 }
 
+#sub SYSMON_first($) {
+#	my (@d) = @_;
+#	return @d[0];
+#	
+#	#my ($d) = @_;
+#	#
+#	#return undef unless defined $d;
+#	
+#	##return ref ($d)." - ".ref(\$d);
+#	#if (ref $d eq "ARRAY") {
+#	# 	return @{$d}[0];
+#	#} else {
+#	#  return $d;
+#	#}
+#}
+#
+#sub SYSMON_last($) {
+#	my (@d) = @_;
+#	
+#	return undef unless defined @d;
+#	
+#	return @d[-1];
+#	
+#	#return ref ($d)." - ".ref(\$d);
+#	#if (ref $d eq "ARRAY") {
+#	# 	return @{$d}[-1];
+#	#} else {
+#	#  return $d;
+#	#}
+#}
+
 #my $proc_fs = undef;
 sub
 SYSMON_isProcFS($) {
@@ -2628,7 +2683,10 @@ sub
 SYSMON_isCPUFreqRPiBBB($) {
 	my ($hash) = @_;
 	if(!defined $hash->{helper}{sys_cpu_freq_rpi_bbb}) {
-	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
+	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
   }
 
 	return $hash->{helper}{sys_cpu_freq_rpi_bbb};
@@ -2645,7 +2703,10 @@ sub
 SYSMON_isCPU1Freq($) {
 	my ($hash) = @_;
 	if(!defined $hash->{helper}{sys_cpu1_freq}) {
-	  $hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  #$hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  # s. o. 
+	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+	  $hash->{helper}{sys_cpu1_freq} = int($t[-1]);
   }
 
 	return $hash->{helper}{sys_cpu1_freq};
@@ -2837,7 +2898,7 @@ sub SYSMON_Open_Connection($)
    my $pwd = AttrVal( $name, "remote_password", undef );
    my $user = AttrVal( $name, "remote_user", "" );
   #test
-  $pwd="dummy";
+  #$pwd="dummy";
   #test
    my $before;
    my $match;
@@ -2996,8 +3057,12 @@ sub SYSMON_Exec($$)
       }
       # Einzeiler als normale Scalars
       my $line = $retVal[0];
-      chomp $line;
-      SYSMON_Log ($hash, 5, "Result '$line'");
+      if(defined($line)) {
+        chomp $line;
+        SYSMON_Log ($hash, 5, "Result '$line'");
+      } else {
+      	SYSMON_Log ($hash, 5, "Result undef");
+      }
       return $line;
       #return $retVal;
    } else {
