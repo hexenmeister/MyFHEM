@@ -626,7 +626,7 @@ SYSMON_Attr($$$)
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
   
-  if($attrName eq "mode" || $attrName eq "remote_host" || $attrName eq "remote_port" ) {
+  if($attrName eq "mode" || $attrName eq "remote_host" || $attrName eq "remote_port" || $attrName eq "remote_password" ) {
     delete($hash->{helper});
   }
 
@@ -718,13 +718,51 @@ sub SYSMON_blockingCall($) {
 	my ($name, $refresh_all) = split(/\|/,$tparam);
 	my $hash = $main::defs{$name};
 	SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
-	
-	my $map = SYSMON_obtainParameters($hash, $refresh_all);
-	
+
+  ## ---
+  ##TODO: SSH
+  #my $msg = undef;
+  #my $openedTelnet = 0;
+  #my $telnet = $hash->{telnet};
+  ##$telnet = undef;
+	#my $mode = AttrVal( $name, 'mode', 'local');
+	## Wenn remote: open connection
+	#if ($mode eq 'telnet') {
+	#	unless (defined $telnet) {
+	#		SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
+  #    $msg = SYSMON_Open_Connection($hash);
+  #    $hash->{helper}{error_msg}=$msg;
+  #    if (!$msg) {
+  #      $openedTelnet = 1;
+  #      $hash->{helper}{error_msg}=undef;
+  #    }
+  #  }
+	#}
+  ## ---
+  
+  #my $map;
+  #if (!$msg) {
+  #	# Werte abrufen
+	#  $map = SYSMON_obtainParameters($hash, $refresh_all);
+  #}
+  
+  my $map = SYSMON_obtainParameters($hash, $refresh_all);
+
+  ## ---
+	## Wenn remote: close connection
+	#if ($mode eq 'telnet') {
+	#	if($openedTelnet) {
+	#	  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+	#	  SYSMON_Close_Connection( $hash );
+	#  }
+	#}
+	## ---
+
 	# Device-Name mitnehmen
   my $ret = "name|".$name;
   
   my $msg = $hash->{helper}{error_msg};
+  #$msg = $hash->{helper}{error_msg};
 	if($msg) {
 		# Problem mit der Verbindung
 		return $ret."|error|".$msg;
@@ -848,11 +886,53 @@ sub SYSMON_updateReadings($$) {
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
 }
 
+sub SYSMON_obtainParameters($$) {
+  my ($hash, $refresh_all) = @_;
+	my $name = $hash->{NAME};
+  # ---
+  #TODO: SSH
+  my $msg = undef;
+  my $openedTelnet = 0;
+  my $telnet = $hash->{telnet};
+  #$telnet = undef;
+	my $mode = AttrVal( $name, 'mode', 'local');
+	# Wenn remote: open connection
+	if ($mode eq 'telnet') {
+		unless (defined $telnet) {
+			SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
+      $msg = SYSMON_Open_Connection($hash);
+      $hash->{helper}{error_msg}=$msg;
+      if (!$msg) {
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
+      }
+    }
+	}
+  # ---
+  
+  my $map;
+  if (!$msg) {
+    $map = SYSMON_obtainParameters_intern($hash, $refresh_all);
+  }
+  
+  # ---
+	# Wenn remote: close connection
+	if ($mode eq 'telnet') {
+		if($openedTelnet) {
+		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+		  SYSMON_Close_Connection( $hash );
+	  }
+	}
+	# ---
+	
+	return $map;
+}
+
 
 # Schattenmap mit den zuletzt gesammelten Werten (merged)
 #my %shadow_map;
 sub
-SYSMON_obtainParameters($$)
+SYSMON_obtainParameters_intern($$)
 {
 	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
@@ -3040,6 +3120,7 @@ sub SYSMON_Exec($$)
    if ($mode eq 'telnet') {
       unless (defined $telnet)
       {
+      	SYSMON_Log($hash, 5, "$name: Open single telnet connection");
         my $msg = SYSMON_Open_Connection($hash);
         $hash->{helper}{error_msg}=$msg;
         if ($msg) {
@@ -3049,7 +3130,12 @@ sub SYSMON_Exec($$)
         $hash->{helper}{error_msg}=undef;
       }
       my @retVal = SYSMON_Exec_Remote($hash, $cmd);
-      SYSMON_Close_Connection ( $hash ) if $openedTelnet;
+      
+      if($openedTelnet) {
+      	SYSMON_Log($hash, 5, "$name: Close single telnet connection");
+        SYSMON_Close_Connection( $hash );
+      }
+      
       # Arrays als solche zurueckgeben
       if(scalar(@retVal)>1) {
         SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
