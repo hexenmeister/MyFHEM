@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.0.0";
+my $VERSION = "2.0.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -102,7 +102,7 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
-                      "mode:local,telnet remote_host remote_port remote_user remote_password ".
+                      "remote_user remote_password ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -116,13 +116,44 @@ SYSMON_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> SYSMON [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
-
+  return "Usage: define <name> SYSMON [MODE:HOST:PORT] [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
+	# define sysmon SYSMON local
+	# define sysmon SYSMON local 1 1 1 10
+	# define sysmon SYSMON telnet:fritz.box
+	# define sysmon SYSMON telnet:fritz.box:23
+	# define sysmon SYSMON telnet:fritz.box:23 10 10 10 60
+	
   if(int(@a)>=3)
   {
-    my @na = @a[2..scalar(@a)-1];
+  	my @na = @a[2..scalar(@a)-1];  
+  	
+  	# wenn das erste Element nicht numerisch
+  	if(!(@na[0] =~ /^\d+$/)) {
+  		# set mode/host/port
+  		my($mode, $host, $port) = split(/:/, @na[0]);
+  		$mode=lc($mode);
+  		# TODO SSH
+  		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
+  		  $hash->{MODE} = $mode;
+  		  delete($hash->{HOST});
+  		  $hash->{HOST} = lc($host) if(defined($host));
+  		  # DefaultPort je nach Protokol (TODO)
+  		  if(!defined($port)) {
+  		    $port = '23' if($mode eq 'telnet');
+  		    $port = '22' if($mode eq 'ssh');
+  		  }
+  		  $hash->{PORT} = lc($port);
+  	  } else {
+  	  	return "unexpected mode. use local or telnet only."; # TODO: SSH
+  	  }
+  		shift @na;
+  	} else {
+      $hash->{MODE}='local';
+    }
+
   	SYSMON_setInterval($hash, @na);
   } else {
+  	$hash->{MODE}='local';
     SYSMON_setInterval($hash, undef);
   }
 
@@ -174,7 +205,7 @@ SYSMON_updateCurrentReadingsMap($) {
   # Map aktueller Namen erstellen
 	
 	# Feste Werte
-	my $mode = AttrVal( $name, 'mode', 'local');
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
 	if($mode eq 'local'){
 	  $rMap->{+PERL_VERSION}       = "Perl Version";
   }
@@ -626,7 +657,7 @@ SYSMON_Attr($$$)
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
   
-  if($attrName eq "mode" || $attrName eq "remote_host" || $attrName eq "remote_port" || $attrName eq "remote_password" ) {
+  if($attrName eq "remote_user" || $attrName eq "remote_password" ) {
     delete($hash->{helper});
   }
 
@@ -719,50 +750,12 @@ sub SYSMON_blockingCall($) {
 	my $hash = $main::defs{$name};
 	SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
 
-  ## ---
-  ##TODO: SSH
-  #my $msg = undef;
-  #my $openedTelnet = 0;
-  #my $telnet = $hash->{telnet};
-  ##$telnet = undef;
-	#my $mode = AttrVal( $name, 'mode', 'local');
-	## Wenn remote: open connection
-	#if ($mode eq 'telnet') {
-	#	unless (defined $telnet) {
-	#		SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
-  #    $msg = SYSMON_Open_Connection($hash);
-  #    $hash->{helper}{error_msg}=$msg;
-  #    if (!$msg) {
-  #      $openedTelnet = 1;
-  #      $hash->{helper}{error_msg}=undef;
-  #    }
-  #  }
-	#}
-  ## ---
-  
-  #my $map;
-  #if (!$msg) {
-  #	# Werte abrufen
-	#  $map = SYSMON_obtainParameters($hash, $refresh_all);
-  #}
-  
   my $map = SYSMON_obtainParameters($hash, $refresh_all);
-
-  ## ---
-	## Wenn remote: close connection
-	#if ($mode eq 'telnet') {
-	#	if($openedTelnet) {
-	#	  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
-	#	  SYSMON_Close_Connection( $hash );
-	#  }
-	#}
-	## ---
 
 	# Device-Name mitnehmen
   my $ret = "name|".$name;
   
   my $msg = $hash->{helper}{error_msg};
-  #$msg = $hash->{helper}{error_msg};
 	if($msg) {
 		# Problem mit der Verbindung
 		return $ret."|error|".$msg;
@@ -888,14 +881,15 @@ sub SYSMON_updateReadings($$) {
 
 sub SYSMON_obtainParameters($$) {
   my ($hash, $refresh_all) = @_;
+    
 	my $name = $hash->{NAME};
   # ---
   #TODO: SSH
   my $msg = undef;
   my $openedTelnet = 0;
-  my $telnet = $hash->{telnet};
+  my $telnet = $hash->{".telnet"};
   #$telnet = undef;
-	my $mode = AttrVal( $name, 'mode', 'local');
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
 	# Wenn remote: open connection
 	if ($mode eq 'telnet') {
 		unless (defined $telnet) {
@@ -952,7 +946,7 @@ SYSMON_obtainParameters_intern($$)
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
 	 
-	my $mode = AttrVal( $name, 'mode', 'local');
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
 	# Einmaliges
 	if(!$hash->{helper}{u_first_mark}) {
 		# nur lokal abfragen (macht remote keinen Sinn)
@@ -2956,7 +2950,7 @@ sub SYSMON_Open_Connection($)
 
    my $msg;
  
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'local') {
      return undef;
    }
@@ -2967,14 +2961,14 @@ sub SYSMON_Open_Connection($)
      return $msg;
    }
 
-   my $host = AttrVal( $name, "remote_host", undef );
+   my $host = $hash->{HOST};#AttrVal( $name, "remote_host", undef );
   
    if(!defined $host) {
      $msg="Error: no remote host provided";
      SYSMON_Log($hash, 3, $msg);
      return $msg unless defined $host;
    }
-   my $port = AttrVal( $name, "remote_port", 23 );
+   my $port = $hash->{PORT};#AttrVal( $name, "remote_port", 23 );
    my $pwd = AttrVal( $name, "remote_password", undef );
    my $user = AttrVal( $name, "remote_user", "" );
   #test
@@ -3012,10 +3006,10 @@ sub SYSMON_Open_Connection($)
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
       $telnet = undef;
-      $hash->{telnet}=$telnet;
+      $hash->{".telnet"}=$telnet;
       return $msg;
    }
-   $hash->{telnet}=$telnet;
+   $hash->{".telnet"}=$telnet;
 
    SYSMON_Log($hash, 5, "Wait for user or password prompt.");
    unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
@@ -3086,18 +3080,18 @@ sub SYSMON_Close_Connection($)
    my ($hash) = @_;
    
    my $name = $hash->{NAME};
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'local') {
      return undef;
    }
    
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
    if (defined $telnet)
    {
       SYSMON_Log ($hash, 5, "Close Telnet connection");
       $telnet->close;
       $telnet = undef;
-      $hash->{telnet}=$telnet;
+      $hash->{".telnet"}=$telnet;
    }
    else
    {
@@ -3111,12 +3105,12 @@ sub SYSMON_Exec($$)
 {
    my ($hash, $cmd) = @_;
    my $openedTelnet = 0;
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
    
    #TODO: SSH
    
    my $name = $hash->{NAME};
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'telnet') {
       unless (defined $telnet)
       {
@@ -3165,7 +3159,7 @@ SYSMON_Exec_Remote($$)
    my @output;
    my $result;
 
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
