@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.1";
+my $VERSION = "2.0.2";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -102,7 +102,7 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
-                      "remote_user remote_password ".
+                      "remote_user ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -573,6 +573,13 @@ SYSMON_Get($@)
   	  my $value = $map->{$name};
   	  $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
     }
+    
+    my $msg = $hash->{helper}{error_msg};
+	  if($msg) {
+		  # Problem mit der Verbindung
+		  return $msg;
+	  }
+	
     return $ret;
   }
 
@@ -642,8 +649,15 @@ SYSMON_Set($@)
     
     return "missing parameter. use clear <reading name>";
   }
-
-  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg clear";
+  
+  if ( lc $cmd eq 'password') {
+  	my $subcmd = $a[2];
+	  if(defined $subcmd) {
+	     return SYSMON_storePassword ($hash, $subcmd);
+	  }
+  }
+  
+  return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
 
 sub
@@ -657,7 +671,7 @@ SYSMON_Attr($$$)
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
   
-  if($attrName eq "remote_user" || $attrName eq "remote_password" ) {
+  if($attrName eq "remote_user") {
     delete($hash->{helper});
   }
 
@@ -2941,6 +2955,81 @@ SYSMON_execute($$)
 
 #------------------------------------------------------------------------------
 
+# checks and stores password used for remote connection
+sub SYSMON_storePassword($$)
+{
+    my ($hash, $password) = @_;
+     
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+    
+    my $enc_pwd = "";
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    
+    my $err = setKeyValue($index, $enc_pwd);
+    return "error while saving the password - $err" if(defined($err));
+    
+    return "password successfully saved";
+}
+
+# read password
+sub SYSMON_readPassword($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+   my $key = getUniqueId().$index;
+
+   my ($password, $err);
+
+   SYSMON_Log($hash, 5, "Read password from file");
+   ($err, $password) = getKeyValue($index);
+
+   if(defined($err))
+   {
+      SYSMON_Log($hash, 3, "unable to read password from file: $err");
+      return undef;
+   }  
+
+   if(defined($password))
+   {
+      if(eval "use Digest::MD5;1")
+      {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+     
+      for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g))
+      {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+     
+      return $dec_pwd;
+   }
+   else
+   {
+      SYSMON_Log($hash, 2, "No password in file");
+      return undef;
+   }
+}
+
 # Opens a Telnet Connection to an external Machine
 ############################################
 sub SYSMON_Open_Connection($)
@@ -2969,7 +3058,7 @@ sub SYSMON_Open_Connection($)
      return $msg unless defined $host;
    }
    my $port = $hash->{PORT};#AttrVal( $name, "remote_port", 23 );
-   my $pwd = AttrVal( $name, "remote_password", undef );
+   my $pwd = SYSMON_readPassword($hash);#AttrVal( $name, "remote_password", undef );
    my $user = AttrVal( $name, "remote_user", "" );
   #test
   #$pwd="dummy";
@@ -2977,21 +3066,21 @@ sub SYSMON_Open_Connection($)
    my $before;
    my $match;
    
-   if(!defined($pwd)) {
-     my $pwdFile = AttrVal( $name, "pwdFile", undef);
-     if(defined($pwdFile)) {
-       SYSMON_Log($hash, 5, "Open password file '$pwdFile' to extract password");
-       if (open(IN, "<" . $pwdFile)) {
-         $pwd = <IN>;
-         close(IN);
-         SYSMON_Log($hash, 5, "Close password file");
-       } else {
-         $msg = "Error: Cannot open password file '$pwdFile': $!";
-         SYSMON_Log($hash, 2, $msg);
-         return $msg;
-       }
-     }
-   }
+   #if(!defined($pwd)) {
+   #  my $pwdFile = AttrVal( $name, "pwdFile", undef);
+   #  if(defined($pwdFile)) {
+   #    SYSMON_Log($hash, 5, "Open password file '$pwdFile' to extract password");
+   #    if (open(IN, "<" . $pwdFile)) {
+   #      $pwd = <IN>;
+   #      close(IN);
+   #      SYSMON_Log($hash, 5, "Close password file");
+   #    } else {
+   #      $msg = "Error: Cannot open password file '$pwdFile': $!";
+   #      SYSMON_Log($hash, 2, $msg);
+   #      return $msg;
+   #    }
+   #  }
+   #}
    
    if(!defined($pwd)) {
      $msg="Error: no passwort provided";
