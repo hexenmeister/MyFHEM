@@ -102,7 +102,6 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
-                      "remote_user ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -122,6 +121,7 @@ SYSMON_Define($$)
 	# define sysmon SYSMON telnet:fritz.box
 	# define sysmon SYSMON telnet:fritz.box:23
 	# define sysmon SYSMON telnet:fritz.box:23 10 10 10 60
+	# define sysmon SYSMON telnet:user@fritz.box:23
 	
   if(int(@a)>=3)
   {
@@ -136,8 +136,15 @@ SYSMON_Define($$)
   		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
   		  $hash->{MODE} = $mode;
   		  delete($hash->{HOST});
+  		  delete($hash->{USER});
+  		  # erkennen, wenn User angegeben ist
+  		  my($user,$th) = split(/@/,$host);
+  		  if(defined($th)) {
+  		  	$hash->{USER} = lc($user);
+  		  	$host = $th;
+  		  }
   		  $hash->{HOST} = lc($host) if(defined($host));
-  		  # DefaultPort je nach Protokol (TODO)
+  		  # DefaultPort je nach Protokol
   		  if(!defined($port)) {
   		    $port = '23' if($mode eq 'telnet');
   		    $port = '22' if($mode eq 'ssh');
@@ -671,10 +678,6 @@ SYSMON_Attr($$$)
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
   
-  if($attrName eq "remote_user") {
-    delete($hash->{helper});
-  }
-
   if( $orig ne $attrVal ) {
     
     if( $cmd eq "set" ) {# set, del  
@@ -3059,7 +3062,8 @@ sub SYSMON_Open_Connection($)
    }
    my $port = $hash->{PORT};#AttrVal( $name, "remote_port", 23 );
    my $pwd = SYSMON_readPassword($hash);#AttrVal( $name, "remote_password", undef );
-   my $user = AttrVal( $name, "remote_user", "" );
+   my $user = $hash->{USER};#AttrVal( $name, "remote_user", "" );
+   $user="" unless defined($user);
   #test
   #$pwd="dummy";
   #test
@@ -3134,7 +3138,7 @@ sub SYSMON_Open_Connection($)
    }
    elsif ( $match eq "password: " && $user ne "")
    {
-      SYSMON_Log($hash, 3, "Attribute 'remote_user' defined but telnet login did not prompt for user name.");
+      SYSMON_Log($hash, 3, "remote user was defined but telnet login did not prompt for user name.");
    }
 
    SYSMON_Log($hash, 5, "Entering password");
