@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 7680 2015-01-23 21:13:45Z hexenmeister $
+# $Id: 42_SYSMON.pm 7781 2015-01-31 00:40:26Z hexenmeister $
 
 package main;
 
@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.2";
+my $VERSION = "2.0.3";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -115,7 +115,7 @@ SYSMON_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> SYSMON [MODE:HOST:PORT] [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
+  return "Usage: define <name> SYSMON [MODE[:[USER@]HOST][:PORT]] [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
 	# define sysmon SYSMON local
 	# define sysmon SYSMON local 1 1 1 10
 	# define sysmon SYSMON telnet:fritz.box
@@ -128,9 +128,9 @@ SYSMON_Define($$)
   	my @na = @a[2..scalar(@a)-1];  
   	
   	# wenn das erste Element nicht numerisch
-  	if(!(@na[0] =~ /^\d+$/)) {
+  	if(!($na[0] =~ /^\d+$/)) {
   		# set mode/host/port
-  		my($mode, $host, $port) = split(/:/, @na[0]);
+  		my($mode, $host, $port) = split(/:/, $na[0]);
   		$mode=lc($mode);
   		# TODO SSH
   		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
@@ -660,10 +660,14 @@ SYSMON_Set($@)
   if ( lc $cmd eq 'password') {
   	my $subcmd = $a[2];
 	  if(defined $subcmd) {
-	     return SYSMON_storePassword ($hash, $subcmd);
+	     my $ret = SYSMON_storePassword ($hash, $subcmd);
+	     if(!defined($hash->{helper}{error_msg})) {
+	       SYSMON_Update($hash, 1);
+	     }
+	     return $ret;
 	  }
   }
-  
+
   return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
 
@@ -2982,6 +2986,7 @@ sub SYSMON_storePassword($$)
     }
     
     my $err = setKeyValue($index, $enc_pwd);
+    $hash->{helper}{error_msg}=$err;
     return "error while saving the password - $err" if(defined($err));
     
     return "password successfully saved";
@@ -3360,14 +3365,14 @@ sub SYSMON_Log($$$) {
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
 <ul>
-This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. 
+This module provides statistics about the system running FHEM server. Furthermore, remote systems can be accessed (Telnet). Only Linux-based systems are supported. 
 Some informations are hardware specific and are not available on every platform. 
 So far, this module has been tested on the following systems: 
-Raspberry Pi (Debian Wheezy) BeagleBone Black, FritzBox 7390 (no CPU data), WR703N under OpenWrt (no CPU data).
+Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390, WR703N under OpenWrt, CubieTruck and some others.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     
 This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
@@ -3392,6 +3397,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
      </li>
     </ul>
+    To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password <password>'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
+    <br>
   <br>
 
   <b>Readings:</b>
@@ -3911,14 +3918,15 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
+  Weiterhin k&ouml;nnen auch Remote-Systeme abgefragt werden (Telnet).
   Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform 
   verf&uuml;gbar.
   Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, 
-  FritzBox 7390 (keine CPU-Daten), WR703N unter OpenWrt.
+  FritzBox 7390, WR703N unter OpenWrt, CubieTruck und einige andere.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     Diese Anweisung erstellt eine neue SYSMON-Instanz.
     Die Parameter M1 bis M4 legen die Aktualisierungsintervalle f&uuml;r verschiedenen Readings (Statistiken) fest.
@@ -3944,6 +3952,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
      </li>
     </ul>
+    F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen. 
+    Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
+    Als MODE sind derzeit 'telnet' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
+    <br>
   <br>
 
   <b>Readings:</b>
