@@ -106,7 +106,7 @@ sendJabberAnswer()
 	  $newmsg.="\n  West: ";
 	  $newmsg.="T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
 	  $newmsg.=" H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
-	  $newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "power_main", "---")." V";
+	  $newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
   }
 
   if($cmd eq "system") {
