@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 7781 2015-01-31 00:40:26Z hexenmeister $
+# $Id: 42_SYSMON.pm 7801 2015-01-31 17:20:12Z hexenmeister $
 
 package main;
 
@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.3";
+my $VERSION = "2.1.0";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -102,6 +102,7 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
+                      "telnet-time-out ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -718,7 +719,7 @@ SYSMON_Update($;$)
   
   $refresh_all="0" unless defined $refresh_all;
 
-  SYSMON_Log($hash, 5, "refresh_all: ".$refresh_all);
+  #SYSMON_Log($hash, 5, "refresh_all: ".$refresh_all);
 
   my $name = $hash->{NAME};
 
@@ -729,7 +730,7 @@ SYSMON_Update($;$)
 
   if( AttrVal($name, "disable", "") eq "1" )
   {
-  	SYSMON_Log($hash, 5, "disabled");
+  	#SYSMON_Log($hash, 5, "disabled");
   	$hash->{STATE} = "Inactive";
   } else {
   	# Beim ersten mal alles aktualisieren!
@@ -1091,7 +1092,7 @@ SYSMON_obtainParameters_intern($$)
       	$map = SYSMON_getFBDECTTemp($hash, $map);
       	
       	#DSL-Downstream und DSL-Upstream abfragen
-	      $map = SYSMON_getFBStreemRate($hash, $map);
+	      $map = SYSMON_getFBStreamRate($hash, $map);
 	      #Sync-Zeit mit Vermittlungsstelle abfragen
 	      $map = SYSMON_getFBSyncTime($hash, $map);
 	      #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
@@ -1286,6 +1287,8 @@ SYSMON_getUptime2($$)
 
 #TODO
   my $uptime = SYSMON_execute($hash,"uptime");
+  
+  #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>".$uptime."<");
 
   #$uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
   $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+)).*load.*: (.*)/ );
@@ -2379,7 +2382,10 @@ sub SYSMON_acquireInfo_intern($$;$)
 	
 	SYSMON_Log($hash, 5, "cmd: ".$cmd);
 	
-	my $str = trim(SYSMON_execute($hash, $cmd));
+	my $str = SYSMON_execute($hash, $cmd);
+	if(defined($str)) {
+	  $str = trim($str);
+	}
 	my $ret;
 	
 	if(!defined($art)) { $art= 0; }
@@ -2432,7 +2438,7 @@ sub SYSMON_FBVersionInfo($$)
 
 
 #DSL-Downstream und DSL-Upstream abfragen
-sub SYSMON_getFBStreemRate($$) {
+sub SYSMON_getFBStreamRate($$) {
 	my ($hash, $map) = @_;
 	
 	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
@@ -3098,8 +3104,9 @@ sub SYSMON_Open_Connection($)
    }
  
    SYSMON_Log($hash, 5, "Open Telnet connection to $host:$port");
-   my $timeout = AttrVal( $name, "telnetTimeOut", "10");
-   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
+   my $timeout = AttrVal( $name, "telnet-time-out", "10");
+   #my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
+   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
    if (!$telnet) {
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
@@ -3150,7 +3157,8 @@ sub SYSMON_Open_Connection($)
    $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
-   unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
+   #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
+   unless ( ($before,$match) = $telnet->waitfor( '/(#|\$) $|Login failed./i' ))
    {
       $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
       SYSMON_Log($hash, 2, $msg);
@@ -3166,7 +3174,17 @@ sub SYSMON_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
-
+   #SYSMON_Log($hash, 2, "Prompt: ".Dumper($before)." > ".$match);
+   
+   # Promptzeile erkenen
+   if(!($hash->{helper}{recognized_prompt})) {
+     my @prompt = SYSMON_Exec_Remote($hash, '');
+     if(scalar(@prompt) == 1) {
+       $hash->{helper}{recognized_prompt}=$prompt[0];
+     }
+   }
+   #SYSMON_Log($hash, 2, "Prompt: '".Dumper(@retVal)."'");
+   
    return undef;
 } # end SYSMON_Open_Connection
 
@@ -3199,9 +3217,9 @@ sub SYSMON_Close_Connection($)
 
 # Executed the command on the remote Shell
 ############################################
-sub SYSMON_Exec($$)
+sub SYSMON_Exec($$;$)
 {
-   my ($hash, $cmd) = @_;
+   my ($hash, $cmd,$is_arr) = @_;
    my $openedTelnet = 0;
    my $telnet = $hash->{".telnet"};
    
@@ -3228,7 +3246,18 @@ sub SYSMON_Exec($$)
         SYSMON_Close_Connection( $hash );
       }
       
+      #Prompt-Zeile entfernen, falls vorhanden
+      my $recognized_prompt = $hash->{helper}{recognized_prompt};
+      if(defined($recognized_prompt)) {
+      	if(scalar(@retVal)>=1) {
+          if($retVal[-1] eq $recognized_prompt) {
+          	delete $retVal[-1];
+          }
+        }
+      }
+      
       # Arrays als solche zurueckgeben
+      #if(!$is_arr && scalar(@retVal)>1) {
       if(scalar(@retVal)>1) {
         SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
         return @retVal;	
@@ -3261,6 +3290,7 @@ SYSMON_Exec_Remote($$)
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
+   #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'");
    return @output;
    ## Arrays als solche zurueckgeben
    #if(scalar(@output)>1) {
