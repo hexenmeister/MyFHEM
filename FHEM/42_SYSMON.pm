@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.0";
+my $VERSION = "2.1.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -103,6 +103,7 @@ SYSMON_Initialize($)
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
                       "telnet-time-out ".
+                      "user-fn ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -880,7 +881,17 @@ sub SYSMON_updateReadings($$) {
   my $name = $hash->{NAME};
   
   readingsBeginUpdate($hash);
-    
+  
+  
+  # Wenn UserFn benutzt wird, werden die erstellten Eintraege erfasst und die entsprechenden Readings nicht erhalten
+  my $h_keys;
+  my $uFnReadings = $map->{".user_fnr"};
+  if(defined($uFnReadings)) {
+    delete $map->{".user_fnr"};
+    my @a_keys = split(/,\s*/, trim($uFnReadings));
+    $h_keys = map { $_ => 1 } @a_keys;
+  }
+  
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
     # Nur aktualisieren, wenn ein gueltiges Value vorliegt
@@ -895,7 +906,9 @@ sub SYSMON_updateReadings($$) {
   # Nicht mehr benoetigte Readings loeschen
   my $omap = SYSMON_getObsoleteReadingsMap($hash);
   foreach my $aName (keys %{$omap}) {
-  	delete $defs{$name}{READINGS}{$aName};
+  	if(!($h_keys->{$aName})) {
+  	  delete $defs{$name}{READINGS}{$aName};
+    }
 	}
 
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
@@ -911,7 +924,7 @@ sub SYSMON_obtainParameters($$) {
   my $openedTelnet = 0;
   my $telnet = $hash->{".telnet"};
   #$telnet = undef;
-	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+	my $mode = $hash->{MODE};
 	# Wenn remote: open connection
 	if ($mode eq 'telnet') {
 		unless (defined $telnet) {
@@ -1154,6 +1167,34 @@ SYSMON_obtainParameters_intern($$)
     }
   }
   
+  
+  # User Functions
+  my $uMap;
+  my $userfn = AttrVal($name, "user-fn", undef);
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach (@userfn_list) {
+    	my $ufn = $_;
+    	SYSMON_Log($hash, 5, "User-Function Reading: [$ufn]");
+	    if(defined $ufn) {
+	      no strict "refs";
+        $uMap = &{$ufn}($hash, $uMap);
+        use strict "refs";
+	    }
+    }
+  }
+  # Werte umverpacken, KeyNamen sichern
+  my $uNames='';
+  if(defined($uMap)) {
+  	foreach my $uName (keys %{$uMap}) {
+  		$uNames.=','.$uName;
+  		$map->{$uName}=$uMap->{$uName};
+  	}
+  	# Erste Komma entfernen
+  	$uNames=substr($uNames,1);
+  	$map->{".user_fnr"}=$uNames;
+  }
+  
   #TEST
   #my $rt = "#";
   #$rt=~s/#/[]/g;
@@ -1167,6 +1208,15 @@ SYSMON_obtainParameters_intern($$)
   $hash->{helper}{shadow_map} = \%shadow_map;
 
   return $map;
+}
+
+# For test purpose only
+sub SYSMON_TestUserFn($$) {
+  my ($hash, $map) = @_;
+  
+  $map->{"my_test_reading"}="my test";
+  
+  return $map;	
 }
 
 #------------------------------------------------------------------------------
@@ -2127,7 +2177,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
   #my @dataThroughput = qx($cmd);
   my @dataThroughput = SYSMON_execute($hash, $cmd);
-  #Log 3, "SYSMON>>>>>>>>>>>>>>>>> ".$dataThroughput[0];
+  SYSMON_Log ($hash, 5, "SYSMON_getNetworkInfo>>>>>>>>>>>>>>>>".Dumper(@dataThroughput));
   
   #--- DEBUG ---
   if($device eq "_test1") {
@@ -2369,6 +2419,79 @@ sub SYSMON_getFBDECTTemp($$)
 	
 	return $map;
 }
+
+#------------------------------------------------------------------------------
+# Liefert Liste an der FritzBox bekannter Devices.
+# Parameter: HASH
+# Return Hash mit Devices
+#------------------------------------------------------------------------------
+sub SYSMON_getFBLanDeviceList($)
+{
+	my ($hash) = @_;
+	
+	if(!SYSMON_isFB($hash)) {
+		return undef;
+	}
+	
+	my $map;
+	
+	my $name = $hash->{NAME};
+	# ---
+  #TODO: SSH
+  my $msg = undef;
+  my $openedTelnet = 0;
+  my $telnet = $hash->{".telnet"};
+  #$telnet = undef;
+	my $mode = $hash->{MODE};
+	# Wenn remote: open connection
+	if ($mode eq 'telnet') {
+		unless (defined $telnet) {
+			SYSMON_Log($hash, 5, "$name: Open single telnet connection");
+      $msg = SYSMON_Open_Connection($hash);
+      $hash->{helper}{error_msg}=$msg;
+      if (!$msg) {
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
+      }
+    }
+	}
+  # ---
+
+	my $count = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice/count");
+	if(defined($count)) {
+		for (my $i=0;$i<$count;$i++) { 
+			#landevice0/...  
+			# ip=192.168.178.12,  mac=00:1F:3F:MM:AA:CC, name=PC-192-168-178-12, manu_name=0,
+			# dhcp=0, static_dhcp=0, wlan=0, ethernet=1, active=1, online=0, speed=100,
+			# deleteable=2, wakeup=0, source=4096, neighbour_name=, is_double_neighbour_name=0
+			# ipv6addrs=, ipv6_ifid=
+
+  	  my $dev_name   = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/name");
+  	  my $dev_ip     = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/ip");
+  	  my $dev_mac    = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/mac");
+  	  my $dev_active = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/active");
+  	  
+  	  $map->{$dev_name}{id}     = $i;
+  	  $map->{$dev_name}{name}   = $dev_name;
+  	  $map->{$dev_name}{ip}     = $dev_ip;
+  	  $map->{$dev_name}{mac}    = $dev_mac;
+  	  $map->{$dev_name}{active} = $dev_active;
+    }
+  }
+  
+  # ---
+	# Wenn remote: close connection
+	if ($mode eq 'telnet') {
+		if($openedTelnet) {
+		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+		  SYSMON_Close_Connection( $hash );
+	  }
+	}
+	# ---
+	
+	return $map;
+}
+
 
 # TODO: FritzBox-Infos: Dateien /var/env oder /proc/sys/urlader/environment. 
 
@@ -3106,7 +3229,7 @@ sub SYSMON_Open_Connection($)
    SYSMON_Log($hash, 5, "Open Telnet connection to $host:$port");
    my $timeout = AttrVal( $name, "telnet-time-out", "10");
    #my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
-   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
+   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$)\s*$/');
    if (!$telnet) {
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
@@ -3158,7 +3281,7 @@ sub SYSMON_Open_Connection($)
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
    #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
-   unless ( ($before,$match) = $telnet->waitfor( '/(#|\$) $|Login failed./i' ))
+   unless ( ($before,$match) = $telnet->waitfor( '/(#|\$)\s*$|Login failed./i' ))
    {
       $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
       SYSMON_Log($hash, 2, $msg);
