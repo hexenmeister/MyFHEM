@@ -885,11 +885,12 @@ sub SYSMON_updateReadings($$) {
   
   # Wenn UserFn benutzt wird, werden die erstellten Eintraege erfasst und die entsprechenden Readings nicht erhalten
   my $h_keys;
-  my $uFnReadings = $map->{".user_fnr"};
+  my $uFnReadings = $map->{"xuser_fnr"};
+  my @a_keys;
   if(defined($uFnReadings)) {
-    delete $map->{".user_fnr"};
-    my @a_keys = split(/,\s*/, trim($uFnReadings));
-    $h_keys = map { $_ => 1 } @a_keys;
+    delete $map->{"xuser_fnr"};
+    @a_keys = split(/,\s*/, trim($uFnReadings));
+    #$h_keys = map { $_ => "1" } @a_keys;
   }
   
   foreach my $aName (keys %{$map}) {
@@ -905,10 +906,14 @@ sub SYSMON_updateReadings($$) {
     
   # Nicht mehr benoetigte Readings loeschen
   my $omap = SYSMON_getObsoleteReadingsMap($hash);
+  
+  # UserFn Keys entfernen
+  foreach my $aName (@a_keys) {
+  	delete($omap->{$aName});
+  }
   foreach my $aName (keys %{$omap}) {
-  	if(!($h_keys->{$aName})) {
+  	#  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
   	  delete $defs{$name}{READINGS}{$aName};
-    }
 	}
 
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
@@ -1171,6 +1176,7 @@ SYSMON_obtainParameters_intern($$)
   # User Functions
   my $uMap;
   my $userfn = AttrVal($name, "user-fn", undef);
+  #TEST$userfn=undef;
   if(defined $userfn) {
   	my @userfn_list = split(/,\s*/, trim($userfn));
     foreach (@userfn_list) {
@@ -1192,7 +1198,7 @@ SYSMON_obtainParameters_intern($$)
   	}
   	# Erste Komma entfernen
   	$uNames=substr($uNames,1);
-  	$map->{".user_fnr"}=$uNames;
+  	$map->{"xuser_fnr"}=$uNames;
   }
   
   #TEST
@@ -1215,6 +1221,7 @@ sub SYSMON_TestUserFn($$) {
   my ($hash, $map) = @_;
   
   $map->{"my_test_reading"}="my test";
+  #$map->{"my"}="my";
   
   return $map;	
 }
@@ -1506,11 +1513,13 @@ SYSMON_getCPUBogoMIPS($$)
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
     my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep -m 1 'BogoMIPS'");
-    #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
-    my ($dummy, $val_txt) = split(/:\s+/, $val);
-    if($val_txt) {
-      $val_txt = trim($val_txt);
-      $map->{+CPU_BOGOMIPS}="$val_txt";
+    if(defined($val)){
+      #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
+      my ($dummy, $val_txt) = split(/:\s+/, $val);
+      if($val_txt) {
+        $val_txt = trim($val_txt);
+        $map->{+CPU_BOGOMIPS}="$val_txt";
+      }
     }
   } else {
   	$map->{+CPU_BOGOMIPS}=$old_val;
