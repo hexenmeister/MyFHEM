@@ -104,6 +104,7 @@ SYSMON_Initialize($)
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
                       "telnet-time-out ".
                       "user-fn ".
+                      "telnet-prompt-regx telnet-login-prompt-regx ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -2574,7 +2575,24 @@ sub SYSMON_getFBStreamRate($$) {
 	my ($hash, $map) = @_;
 	
 	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
+	unless($ds_rate) {
+		return SYSMON_getFBStreamRate2($hash, $map);
+	}
 	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
+	
+	if($ds_rate ne "" && $us_rate ne "") {
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+  }
+  
+  return $map;
+}
+
+# DSL-Geschwindigkeit mit neuer FritzOS (6.23)
+sub SYSMON_getFBStreamRate2($$) {
+	my ($hash, $map) = @_;
+	
+	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in")/1000;
+	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out")/1000;
 	
 	if($ds_rate ne "" && $us_rate ne "") {
     $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
@@ -3237,8 +3255,9 @@ sub SYSMON_Open_Connection($)
  
    SYSMON_Log($hash, 5, "Open Telnet connection to $host:$port");
    my $timeout = AttrVal( $name, "telnet-time-out", "10");
+   my $t_prompt=AttrVal($name,'telnet-prompt-regx','(#|\$)\s*$');
    #my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
-   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$)\s*$/');
+   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/'.$t_prompt.'/');
    if (!$telnet) {
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
@@ -3289,8 +3308,9 @@ sub SYSMON_Open_Connection($)
    $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
+   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$)\s*$|Login failed.');
    #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
-   unless ( ($before,$match) = $telnet->waitfor( '/(#|\$)\s*$|Login failed./i' ))
+   unless ( ($before,$match) = $telnet->waitfor( '/'.$tlogin_prompt.'/i' ))
    {
       $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
       SYSMON_Log($hash, 2, $msg);
@@ -3423,6 +3443,13 @@ SYSMON_Exec_Remote($$)
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
    #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'");
+
+   # Sonderlocke für QNAP: Fuerende Zeilen mit "[~] " am Anfang entfernen
+   while((scalar(@output)>0) && ($output[0]=~ /^\[\~]/)) {
+   	SYSMON_Log ($hash, 5, "Remove line: '".$output[0]."'");
+     delete $output[0];
+   }
+
    return @output;
    ## Arrays als solche zurueckgeben
    #if(scalar(@output)>1) {
@@ -3914,6 +3941,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>disable<br>
       Possible values: 0 and 1. '1' means that the update is stopped.
+    </li>
+    <br>
+    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur für Zugriffe &uuml;ber Telnet relevant.)
     </li>
     <br>
     </ul><br>
@@ -4491,6 +4522,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>disable<br>
     M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
+    </li>
+    <br>
+    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur für Zugriffe &uuml;ber Telnet relevant.)
     </li>
     <br>
     </ul><br>
