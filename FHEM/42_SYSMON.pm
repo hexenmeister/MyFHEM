@@ -620,8 +620,30 @@ SYSMON_Get($@)
   {
   	return $hash->{INTERVAL_MULTIPLIERS};
   }
+  
+  if($cmd eq "list_lan_devices")
+  {
+  	my $ret='';
+  	my $map = SYSMON_getFBLanDeviceList($hash);
+  	if(defined($map)) {
+  		foreach my $dname (sort keys %{$map}) {
+  	    my $dev_ip  =  $map->{$dname}{ip};
+  	    $dev_ip='' unless defined $dev_ip;
+  	    my $dev_mac =  $map->{$dname}{mac};
+  	    my $dev_active = $map->{$dname}{active};
+  	    my $dev_active_txt = $dev_active?'true':'false';
+  	    #$ret.="\n"."$dname : active: $dev_active_txt, IP: $dev_ip, MAC: $dev_mac";
+  	    $ret = "$ret\n".sprintf("%-25s : active: %-5s  IP: %-16s  MAC: %-17s", $dname, $dev_active_txt, $dev_ip, $dev_mac);
+  		}
+  	}
+  	return $ret;
+  }
 
-  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg";
+  my $sfb='';
+  if(SYSMON_isFB($hash)) {
+  	$sfb=' list_lan_devices:noArg';
+  }
+  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg".$sfb;
 }
 
 sub
@@ -4018,8 +4040,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 
   <b>Get:</b><br><br>
     <ul>
-    <li>interval<br>
+    <li>interval_base<br>
     Lists the specified polling intervalls.
+    </li>
+    <br>
+    <li>interval_multipliers<br>
+    Displays update intervals.
     </li>
     <br>
     <li>list<br>
@@ -4034,6 +4060,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Displays the version of SYSMON module.
     </li>
     <br>
+    <li>list_lan_devices<br>
+    Displays known LAN Devices (FritzBox only).
+    </li>
+    <br>
+    
     </ul><br>
 
   <b>Set:</b><br><br>
@@ -4048,6 +4079,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>clear &lt;reading name&gt;<br>
      Deletes the Reading entry with the given name. After an update this entry is possibly re-created (if defined). This mechanism allows the selective deleting unnecessary custom entries.<br>
+    </li>
+    <br>
+    <li>password &lt;Passwort&gt;<br>
+    Specify the password for remote access (usually only necessary once).
     </li>
     <br>
     </ul><br>
@@ -4603,6 +4638,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Listet die bei der Definition angegebene Polling-Intervalle auf.
     </li>
     <br>
+    <li>interval_multipliers<br>
+    Listet die definierten Multipliers.
+    </li>
+    <br>
     <li>list<br>
     Gibt alle Readings aus.
     </li>
@@ -4615,6 +4654,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Zeigt die Version des SYSMON-Moduls.
     </li>
     <br>
+    <br>
+    <li>list_lan_devices<br>
+    Listet bekannte Ger&auml;te im LAN (nur FritzBox).
+    </li>
     </ul><br>
 
   <b>Set:</b><br><br>
@@ -4631,6 +4674,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung) 
     wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter 
     benutzerdefinierten Eintr&auml;ge.<br>
+    </li>
+    <br>
+    <li>password &lt;Passwort&gt;<br>
+    Definiert das Passwort f&uuml;r den Remote-Zugriff (i.d.R. nur einmalig notwendig).
     </li>
     <br>
     </ul><br>
