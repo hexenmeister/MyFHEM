@@ -683,6 +683,13 @@ SYSMON_Set($@)
 	     return $ret;
 	  }
   }
+  
+  # TEST
+  if($cmd eq "reset")
+  {
+  	delete $defs{$name}->{helper};
+  	return 'ok';
+  }
 
   return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
@@ -1210,7 +1217,7 @@ SYSMON_obtainParameters_intern($$)
   
   # User Functions2
   my $uMap;
-  my $userfn = AttrVal($name, "user-fn2", undef);
+  $userfn = AttrVal($name, "user-fn2", undef);
   #TEST$userfn=undef;
   if(defined $userfn) {
   	my @userfn_list = split(/,\s*/, trim($userfn));
@@ -1585,7 +1592,10 @@ SYSMON_getCPUBogoMIPS($$)
 	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
-    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep -m 1 'BogoMIPS'");
+    my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
+    SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
+    my $val=@aval[0];
+    SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
     if(defined($val)){
       #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
       my ($dummy, $val_txt) = split(/:\s+/, $val);
@@ -2690,10 +2700,26 @@ sub SYSMON_getFBSyncTime($$) {
 	my ($hash, $map) = @_;
 	
 	my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
+	unless($data) {
+		return SYSMON_getFBSyncTime2($hash, $map);
+	}
 	
 	if($data ne "") {
 		my $idata = int($data);
     $map->{+FB_DSL_SYNCTIME}=SYSMON_sec2Dauer($idata);
+  }
+  
+  return $map;
+}
+
+#Sync-Zeit mit Vermittlungsstelle abfragen mit neuer FritzOS (6.23)
+sub SYSMON_getFBSyncTime2($$) {
+	my ($hash, $map) = @_;
+	
+	my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
+	
+	if($data ne "") {
+    $map->{+FB_DSL_SYNCTIME}=$data;
   }
   
   return $map;
@@ -3041,9 +3067,11 @@ SYSMON_isCPU1Freq($) {
 sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_fb}) {
+	if(!defined ($hash->{helper}{sys_fb})) {
+		SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
 	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
   } 
+  SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
 	return $hash->{helper}{sys_fb};
 }
 
@@ -3471,28 +3499,29 @@ sub SYSMON_Exec($$;$)
       	SYSMON_Log($hash, 5, "$name: Close single telnet connection");
         SYSMON_Close_Connection( $hash );
       }
-      
+
       #Prompt-Zeile entfernen, falls vorhanden
       my $recognized_prompt = $hash->{helper}{recognized_prompt};
       if(defined($recognized_prompt)) {
       	if(scalar(@retVal)>=1) {
           if($retVal[-1] eq $recognized_prompt) {
-          	delete $retVal[-1];
+          	SYSMON_Log ($hash, 5, "remove prompt: ".$retVal[-1]."'");
+          	splice @retVal, -1, 1;# $retVal[-1];
           }
         }
       }
       
       # Arrays als solche zurueckgeben
-      #if(!$is_arr && scalar(@retVal)>1) {
+      #if($is_arr && scalar(@retVal)>1) {
       if(scalar(@retVal)>1) {
-        SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
+        SYSMON_Log ($hash, 5, "Result A: '".Dumper(@retVal)."'");
         return @retVal;	
       }
       # Einzeiler als normale Scalars
       my $line = $retVal[0];
       if(defined($line)) {
         chomp $line;
-        SYSMON_Log ($hash, 5, "Result '$line'");
+        SYSMON_Log ($hash, 5, "Result L: '$line'");
       } else {
       	SYSMON_Log ($hash, 5, "Result undef");
       }
@@ -3502,6 +3531,39 @@ sub SYSMON_Exec($$;$)
       return SYSMON_Exec_Local($hash, $cmd);
    }
 
+}
+
+sub MYTEST() {
+	my @output=(
+	'',
+'[~] ',
+'',
+'[~] # ',
+'',
+'',
+'',
+'          Interrupt:16 Memory:c0100000-c0120000 ',
+'',
+'          RX bytes:483322579219 (450.1 GiB)  TX bytes:3757348645531 (3.4 TiB)',
+'',
+'          collisions:0 txqueuelen:1000 ',
+'',
+'          TX packets:3656315540 errors:0 dropped:0 overruns:0 carrier:0',
+'',
+'          RX packets:2817622543 errors:8 dropped:265294 overruns:0 frame:8',
+'',
+'          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1',
+'',
+'          inet addr:192.168.178.80  Bcast:192.168.178.255  Mask:255.255.255.0',
+'',
+'eth0      Link encap:Ethernet  HWaddr 00:08:9B:D3:8D:9E'
+	);
+	@output = reverse(@output);
+	for (my $i=0;$i<scalar(@output);$i++) {
+   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
+   }
+   @output = grep{ defined($_) && trim($_) ne '' }@output;
+   return Dumper(@output);
 }
 
 # Executed the command via Telnet
@@ -3516,14 +3578,21 @@ SYSMON_Exec_Remote($$)
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
-   #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'");
+   SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'"); # TODO: remove
 
-   # Sonderlocke fuer QNAP: Fuerende Zeilen mit "[~] " am Anfang entfernen
-   while((scalar(@output)>0) && ($output[0]=~ /^\[\~]/)) {
-   	SYSMON_Log ($hash, 5, "Remove line: '".$output[0]."'");
-     delete $output[0];
+   # Sonderlocke fuer QNAP: letzten Zeilen mit "[~] " am Anfang entfernen
+   #while((scalar(@output)>0) && ($output[-1]=~ /^\[~\]/)) {
+   #	SYSMON_Log ($hash, 5, "Remove line: '".$output[-1]."'");
+   #  splice @output, -1, 1;
+   #}
+   for (my $i=0;$i<scalar(@output);$i++) {
+   	 SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
+   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
    }
-
+   SYSMON_Log($hash, 5, "Result >>> vgrep >>>'".Dumper(@output)."'"); # TODO: remove
+   @output = grep{ defined($_) && trim($_) ne '' }@output;
+   SYSMON_Log($hash, 5, "Result >>> ngrep >>>'".Dumper(@output)."'"); # TODO: remove
+   
    return @output;
    ## Arrays als solche zurueckgeben
    #if(scalar(@output)>1) {
