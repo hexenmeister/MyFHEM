@@ -1615,9 +1615,9 @@ SYSMON_getCPUBogoMIPS($$)
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
     my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
-    SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
+    #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
     my $val=@aval[0];
-    SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
+    #SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
     if(defined($val)){
       #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
       my ($dummy, $val_txt) = split(/:\s+/, $val);
@@ -2757,11 +2757,11 @@ sub SYSMON_getFBCRCFEC($$) {
 	my $ds_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_fec_per15min");
 	my $us_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_fec_per15min");	
 	
-	if($ds_crc ne "") {
+	if(defined($ds_crc) && $ds_crc ne "") {
 	  # FB_DSL_CRC_15
     $map->{+FB_DSL_CRC_15}="down: ".int($ds_crc)." up: ".int($us_crc);
   }
-  if($ds_fec ne "") {
+  if(defined($ds_fec) && $ds_fec ne "") {
 	  # FB_DSL_FEC_15
     $map->{+FB_DSL_FEC_15}="down: ".int($ds_fec)." up: ".int($us_fec);
   }
@@ -3090,10 +3090,10 @@ sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
 	if(!defined ($hash->{helper}{sys_fb})) {
-		SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
+		#SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
 	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
   } 
-  SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
+  #SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
 	return $hash->{helper}{sys_fb};
 }
 
@@ -3600,7 +3600,7 @@ SYSMON_Exec_Remote($$)
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
-   SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'"); # TODO: remove
+   #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'"); # TODO: remove
 
    # Sonderlocke fuer QNAP: letzten Zeilen mit "[~] " am Anfang entfernen
    #while((scalar(@output)>0) && ($output[-1]=~ /^\[~\]/)) {
@@ -3608,12 +3608,12 @@ SYSMON_Exec_Remote($$)
    #  splice @output, -1, 1;
    #}
    for (my $i=0;$i<scalar(@output);$i++) {
-   	 SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
+   	 #SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
    	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
    }
-   SYSMON_Log($hash, 5, "Result >>> vgrep >>>'".Dumper(@output)."'"); # TODO: remove
+   #SYSMON_Log($hash, 5, "Result >>> vgrep >>>'".Dumper(@output)."'"); # TODO: remove
    @output = grep{ defined($_) && trim($_) ne '' }@output;
-   SYSMON_Log($hash, 5, "Result >>> ngrep >>>'".Dumper(@output)."'"); # TODO: remove
+   #SYSMON_Log($hash, 5, "Result >>> ngrep >>>'".Dumper(@output)."'"); # TODO: remove
    
    return @output;
    ## Arrays als solche zurueckgeben
