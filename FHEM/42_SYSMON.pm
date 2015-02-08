@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.1";
+my $VERSION = "2.1.3";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -103,7 +103,7 @@ SYSMON_Initialize($)
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
                       "telnet-time-out ".
-                      "user-fn ".
+                      "user-fn2 user-fn ".
                       "telnet-prompt-regx telnet-login-prompt-regx ".
                        $readingFnAttributes;
 }
@@ -495,6 +495,19 @@ SYSMON_updateCurrentReadingsMap($) {
 	     if(defined $uComment) {
 	    	# Nur gueltige
 		    $rMap->{$uName} = $uComment;
+	    }
+    }
+  }
+
+  # User defined functions
+	my $userfn = AttrVal($name, "user-fn", undef);
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach (@userfn_list) {
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+	     my($fnName, $uInterval, @readings) = split(/:/, $_);
+	     foreach my $rName (@readings) {
+		    $rMap->{$rName} = "user defined: $fnName";
 	    }
     }
   }
@@ -1173,10 +1186,31 @@ SYSMON_obtainParameters_intern($$)
     }
   }
   
-  
-  # User Functions
-  my $uMap;
+  #Log 3, "SYSMON >>> USER_DEFINED FUNCTIONS >>>>>>>>>>>>>>> START";
   my $userfn = AttrVal($name, "user-fn", undef);
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach my $ud (@userfn_list) {
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+	     my($fnName, $uInterval, @readings) = split(/:/, $ud);
+	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
+	     if(defined $uInterval) {
+	     	 my $iInt = int($uInterval);
+	     	 if($iInt>0) {
+	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
+	     	   if($update_ud) {
+	     	 	   $map = SYSMON_getUserDefinedFn($hash, $map, $fnName, @readings);
+	     	   } else {
+	     	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval] out of refresh interval");
+	     	   }
+	       }
+	    }
+    }
+  }
+  
+  # User Functions2
+  my $uMap;
+  my $userfn = AttrVal($name, "user-fn2", undef);
   #TEST$userfn=undef;
   if(defined $userfn) {
   	my @userfn_list = split(/,\s*/, trim($userfn));
@@ -1278,6 +1312,44 @@ SYSMON_getUserDefined($$$$)
 	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
 	return $map;
+}
+
+sub SYSMON_getUserDefinedFn($$$@) {
+  my($hash, $map, $fnName, @readings) = @_;
+  
+  SYSMON_Log($hash, 5, "call User-Function: [$fnName]");
+  if(defined $fnName) {
+    no strict "refs";
+    my @rarr;
+    if($fnName=~/^{/) {
+    	my $HASH = $hash;
+    	my $NAME = $hash->{NAME};
+      @rarr = eval($fnName);
+    } else {
+    	@rarr = &{$fnName}($hash);
+    }
+    use strict "refs";
+    SYSMON_Log($hash, 5, "result User-Function [$fnName]: ".Dumper(@rarr));
+    
+    my $cnt1 = scalar(@readings);
+    my $cnt2 = scalar(@rarr);
+    my $cnt = min($cnt1,$cnt2);
+    if($cnt1!=$cnt2) { # zu wenig readings geliefert ($cnt1>$cnt2) oder zu viel
+      SYSMON_Log($hash, 3, "User-Function [$fnName]: expected readings: [$cnt1], provided [$cnt2]");
+    }
+    #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: $cnt1 / $cnt2: $rarr[0]");
+    for (my $i=0;$i<$cnt;$i++) { 
+    	if(defined($rarr[$i])) {
+    		my $val = trim($rarr[$i]);
+    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: put: '".$readings[$i]."' => '".$val."'");
+    	  $map->{$readings[$i]} = $val;
+    	  #$map->{$readings[$i]}="Dead OWTHERM devices: none";
+    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: ok");
+    	}
+    }
+  }
+  
+  return $map;
 }
 
 #my $sys_cpu_core_num = undef;
@@ -2775,6 +2847,8 @@ sub SYSMON_ShowValuesFmt ($$$;@)
     }
   }
   
+  #TODO: UserDefinedFn?
+  
   my $map;
   if($hash->{TYPE} eq 'SYSMON') {  
     $map = SYSMON_obtainParameters($hash, 1);
@@ -3444,7 +3518,7 @@ SYSMON_Exec_Remote($$)
    @output=$telnet->cmd($cmd);
    #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'");
 
-   # Sonderlocke für QNAP: Fuerende Zeilen mit "[~] " am Anfang entfernen
+   # Sonderlocke fuer QNAP: Fuerende Zeilen mit "[~] " am Anfang entfernen
    while((scalar(@output)>0) && ($output[0]=~ /^\[\~]/)) {
    	SYSMON_Log ($hash, 5, "Remove line: '".$output[0]."'");
      delete $output[0];
@@ -3684,7 +3758,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>user defined<br>
-        These readings provide output of commands, which are passed to the operating system. 
+        These readings provide output of commands, which are passed to the operating system or delivered by user defined functions. 
     </li>
     <br>
     <b>FritzBox specific Readings</b>
@@ -3939,12 +4013,21 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     the number of available updates is daily recorded as 'sys_updates'.
     </li>
     <br>
+    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    List of perl user subroutines.<br>
+    As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
+    The perl function gets the device hash as parameter and must provide an array of values.
+    These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
+    A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name). 
+    Return is expected analogous to a Perl subroutine.
+    </li>
+    <br>
     <li>disable<br>
       Possible values: 0 and 1. '1' means that the update is stopped.
     </li>
     <br>
     <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
-    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur für Zugriffe &uuml;ber Telnet relevant.)
+    RegExp to detect login and command line prompt. (Only for access via Telnet.)
     </li>
     <br>
     </ul><br>
@@ -4256,7 +4339,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
-        Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
+        Die entsprechende Angaben werden durch Attributen <code>user-defined</code> und <code>user-fn</code> definiert.
     </li>
     <br>
     <b>FritzBox-spezifische Readings</b>
@@ -4520,12 +4603,21 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Danach wird die Anzahl der verf&uuml;gbaren Aktualisierungen t&auml;glich als Reading 'sys_updates' protokolliert.
     </li>
     <br>
+    <li>user-fn &lt;fn_name&gt;:&lt;Interval_Minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    Liste der benutzerdefinierten Perlfunktionen.<br>
+    Als &lt;fn_name&gt; k&ouml;nnen entweder Name einer Perlfunktion oder ein Perlausdruck verwendet werden.
+    Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern. 
+    Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
+    Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
+    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.
+    </li>
+    <br>
     <li>disable<br>
     M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
     </li>
     <br>
     <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
-    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur für Zugriffe &uuml;ber Telnet relevant.)
+    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
     </li>
     <br>
     </ul><br>
