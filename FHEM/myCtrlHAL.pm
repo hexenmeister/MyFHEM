@@ -36,9 +36,11 @@ use constant {
   DEVICE_NAME_FK_KU1  => "EG_KU_FK01.Fenster",
   DEVICE_NAME_FK_BZ1  => "OG_BZ_FK01.Fenster",
   DEVICE_NAME_FK_SZ1  => "OG_SZ_FK01.Fenster",
-  DEVICE_NAME_FK_KA1l => "", # Paulas Zimmer
-  DEVICE_NAME_FK_KA1r => "", # Paulas Zimmer
+  DEVICE_NAME_FK_KA1l => "OG_KA_FK01.Fenster", # Paulas Zimmer
+  DEVICE_NAME_FK_KA1r => "OG_KA_FK02.Fenster", # Paulas Zimmer
   DEVICE_NAME_FK_KB1  => "OG_KB_FK01.Fenster", # Hannas Zimmer
+  
+  DEVICE_NAME_TK_EG_FL1 => "EG_FL_TK01", # Eigangstuer
 };
 
 # --- Konstanten für die Werte f. Auto, Enabled, Disabled
@@ -108,6 +110,12 @@ sub getAllWindowNames() {
 	return [DEVICE_NAME_FK_WZ1,  
 	        DEVICE_NAME_FK_KU1,  DEVICE_NAME_FK_BZ1,  DEVICE_NAME_FK_SZ1,
           DEVICE_NAME_FK_KA1l, DEVICE_NAME_FK_KA1r, DEVICE_NAME_FK_KB1];
+}
+
+# Liefert Liste aller Fenster (Namen). Keine Terrassentueren.
+# Festdefinierte Liste, muss ggf. angepasst werden.
+sub getAllDoorNames() {
+	return [DEVICE_NAME_TK_EG_FL1];
 }
 
 # Liefert Liste aller Fenster (Namen).
