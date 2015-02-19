@@ -1374,9 +1374,147 @@ sub logProxy_proplanta2Plot($$$$) {
 	}
 	return ($ret,$min,$max,$prev_value);
 }
+
 # -----------------------------------------------------------------------------
 
+sub temp2RGB {
+   my ($min, $max, $float) = @_;
+   my ($rot,$gruen,$blau);
 
+   $float = $float - $min;
+   my $faktor = 1020 / ($max - $min);
+   my $farbe = round($faktor * $float, 0);
+
+   if ($farbe < 1)
+   { $farbe = 0; }
+
+   if ($farbe > 1020)
+   { $farbe = 1020; }
+
+   if ($farbe <= 510)
+   {
+     $rot = 0;
+     if ($farbe <= 255)
+     {
+       $gruen = 0 + $farbe;
+       $blau = 255;
+     }
+     if ($farbe > 255)
+     {
+       $farbe = $farbe - 255;
+       $blau = 255 - $farbe;
+       $gruen = 255;
+     }
+     if ($farbe > 255)
+     {
+       $farbe = $farbe - 255;
+       $blau = 255 - $farbe;
+       $gruen = 255;
+     }
+   }
+
+   if ($farbe > 510)
+   {
+     $farbe = $farbe - 510;
+     $blau = 0;
+     if ($farbe <= 255)
+     {
+       $rot = 0 + $farbe;
+       $gruen = 255;
+     }
+     if ($farbe > 255)
+     {
+       $farbe = $farbe - 255;
+       $gruen = 255 - $farbe;
+       $rot = 255;
+     }
+   }
+   return sprintf("%02X%02X%02X", $rot,$gruen,$blau);
+}
+
+sub pahColor {
+   my ($starttemp,$midtemp2,$endtemp,$temp,$opacity) = @_;
+
+   $opacity //= 255;
+
+   my($uval,$rval,$rval1,$rval2,$rval3);
+   my($gval,$gval1,$gval2,$gval3);
+   my($bval,$bval1,$bval2,$bval3);
+
+   my $startcolorR =   0;
+   my $startcolorG = 255;
+   my $startcolorB = 255;
+
+   my $midcolor1R =  30;
+   my $midcolor1G =  80;
+   my $midcolor1B = 255;
+
+   my $midcolor2R =  40;
+   my $midcolor2G = 255;
+   my $midcolor2B =  60;
+
+   my $midcolor3R = 160;
+   my $midcolor3G = 128;
+   my $midcolor3B =  10;
+
+   my $endcolorR = 255;
+   my $endcolorG =  69;
+   my $endcolorB =   0;
+
+   return sprintf("%02X%02X%02X%02X",$startcolorR,$startcolorG,$startcolorB,$opacity) if ($temp <= $starttemp);
+   return sprintf("%02X%02X%02X%02X",$endcolorR,$endcolorG,$endcolorB,$opacity)       if ($temp >  $endtemp);
+
+   if ($temp <= $midtemp2) {
+      $uval  = sprintf("%.5f",($temp - $starttemp) / ($midtemp2 - $starttemp));
+      $rval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorR);
+      $rval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1R);
+      $rval3 = sprintf("%.5f",$uval**2 * $midcolor2R);
+      $rval  = sprintf("%.0f",(100*($rval1 + $rval2 + $rval3)+0.5)/100);
+
+      $gval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorG);
+      $gval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1G);
+      $gval3 = sprintf("%.5f",$uval**2 * $midcolor2G);
+      $gval  = sprintf("%.0f",(100*($gval1 + $gval2 + $gval3)+0.5)/100);
+
+      $bval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorB);
+      $bval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1B);
+      $bval3 = sprintf("%.5f",$uval**2 * $midcolor2B);
+      $bval  = sprintf("%.0f",(100*($bval1 + $bval2 + $bval3)+0.5)/100);
+      return sprintf("%02X%02X%02X%02X",$rval,$gval,$bval,$opacity);
+   }
+
+   if ($temp <= $endtemp) {
+      $uval  = sprintf("%.5f",($temp - $midtemp2)/($endtemp - $midtemp2));
+      $rval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2R);
+      $rval2 = sprintf("%.5f",2 * (1-$uval) * $uval * $midcolor3R);
+      $rval3 = sprintf("%.5f",$uval**2 * $endcolorR);
+      $rval  = sprintf("%.0f",(100*($rval1+$rval2+$rval3)+0.5)/100);
+
+      $gval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2G);
+      $gval2 = sprintf("%.5f",2 * (1-$uval) * $uval * $midcolor3G);
+      $gval3 = sprintf("%.5f",$uval**2 * $endcolorG);
+      $gval  = sprintf("%.0f",(100*($gval1+$gval2+$gval3)+0.5)/100);
+
+      $bval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2B);
+      $bval2 = sprintf("%.5f",2*(1-$uval)*$uval*$midcolor3B);
+      $bval3 = sprintf("%.5f",$uval**2 *$endcolorB);
+      $bval  = sprintf("%.0f",(100*($bval1+$bval2+$bval3)+0.5)/100);
+      return sprintf("%02X%02X%02X%02X",$rval,$gval,$bval,$opacity);
+   }
+
+}
+
+# -----------------------------------------------------------------------------
+
+# Definition des Devices listen (wie in der fhem.cfg)
+sub cfgList($) {
+ my ($dev) = shift;
+ my $output = "define $dev $defs{$dev}{TYPE} $defs{$dev}{DEF}\n";
+ while ( my ($key, $value) = each( $attr{$dev} ) ) {
+  $output .= "attr $dev $key $value\n";
+ }
+ return $output;
+}
 
 
 1;

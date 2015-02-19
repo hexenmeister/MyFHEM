@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 7801 2015-01-31 17:20:12Z hexenmeister $
+# $Id: 42_SYSMON.pm 8020 2015-02-17 19:01:48Z hexenmeister $
 
 package main;
 
@@ -1507,15 +1507,17 @@ SYSMON_getLoadAvg($$)
 {
 	my ($hash, $map) = @_;
 
-	#my $la_str = qx(cat /proc/loadavg );
 	my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
-  my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
-
-	$map->{+LOADAVG}="$la1 $la5 $la15";
-  #$map->{"load"}="$la1";
-	#$map->{"load5"}="$la5";
-	#$map->{"load15"}="$la15";
-
+	if(defined($la_str)) {
+    my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
+    if(defined($la1) && defined($la5) && defined($la15)) {
+	    $map->{+LOADAVG}="$la1 $la5 $la15";
+      #$map->{"load"}="$la1";
+	    #$map->{"load5"}="$la5";
+	    #$map->{"load15"}="$la15";
+	  }
+  }
+  
 	return $map;
 }
 
@@ -1616,7 +1618,7 @@ SYSMON_getCPUBogoMIPS($$)
 	if(!defined $old_val) {
     my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
     #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
-    my $val=@aval[0];
+    my $val=$aval[0];
     #SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
     if(defined($val)){
       #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
@@ -1895,16 +1897,27 @@ sub SYSMON_getRamAndSwap($$)
   if(!@speicher) {
   	return $map;
   }
-    
-  shift @speicher;
-  my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
-  shift @speicher;
-  my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
 
-  if($fs_desc2 ne "Swap:")
-  {
-    shift @speicher;
-    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
+  shift @speicher;
+  my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached);
+  if(defined ($speicher[0])) {
+  	($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
+  }
+  
+  shift @speicher;
+  my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2);
+  
+  if(defined ($speicher[0])) {
+    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]))	
+  }
+  
+  if(defined($fs_desc2)) {
+    if($fs_desc2 ne "Swap:") {
+      shift @speicher;
+      if(defined ($speicher[0])) {
+        ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
+      }
+    }
   }
 
   my $ram;
@@ -1912,7 +1925,7 @@ sub SYSMON_getRamAndSwap($$)
   #my $percentage_ram;
   #my $percentage_swap;
   
-  if($total > 0) {
+  if(defined($total) && $total > 0) {
   
     $total   = $total / 1024;
     $used    = $used / 1024;
@@ -1934,7 +1947,7 @@ sub SYSMON_getRamAndSwap($$)
   $map->{+RAM} = $ram;
   
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
-  if($total2 > 0)
+  if(defined($total2) && $total2 > 0)
   {
   	$total2   = $total2 / 1024;
     $used2    = $used2 / 1024;
@@ -2420,14 +2433,16 @@ sub SYSMON_getNetworkInfo ($$$)
       my $lastVal = ReadingsVal($hash->{NAME},$nName,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
       my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
 
-      my $d_rx = $rx-$o_rx;
-      if($d_rx<0) {$d_rx=0;}
-      my $d_tx = $tx-$o_tx;
-      if($d_tx<0) {$d_tx=0;}
-      my $d_tt = $totalRxTx-$o_tt;
-      if($d_tt<0) {$d_tt=0;}
-      my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-      $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      if(defined($o_tx) && defined($o_tt)) {
+        my $d_rx = $rx-$o_rx;
+        if($d_rx<0) {$d_rx=0;}
+        my $d_tx = $tx-$o_tx;
+        if($d_tx<0) {$d_tx=0;}
+        my $d_tt = $totalRxTx-$o_tt;
+        if($d_tt<0) {$d_tt=0;}
+        my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
+        $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      }
     }
   } else {
   	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
@@ -3090,10 +3105,8 @@ sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
 	if(!defined ($hash->{helper}{sys_fb})) {
-		#SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
 	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
-  } 
-  #SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
+  }
 	return $hash->{helper}{sys_fb};
 }
 
@@ -3473,7 +3486,7 @@ sub SYSMON_Close_Connection($)
    
    my $name = $hash->{NAME};
    my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
-   if ($mode eq 'local') {
+   if (!defined($mode) || $mode eq 'local') {
      return undef;
    }
    
