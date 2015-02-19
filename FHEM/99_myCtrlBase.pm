@@ -48,6 +48,21 @@ myCtrlBase_Initialize($)
   return $hash;
 }
 
+sub myLog($$$) {
+   my ( $hash, $loglevel, $text ) = @_;
+   my $xline       = ( caller(0) )[2];
+   
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub="?" unless $sub;
+   #$sub =~ s/SMARTMON_//;
+
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   $instName="" unless $instName;
+   Log3 $hash, $loglevel, "myCtrl $instName: $sub.$xline " . $text;
+}
+
+
 # interne Verarbeitung der periodischen Aufrufen (Steuerung)
 sub
 myCtrlBase_ProcessTimer(@)
