@@ -39,12 +39,12 @@ my $rooms;
   
   $rooms->{og_flur}->{alias}="Flur OG";
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
-  $rooms->{og_flur}->{sensors}=["of_sensor",""];
+  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "of_sensor",""];
   $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{garage}->{alias}="Garage";
   $rooms->{garage}->{fhem_name}="Garage";
-  $rooms->{garage}->{sensors}=[]; # TODO
+  $rooms->{garage}->{sensors}=["eg_ga_owts01"]; # TODO
   $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
@@ -190,13 +190,13 @@ my $sensors;
   $sensors->{virtual_control_sensor}->{alias}       ="Virtuelle Controll-Sammel-Sensor";
   $sensors->{virtual_control_sensor}->{type}        ="virtual";
   $sensors->{virtual_control_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
-  $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "myCtrlProxies_SunValueFn";
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "HAL_SunValueFn";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
   
   #TODO:
-  sub myCtrlProxies_SunValueFn($$) {
+  sub HAL_SunValueFn($$) {
   	my ($device, $record) = @_;
   	#my $oRecord=$_[1];
   	my $senList = $record->{FnParams};
@@ -212,7 +212,7 @@ my $sensors;
     	my $senLim1 = $a->[1];
     	my $senLim2 = $a->[2];
     	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', Lim1/2: '.$senLim1.'/'.$senLim2;
-    	my $sRec = myCtrlProxies_getSensorValueRecord($sensorName,$readingName);
+    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
     	if($sRec->{alive}) {
     		my $sVal = $sRec->{value};
     		#Log 3,'>------------>sVal: '.$sVal;
@@ -415,6 +415,14 @@ my $sensors;
   $sensors->{um_vh_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
   $sensors->{um_vh_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   
+  $sensors->{eg_ga_owts01}->{alias}     ="OWX Garage";
+  $sensors->{eg_ga_owts01}->{fhem_name} ="EG_GA_OWTS01.Raum";
+  $sensors->{eg_ga_owts01}->{type}      ="OneWire";
+  $sensors->{eg_ga_owts01}->{location}  ="garage";
+  $sensors->{eg_ga_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  $sensors->{eg_ga_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  $sensors->{eg_ga_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  
   $sensors->{eg_fl_owts01}->{alias}     ="OWX Flur";
   $sensors->{eg_fl_owts01}->{fhem_name} ="EG_FL_OWTS01.Raum";
   $sensors->{eg_fl_owts01}->{type}      ="OneWire";
@@ -529,31 +537,31 @@ sub myCtrlProxies_Initialize($$);
 
 
 # Rooms
-sub myCtrlProxies_getRoom($);
-#sub myCtrlProxies_getRooms(;$); # Räume  nach verschiedenen Kriterien?
-#sub myCtrlProxies_getActions(;$); # <DevName>
+sub HAL_getRoom($);
+#sub HAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
+#sub HAL_getActions(;$); # <DevName>
 
-#sub myCtrlProxies_getRoomSensors($);
-#sub myCtrlProxies_getRoomOutdoorSensors($);
+#sub HAL_getRoomSensors($);
+#sub HAL_getRoomOutdoorSensors($);
 
-sub myCtrlProxies_getRoomSensorNames($);
-sub myCtrlProxies_getRoomOutdoorSensorNames($);
+sub HAL_getRoomSensorNames($);
+sub HAL_getRoomOutdoorSensorNames($);
 
-sub myCtrlProxies_getRoomMeasurementRecord($$);
-sub myCtrlProxies_getRoomMeasurementValue($$);
+sub HAL_getRoomMeasurementRecord($$);
+sub HAL_getRoomMeasurementValue($$);
 
 
 # Sensoren
-sub myCtrlProxies_getSensor($);
+sub HAL_getSensor($);
 
-sub myCtrlProxies_getSensorValueRecord($$);
-sub myCtrlProxies_getSensorReadingValue($$);
-sub myCtrlProxies_getSensorReadingUnit($$);
+sub HAL_getSensorValueRecord($$);
+sub HAL_getSensorReadingValue($$);
+sub HAL_getSensorReadingUnit($$);
 
-#TODO sub myCtrlProxies_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
+#TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
 # 
-#sub myCtrlProxies_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
+#sub HAL_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
 
 #
@@ -561,9 +569,9 @@ sub myCtrlProxies_getSensorReadingUnit($$);
 require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 # Action
-sub myCtrlProxies_doAllActions();
-sub myCtrlProxies_doAction($$);
-sub myCtrlProxies_DeviceSetFn($@);
+sub HAL_doAllActions();
+sub HAL_doAction($$);
+sub HAL_DeviceSetFn($@);
 
 #------------------------------------------------------------------------------
 
@@ -576,36 +584,36 @@ myCtrlProxies_Initialize($$)
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Measurement-Name
 # return ReadingsRecord
-sub myCtrlProxies_getRoomMeasurementRecord($$) {
+sub HAL_getRoomMeasurementRecord($$) {
 	my ($roomName, $measurementName) = @_;
-	return myCtrlProxies_getRoomMeasurementRecord_($roomName, $measurementName, "");
+	return HAL_getRoomMeasurementRecord_($roomName, $measurementName, "");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Measurement-Name
 # return ReadingsRecord
-sub myCtrlProxies_getRoomOutdoorMeasurementRecord($$) {
+sub HAL_getRoomOutdoorMeasurementRecord($$) {
 	my ($roomName, $measurementName) = @_;
-	return myCtrlProxies_getRoomMeasurementRecord_($roomName, $measurementName, "_outdoor");
+	return HAL_getRoomMeasurementRecord_($roomName, $measurementName, "_outdoor");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte und Sensorliste (Internal)
 # Param Room-Name, Measurement-Name, Name der Liste (sensors, sensors_outdoor)
 # return ReadingsRecord
-sub myCtrlProxies_getRoomMeasurementRecord_($$$) {
+sub HAL_getRoomMeasurementRecord_($$$) {
 	my ($roomName, $measurementName, $listNameSuffix) = @_;
 	my $listName.="sensors".$listNameSuffix;
 	
 	#TODO: EinzelReadings
 	
-	my $sensorList = myCtrlProxies_getRoomSensorNames_($roomName, $listName);	#myCtrlProxies_getRoomSensorNames($roomName);
+	my $sensorList = HAL_getRoomSensorNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
-		my $rec = myCtrlProxies_getSensorValueRecord($sName, $measurementName);
+		my $rec = HAL_getSensorValueRecord($sName, $measurementName);
 		if(defined $rec) {
-			my $roomRec=myCtrlProxies_getRoom($roomName);
+			my $roomRec=HAL_getRoom($roomName);
 			$rec->{room_alias}=$roomRec->{alias};
 			$rec->{room_fhem_name}=$roomRec->{fhem_name};
 			# XXX: ggf. weitere Room Eigenschaften
@@ -618,21 +626,25 @@ sub myCtrlProxies_getRoomMeasurementRecord_($$$) {
 
 
 # Liefert angeforderte Messwerte
-# Param Room-Name, Measurement-Name
+# Param Room-Name, Measurement-Name, Default1, Default2
 # return ReadingsWert
-sub myCtrlProxies_getRoomMeasurementValue($$) {
-	my ($roomName, $measurementName) = @_;
-	 
-	my $sensorList = myCtrlProxies_getRoomSensorNames($roomName);
-	return undef unless $sensorList;
+# Wenn kein Wert gefunden werden kann, wird Default1 zurückgageben (wenn angegeben, ansonsten undef)
+# Wenn Default2 angegeben, dann wird dieser zurückgegeben, falls Raum nicht bekannt ist, ansonsten Default1 (wenn nicht angegeben - undef)
+sub HAL_getRoomMeasurementValue($$;$$) {
+	my ($roomName, $measurementName, $def1, $def2) = @_;
+	
+	$def2 = $def1 unless defined($def2); 
+	
+	my $sensorList = HAL_getRoomSensorNames($roomName);
+	return $def2 unless $sensorList;
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
-		my $val = myCtrlProxies_getSensorReadingValue($sName, $measurementName);
+		my $val = HAL_getSensorReadingValue($sName, $measurementName);
 		if(defined $val) {return $val;}
 	}
 	
-	return undef;
+	return $def1;
 }
 
 #------------------------------------------------------------------------------
@@ -647,7 +659,7 @@ sub myCtrlProxies_getRoomMeasurementValue($$) {
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
 sub 
-myCtrlProxies_getSensor($)
+HAL_getSensor($)
 {
 	my ($name) = @_;
 	return undef unless $name;
@@ -664,7 +676,7 @@ myCtrlProxies_getSensor($)
 # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
 #  X->{name}->{sensors}   =(<Liste der Namen>);
 #  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
-sub myCtrlProxies_getRoom($) {
+sub HAL_getRoom($) {
 	my ($name) = @_;
 	my $ret = $rooms->{$name};
 	$ret->{name} = $name; # Name hinzufuegen
@@ -673,28 +685,28 @@ sub myCtrlProxies_getRoom($) {
 
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
 # Param: Raumname
-#  Beispiel:   {myCtrlProxies_getRoomSensorNames("wohnzimmer")->[0]}
-sub myCtrlProxies_getRoomSensorNames($)
+#  Beispiel:   {HAL_getRoomSensorNames("wohnzimmer")->[0]}
+sub HAL_getRoomSensorNames($)
 {
 	my ($roomName) = @_;
-  return myCtrlProxies_getRoomSensorNames_($roomName,"sensors");	
+  return HAL_getRoomSensorNames_($roomName,"sensors");	
 }
 
 # liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
 # Param: Raumname
-#  Beispiel:  {myCtrlProxies_getRoomSensorNames("wohnzimmer")->[0]}
-sub myCtrlProxies_getRoomOutdoorSensorNames($)
+#  Beispiel:  {HAL_getRoomSensorNames("wohnzimmer")->[0]}
+sub HAL_getRoomOutdoorSensorNames($)
 {
 	my ($roomName) = @_;
-  return myCtrlProxies_getRoomSensorNames_($roomName,"sensors_outdoor");	
+  return HAL_getRoomSensorNames_($roomName,"sensors_outdoor");	
 }
 
 # liefert Referenz der Liste der Sensors in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-sub myCtrlProxies_getRoomSensorNames_($$)
+sub HAL_getRoomSensorNames_($$)
 {
 	my ($roomName, $listName) = @_;
-	my $roomRec=myCtrlProxies_getRoom($roomName);
+	my $roomRec=HAL_getRoom($roomName);
 	return undef unless $roomRec;
 	my $sensorList=$roomRec->{$listName};
 	return undef unless $sensorList;
@@ -706,35 +718,35 @@ sub myCtrlProxies_getRoomSensorNames_($$)
 #### TODO: Sind die Methoden, die Hashesliste zurückgeben überhaupt notwendig?
 ## liefert Liste der Sensors in einem Raum (Array of Hashes)
 ## Param: Raumname
-##  Beispiel:  {(myCtrlProxies_getRoomSensors("wohnzimmer"))[0]->{alias}}
-#sub myCtrlProxies_getRoomSensors($)
+##  Beispiel:  {(HAL_getRoomSensors("wohnzimmer"))[0]->{alias}}
+#sub HAL_getRoomSensors($)
 #{
 #	my ($roomName) = @_;
-#  return myCtrlProxies_getRoomSensors_($roomName,"sensors");	
+#  return HAL_getRoomSensors_($roomName,"sensors");	
 #}
 #
 ## liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
 ## Param: Raumname
-##  Beispiel:  {(myCtrlProxies_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
-#sub myCtrlProxies_getRoomOutdoorSensors($)
+##  Beispiel:  {(HAL_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
+#sub HAL_getRoomOutdoorSensors($)
 #{
 #	my ($roomName) = @_;
-#  return myCtrlProxies_getRoomSensors_($roomName,"sensors_outdoor");	
+#  return HAL_getRoomSensors_($roomName,"sensors_outdoor");	
 #}
 #
 ## liefert Liste der Sensors in einem Raum (Array of Hashes)
 ## Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-#sub myCtrlProxies_getRoomSensors_($$)
+#sub HAL_getRoomSensors_($$)
 #{
 #	my ($roomName, $listName) = @_;
-#	my $roomRec=myCtrlProxies_getRoom($roomName);
+#	my $roomRec=HAL_getRoom($roomName);
 #	return undef unless $roomRec;
 #	my $sensorList=$roomRec->{$listName};
 #	return undef unless $sensorList;
 #	
 #	my @ret;
 #	foreach my $sName (@{$sensorList}) {
-#		my $sRec = myCtrlProxies_getSensor($sName);
+#		my $sRec = HAL_getSensor($sName);
 #		push(@ret, \%{$sRec}) if $sRec ;
 #	}
 #	
@@ -744,11 +756,11 @@ sub myCtrlProxies_getRoomSensorNames_($$)
 
 
 
-sub myCtrlProxies_getSensorReadingCompositeRecord_intern($$);
+sub HAL_getSensorReadingCompositeRecord_intern($$);
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
 # liefert Device und Reading Recors als Array 
 sub
-myCtrlProxies_getSensorReadingCompositeRecord_intern($$)
+HAL_getSensorReadingCompositeRecord_intern($$)
 {
 	my ($device_record,$reading) = @_;
 	return (undef, undef) unless $device_record;
@@ -763,8 +775,8 @@ myCtrlProxies_getSensorReadingCompositeRecord_intern($$)
 	my $composites = $device_record->{composite};
 
 	foreach my $composite_name (@{$composites}) {
-		my $new_device_record = myCtrlProxies_getSensor($composite_name);
-		my ($new_device_record2, $new_single_reading_record) = myCtrlProxies_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
+		my $new_device_record = HAL_getSensor($composite_name);
+		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
 			return ($new_device_record2, $new_single_reading_record);
 		}
@@ -779,13 +791,13 @@ myCtrlProxies_getSensorReadingCompositeRecord_intern($$)
 #  X->{reading} = "<fhem_device_reading_name>";
 #  X->{unit} = "";
 sub 
-myCtrlProxies_getSensorReadingRecord($$)
+HAL_getSensorReadingRecord($$)
 {
 	my ($name, $reading) = @_;
-	my $record = myCtrlProxies_getSensor($name);
+	my $record = HAL_getSensor($name);
 	
 	if(defined($record)) {
-    return myCtrlProxies_getSensorReadingCompositeRecord_intern($record,$reading);
+    return HAL_getSensorReadingCompositeRecord_intern($record,$reading);
   }
 	return (undef, undef);
 }
@@ -800,13 +812,13 @@ myCtrlProxies_getSensorReadingRecord($$)
 # X->{fhem_name}
 # X->{reading}
 # X->...
-sub myCtrlProxies_getSensorValueRecord($$)
+sub HAL_getSensorValueRecord($$)
 {
 	my ($name, $reading) = @_;
   # Sensor/Reading-Record suchen
-  my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
+  my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
   
-  return myCtrlProxies_getReadingsValueRecord($device, $record);
+  return HAL_getReadingsValueRecord($device, $record);
   
 	#if (defined($record)) {
 	#  my $fhem_name = $device->{fhem_name};
@@ -838,7 +850,7 @@ sub senTest($;$) {
 # Liefert ValueRecord (ermittelter Wert und andere SensorReadingDaten)
 # Param: Device-Hash, Reading-Hash
 # Return: Value-Hash
-sub myCtrlProxies_getReadingsValueRecord($$) {
+sub HAL_getReadingsValueRecord($$) {
 	my ($device, $record) = @_;
 	
 	if (defined($record)) {
@@ -851,7 +863,7 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 			my($sensorName,$readingName) = split(/:/, $link);
 			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
 			return undef unless $readingName;
-			return myCtrlProxies_getSensorValueRecord($sensorName,$readingName);
+			return HAL_getSensorValueRecord($sensorName,$readingName);
 		} 
 		
 		my $valueFn =  $record->{ValueFn};
@@ -932,10 +944,10 @@ sub myCtrlProxies_getReadingsValueRecord($$) {
 # Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
 # parameters: name, reading name
 # returns current readings value
-sub myCtrlProxies_getSensorReadingValue($$)
+sub HAL_getSensorReadingValue($$)
 {
 	my ($name, $reading) = @_;
-	my $h = myCtrlProxies_getSensorValueRecord($name, $reading);
+	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{value};
 }
@@ -943,15 +955,15 @@ sub myCtrlProxies_getSensorReadingValue($$)
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading das Unit-String aus
 # parameters: name, reading name
 # returns readings unit
-sub myCtrlProxies_getSensorReadingUnit($$)
+sub HAL_getSensorReadingUnit($$)
 {
 	my ($name, $reading) = @_;
-	my $h = myCtrlProxies_getSensorValueRecord($name, $reading);
+	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{unit};
 	
 	# Sensor/Reading-Record suchen
-	my ($device, $record) = myCtrlProxies_getSensorReadingRecord($name,$reading);
+	my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
 	  return $record->{unit};
 	}
@@ -968,11 +980,11 @@ sub myCtrlProxies_getSensorReadingUnit($$)
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
 sub
-myCtrlProxies_doAllActions() {
+HAL_doAllActions() {
 	Main:Log 3, "PROXY_CTRL:--------> do all ";
 	foreach my $act (keys %{$actTab}) {
 		my $cTab = $actTab->{$act};
-		myCtrlProxies_doAction($cTab, $act);
+		HAL_doAction($cTab, $act);
 	}
 }
 
@@ -981,7 +993,7 @@ myCtrlProxies_doAllActions() {
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
 sub
-myCtrlProxies_doAction($$) {
+HAL_doAction($$) {
 	my ($cTab, $actName) = @_;
 	
 	Log 3, "PROXY_CTRL:--------> do ".$actName;
@@ -1003,13 +1015,13 @@ myCtrlProxies_doAction($$) {
 	if(@devList) {
 	 	foreach my $dev (@devList) {
 	 		Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
-		  myCtrlProxies_DeviceSetFn($dev, $actName);
+		  HAL_DeviceSetFn($dev, $actName);
 	  }
 	} else {
 	  foreach my $dev (keys %{$devTab}) {     
 	  	Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
   	  if($dev ne 'DEFAULT') {
-  	  	myCtrlProxies_DeviceSetFn($dev, $actName, "www"); #?
+  	  	HAL_DeviceSetFn($dev, $actName, "www"); #?
   	  }
     }
 	}
@@ -1027,7 +1039,7 @@ myCtrlProxies_doAction($$) {
 # und auch wie stark (wie weit soll Rollo heruntergefahren werden).
 ###############################################################################
 sub
-myCtrlProxies_DeviceSetFn($@) {
+HAL_DeviceSetFn($@) {
 	my ($DEVICE,@a) = @_;
 	my $CMD = $a[0];
   my $ARGS = join(" ", @a[1..$#a]);
@@ -1045,7 +1057,7 @@ myCtrlProxies_DeviceSetFn($@) {
 # Zur Verwendung in ReadingProxy. Prüft (transparent) ob und wie ein Befehl ausgeführt werden soll.
 # TODO
 sub
-myCtrlProxies_SetProxyFn($@) {
+HAL_SetProxyFn($@) {
 	my ($DEVICE,@a) = @_;
 	my $CMD = $a[0];
   my $ARGS = join(" ", @a[1..$#a]);
