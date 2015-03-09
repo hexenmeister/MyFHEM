@@ -8,7 +8,8 @@ use POSIX;
 use Time::Local;
 #use List::Util qw[min max];
 
-use myCtrlHAL;
+#use myCtrlHAL;
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 # --- Konstanten fuer die verwendeten ElementNamen ----------------------------
 #use constant {
@@ -1516,5 +1517,17 @@ sub cfgList($) {
  return $output;
 }
 
+sub moduleList() {
+	my $dir = AttrVal("global" , "modpath",".")."/FHEM";
+	my $string = "";
+	my $ret = opendir(DIR, $dir) or return "error: ".$!;
+	while (my $file = readdir(DIR)){
+		next unless (-f "$dir/$file");
+		next unless ($file =~ m/\d\d_.*\.pm$/);
+		$string = $string."$file\n"
+	}
+	closedir(DIR);
+	return $string;
+}
 
 1;
