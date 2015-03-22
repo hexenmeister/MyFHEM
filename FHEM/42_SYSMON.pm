@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 8144 2015-03-03 00:05:48Z hexenmeister $
+# $Id: 42_SYSMON.pm 8245 2015-03-19 19:37:12Z hexenmeister $
 
 package main;
 
@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.3";
+my $VERSION = "2.1.4";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -53,6 +53,12 @@ use constant {
 use constant {
   CPU_FREQ     => "cpu_freq",
   CPU1_FREQ     => "cpu1_freq",
+  CPU2_FREQ     => "cpu2_freq",
+  CPU3_FREQ     => "cpu3_freq",
+  CPU4_FREQ     => "cpu4_freq",
+  CPU5_FREQ     => "cpu5_freq",
+  CPU6_FREQ     => "cpu6_freq",
+  CPU7_FREQ     => "cpu7_freq",
   CPU_BOGOMIPS => "cpu_bogomips",
   CPU_TEMP     => "cpu_temp",
   CPU_TEMP_AVG => "cpu_temp_avg",
@@ -225,6 +231,12 @@ SYSMON_updateCurrentReadingsMap($) {
     #$rMap->{"cpu_freq"}       = "CPU Frequenz";
     $rMap->{"cpu_freq"}        = "CPU frequency";
     $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
+    $rMap->{"cpu2_freq"}        = "CPU frequency (core 3)";
+    $rMap->{"cpu3_freq"}        = "CPU frequency (core 4)";
+    $rMap->{"cpu4_freq"}        = "CPU frequency (core 5)";
+    $rMap->{"cpu5_freq"}        = "CPU frequency (core 6)";
+    $rMap->{"cpu6_freq"}        = "CPU frequency (core 7)";
+    $rMap->{"cpu7_freq"}        = "CPU frequency (core 8)";
   }
   if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
@@ -1073,10 +1085,12 @@ SYSMON_obtainParameters_intern($$)
         $map = SYSMON_getCPUTemp_FB($hash, $map);
       }
       if(SYSMON_isCPUFreqRPiBBB($hash)) {
-        $map = SYSMON_getCPUFreq($hash, $map);
+        $map = SYSMON_getCPUFreq($hash, $map, 0);
       }
-      if(SYSMON_isCPU1Freq($hash)) {
-        $map = SYSMON_getCPU1Freq($hash, $map);
+      foreach my $li (1..7) {
+        if(SYSMON_isCPUXFreq($hash, $li)) {
+          $map = SYSMON_getCPUFreq($hash, $map, $li);
+        }
       }
       if(SYSMON_isProcFS($hash)) {
         $map = SYSMON_getLoadAvg($hash, $map);
@@ -1460,25 +1474,28 @@ SYSMON_getUptime2($$)
     my $hours = $4;
     my $minutes = $5;
     
-    $uptime = $days * 24;
-    $uptime += $hours;
-    $uptime *= 60;
-    $uptime += $minutes;
-    $uptime *= 60;
-    
+    if(defined($days) && defined($hours) && defined($minutes)) {
+      $uptime = $days * 24;
+      $uptime += $hours;
+      $uptime *= 60;
+      $uptime += $minutes;
+      $uptime *= 60;
+    }
     
     $map->{+UPTIME}=sprintf("%d",$uptime);
     $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
     
     my $loadavg=$6;
-    my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
-    if(defined($la1) && defined($la5) && defined($la15)) {
-      $la1 =~ s/,$//; 
-      $la5 =~ s/,$//; 
-      $la1 =~ s/,/./; 
-      $la5 =~ s/,/./; 
-      $la15 =~ s/,/./; 
-      $map->{+LOADAVG}="$la1 $la5 $la15";
+    if(defined($loadavg)) {
+      my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
+      if(defined($la1) && defined($la5) && defined($la15)) {
+        $la1 =~ s/,$//; 
+        $la5 =~ s/,$//; 
+        $la1 =~ s/,/./; 
+        $la5 =~ s/,/./; 
+        $la15 =~ s/,/./; 
+        $map->{+LOADAVG}="$la1 $la5 $la15";
+      }
     }
   }
   
@@ -1587,29 +1604,34 @@ SYSMON_getCPUTemp_FB($$)
 # leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUFreq($$)
+SYSMON_getCPUFreq($$;$)
 {
-  my ($hash, $map) = @_;
-  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
+  my ($hash, $map, $cpuNum) = @_;
+  $cpuNum = 0 unless defined $cpuNum;
+  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1");
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
-  $map->{+CPU_FREQ}="$val_txt";
+  if($cpuNum == 0) {
+    $map->{+CPU_FREQ}="$val_txt";
+  } else {
+    $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+  }
   return $map;
 }
 
 #------------------------------------------------------------------------------
 # leifert CPU Frequenz fuer 2te CPU (Cubietruck, etc.)
 #------------------------------------------------------------------------------
-sub
-SYSMON_getCPU1Freq($$)
-{
-  my ($hash, $map) = @_;
-  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq 2>&1");
-  $val = int($val);
-  my $val_txt = sprintf("%d", $val/1000);
-  $map->{+CPU1_FREQ}="$val_txt";
-  return $map;
-}
+#sub
+#SYSMON_getCPU1Freq($$)
+#{
+#  my ($hash, $map) = @_;
+#  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq 2>&1");
+#  $val = int($val);
+#  my $val_txt = sprintf("%d", $val/1000);
+#  $map->{+CPU1_FREQ}="$val_txt";
+#  return $map;
+#}
 
 #------------------------------------------------------------------------------
 # leifert CPU Speed in BogoMIPS
@@ -2387,9 +2409,12 @@ sub SYSMON_getNetworkInfo ($$$)
 
     my $rxRaw = -1;
     my $txRaw = -1;
-    if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+    # if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+    if(SYSMON_isNetStatClass($hash, $nName)) {
         $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes");
+        $rxRaw = -1 unless defined $rxRaw;
         $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes");
+        $txRaw = -1 unless defined $txRaw;
     }
     
   if($rxRaw<0||$txRaw<0) {   
@@ -3101,18 +3126,17 @@ sub SYSMON_isCPUTempFB($) {
   return SYSMON_isFB($hash);
 }
 
-#my $sys_cpu1_freq = undef;
 sub
-SYSMON_isCPU1Freq($) {
-  my ($hash) = @_;
-  if(!defined $hash->{helper}{sys_cpu1_freq}) {
-    #$hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+SYSMON_isCPUXFreq($$) {
+  my ($hash, $cpuNum) = @_;
+  if(!defined $hash->{helper}{"sys_cpu".$cpuNum."_freq"}) {
+    #$hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # s. o. 
-    my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    $hash->{helper}{sys_cpu1_freq} = int($t[-1]);
+    my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+    $hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int($t[-1]);
   }
 
-  return $hash->{helper}{sys_cpu1_freq};
+  return $hash->{helper}{"sys_cpu".$cpuNum."_freq"};
 }
 
 #my $sys_fb = undef;
@@ -3168,6 +3192,17 @@ SYSMON_isSysCpuNum($) {
   }
 
   return $hash->{helper}{sys_cpu_num};
+}
+
+sub
+SYSMON_isNetStatClass($$) {
+  my ($hash, $nName) = @_;
+  if(!defined $hash->{helper}{'net_'.$nName.'_stat_class'}) {
+    $hash->{helper}{'net_'.$nName.'_stat_class'} = int(SYSMON_execute($hash, "[ -f /sys/class/net/$nName/statistics/rx_bytes ] && echo 1 || echo 0"));
+    # /sys/class/net/$nName/statistics/tx_bytes
+  }
+
+  return $hash->{helper}{'net_'.$nName.'_stat_class'};
 }
 
 sub SYSMON_PowerAcInfo($$)
@@ -3928,7 +3963,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Power Supply Readings</b>
     <li>power_ac_stat<br>
-        status information to the AC socket: present (0|1), online (0|1), voltage, current<br>
+        status information to the AC socket: online (0|1), present (0|1), voltage, current<br>
         Example:<br>
         <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -3948,7 +3983,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        status information to the battery (if installed): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        status information to the battery (if installed): online (0|1), present (0|1), voltage, current, actual capacity<br>
         Example:<br>
         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
@@ -4522,7 +4557,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Readings zur Stromversorgung</b>
     <li>power_ac_stat<br>
-        Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current<br>
+        Statusinformation f&uuml;r die AC-Buchse: online (0|1), present (0|1), voltage, current<br>
         Beispiel:<br>
         <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -4542,7 +4577,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        Statusinformation f&uuml;r die Batterie (wenn vorhanden): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        Statusinformation f&uuml;r die Batterie (wenn vorhanden): online (0|1), present (0|1), voltage, current, actual capacity<br>
         Beispiel:<br>
         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
