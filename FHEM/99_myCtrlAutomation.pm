@@ -7,8 +7,8 @@ use warnings;
 use POSIX;
 use Time::Local;
 
-use myCtrlHAL;
-#require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
+#use myCtrlHAL;
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 require "$attr{global}{modpath}/FHEM/99_myCtrlBase.pm";
 #require "$attr{global}{modpath}/FHEM/99_myCtrlVoice.pm";
 
