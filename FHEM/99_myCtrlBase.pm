@@ -8,7 +8,8 @@ use POSIX;
 use Time::Local;
 use Time::HiRes qw(gettimeofday);
 
-use myCtrlHAL;
+#use myCtrlHAL;
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 sub putCtrlData($$);
 sub getCtrlData($);
