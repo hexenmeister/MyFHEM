@@ -1530,4 +1530,35 @@ sub moduleList() {
 	return $string;
 }
 
+# 52.479399,9.736270 => Kaltenweide
+# Zeigt Google-Maps-Karte an.
+# Parameter: Lat., Long., Zoom, Breite, Hoehe
+sub ShowGoogleMapsCode($$;$$$) {
+	my ($lat,$lng,$zoom,$width,$height) = @_;
+	$zoom='12' unless $zoom;
+	$width='400' unless $width;
+	$height='400' unless $height;
+	
+  my $htmlcode = "";
+  
+  $htmlcode .= "<script src='https://maps.googleapis.com/maps/api/js?v=3.exp&signed_in=true'></script>";
+  $htmlcode .= "<script>";
+  $htmlcode .= "function initialize() {  ";
+  $htmlcode .= "var myLatlng = new google.maps.LatLng(".$lat.",".$lng.");  ";
+  $htmlcode .= "var mapOptions = {    ";
+  $htmlcode .= "  zoom: ".$zoom.",    ";
+  $htmlcode .= "  center: myLatlng  ";
+  $htmlcode .= "};  ";
+  $htmlcode .= "var map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);  ";
+  $htmlcode .= "var trafficLayer = new google.maps.TrafficLayer();  ";
+  $htmlcode .= "trafficLayer.setMap(map);";
+  $htmlcode .= "}";
+  $htmlcode .= "google.maps.event.addDomListener(window, 'load', initialize);    ";
+  $htmlcode .= "</script>    ";
+  $htmlcode .= "<div id='map-canvas' style='width:".$width."px;height:".$height."px;'></div>";
+  
+  return $htmlcode;
+}
+
+
 1;
