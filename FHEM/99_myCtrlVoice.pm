@@ -569,7 +569,7 @@ sub voiceActLeaveHome() {
       if($since_last>=300) {
         speakWetterDaten();
         #speak("angenehmen Tag!",0);
-        speak("registriert!",0);
+        speak("verstanden!",0);
       }
     }
   }
