@@ -7,7 +7,6 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set title '<TL>'
-
 set ytics ("Aus" 0, "An" 1)
 set y2tics ("Aus" 0, "An" 1)
 set yrange [-0.1:1.1]
