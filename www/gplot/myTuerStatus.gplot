@@ -1,0 +1,18 @@
+# Created by FHEM/98_SVG.pm, 2015-03-29 20:16:44
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics ("Zu" 0, "Auf" 1)
+set y2tics ("Zu" 0, "Auf" 1)
+set grid
+set ylabel "Status"
+set y2label "Status"
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+
+#FileLog 3:open|closed::$fld[2]=~"open"?1:0
+
+plot "<IN>" using 1:2 axes x1y2 title 'Tür' ls l1fill lw 1 with steps

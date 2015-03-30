@@ -1,0 +1,55 @@
+#
+# Display the measured temp and the pressure.
+#
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
+# Filelog example:
+# define FileLog_BTHR918N_2d FileLog /var/log/fhem/BTHR918N_2d-%Y.log BTHR918N_2d
+#
+# Logfile record example:
+# 2014-03-29_01:01:48 EG_WZ_KS01 temperature: 21.0
+# 2014-03-29_01:01:48 EG_WZ_KS01 battery: ok
+# 2014-03-29_01:01:48 EG_WZ_KS01 humidity: 56
+# 2014-03-29_01:01:48 EG_WZ_KS01 airpress: 1019
+# 2014-03-29_01:01:48 EG_WZ_KS01 lux: 0.86
+# 2014-03-29_01:01:48 EG_WZ_KS01 T: 21.0 H: 56 AP: 1019 Lux: 0.86
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+#set ytics nomirror
+set ytics
+#set y2tics
+#set title '<L1>'
+set grid xtics ytics
+
+set title '<TL>'
+set ylabel "Temperature (C)"
+set y2label "Humidity (%)"
+set y3label "Pressure (kPa)"
+set y4label "Brightness (Lx)"
+
+#FileLog 4:temperature\x3a:0:
+#FileLog 4:humidity\x3a:0:
+#FileLog 4:airpress|pressure:0:
+#FileLog 4:lux|luminosity:0:
+
+plot \
+  "< awk $3=="temperature:" {print $1, $4}' <IN>"\
+     using 1:1 ls l0 axes x1y1 title 'Temperature C' with lines lw 2
+plot \
+  "< awk $3=="humidity:" {print $1, $4}' <IN>"\
+     using 1:1 ls l2fill axes x1y2 title 'Humidity %' with lines lw 1
+plot \
+  "< awk $3=="pressure:" {print $1, $4}' <IN>"\
+     using 1:1 ls l3fill axes x1y3 title 'Luftdruck kPa' with lines lw 2
+plot \
+  "< awk $3=="brightness:" {print $1, $4}' <IN>"\
+     using 1:1 ls l1 axes x1y4 title 'Brightness Lx' with lines lw 2

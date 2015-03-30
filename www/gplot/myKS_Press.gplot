@@ -1,0 +1,17 @@
+# Created by FHEM/98_SVG.pm, 2014-08-02 15:20:16
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics 
+set y2tics 
+set grid ytics
+set ylabel "Pressure (kPa)"
+set y2label ""
+set yrange [990:1050]
+
+#FileLog 4:EG_WZ_KS01.pressure\x3a:0:
+
+plot "<IN>" using 1:2 axes x1y1 title 'Luftdruck kPa' ls l3fill lw 1 with lines
