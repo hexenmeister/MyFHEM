@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 8269 2015-03-22 20:31:25Z hexenmeister $
+# $Id: 42_SYSMON.pm 8349 2015-04-02 07:32:43Z hexenmeister $
 
 package main;
 
@@ -1260,9 +1260,9 @@ SYSMON_obtainParameters_intern($$)
   #Log 3, "SYSMON >>> USER_DEFINED FUNCTIONS >>>>>>>>>>>>>>> START";
   my $userfn = AttrVal($name, "user-fn", undef);
   if(defined $userfn) {
-    my @userfn_list = split(/,\s*/, trim($userfn));
+    my @userfn_list = split(/,\s+/, trim($userfn));
     foreach my $ud (@userfn_list) {
-       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>..., [<fn-name>:...]
        my($fnName, $uInterval, @readings) = split(/:/, $ud);
        SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
        if(defined $uInterval) {
@@ -1508,6 +1508,8 @@ SYSMON_getUptime2($$)
       $uptime *= 60;
       $uptime += $minutes;
       $uptime *= 60;
+    } else {
+    	$uptime = 0;
     }
     
     $map->{+UPTIME}=sprintf("%d",$uptime);
@@ -1605,7 +1607,7 @@ SYSMON_getCPUTemp_BBB($$)
   $map->{"cpu0_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}=$t_avg;  
-  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
+  $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu0_temp_avg"}=$t_avg;  
   return $map;
 }
@@ -3165,7 +3167,7 @@ SYSMON_isCPUFreqRPiBBB($) {
     #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
     }
   }
@@ -3188,7 +3190,7 @@ SYSMON_isCPUTemp_X($$) {
     #$hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".$cpuNum."_input ] && echo 1 || echo 0"));
     # s. o. 
     my @t = SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".($cpuNum+1)."_input ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int($t[-1]);
     }
   }
@@ -3203,7 +3205,7 @@ SYSMON_isCPUXFreq($$) {
     #$hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # s. o. 
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int($t[-1]);
     }
   }
@@ -4252,13 +4254,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     the number of available updates is daily recorded as 'sys_updates'.
     </li>
     <br>
-    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;], ...<br>
     List of perl user subroutines.<br>
     As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
     The perl function gets the device hash as parameter and must provide an array of values.
     These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
     A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name). 
-    Return is expected analogous to a Perl subroutine.
+    Return is expected analogous to a Perl subroutine.<br>
+    Important! The separation between multiple user functions must be done with a comma AND a space! Within the function definition commas may not be followed by spaces.
     </li>
     <br>
     <li>disable<br>
@@ -4860,7 +4863,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern. 
     Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
     Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
-    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.
+    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
+    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition dürfen Kommas nicht durch Leerzeichen gefolgt werden.
     </li>
     <br>
     <li>disable<br>
