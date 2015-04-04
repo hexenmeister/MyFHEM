@@ -51,7 +51,8 @@ use constant {
 };
 
 use constant {
-  CPU_FREQ     => "cpu_freq",
+	CPU_CORE_CNT  => "cpu_core_count",
+  CPU_FREQ      => "cpu_freq",
   CPU0_FREQ     => "cpu0_freq",
   CPU1_FREQ     => "cpu1_freq",
   CPU2_FREQ     => "cpu2_freq",
@@ -267,6 +268,8 @@ SYSMON_updateCurrentReadingsMap($) {
       $rMap->{"cpu".$li."_temp_avg"}   = "Average CPU temperature (core $li)";
     }
   }  
+  
+  $rMap->{+CPU_CORE_CNT}   = "Number of CPU cores";
   
   if(SYSMON_isSysPowerAc($hash)) {
     #$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
@@ -1097,6 +1100,9 @@ SYSMON_obtainParameters_intern($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
     if($refresh_all || ($ref % $m1) eq 0) {
+    	
+    	$map = SYSMON_getCPUCoreNum($hash, $map);
+    	
       #Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
       if(SYSMON_isCPUTempRPi($hash)) { # Rasp
          $map = SYSMON_getCPUTemp_RPi($hash, $map);
@@ -1425,7 +1431,7 @@ sub SYSMON_getUserDefinedFn($$$@) {
 
 #my $sys_cpu_core_num = undef;
 sub
-SYSMON_getCPUCoreNum($)
+SYSMON_getCPUCoreNum_intern($)
 {
   my ($hash) = @_;
   
@@ -1450,6 +1456,16 @@ SYSMON_getCPUCoreNum($)
 }
 
 #------------------------------------------------------------------------------
+# leifert Anzahl CPU Kerne
+#------------------------------------------------------------------------------
+sub SYSMON_getCPUCoreNum($$) {
+	 my ($hash, $map) = @_;
+   my $cpuCoreCnt = SYSMON_getCPUCoreNum_intern($hash);
+   $map->{+CPU_CORE_CNT}=$cpuCoreCnt;
+   return $map;
+}
+
+#------------------------------------------------------------------------------
 # leifert Zeit seit dem Systemstart
 #------------------------------------------------------------------------------
 sub
@@ -1463,7 +1479,7 @@ SYSMON_getUptime($$)
     my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
     if(defined($uptime) && int($uptime)!=0) {
       # Anzahl Cores beruecksichtigen
-      my $core_num = SYSMON_getCPUCoreNum($hash);
+      my $core_num = SYSMON_getCPUCoreNum_intern($hash);
       my $idle_percent = $idle/($uptime*$core_num)*100;
     
       $map->{+UPTIME}=sprintf("%d",$uptime);
@@ -3906,6 +3922,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_core_count<br>
+        CPU core count
+    </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
@@ -4495,6 +4514,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_core_count<br>
+        Anzahl der CPU Kerne
+    </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
