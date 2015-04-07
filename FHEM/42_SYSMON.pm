@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 8371 2015-04-04 17:27:53Z hexenmeister $
+# $Id: 42_SYSMON.pm 8384 2015-04-06 18:13:04Z hexenmeister $
 
 package main;
 
@@ -1502,7 +1502,9 @@ SYSMON_getUptime($$)
       # Anzahl Cores beruecksichtigen
       my $core_num = SYSMON_getCPUCoreNum_intern($hash);
       my $idle_percent = $idle/($uptime*$core_num)*100;
-    
+      
+      $idle = $idle/$core_num;
+
       $map->{+UPTIME}=sprintf("%d",$uptime);
       #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
       $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
@@ -3662,7 +3664,7 @@ sub SYSMON_Open_Connection($)
    $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
-   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$)\s*$|Login failed.');
+   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$|>)\s*$|Login failed.');
    #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
    unless ( ($before,$match) = $telnet->waitfor( '/'.$tlogin_prompt.'/i' ))
    {
