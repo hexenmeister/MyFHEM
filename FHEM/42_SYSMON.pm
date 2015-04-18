@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.5";
+my $VERSION = "2.1.6";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -93,6 +93,7 @@ use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
   DIFF_SUFFIX => "_diff",
+  SPEED_SUFFIX => "_speed",
   IP_SUFFIX   => "_ip",
   IP6_SUFFIX  => "_ip6",
   FB_WLAN_STATE       => "wlan_state",
@@ -407,6 +408,7 @@ SYSMON_updateCurrentReadingsMap($) {
       
       $rMap->{$nName}           =  $nPt;
       $rMap->{$nName."_diff"}   =  $nPt." (diff)";
+      $rMap->{$nName."_speed"}   =  $nPt." (speed)";
       $rMap->{$nName."_rx"}     =  $nPt." (RX)";
       $rMap->{$nName."_tx"}     =  $nPt." (TX)";
       $rMap->{$nName."_ip"}     =  $nPt." (IP)";
@@ -420,6 +422,7 @@ SYSMON_updateCurrentReadingsMap($) {
       my $nName = "ath0";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -428,6 +431,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "ath1";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -436,6 +440,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "cpmac0";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -444,6 +449,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "dsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -452,6 +458,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = ETH0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -460,6 +467,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "guest";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -468,6 +476,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "hotspot";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -476,6 +485,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "lan";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -484,6 +494,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "vdsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -493,6 +504,7 @@ SYSMON_updateCurrentReadingsMap($) {
       my $nName = ETH0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -501,6 +513,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = WLAN0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -2605,6 +2618,11 @@ sub SYSMON_getNetworkInfo ($$$) {
         if($d_tt<0) {$d_tt=0;}
         my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
         $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      }
+      
+      my $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed");
+      if(defined($speed)) {
+      	 $map->{$nName.SPEED_SUFFIX} = $speed;
       }
     }
   } else {
