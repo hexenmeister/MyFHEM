@@ -10,9 +10,9 @@ set y2tics ("Zu" 0, "Auf" 1)
 set grid
 set ylabel "Status"
 set y2label "Status"
-set yrange [-0.1:1.1]
-set y2range [-0.1:1.1]
+set yrange [-1.1:2.1]
+set y2range [-1.1:2.1]
 
 #FileLog 3:open|closed::$fld[2]=~"open"?1:0
 
-plot "<IN>" using 1:2 axes x1y2 title 'Tür' ls l1fill lw 1 with steps
+plot "<IN>" using 1:2 axes x1y2 title 'Tür' ls l1 lw 1 with steps
