@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.6";
+my $VERSION = "2.1.7";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -341,6 +341,7 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"stat_cpu_diff"}     = "CPU statistics (diff)";
   $rMap->{"stat_cpu_percent"}  = "CPU statistics (diff, percent)";
   $rMap->{"stat_cpu_text"}     = "CPU statistics (text)";
+  $rMap->{"cpu_idle_stat"}     = "CPU min/max/avg (idle)";
   
   $rMap->{"stat_cpu_user_percent"} = "CPU statistics user %";
   $rMap->{"stat_cpu_nice_percent"} = "CPU statistics nice %";
@@ -356,6 +357,7 @@ SYSMON_updateCurrentReadingsMap($) {
     $rMap->{"stat_cpu".$i."_diff"}    = "CPU".$i." statistics (diff)";
     $rMap->{"stat_cpu".$i."_percent"} = "CPU".$i." statistics (diff, percent)";
     $rMap->{"stat_cpu".$i."_text"} = "CPU".$i." statistics (text)";
+    $rMap->{"cpu".$i."_idle_stat"}     = "CPU".$i." min/max/avg (idle)";
   }
   
   # Filesystems <readingName>[:<mountPoint>[:<Comment>]]
@@ -1389,6 +1391,25 @@ SYSMON_getValues($;@)
   return \%shadow_map;
 }
 
+sub SYSMON_getComputeStat($$$$) {
+	my ($hash, $map, $val, $name) = @_;
+	
+	my $t = ReadingsVal($hash->{NAME},$name,"$val $val $val");
+	
+	my($min, $max, $avg) = split(/ /,$t);
+	$min = $val if $min>$val;
+	$max = $val if $max<$val;
+	$avg = (3*$avg + $val)/4;
+	
+	$t = sprintf( "%.2f %.2f %.2f", $min, $max, $avg );
+	
+	$map->{$name} = $t;
+	
+	#SYSMON_Log($hash, 3, ">>>>>>>>>>>>>>>>> ".$name." => $t");
+	
+	return $map;
+}
+
 #------------------------------------------------------------------------------
 # Liest Benutzerdefinierte Eintraege
 #------------------------------------------------------------------------------
@@ -2010,8 +2031,8 @@ SYSMON_getCPUProcStat_intern($$$)
 {
   my ($hash, $map, $entry) = @_;
   
-  my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
-  $pName = "stat_".$pName;
+  my($tName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
+  my $pName = "stat_".$tName;
   $map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
   
   my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
@@ -2039,6 +2060,8 @@ SYSMON_getCPUProcStat_intern($$$)
     
     $map->{$pName."_percent"}=sprintf ("%.2f %.2f %.2f %.2f %.2f %.2f %.2f",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
     $map->{$pName."_text"}=sprintf ("user: %.2f %%, nice: %.2f %%, sys: %.2f %%, idle: %.2f %%, io: %.2f %%, irq: %.2f %%, sirq: %.2f %%",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+    
+    $map = SYSMON_getComputeStat($hash, $map, $PercentCPUidle, $tName."_idle_stat");
   }
 
   return $map;
