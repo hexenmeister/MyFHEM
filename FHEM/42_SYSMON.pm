@@ -265,6 +265,7 @@ SYSMON_updateCurrentReadingsMap($) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
+    $rMap->{+CPU_TEMP.'_stat'}= "CPU temperature stat";
     #$rMap->{"cpu0_temp"}      = "CPU temperature (core 0)";
     $rMap->{"cpu_temp_avg"}   = "Average CPU temperature";
     #$rMap->{"cpu0_temp_avg"}   = "Average CPU temperature (core 0)";
@@ -272,7 +273,8 @@ SYSMON_updateCurrentReadingsMap($) {
   foreach my $li (0..7) {
     if(SYSMON_isCPUTemp_X($hash, $li)) {
       $rMap->{"cpu".$li."_temp"}      = "CPU temperature (core $li)";
-      $rMap->{"cpu".$li."_temp_avg"}   = "Average CPU temperature (core $li)";
+      $rMap->{"cpu".$li."_temp_avg"}  = "Average CPU temperature (core $li)";
+      $rMap->{"cpu".$li."_temp_stat"} = "CPU temperature stat (core $li)";
     }
   }  
   
@@ -1673,6 +1675,9 @@ SYSMON_getCPUTemp_RPi($$) {
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+  
   return $map;
 }
 
@@ -1694,6 +1699,9 @@ SYSMON_getCPUTemp_BBB($$) {
   $map->{+CPU_TEMP_AVG}=$t_avg;  
   $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu0_temp_avg"}=$t_avg;  
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+  
   return $map;
 }
 
@@ -1714,6 +1722,9 @@ SYSMON_getCPUTemp_X($$;$) {
   $map->{"cpu".$cpuNum."_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu".$cpuNum."_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu".$cpuNum."_temp_avg"}=$t_avg;  
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_temp"."_stat");
+  
   return $map;
 }
 
@@ -1734,6 +1745,9 @@ SYSMON_getCPUTemp_FB($$) {
       $map->{+CPU_TEMP}="$val_txt";
       my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
       $map->{+CPU_TEMP_AVG}="$t_avg";
+      
+      $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+      
     }
   }
   return $map;
@@ -4234,11 +4248,17 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>    
         <li>cpuX_idle_stat<br>
-        Idel statistik for CPU X: minimum,  maximum und average values<br>
+        Idle statistik for CPU X: minimum,  maximum und average values<br>
         Example:<br>
         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
-    <br>    
+    <br>       
+        <li>cpu_temp_stat<br>
+        Temperature statistik for CPU: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>
   <br>
   </ul>
 
@@ -4866,6 +4886,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
     <br>    
+        <li>cpu[X]_temp_stat<br>
+        Temperatur-Statistik f&uuml;r CPU: minimum,  maximum und average values<br>
+        Beispiel:<br>
+        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>
   <br>
   </ul>
 
