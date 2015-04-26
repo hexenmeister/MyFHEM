@@ -252,10 +252,13 @@ SYSMON_updateCurrentReadingsMap($) {
   if(SYSMON_isCPUFreqRPiBBB($hash)) {
     $rMap->{"cpu_freq"}       = "CPU frequency";
     $rMap->{"cpu0_freq"}       = "CPU frequency";
+    $rMap->{"cpu_freq_stat"}       = "CPU frequency stat";
+    $rMap->{"cpu0_freq_stat"}       = "CPU frequency stat";
   }
   foreach my $li (0..7) {
     if(SYSMON_isCPUXFreq($hash, $li)) {
       $rMap->{"cpu".$li."_freq"}        = "CPU frequency (core $li)";
+      $rMap->{"cpu".$li."_freq_stat"}        = "CPU frequency (core $li) stat";
     }
   }
   if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
@@ -1752,9 +1755,11 @@ SYSMON_getCPUFreq($$;$) {
   if($cpuNum == 0) {
   	# aus Kompatibilitaetsgruenden
     $map->{+CPU_FREQ}="$val_txt";
+    #$map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
   }
   
   $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_freq"."_stat");
   
   return $map;
 }
