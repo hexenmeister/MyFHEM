@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.7";
+my $VERSION = "2.1.8";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -1749,7 +1749,7 @@ SYSMON_getCPUFreq($$;$) {
   if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
   
   $cpuNum = 0 unless defined $cpuNum;
-  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1");
+  my $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
   if($cpuNum == 0) {
@@ -2648,7 +2648,7 @@ sub SYSMON_getNetworkInfo ($$$) {
         $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
       }
       
-      my $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed");
+      my $speed = SYSMON_execute($hash, "[ -f /sys/class/net/eth0/speed ] && cat /sys/class/net/eth0/speed || echo not available");
       if(defined($speed)) {
       	 $map->{$nName.SPEED_SUFFIX} = $speed;
       }
@@ -4117,6 +4117,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
+    <li>Network Speed (if avialable)<br>
+    speed of the network connection.
+    <br>
+    Examples:<br>
+    <code>eth0_speed 100</code><br>
+    </li>
+    <br>
     <li>File system information<br>
       Usage of the desired file systems.<br>
       Example:<br>
@@ -4218,6 +4225,18 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Example:<br>
         <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
         The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
+    </li>
+    <br>
+    <li>cpuX_freq_stat<br>
+        Frequency statistics for CPU X: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu0_freq_stat: 100 1000 900</code><br>
+    </li>
+    <br>    
+        <li>cpuX_idle_stat<br>
+        Idel statistik for CPU X: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
     <br>    
   <br>
@@ -4721,6 +4740,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
+    <li>Network Speed (wenn verf&uuml;gbar)<br>
+    Geschwindigkeit der aktuellen Netzwerkverbindung.
+    <br>
+    Beispiel:<br>
+    <code>eth0_speed 100</code><br>
+    </li>
+    <br>
     <li>Dateisysteminformationen<br>
         Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
         Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
@@ -4826,6 +4852,18 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Beispiel:<br>
         <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
         Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
+    </li>
+    <br>    
+    <li>cpuX_freq_stat<br>
+        Frequenz-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Beispiel:<br>
+        <code>cpu0_freq_stat: 100 1000 900</code><br>
+    </li>
+    <br>    
+        <li>cpuX_idle_stat<br>
+        Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Beispiel:<br>
+        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
     <br>    
   <br>
@@ -5024,7 +5062,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
     Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
     R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
-    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition dürfen Kommas nicht durch Leerzeichen gefolgt werden.
+    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition d&uuml;rfen Kommas nicht durch Leerzeichen gefolgt werden.
     </li>
     <br>
     <li>disable<br>
