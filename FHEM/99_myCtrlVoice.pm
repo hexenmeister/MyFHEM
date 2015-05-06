@@ -591,9 +591,40 @@ sub voiceActLeaveHome() {
 
 # Bewegung im Vorgarten: InfoTon : nicht zu oft hintereinander abspielen
 sub voiceBewegungVorgarten() {
-	if(debounce("voice-pir-vorgarten",60)) {
-		speak(":sonar-ping0.mp3:",40);
-	}
+	#if(debounce("voice-pir-vorgarten",60)) {
+	#	#speak(":sonar-ping0.mp3:",40);
+	#	speak(":sonar-ping0.mp3:",10);
+	#}
+	
+	my $ret = previewGenericCtrlBlock("voice_pir_vorgarten", 'x', 300);
+	my $since_last = $ret->{SINCE_LAST_SEC};
+	if($since_last > 30) { # Events unter 30 Sekunden ausfiltern.
+	
+	  $ret = getGenericCtrlBlock("voice_pir_vorgarten", 'x', 300); # Letzte 5 Min betrachten.
+    $since_last = $ret->{SINCE_LAST_SEC};
+    my $cnt_PP = $ret->{EQ_ACT_PP_CNT};
+    my $cnt_15 = $ret->{EQ_ACT_15MIN_CNT};
+    
+    my $limit = 60; # Nicht öffters als 60 Sekunden abspielen.
+    
+    if($cnt_15 > 3) { # Wenn innerhalb der 15 Minuten es schon 3 Events gab - Interval auf 5 Min.
+    	$limit = 300;
+    } elsif($cnt_PP > 2) { 
+    	$limit = 180;
+    } elsif($cnt_PP > 1) { # Wenn innerhalb der 5 Minuten es schon ein Event gab, dann Interval verdoppeln
+    	$limit = 120;
+    }
+    
+	  if($since_last > $limit) {
+	  	speak(":sonar-ping0.mp3:",40);
+	  } else {
+	  	# (Leise) altes Minuten-Verfahren (TODO: Nach dem Test entfernen)
+	  	if(debounce("voice-pir-vorgarten",60)) {
+	  	speak(":sonar-ping0.mp3:",10);
+	    }
+	  	
+	  }
+  }
 }
 
 # Morgendliche Begruessung ausgeloest durch BW-Melder im EG_Flur
