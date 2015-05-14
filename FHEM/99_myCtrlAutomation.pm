@@ -268,6 +268,8 @@ sub getHomeAutomaticCtrlBlock($) {
 	return ($ret->{SINCE_LAST_SEC}, $ret->{BETWEEN_2_LAST_SEC}, $ret->{EQ_ACT_CNT}, $ret->{EQ_ACT_PP_CNT});
 }
 
+#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst);
+my $hms;
 # wird regelmaessig (minuetlich) aufgerufen (AT)
 sub automationHeartbeat() {
 	# nach Bedarf (nachts) Automatik wieder aktivieren:
@@ -277,7 +279,9 @@ sub automationHeartbeat() {
 	
 	#Log 3, "AutomationControlBase: Heartbeat";
 	
-	my $hms = CurrentTime();
+	#($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	
+	$hms = CurrentTime();
 	my $cDate = CurrentDate(); 
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
 	my $lDate = getCtrlData("ctrl_last_automatic_heartbeat_reset");
@@ -368,8 +372,11 @@ sub checkFensterZustand($) {
     	    # Alarm wenn kalt im Zimmer?
   	      #TODO
   	      getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
-  	      voiceNotificationMsgWarn(100);
-  	      speak("Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten gekippt!",0);
+  	      # Aber nicht nachts in Schlafzimmern/Bad
+  	      if($hms lt "11:00" and $hms gt "06:00") {
+  	        voiceNotificationMsgWarn(100);
+  	        speak("Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten gekippt!",0);
+  	      }
         }
       }
 		} else {
