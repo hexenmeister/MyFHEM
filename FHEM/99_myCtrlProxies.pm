@@ -13,7 +13,7 @@ my $rooms;
   $rooms->{wohnzimmer}->{alias}="Wohnzimmer";
   $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
-  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor"];
+  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor"];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
   #ggf. for future use
@@ -39,12 +39,12 @@ my $rooms;
   
   $rooms->{og_flur}->{alias}="Flur OG";
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
-  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "of_sensor",""];
+  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "fl_og_ms_sensor"];
   $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{garage}->{alias}="Garage";
   $rooms->{garage}->{fhem_name}="Garage";
-  $rooms->{garage}->{sensors}=["eg_ga_owts01"]; # TODO
+  $rooms->{garage}->{sensors}=["eg_ga_owts01","ga_sensor"];
   $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
@@ -64,17 +64,31 @@ my $rooms;
   
   $rooms->{paula}->{alias}="Paulas Zimmer";
   $rooms->{paula}->{fhem_name}="Paula";
-  $rooms->{paula}->{sensors}=["ka_raumsensor",""]; # TODO: Fensterkontakt, Thermostat
+  $rooms->{paula}->{sensors}=["ka_raumsensor","ka_wandthermostat"]; # TODO: Fensterkontakt
   $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{hanna}->{alias}="Hannas Zimmer";
   $rooms->{hanna}->{fhem_name}="Hanna";
-  $rooms->{hanna}->{sensors}=["kb_raumsensor",""]; # TODO: Fensterkontakt, Thermostat
+  $rooms->{hanna}->{sensors}=["kb_raumsensor","kb_wandthermostat"]; # TODO: Fensterkontakt
   $rooms->{hanna}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
-  # HWR, GästeWC, Garage
+  $rooms->{ar}->{alias}="OG Abstellraum";
+  $rooms->{ar}->{fhem_name}="OG_AR";
+  $rooms->{ar}->{sensors}=["of_sensor"];
+  $rooms->{ar}->{sensors_outdoor}=["vr_luftdruck",""];
+  
+  $rooms->{wc}->{alias}="Gäste WC";
+  $rooms->{wc}->{fhem_name}="WC";
+  $rooms->{wc}->{sensors}=["eg_wc_owts01"];
+  $rooms->{wc}->{sensors_outdoor}=["vr_luftdruck",""];
+  
+  $rooms->{hwr}->{alias}="HWR";
+  $rooms->{hwr}->{fhem_name}="hwr";
+  $rooms->{hwr}->{sensors}=["eg_ha_owts01"];
+  $rooms->{hwr}->{sensors_outdoor}=["vr_luftdruck",""];
+  
   # DG
-  # Räume ohne Sensoren: Speisekammer, Abstellkammer
+  # Räume ohne Sensoren: Speisekammer, (Abstellkammer => GSD1.3)
   
 # Aktoren
 my $actors;
@@ -412,6 +426,42 @@ my $sensors;
   $sensors->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $sensors->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
+  $sensors->{ka_wandthermostat}->{alias}     ="KA Wandthermostat";
+  $sensors->{ka_wandthermostat}->{fhem_name} ="OG_KA_WT01";
+  $sensors->{ka_wandthermostat}->{type}      ="HomeMatic";
+  $sensors->{ka_wandthermostat}->{location}  ="paula";
+  $sensors->{ka_wandthermostat}->{composite} =["ka_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $sensors->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $sensors->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $sensors->{ka_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $sensors->{ka_wandthermostat_climate}->{alias}     ="KA Wandthermostat (Ch)";
+  $sensors->{ka_wandthermostat_climate}->{fhem_name} ="OG_KA_WT01_Climate";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  
+  $sensors->{kb_wandthermostat}->{alias}     ="KB Wandthermostat";
+  $sensors->{kb_wandthermostat}->{fhem_name} ="OG_KA_WT01";
+  $sensors->{kb_wandthermostat}->{type}      ="HomeMatic";
+  $sensors->{kb_wandthermostat}->{location}  ="hanna";
+  $sensors->{kb_wandthermostat}->{composite} =["kb_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $sensors->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $sensors->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $sensors->{kb_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $sensors->{kb_wandthermostat_climate}->{alias}     ="KB Wandthermostat (Ch)";
+  $sensors->{kb_wandthermostat_climate}->{fhem_name} ="OG_KB_WT01_Climate";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  
   $sensors->{hg_sensor}->{alias}     ="Garten-Sensor";
   $sensors->{hg_sensor}->{fhem_name} ="GSD_1.4";
   $sensors->{hg_sensor}->{type}      ="GSD";
@@ -446,10 +496,10 @@ my $sensors;
   $sensors->{tt_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $sensors->{tt_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
-  $sensors->{of_sensor}->{alias}     ="OG Flur Sensor";
+  $sensors->{of_sensor}->{alias}     ="OG AR Sensor";
   $sensors->{of_sensor}->{fhem_name} ="GSD_1.3";
   $sensors->{of_sensor}->{type}      ="GSD";
-  $sensors->{of_sensor}->{location}  ="og_flur";
+  $sensors->{of_sensor}->{location}  ="OG_AR";
   $sensors->{of_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $sensors->{of_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
   $sensors->{of_sensor}->{readings}->{temperature} ->{unit}     ="°C";
@@ -463,6 +513,57 @@ my $sensors;
   $sensors->{of_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $sensors->{of_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
 
+  $sensors->{ga_sensor}->{alias}     ="Garage Kombisensor";
+  $sensors->{ga_sensor}->{fhem_name} ="EG_GA_MS01";
+  $sensors->{ga_sensor}->{type}      ="MySensors";
+  $sensors->{ga_sensor}->{location}  ="garage";
+  $sensors->{ga_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  $sensors->{ga_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $sensors->{ga_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  $sensors->{ga_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  $sensors->{ga_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $sensors->{ga_sensor}->{readings}->{humidity}    ->{alias}    ="rel. Feuchte";
+  $sensors->{ga_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $sensors->{ga_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $sensors->{ga_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $sensors->{ga_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $sensors->{ga_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt"; 
+  $sensors->{ga_sensor}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
+  $sensors->{ga_sensor}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
+  $sensors->{ga_sensor}->{readings}->{absFeuchte}  ->{alias}    ="Abs. Feuchte";
+  $sensors->{ga_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
+  $sensors->{ga_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
+  $sensors->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
+  $sensors->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  $sensors->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  
+  $sensors->{wz_ms_sensor}->{alias}     ="WZ MS Kombisensor";
+  $sensors->{wz_ms_sensor}->{fhem_name} ="EG_WZ_MS01";
+  $sensors->{wz_ms_sensor}->{type}      ="MySensors";
+  $sensors->{wz_ms_sensor}->{location}  ="wohnzimmer";
+  $sensors->{wz_ms_sensor}->{readings}->{luminosity} ->{act_cycle} ="600";
+  $sensors->{wz_ms_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
+  $sensors->{wz_ms_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{wz_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
+  $sensors->{wz_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
+  $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  
+  $sensors->{fl_og_ms_sensor}->{alias}     ="FL OG MS Kombisensor";
+  $sensors->{fl_og_ms_sensor}->{fhem_name} ="EG_FL_MS01";
+  $sensors->{fl_og_ms_sensor}->{type}      ="MySensors";
+  $sensors->{fl_og_ms_sensor}->{location}  ="og_flur";
+  $sensors->{fl_og_ms_sensor}->{readings}->{luminosity} ->{act_cycle} ="600";
+  $sensors->{fl_og_ms_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
+  $sensors->{fl_og_ms_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{fl_og_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
+  $sensors->{fl_og_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
 
   $sensors->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $sensors->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
@@ -569,6 +670,22 @@ my $sensors;
   $sensors->{eg_fl_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $sensors->{eg_fl_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
   $sensors->{eg_fl_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  
+  $sensors->{eg_wc_owts01}->{alias}     ="OWX Gäste WC";
+  $sensors->{eg_wc_owts01}->{fhem_name} ="EG_WC_OWTS01.Raum";
+  $sensors->{eg_wc_owts01}->{type}      ="OneWire";
+  $sensors->{eg_wc_owts01}->{location}  ="wc";
+  $sensors->{eg_wc_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  $sensors->{eg_wc_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  $sensors->{eg_wc_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  
+  $sensors->{eg_ha_owts01}->{alias}     ="OWX HWR";
+  $sensors->{eg_ha_owts01}->{fhem_name} ="EG_HA_OWTS01.Raum_Oben";
+  $sensors->{eg_ha_owts01}->{type}      ="OneWire";
+  $sensors->{eg_ha_owts01}->{location}  ="hwr";
+  $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   
   $sensors->{eg_ku_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{eg_ku_fk01}->{fhem_name} ="EG_KU_FK01.Fenster";
