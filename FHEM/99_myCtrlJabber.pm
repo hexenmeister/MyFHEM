@@ -7,6 +7,8 @@ use warnings;
 use POSIX;
 use Time::Local;
 
+require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
+
 use constant {
  MY_JABBER_ADDR    => 'hexenmeister@jabber.de'
 };
