@@ -1204,6 +1204,16 @@ sub rundeZahl1($) {
 	return $val;
 }
 
+# Rundet eine Zahl mit 2 Nachkommastellen
+sub rundeZahl2($) {
+	my($val)=@_;
+	# Prüfen, ob numerisch
+	if(int($val)>0) {
+		$val = int(100*$val+0.5)/100;
+	}
+	return $val;
+}
+
 ###############################################################################
 # Schnittmenge, Differenzmenge oder die Vereinigungsmenge 
 # der Elemente zweier Listen erstellen
