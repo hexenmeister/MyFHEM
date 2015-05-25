@@ -1560,5 +1560,33 @@ sub ShowGoogleMapsCode($$;$$$) {
   return $htmlcode;
 }
 
+# Prueft, ob der angegebener Tag Wochenende oder Feiertag ist (optional)
+# Params:
+#   day: 0-heute, 1-morgen etc. Wenn nichts angegeben, wird heute angenommen.
+#   Holiday-Device: (s. commandref) wird für die Feiertagspruefung verwendet.
+#                   falls nicht angegeben, wird im Attribut holiday2we in global
+#                   nachgesehen. Falls auch nicht angegeben, wird ignoriert. 
+#
+sub isWeOrHoliday(;$$) {
+  my ($day, $hdev) = @_;
+  $day = 0 unless $day;
+  $hdev = $attr{global}{holiday2we} unless $hdev;
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  
+  my $twday = $wday+$day;
+  $twday = $twday % 7;
+  
+  my $we = (($twday==0 || $twday==6) ? 1 : 0);
+  
+  if(!$we && $hdev && $defs{$hdev}) {
+    my $v = fhem("get $hdev days $day");
+    $we = 1 if($v ne "none");
+  }
+  
+  return $we;
+}
+
+
 
 1;
