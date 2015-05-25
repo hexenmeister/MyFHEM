@@ -29,12 +29,12 @@ my $rooms;
     
   $rooms->{umwelt}->{alias}="Umwelt";
   $rooms->{umwelt}->{fhem_name}="Umwelt";
-  $rooms->{umwelt}->{sensors}=["hg_sensor","um_vh_licht","um_hh_licht","um_vh_owts01","vr_luftdruck"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
+  $rooms->{umwelt}->{sensors}=["hg_sensor","um_vh_licht","um_hh_licht","um_vh_owts01","vr_luftdruck","um_vh_bw_licht"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
   $rooms->{umwelt}->{sensors_outdoor}=[]; # Keine
   
   $rooms->{eg_flur}->{alias}="Flur EG";
   $rooms->{eg_flur}->{fhem_name}="EG_Flur";
-  $rooms->{eg_flur}->{sensors}=["eg_fl_raumsensor",""];
+  $rooms->{eg_flur}->{sensors}=["eg_fl_raumsensor","fl_eg_ms_sensor"];
   $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{og_flur}->{alias}="Flur OG";
@@ -288,12 +288,38 @@ my $sensors;
   # 
   $sensors->{virtual_control_sensor}->{alias}       ="Virtuelle Controll-Sammel-Sensor";
   $sensors->{virtual_control_sensor}->{type}        ="virtual";
+  $sensors->{virtual_control_sensor}->{location}    ="umwelt";
   $sensors->{virtual_control_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "HAL_SunValueFn";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
   
+  
+  
+  
+  #TODO:
+  # Motion: 1m, 15m, Stunde, selber Tag etc.
+
+  # Params: Dev-Hash, Record-HASH
+  sub HAL_MotionValueFn($$) {
+  	my ($device, $record) = @_;
+  	my ($pTime,$rName) = @{$record->{FnParams}};
+    my $devName = $device->{name};
+    $rName = "motion" unless $rName;
+    my $mTime = HAL_getSensorReadingTime($devName, $rName);    
+    #Log 3,'>------------>Name: '.$devName.', Reading: '.$rName.', time: '.$mTime;
+
+    if($mTime) {
+    	my $dTime = dateTime2dec($mTime);
+    	my $diffTime = time() - $dTime;
+    	
+    	return $diffTime < $pTime?1:0;
+    }
+    
+    return 0;
+  }
+
   #TODO:
   sub HAL_SunValueFn($$) {
   	my ($device, $record) = @_;
@@ -538,6 +564,27 @@ my $sensors;
   $sensors->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{ga_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $sensors->{ga_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $sensors->{ga_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $sensors->{ga_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{ga_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $sensors->{ga_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $sensors->{ga_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $sensors->{ga_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{ga_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $sensors->{ga_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $sensors->{ga_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $sensors->{ga_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{ga_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $sensors->{ga_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $sensors->{ga_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $sensors->{ga_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{ga_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $sensors->{ga_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $sensors->{ga_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+
   
   $sensors->{wz_ms_sensor}->{alias}     ="WZ MS Kombisensor";
   $sensors->{wz_ms_sensor}->{fhem_name} ="EG_WZ_MS01";
@@ -551,9 +598,64 @@ my $sensors;
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $sensors->{wz_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $sensors->{wz_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $sensors->{wz_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $sensors->{wz_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $sensors->{wz_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $sensors->{wz_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $sensors->{wz_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $sensors->{wz_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $sensors->{wz_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $sensors->{wz_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $sensors->{wz_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+
   
+  $sensors->{fl_eg_ms_sensor}->{alias}     ="FL EG MS Kombisensor";
+  $sensors->{fl_eg_ms_sensor}->{fhem_name} ="EG_FL_MS01";
+  $sensors->{fl_eg_ms_sensor}->{type}      ="MySensors";
+  $sensors->{fl_eg_ms_sensor}->{location}  ="eg_flur";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{luminosity} ->{act_cycle} ="600";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
+  $sensors->{fl_eg_ms_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+
+
   $sensors->{fl_og_ms_sensor}->{alias}     ="FL OG MS Kombisensor";
-  $sensors->{fl_og_ms_sensor}->{fhem_name} ="EG_FL_MS01";
+  $sensors->{fl_og_ms_sensor}->{fhem_name} ="OG_FL_MS01";
   $sensors->{fl_og_ms_sensor}->{type}      ="MySensors";
   $sensors->{fl_og_ms_sensor}->{location}  ="og_flur";
   $sensors->{fl_og_ms_sensor}->{readings}->{luminosity} ->{act_cycle} ="600";
@@ -564,7 +666,28 @@ my $sensors;
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
 
+  
   $sensors->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $sensors->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
   $sensors->{ku_raumsensor}->{type}      ="HomeMatic compatible";
@@ -634,18 +757,38 @@ my $sensors;
   $sensors->{um_vh_bw_licht}->{readings}->{bat_status}  ->{reading}   ="battery";
   $sensors->{um_vh_bw_licht}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
   $sensors->{um_vh_bw_licht}->{readings}->{bat_status}  ->{unit_type} ="ENUM: ok,low";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $sensors->{um_vh_bw_licht}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $sensors->{um_vh_bw_licht}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $sensors->{um_vh_bw_licht}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $sensors->{um_vh_bw_licht}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
   
-  $sensors->{eg_fl_bw_licht}->{alias}     ="Bewegungsmelder (Flur hinten)";
-  $sensors->{eg_fl_bw_licht}->{fhem_name} ="EG_FL_MS01";
-  $sensors->{eg_fl_bw_licht}->{type}      ="MySensors";
-  $sensors->{eg_fl_bw_licht}->{location}  ="eg_flur";
-  $sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{reading}   ="brightness";
-  $sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{alias}     ="Helligkeit";
-  $sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{unit}      ="RANGE: 0-54612";
-  $sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{act_cycle} ="600";
-  $sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{reading}   ="motion";
-  $sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
-  $sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  #$sensors->{eg_fl_bw_licht}->{alias}     ="Bewegungsmelder (Flur hinten)";
+  #$sensors->{eg_fl_bw_licht}->{fhem_name} ="EG_FL_MS01";
+  #$sensors->{eg_fl_bw_licht}->{type}      ="MySensors";
+  #$sensors->{eg_fl_bw_licht}->{location}  ="eg_flur";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{reading}   ="brightness";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{alias}     ="Helligkeit";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{unit}      ="RANGE: 0-54612";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{brightness}  ->{act_cycle} ="600";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{reading}   ="motion";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  #$sensors->{eg_fl_bw_licht}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
   
   $sensors->{um_vh_owts01}->{alias}     ="OWX Aussentemperatur";
   $sensors->{um_vh_owts01}->{fhem_name} ="UM_VH_OWTS01.Luft";
@@ -813,6 +956,7 @@ sub HAL_getSensor($);
 sub HAL_getSensorValueRecord($$);
 sub HAL_getSensorReadingValue($$);
 sub HAL_getSensorReadingUnit($$);
+sub HAL_getSensorReadingTime($$);
 
 #TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
@@ -1226,6 +1370,16 @@ sub HAL_getSensorReadingUnit($$)
 	return undef;
 }
 
+# Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus
+# parameters: name, reading name
+# returns current readings time
+sub HAL_getSensorReadingTime($$)
+{
+	my ($name, $reading) = @_;
+	my $h = HAL_getSensorValueRecord($name, $reading);
+	return undef unless $h;
+	return $h->{time};
+}
 
 #------------------------------------------------------------------------------
 
