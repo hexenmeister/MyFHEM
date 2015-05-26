@@ -14,7 +14,7 @@ my $rooms;
   $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
   $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor"];
-  $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
+  $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
   #ggf. for future use
   #$rooms->{wohnzimmer}->{measurements}->{temperature}=["wz_raumsensor:temperature"];
@@ -25,11 +25,11 @@ my $rooms;
   $rooms->{kueche}->{alias}="Küche";
   $rooms->{kueche}->{fhem_name}="Kueche";
   $rooms->{kueche}->{sensors}=["ku_raumsensor","eg_ku_fk01"];
-  $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht","hg_sensor"]; 
+  $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht_th","hg_sensor"]; 
     
   $rooms->{umwelt}->{alias}="Umwelt";
   $rooms->{umwelt}->{fhem_name}="Umwelt";
-  $rooms->{umwelt}->{sensors}=["hg_sensor","virtual_umwelt_brightness_sensor","um_vh_owts01","vr_luftdruck","um_vh_bw_licht"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
+  $rooms->{umwelt}->{sensors}=["virtual_umwelt_sensor","vr_luftdruck","um_vh_bw_licht"]; # Licht/Bewegung, 1wTemp, TinyTX-Garten (T/H), LichtGarten, LichtVorgarten
   $rooms->{umwelt}->{sensors_outdoor}=[]; # Keine
   
   $rooms->{vorgarten}->{alias}="Vorgarten";
@@ -39,33 +39,33 @@ my $rooms;
   
   $rooms->{garten}->{alias}="Vorgarten";
   $rooms->{garten}->{fhem_name}="---";
-  $rooms->{garten}->{sensors}=["hg_sensor","um_hh_licht","vr_luftdruck"];
+  $rooms->{garten}->{sensors}=["hg_sensor","um_hh_licht_th","vr_luftdruck"];
   $rooms->{garten}->{sensors_outdoor}=[];
   
   $rooms->{eg_flur}->{alias}="Flur EG";
   $rooms->{eg_flur}->{fhem_name}="EG_Flur";
   $rooms->{eg_flur}->{sensors}=["eg_fl_raumsensor","fl_eg_ms_sensor"];
-  $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{og_flur}->{alias}="Flur OG";
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
   $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "fl_og_ms_sensor"];
-  $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{garage}->{alias}="Garage";
   $rooms->{garage}->{fhem_name}="Garage";
   $rooms->{garage}->{sensors}=["eg_ga_owts01","ga_sensor"];
-  $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
   $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
   $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor","sz_wandthermostat"]; # TODO: Fensterkontakt
-  $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{badezimmer}->{alias}="Badezimmer";
   $rooms->{badezimmer}->{fhem_name}="Badezimmer";
   $rooms->{badezimmer}->{sensors}=["bz_raumsensor","bz_wandthermostat"]; # TODO: Fensterkontakt
-  $rooms->{badezimmer}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{badezimmer}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{duschbad}->{alias}="Duschbad";
   $rooms->{duschbad}->{fhem_name}="Duschbad";
@@ -75,12 +75,12 @@ my $rooms;
   $rooms->{paula}->{alias}="Paulas Zimmer";
   $rooms->{paula}->{fhem_name}="Paula";
   $rooms->{paula}->{sensors}=["ka_raumsensor","ka_wandthermostat"]; # TODO: Fensterkontakt
-  $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht","um_vh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{hanna}->{alias}="Hannas Zimmer";
   $rooms->{hanna}->{fhem_name}="Hanna";
   $rooms->{hanna}->{sensors}=["kb_raumsensor","kb_wandthermostat"]; # TODO: Fensterkontakt
-  $rooms->{hanna}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{hanna}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{ar}->{alias}="OG Abstellraum";
   $rooms->{ar}->{fhem_name}="OG_AR";
@@ -301,19 +301,74 @@ my $sensors;
   $sensors->{virtual_control_sensor}->{location}    ="umwelt";
   $sensors->{virtual_control_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{ValueFn} = "HAL_SunValueFn";
-  $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
+  $sensors->{virtual_control_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht_th:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
   $sensors->{virtual_control_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
   
-  $sensors->{virtual_umwelt_brightness_sensor}->{alias}       ="Virtuelle Helligkeitssensor";
-  $sensors->{virtual_umwelt_brightness_sensor}->{type}        ="virtual";
-  $sensors->{virtual_umwelt_brightness_sensor}->{location}    ="umwelt";
-  $sensors->{virtual_umwelt_brightness_sensor}->{comment}     ="Virtueller Sensor: Berechnet Max. Helligkeit mehreren Sensoren.";
-  $sensors->{virtual_umwelt_brightness_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
-  $sensors->{virtual_umwelt_brightness_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht:luminosity"];
-  $sensors->{virtual_umwelt_brightness_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Sensor";
-  $sensors->{virtual_umwelt_brightness_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
+  $sensors->{virtual_umwelt_sensor}->{alias}       ="Virtuelle Umweltsensoren";
+  $sensors->{virtual_umwelt_sensor}->{type}        ="virtual";
+  $sensors->{virtual_umwelt_sensor}->{location}    ="umwelt";
+  $sensors->{virtual_umwelt_sensor}->{comment}     ="Virtueller Sensor: Berechnet Max. Helligkeit mehreren Sensoren, Durchschnittstemperatur etc.";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
+  $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_AvgReadingValueFn";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity", "hg_sensor:humidity"];
+  $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   
+
+# ValueFn: Fragt angegebene Sensoren ab un liefert den Durchschnittswert aller Readings.
+# FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
+sub HAL_AvgReadingValueFn($$) {
+	my ($device, $record) = @_;
+	my $senList = $record->{FnParams};
+	# keine 'dead' Sensoren verwenden. 
+  my $aVal = 0;
+  my $aCnt = 0;
+  foreach my $a (@{$senList}) {
+  	my($sensorName,$readingName) = split(/:/, $a);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+  	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', val: '. $sRec->{value}.', alive: '.$sRec->{alive};
+  	if($sRec->{alive}) {
+  		$aCnt += 1;
+  		my $sVal = $sRec->{value};
+  		$aVal += $sVal;
+  	}
+  	#Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
+  }
+  if($aCnt>0) {
+  	return $aVal / $aCnt;
+  }
+  return undef;
+}
+
+# ValueFn: Fragt angegebene Sensoren ab un liefert den Min. Wert aller Readings.
+# FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
+sub HAL_MinReadingValueFn($$) {
+	my ($device, $record) = @_;
+	my $senList = $record->{FnParams};
+	# keine 'dead' Sensoren verwenden. 
+  my $mVal = undef;
+  foreach my $a (@{$senList}) {
+  	my($sensorName,$readingName) = split(/:/, $a);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+  	if($sRec->{alive}) {
+  		my $sVal = $sRec->{value};
+  		if(!defined($mVal) || $sVal<$mVal) {
+  		  $mVal = $sVal;
+  		}
+  	}
+  }
+  return $mVal;
+}
 
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Max. Wert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
@@ -334,7 +389,39 @@ sub HAL_MaxReadingValueFn($$) {
   }
   return $mVal;
 }
+
+
+# ValueFn: Benutzt Time der angegebenen Reading (default: motion) und
+#    berechnet die vergangene Zeitspanne. Ausgabe menschenlesbar
+# FnParams: Readingname 
+# Params: Dev-Hash, Record-HASH
+sub HAL_MotionTimeStrValueFn($$) {
+	my ($device, $record) = @_;
+  my $t = HAL_MotionTimeValueFn($device, $record);
+  return sec2Dauer($t);
+}
+
+# ValueFn: Benutzt Time der angegebenen Reading (default: motion) und
+#    berechnet die vergangene Zeitspanne. Ausgabe: Zahl in Sekunden
+# FnParams: Readingname 
+# Params: Dev-Hash, Record-HASH
+sub HAL_MotionTimeValueFn($$) {
+	my ($device, $record) = @_;
+	my $rName = $record->{FnParams};
+  my $devName = $device->{name};
+  $rName = "motion" unless $rName;
+  my $mTime = HAL_getSensorReadingTime($devName, $rName);    
   
+  if($mTime) {
+  	my $dTime = dateTime2dec($mTime);
+  	my $diffTime = time() - $dTime;
+  	
+  	return int($diffTime);
+  }
+  
+  return undef;
+}
+
 # ValueFn: Benutzt Time der angegebenen Reading (default: motion) und 
 #   vergleich mit der angegebener Zeitspanne. Wenn diese noch nicht überschritten ist, 
 #   wird 1 (true), ansonsten 0 (false) zurückgegeben.
@@ -617,6 +704,11 @@ sub HAL_round2($) {
   $sensors->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{ga_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $sensors->{ga_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$sensors->{ga_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
+  $sensors->{ga_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $sensors->{ga_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $sensors->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $sensors->{ga_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $sensors->{ga_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
@@ -651,6 +743,11 @@ sub HAL_round2($) {
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{wz_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{wz_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $sensors->{wz_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$sensors->{wz_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
+  $sensors->{wz_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $sensors->{wz_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $sensors->{wz_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
@@ -685,6 +782,11 @@ sub HAL_round2($) {
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$sensors->{fl_eg_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $sensors->{fl_eg_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $sensors->{fl_eg_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
@@ -719,6 +821,11 @@ sub HAL_round2($) {
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$sensors->{fl_og_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $sensors->{fl_og_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $sensors->{fl_og_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
@@ -778,23 +885,30 @@ sub HAL_round2($) {
   $sensors->{um_vh_licht}->{readings}->{bat_voltage} ->{unit}      ="V";
   $sensors->{um_vh_licht}->{readings}->{bat_status}  ->{reading}   ="battery";
   
-  $sensors->{um_hh_licht}->{alias}     ="HH Aussensensor";
-  $sensors->{um_hh_licht}->{fhem_name} ="UM_HH_KS01";
-  $sensors->{um_hh_licht}->{type}      ="HomeMatic compatible";
-  $sensors->{um_hh_licht}->{location}  ="umwelt";
-  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
-  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
-  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
-  $sensors->{um_hh_licht}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
-  $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
-  $sensors->{um_hh_licht}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $sensors->{um_hh_licht}->{readings}->{bat_status}  ->{reading}   ="battery";
-  $sensors->{um_hh_licht}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
-  $sensors->{um_hh_licht}->{readings}->{temperature} ->{reading}   ="temperature";
-  $sensors->{um_hh_licht}->{readings}->{temperature} ->{alias}     ="Temperatur";
-  $sensors->{um_hh_licht}->{readings}->{temperature} ->{unit}      ="°C";
-  $sensors->{um_hh_licht}->{readings}->{temperature} ->{act_cycle} ="600"; 
+  $sensors->{um_hh_licht_th}->{alias}     ="HH Aussensensor";
+  $sensors->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
+  $sensors->{um_hh_licht_th}->{type}      ="HomeMatic compatible";
+  $sensors->{um_hh_licht_th}->{location}  ="umwelt";
+  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
+  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
+  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
+  $sensors->{um_hh_licht_th}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
+  $sensors->{um_hh_licht_th}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
+  $sensors->{um_hh_licht_th}->{readings}->{bat_voltage} ->{unit}      ="V";
+  $sensors->{um_hh_licht_th}->{readings}->{bat_status}  ->{reading}   ="battery";
+  $sensors->{um_hh_licht_th}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
+  $sensors->{um_hh_licht_th}->{readings}->{temperature} ->{reading}   ="temperature";
+  $sensors->{um_hh_licht_th}->{readings}->{temperature} ->{alias}     ="Temperatur";
+  $sensors->{um_hh_licht_th}->{readings}->{temperature} ->{unit}      ="°C";
+  $sensors->{um_hh_licht_th}->{readings}->{temperature} ->{act_cycle} ="600";
+  $sensors->{um_hh_licht_th}->{readings}->{humidity}    ->{reading}   ="humidity";
+  $sensors->{um_hh_licht_th}->{readings}->{humidity}    ->{alias}     ="Luftfeuchtigkeit"; 
+  $sensors->{um_hh_licht_th}->{readings}->{humidity}    ->{unit}      ="% rH";
+  $sensors->{um_hh_licht_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $sensors->{um_hh_licht_th}->{readings}->{dewpoint}    ->{reading}   ="dewpoint";
+  $sensors->{um_hh_licht_th}->{readings}->{dewpoint}    ->{unit}      ="°C";
+  $sensors->{um_hh_licht_th}->{readings}->{dewpoint}    ->{alias}     ="Taupunkt";
   
   $sensors->{um_vh_bw_licht}->{alias}     ="Bewegungsmelder (Vorgarten)";
   $sensors->{um_vh_bw_licht}->{fhem_name} ="UM_VH_HMBL01.Eingang";
@@ -812,6 +926,11 @@ sub HAL_round2($) {
   $sensors->{um_vh_bw_motion}->{readings}->{motion}      ->{reading}   ="motion";
   $sensors->{um_vh_bw_motion}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $sensors->{um_vh_bw_motion}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  $sensors->{um_vh_bw_motion}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $sensors->{um_vh_bw_motion}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$sensors->{um_vh_bw_motion}->{readings}->{motiontime}->{FnParams}  = "motion";
+  $sensors->{um_vh_bw_motion}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $sensors->{um_vh_bw_motion}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $sensors->{um_vh_bw_motion}->{readings}->{bat_status}  ->{reading}   ="battery";
   $sensors->{um_vh_bw_motion}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
   $sensors->{um_vh_bw_motion}->{readings}->{bat_status}  ->{unit_type} ="ENUM: ok,low";
