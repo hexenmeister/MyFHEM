@@ -863,12 +863,15 @@ SYSMON_Update($;$)
       $refresh_all = 1;
     }
 
+    SYSMON_obtainLocalCPUFreq($hash);
+    
+    my $map;
     if(!AttrVal($name, "nonblocking", 1)) {
       # direkt call
       
       # Parameter holen
-      my $map = SYSMON_obtainParameters($hash, $refresh_all);
-
+      $map = SYSMON_obtainParameters($hash, $refresh_all);
+			
       # Mark setzen 
       if(!$hash->{helper}{u_first_mark}) {
         $hash->{helper}{u_first_mark} = 1;
@@ -886,9 +889,47 @@ SYSMON_Update($;$)
       
       $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall("SYSMON_blockingCall", $name."|".$refresh_all, "SYSMON_blockingFinish", 55, "SYSMON_blockingAbort", $hash);
     }
-      
+    
+    
+       
   }
 
+}
+
+sub SYSMON_obtainLocalCPUFreq($) {
+	my ($hash) = @_;
+	
+	my $map;
+	#--------------------------------------------------------------------------
+  my $base=$DEFAULT_INTERVAL_BASE; 
+  my $im = "1 1 1 10";
+  # Wenn wesentliche Parameter nicht definiert sind, soll aktualisierung immer vorgenommen werden
+  if((defined $hash->{INTERVAL_BASE})) {
+    $base = $hash->{INTERVAL_BASE};
+  }
+  if((defined $hash->{INTERVAL_MULTIPLIERS})) {
+    $im = $hash->{INTERVAL_MULTIPLIERS};
+  }
+
+  my $ref =  int(time()/$base);
+  my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
+  
+  if($m1 gt 0) { # Nur wenn > 0
+    # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
+    if(($ref % $m1) eq 0) {
+	    # Sonderlocke: CPUFreq
+	    my $mode = $hash->{MODE};
+	    if ($mode eq 'local') {
+		    foreach my $li (0..7) {
+		      if(SYSMON_isCPUXFreq($hash, $li)) {
+		        $map = SYSMON_getCPUFreqLocal($hash, $map, $li);
+		      }
+		    }
+	    }
+	  }
+	}
+  #--------------------------------------------------------------------------
+  SYSMON_updateReadings($hash,$map);
 }
 
 sub SYSMON_blockingCall($) {
@@ -1778,6 +1819,41 @@ SYSMON_getCPUTemp_FB($$) {
 
 #------------------------------------------------------------------------------
 # leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
+# Sonderlocke fuer lokale Erfassung (damit die CPU nicht auf Max. gefahren wird)
+# Dazu darf nicht in BlockingCall und keine System-Aufrufe wie 'cat' etc.
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUFreqLocal($$;$) {
+	my ($hash, $map, $cpuNum) = @_;
+	
+	if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
+  
+  $cpuNum = 0 unless defined $cpuNum;
+  
+	my $val;
+  if(open(my $fh, '<', "/sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq")) {
+    $val = <$fh>;
+    close($fh);
+  }
+  
+  $val = int($val);
+  my $val_txt = sprintf("%d", $val/1000);
+  if($cpuNum == 0) {
+  	# aus Kompatibilitaetsgruenden
+    $map->{+CPU_FREQ}="$val_txt";
+    $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
+  }
+  
+  $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_freq"."_stat");
+  
+  return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
+# Nur Remote Aufrufe
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPUFreq($$;$) {
@@ -1786,7 +1862,25 @@ SYSMON_getCPUFreq($$;$) {
   if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
   
   $cpuNum = 0 unless defined $cpuNum;
-  my $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
+  
+  my $val;
+  
+  my $mode = $hash->{MODE};
+  if ($mode eq 'local') {
+  	# do nothing
+  	return $map;
+  }
+  # XXX Hack: Versuch zu vermeiden, dass Frequenz immer als Maximum gelesen wird
+  #my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+  #if ($mode eq 'local') {
+  #  if(open(my $fh, '<', "/sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq")) {
+  #    $val = <$fh>;
+  #    close($fh);
+  #  }
+  #} else {
+    $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
+  #}
+  
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
   if($cpuNum == 0) {
@@ -3555,8 +3649,7 @@ sub SYSMON_PowerBatInfo($$) {
 }
 #-------------
 
-sub
-SYSMON_execute($$)
+sub SYSMON_execute($$)
 {
   my ($hash, $cmd) = @_;
   return SYSMON_Exec($hash, $cmd);
