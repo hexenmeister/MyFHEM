@@ -1265,7 +1265,7 @@ sub arraysVergleich($$) {
 #   arraysVergleich(["six","seven", "eight"], [6,7,8,9]); #anonyme zeiger
 # Rueckgabe: Array mit den Elementen, der Menge der Ueberschneidung.
 ###############################################################################
-sub arraysIntersec($$) {
+sub arraysIntersec2($$) {
 	#gewinnen der ganzen arrays:
   my @array1=@{$_[0]};
   my @array2=@{$_[1]};
@@ -1282,6 +1282,37 @@ sub arraysIntersec($$) {
   }
   
   return \@intersec;
+}
+
+sub arraysIntesecTest() {
+  my @a = ('a','b','c');
+  my @b = ('b','c','d');
+  
+  my @c = arraysIntesec(\@a,\@b);
+  
+  Log 3,"+++++++++++++++++> a:".Dumper(@a);
+  Log 3,"+++++++++++++++++> b:".Dumper(@b);
+  Log 3,"+++++++++++++++++> c:".Dumper(@c);  
+}
+
+sub arraysIntesec($$) {
+	my ($a1,$a2) = @_;
+	
+	my @array1 = @$a1; # erstes Array
+  my @array2 = @$a2; # zweites Array
+  my @final = ();  # Schnittmenge
+
+  foreach my $el (@array1) {
+    foreach my $el2 (@array2) {
+      if (defined $el2 && $el eq $el2) {
+        $final[$#final+1] = $el;
+        undef $el2;
+        last;
+      }
+    }
+  }
+
+  return @final;
 }
 
 
