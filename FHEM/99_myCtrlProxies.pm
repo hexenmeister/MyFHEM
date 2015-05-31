@@ -15,12 +15,8 @@ my $rooms;
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
   $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor","eg_wz_fk01","eg_wz_tk01","eg_wz_tk02"];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
-  # Definiert nutzbare Messwerte einzeln. Hat vorrang vor der Definition von kompletten Sensoren. Reihenfolge gibt Priorität an.
-  #ggf. for future use
-  #$rooms->{wohnzimmer}->{measurements}->{temperature}=["wz_raumsensor:temperature"];
-  #$rooms->{wohnzimmer}->{measurements_outdoor}->{temperature}=["hg_sensor:temperature"];
-  #$rooms->{wohnzimmer}->{measurements}->{pressure}=["wz_raumsensor:pressure"];
-  #$rooms->{wohnzimmer}->{measurements_outdoor}->{pressure}=["hg_sensor:pressure"];
+  # auch moeglich: Sensor mit der Liste der zu nutzenden Readings.
+  # $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor:temperature,humidity",...
   
   $rooms->{kueche}->{alias}="Küche";
   $rooms->{kueche}->{fhem_name}="Kueche";
@@ -367,7 +363,12 @@ sub HAL_AvgReadingValueFn($$) {
   	#Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
   }
   if($aCnt>0) {
-  	return $aVal / $aCnt;
+  	my $retVal = $aVal / $aCnt;
+  	my $ret;
+  	$ret->{value} = $retVal;
+  	#$ret->{time} = "test";
+  	# TODO: Time, Unit
+  	return $ret;
   }
   return undef;
 }
@@ -389,6 +390,7 @@ sub HAL_MinReadingValueFn($$) {
   		}
   	}
   }
+  # TODO: Time, Unit
   return $mVal;
 }
 
@@ -409,6 +411,7 @@ sub HAL_MaxReadingValueFn($$) {
   		}
   	}
   }
+  # TODO: Time, Unit
   return $mVal;
 }
 
@@ -427,6 +430,7 @@ sub HAL_ReadingTimeStrValueFn($$;$) {
   my $t = HAL_ReadingTimeValueFn($device, $record,$rName);
   
   if($t) {
+  	# TODO: Time, Unit
     return sec2Dauer($t);
   }
   return undef;
@@ -440,6 +444,7 @@ sub HAL_MotionTimeStrValueFn($$) {
 	my ($device, $record) = @_;
   my $t = HAL_MotionTimeValueFn($device, $record);
   if($t) {
+  	# TODO: Time, Unit
     return sec2Dauer($t);
   }
   return undef;
@@ -473,6 +478,7 @@ sub HAL_ReadingTimeValueFn($$;$) {
   	my $dTime = dateTime2dec($mTime);
   	my $diffTime = time() - $dTime;
   	
+  	# TODO: Time, Unit
   	return int($diffTime);
   }
   
@@ -496,6 +502,7 @@ sub HAL_MotionValueFn($$) {
   	my $dTime = dateTime2dec($mTime);
   	my $diffTime = time() - $dTime;
   	
+  	# TODO: Time, Unit
   	return $diffTime < $pTime?1:0;
   }
   
@@ -550,6 +557,8 @@ sub HAL_MotionValueFn($$) {
     $record->{oldVal}=$newVal;  #TODO: Dauerhaft (Neustartsicher) speichern (Reading?)
     $record->{oldTime}=time();
     #Log 3,'>------------> => newVal '.$newVal;
+    
+    # TODO: Time, Unit
     return $newVal;
   }
     
@@ -1299,19 +1308,26 @@ sub myCtrlProxies_Initialize($$);
 
 
 # Rooms
-sub HAL_getRoom($);
+sub HAL_getRooms();
+sub HAL_getRoomRecord($);
+sub HAL_getRoomNames();
 #sub HAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
 #sub HAL_getActions(;$); # <DevName>
 
 sub HAL_getRoomSensorNames($);
 sub HAL_getRoomOutdoorSensorNames($);
+sub HAL_getRoomSensorReadingsList($;$);
+sub HAL_getRoomOutdoorSensorReadingsList($;$);
 
-sub HAL_getRoomMeasurementRecord($$);
-sub HAL_getRoomMeasurementValue($$);
+sub HAL_getRoomReadingRecord($$);
+sub HAL_getRoomOutdoorReadingRecord($$);
+sub HAL_getRoomReadingValue($$;$$);
 
 
 # Sensoren
-sub HAL_getSensor($);
+sub HAL_getSensors();
+sub HAL_getSensorNames();
+sub HAL_getSensorRecord($);
 sub HAL_getSensorReadingsList($);
 sub HAL_getSensorValueRecord($$);
 sub HAL_getSensorReadingValue($$);
@@ -1323,6 +1339,11 @@ sub HAL_getSensorReadingTime($$);
 # 
 #sub HAL_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
+# Readings
+sub HAL_getReadingRecord($); # "sname:rname" => HAL_getSensorValueRecord
+sub HAL_getReadingValue($);  # "sname:rname" => HAL_getSensorReadingValue
+sub HAL_getReadingUnit($);   # "sname:rname" => HAL_getSensorReadingUnit
+sub HAL_getReadingTime($);   # "sname:rname" => HAL_getSensorReadingTime
 
 #
 
@@ -1342,26 +1363,26 @@ myCtrlProxies_Initialize($$)
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte
-# Param Room-Name, Measurement-Name
+# Param Room-Name, Reading-Name
 # return ReadingsRecord
-sub HAL_getRoomMeasurementRecord($$) {
-	my ($roomName, $measurementName) = @_;
-	return HAL_getRoomMeasurementRecord_($roomName, $measurementName, "");
+sub HAL_getRoomReadingRecord($$) {
+	my ($roomName, $readingName) = @_;
+	return HAL_getRoomReadingRecord_($roomName, $readingName, "");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte
-# Param Room-Name, Measurement-Name
+# Param Room-Name, Reading-Name
 # return ReadingsRecord
-sub HAL_getRoomOutdoorMeasurementRecord($$) {
-	my ($roomName, $measurementName) = @_;
-	return HAL_getRoomMeasurementRecord_($roomName, $measurementName, "_outdoor");
+sub HAL_getRoomOutdoorReadingRecord($$) {
+	my ($roomName, $readingName) = @_;
+	return HAL_getRoomReadingRecord_($roomName, $readingName, "_outdoor");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte und Sensorliste (Internal)
-# Param Room-Name, Measurement-Name, Name der Liste (sensors, sensors_outdoor)
+# Param Room-Name, Reading-Name, Name der Liste (sensors, sensors_outdoor)
 # return ReadingsRecord
-sub HAL_getRoomMeasurementRecord_($$$) {
-	my ($roomName, $measurementName, $listNameSuffix) = @_;
+sub HAL_getRoomReadingRecord_($$$) {
+	my ($roomName, $readingName, $listNameSuffix) = @_;
 	my $listName.="sensors".$listNameSuffix;
 	
 	#TODO: EinzelReadings
@@ -1369,15 +1390,79 @@ sub HAL_getRoomMeasurementRecord_($$$) {
 	my $sensorList = HAL_getRoomSensorNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
-	foreach my $sName (@$sensorList) {
-		if(!defined($sName)) {next;} 
-		my $rec = HAL_getSensorValueRecord($sName, $measurementName);
+	# Wenn Reading mit Sensorname ubergeben wurde
+	my($tsname,$trname) = split(/:/,$readingName);
+	#Log 3,"+++++++++++++++++> ::::: ".$tsname." > :: ".$trname;
+	if($trname) {
+		# Pruefen, ob dieser Sensor in der aktuellen Raum-Liste bekannt ist
+		my $found=0;
+		foreach my $tsn (@{$sensorList}) {
+			#Log 3,"+++++++++++++++++> 1: ".$tsn." > 2: ".$tsname;
+			my($tsnSN,$tsnRest) = split(/:/,$tsn);
+			if($tsnSN eq $tsname) {
+				if($tsnRest) {
+					#Log 3,"+++++++++++++++++> XXX ".$tsnSN." > :: ".$tsnRest;
+					# ggf. auch (kommaseparierte) Liste der ReadingsNamen pruefen
+					my @aRN = split(/,\s*/,$tsnRest);
+					foreach my $tRN (@aRN) {
+						if($tRN eq $trname) {
+							$found=1;
+	  			    last;
+						}
+					}
+				  if($found) {last;}
+				} else {
+  				$found=1;
+	  			last;
+	  		}
+			}
+		}
+		if(!$found) { return undef };
+		#Log 3,"+++++++++++++++++> >>> ".$tsname." > :: ".$trname;
+		my $rec = HAL_getSensorValueRecord($tsname, $trname);
 		if(defined $rec) {
-			my $roomRec=HAL_getRoom($roomName);
+			my $roomRec=HAL_getRoomRecord($roomName);
 			$rec->{room_alias}=$roomRec->{alias};
 			$rec->{room_fhem_name}=$roomRec->{fhem_name};
 			# XXX: ggf. weitere Room Eigenschaften
 			return $rec;
+		}
+	}
+	
+	foreach my $sName (@$sensorList) {
+		if(!defined($sName)) {next;} 
+		Log 3,"+++++++++++++++++> >>> ".$sName." > :: ".$readingName;
+		# Pruefen, ob in den sName auch Reading(s) angegeben sind (in Raumdefinition)
+		my($tsname,$trname) = split(/:/,$sName);
+		if($trname) {
+		  #TODO: Pruefung, ob in trname readingName enthalten ist
+		  my @aRN = split(/,\s*/,$trname);
+		  my $found=0;
+		  foreach my $tRN (@aRN) {
+				if($tRN eq $readingName) {
+					$found=1;
+			    last;
+				}
+			}
+			if(!$found) { next; }
+		  
+		  my $rec = HAL_getSensorValueRecord($tsname, $readingName);
+	  	if(defined $rec) {
+		  	my $roomRec=HAL_getRoomRecord($roomName);
+			  $rec->{room_alias}=$roomRec->{alias};
+			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
+			  # XXX: ggf. weitere Room Eigenschaften
+			  return $rec;
+		  }
+		} else {
+  		my $rec = HAL_getSensorValueRecord($sName, $readingName);
+	  	if(defined $rec) {
+		  	my $roomRec=HAL_getRoomRecord($roomName);
+			  $rec->{room_alias}=$roomRec->{alias};
+			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
+			  # XXX: ggf. weitere Room Eigenschaften
+			  return $rec;
+		  }
 		}
 	}
 	
@@ -1386,12 +1471,12 @@ sub HAL_getRoomMeasurementRecord_($$$) {
 
 
 # Liefert angeforderte Messwerte
-# Param Room-Name, Measurement-Name, Default1, Default2
+# Param Room-Name, Reading-Name, Default1, Default2
 # return ReadingsWert
 # Wenn kein Wert gefunden werden kann, wird Default1 zurückgageben (wenn angegeben, ansonsten undef)
 # Wenn Default2 angegeben, dann wird dieser zurückgegeben, falls Raum nicht bekannt ist, ansonsten Default1 (wenn nicht angegeben - undef)
-sub HAL_getRoomMeasurementValue($$;$$) {
-	my ($roomName, $measurementName, $def1, $def2) = @_;
+sub HAL_getRoomReadingValue($$;$$) {
+	my ($roomName, $readingName, $def1, $def2) = @_;
 	
 	$def2 = $def1 unless defined($def2); 
 	
@@ -1400,7 +1485,7 @@ sub HAL_getRoomMeasurementValue($$;$$) {
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
-		my $val = HAL_getSensorReadingValue($sName, $measurementName);
+		my $val = HAL_getSensorReadingValue($sName, $readingName);
 		if(defined $val) {return $val;}
 	}
 	
@@ -1419,13 +1504,24 @@ sub HAL_getRoomMeasurementValue($$;$$) {
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
 sub 
-HAL_getSensor($)
+HAL_getSensorRecord($)
 {
 	my ($name) = @_;
 	return undef unless $name;
-	my $ret = $sensors->{$name};
+	my $ret = HAL_getSensors()->{$name};
 	$ret->{name} = $name; # Name hinzufuegen
 	return $ret;
+}
+
+# Liefert HASH mit Sensor-Definitionen
+sub HAL_getSensors() {
+  return $sensors;
+}
+
+# Liefert Liste der Sensornamen.
+sub HAL_getSensorNames() {
+	my $r = HAL_getSensors();
+	return keys($r);
 }
 
 # returns Room-Record by name
@@ -1436,11 +1532,22 @@ HAL_getSensor($)
 # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
 #  X->{name}->{sensors}   =(<Liste der Namen>);
 #  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
-sub HAL_getRoom($) {
+sub HAL_getRoomRecord($) {
 	my ($name) = @_;
-	my $ret = $rooms->{$name};
+	my $ret = HAL_getRooms()->{$name};
 	$ret->{name} = $name; # Name hinzufuegen
 	return $ret;
+}
+
+# Liefert HASH mit Raum-Definitionen
+sub HAL_getRooms() {
+  return $rooms;
+}
+
+# Liefert Liste der Raumnamen.
+sub HAL_getRoomNames() {
+	my $r = HAL_getRooms();
+	return keys($r);
 }
 
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
@@ -1466,12 +1573,58 @@ sub HAL_getRoomOutdoorSensorNames($)
 sub HAL_getRoomSensorNames_($$)
 {
 	my ($roomName, $listName) = @_;
-	my $roomRec=HAL_getRoom($roomName);
+	my $roomRec=HAL_getRoomRecord($roomName);
 	return undef unless $roomRec;
 	my $sensorList=$roomRec->{$listName};
 	return undef unless $sensorList;
 	
 	return $sensorList;
+}
+
+# liefert liste aller veruegbaren Readings in einem Raum
+# Param: Raumname, 
+#        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
+#              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
+sub HAL_getRoomSensorReadingsList($;$) {
+	my ($roomName,$withSensorNames) = @_;
+  return HAL_getRoomSensorReadingsList_($roomName,'sensors',$withSensorNames);
+}
+
+# liefert liste aller veruegbaren Readings in einem Raum für Außenbereich
+# Param: Raumname, 
+#        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
+#              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
+sub HAL_getRoomOutdoorSensorReadingsList($;$) {
+	my ($roomName,$withSensorNames) = @_;
+  return HAL_getRoomSensorReadingsList_($roomName,'sensors_outdoor',$withSensorNames);
+}
+
+# liefert liste aller veruegbaren Readings in einem Raum
+# Param: Raumname, 
+#        Liste (sensors, sensors_outdoor)
+#        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
+#              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
+sub HAL_getRoomSensorReadingsList_($$;$) {
+	my ($roomName,$listName,$withSensorNames) = @_;
+	
+	my $snames = HAL_getRoomSensorNames_($roomName,$listName);
+	my @rnames = ();
+	#Log 3,"+++++++++++++++++> SNames: ".Dumper($snames);
+	foreach my $sname (@{$snames}) {
+		#Log 3,"+++++++++++++++++> Name:".$sname." | ".Dumper($sname);
+		my @tnames = HAL_getSensorReadingsList($sname);
+		if($withSensorNames) {
+			@tnames = map {$sname.':'.$_} @tnames;
+		}
+		@rnames = (@rnames, @tnames);
+	}
+	
+	if(!$withSensorNames) {
+	  #distinct
+		@rnames = keys { map { $_ => 1 } @rnames };
+	}
+	
+	return @rnames;
 }
 
 
@@ -1499,14 +1652,14 @@ sub HAL_getRoomSensorNames_($$)
 #sub HAL_getRoomSensors_($$)
 #{
 #	my ($roomName, $listName) = @_;
-#	my $roomRec=HAL_getRoom($roomName);
+#	my $roomRec=HAL_getRoomRecord($roomName);
 #	return undef unless $roomRec;
 #	my $sensorList=$roomRec->{$listName};
 #	return undef unless $sensorList;
 #	
 #	my @ret;
 #	foreach my $sName (@{$sensorList}) {
-#		my $sRec = HAL_getSensor($sName);
+#		my $sRec = HAL_getSensorRecord($sName);
 #		push(@ret, \%{$sRec}) if $sRec ;
 #	}
 #	
@@ -1519,7 +1672,7 @@ sub HAL_getRoomSensorNames_($$)
 sub HAL_getSensorReadingsList($) {
 	my ($name) = @_;
 	
-	my $record = HAL_getSensor($name);
+	my $record = HAL_getSensorRecord($name);
 	
 	if(defined($record)) {
 		# Eigene Readings
@@ -1531,9 +1684,9 @@ sub HAL_getSensorReadingsList($) {
 	  foreach my $composite_rec (@{$composites}) {
 		  my($composite_name,$composite_readings_names)= split(/:/,$composite_rec);
 		  if($composite_name) {
-		  	my @a_composite_readings_names = split(/,/,$composite_readings_names);
 		  	my @composite_readings = HAL_getSensorReadingsList($composite_name);
   		  if(defined($composite_readings_names)) {
+  		  	my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
 	  	  	@composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
 		    }
 		    
@@ -1567,7 +1720,7 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 	foreach my $composite_rec (@{$composites}) {
 		my($composite_name,$composite_readings)= split(/:/,$composite_rec);
 		if(defined($composite_readings)) {
-			my @a_composite_readings = split(/,/,$composite_readings);
+			my @a_composite_readings = split(/,\s*/,$composite_readings);
 			#Log 3,"+++++++++++++++++> R:".$reading." A: ".Dumper(@a_composite_readings);
 			my $found=0;
 			for my $aval (@a_composite_readings) { if($aval eq $reading) {$found=1;last;} }
@@ -1575,7 +1728,7 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 			  next;
 		  }
 		}
-		my $new_device_record = HAL_getSensor($composite_name);
+		my $new_device_record = HAL_getSensorRecord($composite_name);
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
 			return ($new_device_record2, $new_single_reading_record);
@@ -1594,7 +1747,7 @@ sub
 HAL_getSensorReadingRecord($$)
 {
 	my ($name, $reading) = @_;
-	my $record = HAL_getSensor($name);
+	my $record = HAL_getSensorRecord($name);
 	
 	if(defined($record)) {
     return HAL_getSensorReadingCompositeRecord_intern($record,$reading);
@@ -1799,6 +1952,38 @@ sub HAL_getSensorReadingTime($$)
 	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{time};
+}
+
+# Liefert Record fuer eine Reading eines Sensors
+# Param: Spec in Form SensorName:ReadingName
+sub HAL_getReadingRecord($) {
+	my($readingSpec) = @_;
+	my($sNamem,$rName) = split(/:/,$readingSpec);
+	return HAL_getSensorValueRecord($sNamem,$rName);
+}
+
+# Liefert Value einer Reading eines Sensors
+# Param: Spec in Form SensorName:ReadingName
+sub HAL_getReadingValue($) {
+	my($readingSpec) = @_;
+	my($sNamem,$rName) = split(/:/,$readingSpec);
+	return HAL_getSensorReadingValue($sNamem,$rName);
+}
+
+# Liefert Unit einer Reading eines Sensors
+# Param: Spec in Form SensorName:ReadingName
+sub HAL_getReadingUnit($) {
+	my($readingSpec) = @_;
+	my($sNamem,$rName) = split(/:/,$readingSpec);
+	return HAL_getSensorReadingUnit($sNamem,$rName);
+}
+
+# Liefert Time einer Reading eines Sensors
+# Param: Spec in Form SensorName:ReadingName
+sub HAL_getReadingTime($) {
+	my($readingSpec) = @_;
+	my($sNamem,$rName) = split(/:/,$readingSpec);
+	return HAL_getSensorReadingTime($sNamem,$rName);
 }
 
 #------------------------------------------------------------------------------
