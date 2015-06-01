@@ -349,6 +349,9 @@ sub HAL_AvgReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	# keine 'dead' Sensoren verwenden. 
+	my $time;
+	my $unit;
+	my $rname;
   my $aVal = 0;
   my $aCnt = 0;
   foreach my $a (@{$senList}) {
@@ -359,6 +362,9 @@ sub HAL_AvgReadingValueFn($$) {
   		$aCnt += 1;
   		my $sVal = $sRec->{value};
   		$aVal += $sVal;
+  		if(!defined($unit)) { $unit = $sRec->{unit}; }
+  		if(!defined($rname)) { $rname = $sRec->{reading}; }
+  		if($time lt $sRec->{time}) { $time = $sRec->{time}; }
   	}
   	#Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
   }
@@ -366,8 +372,9 @@ sub HAL_AvgReadingValueFn($$) {
   	my $retVal = $aVal / $aCnt;
   	my $ret;
   	$ret->{value} = $retVal;
-  	#$ret->{time} = "test";
-  	# TODO: Time, Unit
+  	$ret->{unit} = $unit;
+  	$ret->{time} = $time;
+  	$ret->{reading} = $rname;
   	return $ret;
   }
   return undef;
@@ -379,6 +386,9 @@ sub HAL_MinReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	# keine 'dead' Sensoren verwenden. 
+	my $time;
+	my $unit;
+	my $rname;
   my $mVal = undef;
   foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
@@ -387,11 +397,18 @@ sub HAL_MinReadingValueFn($$) {
   		my $sVal = $sRec->{value};
   		if(!defined($mVal) || $sVal<$mVal) {
   		  $mVal = $sVal;
+  		  $unit = $sRec->{unit};
+  		  $time = $sRec->{time};
+  		  $rname = $sRec->{reading};
   		}
   	}
   }
-  # TODO: Time, Unit
-  return $mVal;
+  my $ret;
+	$ret->{value} = $mVal;
+	$ret->{unit} = $unit;
+	$ret->{time} = $time;
+	$ret->{reading} = $rname;
+	return $ret;
 }
 
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Max. Wert aller Readings.
@@ -399,7 +416,10 @@ sub HAL_MinReadingValueFn($$) {
 sub HAL_MaxReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
-	# keine 'dead' Sensoren verwenden. 
+	# keine 'dead' Sensoren verwenden.
+	my $time;
+	my $unit;
+	my $rname;
   my $mVal = undef;
   foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
@@ -408,11 +428,18 @@ sub HAL_MaxReadingValueFn($$) {
   		my $sVal = $sRec->{value};
   		if(!defined($mVal) || $sVal>$mVal) {
   		  $mVal = $sVal;
+  		  $unit = $sRec->{unit};
+  		  $time = $sRec->{time};
+  		  $rname = $sRec->{reading};
   		}
   	}
   }
-  # TODO: Time, Unit
-  return $mVal;
+  my $ret;
+	$ret->{value} = $mVal;
+	$ret->{unit} = $unit;
+	$ret->{time} = $time;
+	$ret->{reading} = $rname;
+	return $ret;
 }
 
 # ValueFn: Benutzt Time der angegebenen Reading 
@@ -430,8 +457,14 @@ sub HAL_ReadingTimeStrValueFn($$;$) {
   my $t = HAL_ReadingTimeValueFn($device, $record,$rName);
   
   if($t) {
-  	# TODO: Time, Unit
-    return sec2Dauer($t);
+  	if(ref $t eq ref {}) {
+		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
+    	$t->{value} = sec2Dauer($t);
+    	return $t;
+    } else {
+    	# Scalar-Wert annehmen
+    	return sec2Dauer($t);
+    }
   }
   return undef;
 }
@@ -444,8 +477,14 @@ sub HAL_MotionTimeStrValueFn($$) {
 	my ($device, $record) = @_;
   my $t = HAL_MotionTimeValueFn($device, $record);
   if($t) {
-  	# TODO: Time, Unit
-    return sec2Dauer($t);
+  	if(ref $t eq ref {}) {
+		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
+    	$t->{value} = sec2Dauer($t);
+    	return $t;
+    } else {
+    	# Scalar-Wert annehmen
+    	return sec2Dauer($t);
+    }
   }
   return undef;
 }
@@ -478,8 +517,10 @@ sub HAL_ReadingTimeValueFn($$;$) {
   	my $dTime = dateTime2dec($mTime);
   	my $diffTime = time() - $dTime;
   	
-  	# TODO: Time, Unit
-  	return int($diffTime);
+  	my $ret;
+  	$ret->{value} = int($diffTime);
+  	$ret->{time} = TimeNow();
+  	return $ret;
   }
   
   return undef;
@@ -502,8 +543,11 @@ sub HAL_MotionValueFn($$) {
   	my $dTime = dateTime2dec($mTime);
   	my $diffTime = time() - $dTime;
   	
-  	# TODO: Time, Unit
-  	return $diffTime < $pTime?1:0;
+  	#return $diffTime < $pTime?1:0;
+  	my $ret;
+  	$ret->{value} = $diffTime < $pTime?1:0;
+  	$ret->{time} = TimeNow();
+  	return $ret;
   }
   
   return 0;
@@ -558,8 +602,11 @@ sub HAL_MotionValueFn($$) {
     $record->{oldTime}=time();
     #Log 3,'>------------> => newVal '.$newVal;
     
-    # TODO: Time, Unit
-    return $newVal;
+    #return $newVal;
+    my $ret;
+    $ret->{value} = $newVal;
+  	$ret->{time} = TimeNow();
+  	return $ret;
   }
     
 sub HAL_round0($) {
@@ -1384,9 +1431,7 @@ sub HAL_getRoomOutdoorReadingRecord($$) {
 sub HAL_getRoomReadingRecord_($$$) {
 	my ($roomName, $readingName, $listNameSuffix) = @_;
 	my $listName.="sensors".$listNameSuffix;
-	
-	#TODO: EinzelReadings
-	
+		
 	my $sensorList = HAL_getRoomSensorNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
@@ -1435,7 +1480,7 @@ sub HAL_getRoomReadingRecord_($$$) {
 		# Pruefen, ob in den sName auch Reading(s) angegeben sind (in Raumdefinition)
 		my($tsname,$trname) = split(/:/,$sName);
 		if($trname) {
-		  #TODO: Pruefung, ob in trname readingName enthalten ist
+		  #Pruefung, ob in trname readingName enthalten ist
 		  my @aRN = split(/,\s*/,$trname);
 		  my $found=0;
 		  foreach my $tRN (@aRN) {
