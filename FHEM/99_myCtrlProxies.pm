@@ -342,6 +342,7 @@ my $sensors;
   $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
   $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   
+  # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
   
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Durchschnittswert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
@@ -364,7 +365,9 @@ sub HAL_AvgReadingValueFn($$) {
   		$aVal += $sVal;
   		if(!defined($unit)) { $unit = $sRec->{unit}; }
   		if(!defined($rname)) { $rname = $sRec->{reading}; }
-  		if($time lt $sRec->{time}) { $time = $sRec->{time}; }
+  		if($time && $sRec->{time}) {
+    		if($time lt $sRec->{time}) { $time = $sRec->{time}; }
+    	}
   	}
   	#Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
   }
@@ -479,7 +482,7 @@ sub HAL_MotionTimeStrValueFn($$) {
   if($t) {
   	if(ref $t eq ref {}) {
 		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
-    	$t->{value} = sec2Dauer($t);
+    	$t->{value} = sec2Dauer($t->{value});
     	return $t;
     } else {
     	# Scalar-Wert annehmen
@@ -1855,10 +1858,11 @@ sub HAL_getReadingsValueRecord($$) {
 		my $val=undef;
 		my $time=undef;
 		my $ret;
-		
+	
 		my $link = $record->{link};
 		if($link) {
 			my($sensorName,$readingName) = split(/:/, $link);
+			
 			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
 			return undef unless $readingName;
 			return HAL_getSensorValueRecord($sensorName,$readingName);
@@ -1896,10 +1900,12 @@ sub HAL_getReadingsValueRecord($$) {
     }
     
     $ret->{value}     =$val if(defined $val);
+    $val = $ret->{value};
     
     # ValueFilterFn
     my $valueFilterFn =  $record->{ValueFilterFn};
-		if($valueFilterFn) {
+    if($valueFilterFn) {
+    	#Log 3,"+++++++++++++++++> D: ".$val;
 			if($valueFilterFn=~m/\{.*\}/) {
 	    	# Klammern: direkt evaluieren
 	    	my $VAL = $val;
@@ -1911,6 +1917,7 @@ sub HAL_getReadingsValueRecord($$) {
         if(defined($r)) {
         	$val=$r;
         }
+	    #Log 3,"+++++++++++++++++> R: ".$val;
 	    }
 	    
 	    $ret->{value}     =$val if(defined $val);
@@ -1951,6 +1958,7 @@ sub HAL_getReadingsValueRecord($$) {
     $ret->{unit}      =$record->{unit};
     $ret->{alias}     =$record->{alias};
     $ret->{fhem_name} =$device->{fhem_name};
+    $ret->{sensor_name} =$device->{name};
     $ret->{reading}   =$record->{reading};
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
