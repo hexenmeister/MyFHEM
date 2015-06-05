@@ -1197,6 +1197,7 @@ sub rundeZahl0($) {
 # Rundet eine Zahl mit 1-er Nachkommastelle
 sub rundeZahl1($) {
 	my($val)=@_;
+	return undef unless defined($val);
 	# Prüfen, ob numerisch
 	if(int($val)>0) {
 		$val = int(10*$val+0.5)/10;
@@ -1315,7 +1316,18 @@ sub arraysIntesec($$) {
   return @final;
 }
 
+# Convert between radians and degrees (2π radians equals 360 degrees).
+use constant PI => 3.14159265358979;
 
+sub deg2rad {
+    my $degrees = shift;
+    return ($degrees / 180) * PI;
+}
+
+sub rad2deg {
+    my $radians = shift;
+    return ($radians / PI) * 180;
+}
 
 #####Icon Download#####
 sub
