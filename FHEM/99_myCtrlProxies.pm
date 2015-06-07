@@ -17,6 +17,7 @@ my $rooms;
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # auch moeglich: Sensor mit der Liste der zu nutzenden Readings.
   # $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor:temperature,humidity",...
+  # TODO: ROllostand: Kombiniert ("eg_wz_rl01",..)
   
   $rooms->{kueche}->{alias}="Küche";
   $rooms->{kueche}->{fhem_name}="Kueche";
@@ -343,6 +344,155 @@ my $sensors;
   $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   
   # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
+  # Fenster-Höhen: WZ: 115 (unten 92), Terrassentuer: 112
+  $sensors->{virtual_wz_fenster}->{alias}    = "Wohnzimmer Fenster";
+  $sensors->{virtual_wz_fenster}->{type}     = "virtual";
+  $sensors->{virtual_wz_fenster}->{location} = "wohnzimmer";
+  $sensors->{virtual_wz_fenster}->{comment}  = "Wohnzimmer: Fenster: Zustand und Sonne";
+  $sensors->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state","eg_wz_rl01:level","twilight_sensor:azimuth,elevation"];
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{1.15}";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{unit} = "m";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{0.92}";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
+  $sensors->{virtual_wz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';#'{my $t=HAL_getSensorReadingValue("eg_wz_fk01","state");$t eq "closed"?1:0}';
+  $sensors->{virtual_wz_fenster}->{readings}->{secure}->{FnParams} = ['eg_wz_fk01:state'];
+  $sensors->{virtual_wz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
+  $sensors->{virtual_wz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [240,290];
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [1.15];
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
+  
+  # + state: sensor: eg_wz_fk01:state
+  # + secure: 0,1
+  # + Sonnenseite? 240° bis 290° (ca.)  sunny side
+  # Sonne scheint ins Fenster: sunny (sunny_side + Helligkeit)
+  # + Länge des Sonnenflecks im Zimmer
+  # + rollostand
+
+# ValueFn: Berechnet, wieweit die Sonne aktuell ins Zimmer hineinstrahlt (am Boden). Beruecksichtigt nur Azimuth/Elevation, nicht die aktuelle Intensitaet.
+# FnParams: Fensterhoehe (Oberkante)
+sub HAL_WinSunRoomRange($$) {
+	my ($device, $record) = @_;
+	my $params = $record->{FnParams};
+	
+	my $val = 0;
+	my $msg = undef;
+	
+	my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+	if($sRec) {
+		my $elevation = $sRec->{value};
+		if($elevation<=0) {
+			$val = 0;
+		  $msg = 'night';
+		} else {
+  		my $height = @{$params}[0];
+	  	$val = $height/tan(deg2rad($elevation));
+		  $msg = 'elevation: $elevation, height: $height';
+		}
+	} else {
+		$val = 0;
+		$msg = 'error: elevation';
+	}
+	
+	my $ret;
+	$ret->{value} = $val;
+	$ret->{time} = TimeNow();
+	$ret->{reading} = $record->{name};
+	$ret->{message} = $msg;
+	return $ret;
+	
+}
+
+# ValueFn: Prueft, ob das Fenster auf der Sonnenseite ist (Sonne ist zum Fenster zugewandt: Azimut) und nicht Nacht ist (Elevation).
+# FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
+sub HAL_WinSunnySideValueFn($$) {
+	my ($device, $record) = @_;
+	my $params = $record->{FnParams};
+	
+	my $val = 0;
+	my $msg = undef;
+	
+	my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+	if($sRec) {
+		if($sRec->{value} < 10) { # XXX fester Wert für Sonnenwinkel. 10 OK?
+			$val = 0;
+	    $msg = 'dark: elevation';
+		} else {
+			$sRec = HAL_getSensorValueRecord($device->{name},'azimuth');
+			if($sRec) {
+				my $t = $sRec->{value};
+				if($t > @{$params}[0] && $t < @{$params}[1]) {
+				  $val = 1;
+		      $msg = 'sunny';	
+				} else {
+					$val = 0;
+		      $msg = 'dark: azimuth';
+				}
+			} else {
+				$val = 0;
+		    $msg = 'error: azimuth';
+			}
+		}
+	} else {
+		$val = 0;
+		    $msg = 'error: elevation';
+	}
+	
+	my $ret;
+	$ret->{value} = $val;
+	$ret->{time} = TimeNow();
+	$ret->{reading} = $record->{name};
+	$ret->{message} = $msg;
+	return $ret;
+}
+
+  
+# ValueFn: Fragt angegebene (Fenster)Sensoren ab un liefert den Sicherheitsstand (ob alles geschlossen ist).
+# FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
+sub HAL_WinSecureStateValueFn($$) {
+	my ($device, $record) = @_;
+	my $senList = $record->{FnParams};
+	
+	my $secure = 1;
+	my $msg = undef;
+	
+	foreach my $a (@{$senList}) {
+  	my($sensorName,$readingName) = split(/:/, $a);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+  	if(!defined($sRec)) {
+  		$secure=0;
+  		$msg = 'error: undefined sensor';
+  		last;
+  	} elsif(!$sRec->{alive}) {
+  		$secure=0;
+  		$msg = 'dead sensor';
+  		last;
+  	} else {
+  	  if($sRec->{value} ne 'closed') {
+  	  	$secure=0;
+  		  $msg = 'insecure state: '.$sRec->{value};
+  		  last;
+  	  }
+  	}
+  }
+  
+  my $ret;
+	$ret->{value} = $secure;
+	$ret->{time} = TimeNow();
+	$ret->{reading} = $record->{name};
+	$ret->{message} = $msg;
+	return $ret;
+}  
+  
   
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Durchschnittswert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
@@ -1149,6 +1299,15 @@ sub HAL_round2($) {
   $sensors->{eg_ku_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #TODO: Mapping f. Zustaende: closed => geschlossen?
   
+  $sensors->{eg_wz_rl01}->{alias}     ="Rollo";
+  $sensors->{eg_wz_rl01}->{fhem_name} ="wz_rollo_l";
+  $sensors->{eg_wz_rl01}->{type}      ="HomeMatic";
+  $sensors->{eg_wz_rl01}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_rl01}->{comment}   ="Rollostand";
+  $sensors->{eg_wz_rl01}->{readings}->{level} ->{reading}   ="level";
+  $sensors->{eg_wz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
+  $sensors->{eg_wz_rl01}->{readings}->{level} ->{unit} ="%";
+  
   $sensors->{eg_wz_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{eg_wz_fk01}->{fhem_name} ="EG_WZ_FK01.Fenster";
   $sensors->{eg_wz_fk01}->{type}      ="HomeMatic";
@@ -1759,7 +1918,11 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 	
 	my $readings_record = $device_record->{readings};
 	my $single_reading_record = $readings_record->{$reading};
-	return ($device_record, $single_reading_record) if $single_reading_record;
+	
+	if ($single_reading_record) {
+		$single_reading_record->{reading} = $reading;
+	  return ($device_record, $single_reading_record);
+	}
 	
 	# composites verarbeiten
 	# e.g.  $sensors->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); 
@@ -1779,6 +1942,7 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 		my $new_device_record = HAL_getSensorRecord($composite_name);
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
+			$new_single_reading_record->{reading} = $reading;
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
@@ -1958,7 +2122,7 @@ sub HAL_getReadingsValueRecord($$) {
     $ret->{unit}      =$record->{unit};
     $ret->{alias}     =$record->{alias};
     $ret->{fhem_name} =$device->{fhem_name};
-    $ret->{sensor_name} =$device->{name};
+    $ret->{sensor} =$device->{name};
     $ret->{reading}   =$record->{reading};
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
