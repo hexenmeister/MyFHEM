@@ -13,15 +13,15 @@ my $rooms;
   $rooms->{wohnzimmer}->{alias}="Wohnzimmer";
   $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
-  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor","eg_wz_fk01","eg_wz_tk01","eg_wz_tk02"];
+  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor","eg_wz_fk01","eg_wz_tk01","eg_wz_tk02","virtual_wz_fenster","virtual_wz_terrassentuer"];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # auch moeglich: Sensor mit der Liste der zu nutzenden Readings.
   # $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor:temperature,humidity",...
-  # TODO: ROllostand: Kombiniert ("eg_wz_rl01",..)
+  # TODO: ROllostand: Kombiniert ("eg_wz_rl01","eg_wz_rl02"..)
   
   $rooms->{kueche}->{alias}="Küche";
   $rooms->{kueche}->{fhem_name}="Kueche";
-  $rooms->{kueche}->{sensors}=["ku_raumsensor","eg_ku_fk01"];
+  $rooms->{kueche}->{sensors}=["ku_raumsensor","eg_ku_fk01","virtual_ku_fenster"];
   $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht_th","hg_sensor"]; 
     
   $rooms->{umwelt}->{alias}="Umwelt";
@@ -332,7 +332,7 @@ my $sensors;
   $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
   $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
   $sensors->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
-  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_AvgReadingValueFn";
+  $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
   $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
   $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
   $sensors->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
@@ -344,13 +344,13 @@ my $sensors;
   $sensors->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   
   # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
-  # Fenster-Höhen: WZ: 115 (unten 92), Terrassentuer: 112
+  # Fenster-Höhen: WZ: 210 (unten 92), Terrassentuer: 207, Kueche: 212
   $sensors->{virtual_wz_fenster}->{alias}    = "Wohnzimmer Fenster";
   $sensors->{virtual_wz_fenster}->{type}     = "virtual";
   $sensors->{virtual_wz_fenster}->{location} = "wohnzimmer";
   $sensors->{virtual_wz_fenster}->{comment}  = "Wohnzimmer: Fenster: Zustand und Sonne";
-  $sensors->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state","eg_wz_rl01:level","twilight_sensor:azimuth,elevation"];
-  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{1.15}";
+  $sensors->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state","eg_wz_rl01:level","twilight_sensor:azimuth,elevation","virtual_umwelt_sensor"];
+  $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.10}";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{unit} = "m";
@@ -358,23 +358,97 @@ my $sensors;
   $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_wall_thickness}->{ValueFn} = "{0.38}";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_wall_thickness}->{alias}   = "Korrekturfaktor Wanddicke";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_wall_thickness}->{comment} = "Korrektur fuer die Wand/Rolladenkasten-Dicke";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_wall_thickness}->{unit} = "m";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
+  #$sensors->{virtual_wz_fenster}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
   $sensors->{virtual_wz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';#'{my $t=HAL_getSensorReadingValue("eg_wz_fk01","state");$t eq "closed"?1:0}';
   $sensors->{virtual_wz_fenster}->{readings}->{secure}->{FnParams} = ['eg_wz_fk01:state'];
   $sensors->{virtual_wz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $sensors->{virtual_wz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
-  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [240,290];
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315]; # zu beachtender Winkel (Azimuth): von, bis
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
-  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [1.15];
+  $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
+
+  $sensors->{virtual_wz_terrassentuer}->{alias}    = "Wohnzimmer Terrassentuer";
+  $sensors->{virtual_wz_terrassentuer}->{type}     = "virtual";
+  $sensors->{virtual_wz_terrassentuer}->{location} = "wohnzimmer";
+  $sensors->{virtual_wz_terrassentuer}->{comment}  = "Wohnzimmer: Terrassentuer: Zustand und Sonne";
+  $sensors->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk01:state","eg_wz_rl02:level","twilight_sensor:azimuth,elevation","virtual_umwelt_sensor"]; # TODO: Kombiniertes 2-KontaktSensor
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{ValueFn} = "{2.07}";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{alias}   = "Hoehe";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{unit} = "m";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{ValueFn} = "{0.12}";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{unit} = "m";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{ValueFn} = "{0.38}";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{alias}   = "Korrekturfaktor Wanddicke";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{comment} = "Korrektur fuer die Wand/Rolladenkasten-Dicke";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{unit} = "m";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
+  #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{FnParams} = ['eg_wz_tk01:state']; # TODO: Kombiniertes 2-KontaktSensor
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{alias}   = "gesichert";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{FnParams} = [195,315]; # Beachten Winkel (Azimuth): von, bis
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{FnParams} = [2.07, 0.58, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
+
+  $sensors->{virtual_ku_fenster}->{alias}    = "Kueche Fenster";
+  $sensors->{virtual_ku_fenster}->{type}     = "virtual";
+  $sensors->{virtual_ku_fenster}->{location} = "kueche";
+  $sensors->{virtual_ku_fenster}->{comment}  = "Kueche: Fenster: Zustand und Sonne";
+  $sensors->{virtual_ku_fenster}->{composite} =["eg_ku_fk01:state","eg_ku_rl01:level","twilight_sensor:azimuth,elevation","virtual_umwelt_sensor"];
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_top}->{unit} = "m";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
+  $sensors->{virtual_ku_fenster}->{readings}->{dim_bottom}->{unit} = "m";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{ValueFn} = "{0.55}";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{alias}   = "Korrekturfaktor Wanddicke";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{comment} = "Korrektur fuer die Wand/Rolladenkasten-Dicke";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{unit} = "m";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
+  #$sensors->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
+  $sensors->{virtual_ku_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
+  $sensors->{virtual_ku_fenster}->{readings}->{secure}->{FnParams} = ['eg_ku_fk01:state'];
+  $sensors->{virtual_ku_fenster}->{readings}->{secure}->{alias}   = "gesichert";
+  $sensors->{virtual_ku_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
+  $sensors->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   
   # + state: sensor: eg_wz_fk01:state
   # + secure: 0,1
   # + Sonnenseite? 240° bis 290° (ca.)  sunny side
-  # Sonne scheint ins Fenster: sunny (sunny_side + Helligkeit)
+  # Sonne scheint ins Fenster: sunny (sunny_side + Helligkeit>X)
+  # sunny + temp_outside > rollo zu 
   # + Länge des Sonnenflecks im Zimmer
   # + rollostand
 
@@ -387,16 +461,62 @@ sub HAL_WinSunRoomRange($$) {
 	my $val = 0;
 	my $msg = undef;
 	
-	my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+	my $sRec = HAL_getSensorValueRecord($device->{name},'sunny_side');
 	if($sRec) {
-		my $elevation = $sRec->{value};
-		if($elevation<=0) {
+		my $sside = $sRec->{value};
+		if($sside==0) {
 			$val = 0;
-		  $msg = 'night';
+		  $msg = $sRec->{message};
 		} else {
-  		my $height = @{$params}[0];
-	  	$val = $height/tan(deg2rad($elevation));
-		  $msg = 'elevation: $elevation, height: $height';
+			$sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+			if($sRec) {
+      my $elevation = $sRec->{value};
+  		  my $height = @{$params}[0];
+	      $val = $height/tan(deg2rad($elevation));
+	      
+	      # Korrekturfaktor Wanddicke
+	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_wall_thickness');
+	      my $cf = @{$params}[1];
+	      #if($cf) {
+	      #	$val-=$cf;
+	      #	$val = 0 unless $val>0;
+	      #}
+	      
+	      # Winkel: Elevation bei 90° Winkel zu Fenster
+	      my $cfW = @{$params}[2];
+	      if($cfW) {
+	      	my $aRec = HAL_getSensorValueRecord($device->{name},'azimuth');
+	      	if($aRec) {
+	      		my $azimuth = $aRec->{value};
+		      	my $winkel = abs($azimuth-$cfW);
+		      	# Aus dem Winkel die neue Dicke der Wand berechen (entlang der Strahlen)
+		      	my $wdc = $cf/cos(deg2rad($winkel));
+		      	$wdc=$cf if ($wdc<$cf);
+		      	# Bei großen Winkel wird auch sehr groß. Max Fensterbreite ist aber der Begrenzender Faktor (praktisch nicht wirklich relevant).
+		      	$wdc=2 if ($wdc>2); # 2 meter annehmen
+		      	
+		      	#Log 3,'>------------>WD: '.$cf.', W: '.$winkel.', WDC: '.$wdc;
+		      	
+		      	$val-=$wdc;
+		        $val = 0 unless $val>0;
+		      }
+	      }
+
+	      # Korrekturfaktor Anpassung
+	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_sun_room_range');
+	      #if($cf) {
+	      #	$val*=$cf;
+	      #}
+	      
+	      #Log 3,'>------------>Val: '.$val;
+	  	  $val=HAL_round2($val);
+	  	  #Log 3,'>------------>Val: '.$val;
+	  	  
+		    $msg = "elevation: $elevation, height: $height";
+		  } else {
+		  	$val = 0;
+		    $msg = 'error: elevation';
+		  }
 		}
 	} else {
 		$val = 0;
@@ -406,7 +526,7 @@ sub HAL_WinSunRoomRange($$) {
 	my $ret;
 	$ret->{value} = $val;
 	$ret->{time} = TimeNow();
-	$ret->{reading} = $record->{name};
+	$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 	
@@ -435,7 +555,7 @@ sub HAL_WinSunnySideValueFn($$) {
 		      $msg = 'sunny';	
 				} else {
 					$val = 0;
-		      $msg = 'dark: azimuth';
+		      $msg = 'shady: azimuth (now: '.$t.', Limits: ['.@{$params}[0].', '.@{$params}[1].'])';
 				}
 			} else {
 				$val = 0;
@@ -450,7 +570,7 @@ sub HAL_WinSunnySideValueFn($$) {
 	my $ret;
 	$ret->{value} = $val;
 	$ret->{time} = TimeNow();
-	$ret->{reading} = $record->{name};
+	$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 }
@@ -488,7 +608,7 @@ sub HAL_WinSecureStateValueFn($$) {
   my $ret;
 	$ret->{value} = $secure;
 	$ret->{time} = TimeNow();
-	$ret->{reading} = $record->{name};
+	$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 }  
@@ -527,7 +647,7 @@ sub HAL_AvgReadingValueFn($$) {
   	$ret->{value} = $retVal;
   	$ret->{unit} = $unit;
   	$ret->{time} = $time;
-  	$ret->{reading} = $rname;
+  	$ret->{reading_name} = $rname;
   	return $ret;
   }
   return undef;
@@ -560,7 +680,7 @@ sub HAL_MinReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	$ret->{reading} = $rname;
+	$ret->{reading_name} = $rname;
 	return $ret;
 }
 
@@ -591,7 +711,7 @@ sub HAL_MaxReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	$ret->{reading} = $rname;
+	$ret->{reading_name} = $rname;
 	return $ret;
 }
 
@@ -1142,7 +1262,8 @@ sub HAL_round2($) {
   $sensors->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
   $sensors->{um_vh_licht}->{type}      ="HomeMatic compatible";
   $sensors->{um_vh_licht}->{location}  ="umwelt";
-  $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  #$sensors->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity";
   $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
   $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
   $sensors->{um_vh_licht}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
@@ -1155,7 +1276,8 @@ sub HAL_round2($) {
   $sensors->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
   $sensors->{um_hh_licht_th}->{type}      ="HomeMatic compatible";
   $sensors->{um_hh_licht_th}->{location}  ="umwelt";
-  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  #$sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity"; 
   $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
   $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
   $sensors->{um_hh_licht_th}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
@@ -1277,6 +1399,15 @@ sub HAL_round2($) {
   $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
   $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $sensors->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+
+  $sensors->{eg_ku_rl01}->{alias}     ="Rollo";
+  $sensors->{eg_ku_rl01}->{fhem_name} ="ku_rollo";
+  $sensors->{eg_ku_rl01}->{type}      ="HomeMatic";
+  $sensors->{eg_ku_rl01}->{location}  ="kueche";
+  $sensors->{eg_ku_rl01}->{comment}   ="Rollostand";
+  $sensors->{eg_ku_rl01}->{readings}->{level} ->{reading}   ="level";
+  $sensors->{eg_ku_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
+  $sensors->{eg_ku_rl01}->{readings}->{level} ->{unit} ="%";
   
   $sensors->{eg_ku_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{eg_ku_fk01}->{fhem_name} ="EG_KU_FK01.Fenster";
@@ -1307,6 +1438,15 @@ sub HAL_round2($) {
   $sensors->{eg_wz_rl01}->{readings}->{level} ->{reading}   ="level";
   $sensors->{eg_wz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $sensors->{eg_wz_rl01}->{readings}->{level} ->{unit} ="%";
+  
+  $sensors->{eg_wz_rl02}->{alias}     ="Rollo";
+  $sensors->{eg_wz_rl02}->{fhem_name} ="wz_rollo_r";
+  $sensors->{eg_wz_rl02}->{type}      ="HomeMatic";
+  $sensors->{eg_wz_rl02}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_rl02}->{comment}   ="Rollostand";
+  $sensors->{eg_wz_rl02}->{readings}->{level} ->{reading}   ="level";
+  $sensors->{eg_wz_rl02}->{readings}->{level} ->{alias}     ="Rollostand";
+  $sensors->{eg_wz_rl02}->{readings}->{level} ->{unit} ="%";
   
   $sensors->{eg_wz_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{eg_wz_fk01}->{fhem_name} ="EG_WZ_FK01.Fenster";
@@ -1920,7 +2060,7 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 	my $single_reading_record = $readings_record->{$reading};
 	
 	if ($single_reading_record) {
-		$single_reading_record->{reading} = $reading;
+		$single_reading_record->{reading_name} = $reading;
 	  return ($device_record, $single_reading_record);
 	}
 	
@@ -1942,7 +2082,7 @@ HAL_getSensorReadingCompositeRecord_intern($$)
 		my $new_device_record = HAL_getSensorRecord($composite_name);
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
-			$new_single_reading_record->{reading} = $reading;
+			$new_single_reading_record->{reading_name} = $reading;
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
@@ -2018,6 +2158,9 @@ sub senTest($;$) {
 sub HAL_getReadingsValueRecord($$) {
 	my ($device, $record) = @_;
 	
+	#Log 3,"+++++++++++++++++> ".Dumper($device);
+	#Log 3,"+++++++++++++++++> ".Dumper($record);
+	
 	if (defined($record)) {
 		my $val=undef;
 		my $time=undef;
@@ -2057,7 +2200,7 @@ sub HAL_getReadingsValueRecord($$) {
 		{
 	    my $fhem_name = $device->{fhem_name};
       my $reading_fhem_name = $record->{reading};
-
+      #Log 3,"+++++++++++++++++> ".Dumper($record);
       $val = ReadingsVal($fhem_name,$reading_fhem_name,undef);
       $time = ReadingsTimestamp($fhem_name,$reading_fhem_name,undef);
       #Log 3,"+++++++++++++++++> Name: ".$fhem_name." Reading: ".$reading_fhem_name." =>VAL:".$val;
