@@ -1199,19 +1199,19 @@ sub rundeZahl1($) {
 	my($val)=@_;
 	return undef unless defined($val);
 	# Prüfen, ob numerisch
-	if(int($val)>0) {
+	#if(int($val)>0) {
 		$val = int(10*$val+0.5)/10;
-	}
+	#}
 	return $val;
 }
 
 # Rundet eine Zahl mit 2 Nachkommastellen
 sub rundeZahl2($) {
 	my($val)=@_;
-	# Prüfen, ob numerisch
-	if(int($val)>0) {
+	# Prüfen, ob numerisch => Provlemen mit Zahlen < 1
+	#if(int($val)>0) {
 		$val = int(100*$val+0.5)/100;
-	}
+	#}
 	return $val;
 }
 
