@@ -52,7 +52,10 @@ use constant {
   #OFF         => "Aus",
   PRESENT      => "Anwesend",
   ABSENT       => "Abwesend",
-  FAR_AWAY     => "Verreist"
+  FAR_AWAY     => "Verreist",
+  NORMAL       => "Normal",
+  CONSERVATIVE => "Konservativ",
+  AGGRESSIVE   => "Aggressiv"
 };
 
 sub
