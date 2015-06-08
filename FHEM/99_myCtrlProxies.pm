@@ -13,7 +13,7 @@ my $rooms;
   $rooms->{wohnzimmer}->{alias}="Wohnzimmer";
   $rooms->{wohnzimmer}->{fhem_name}="Wohnzimmer";
   # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
-  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor","eg_wz_fk01","eg_wz_tk01","eg_wz_tk02","virtual_wz_fenster","virtual_wz_terrassentuer"];
+  $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor","wz_wandthermostat","tt_sensor","wz_ms_sensor","eg_wz_fk01","eg_wz_tk","virtual_wz_fenster","virtual_wz_terrassentuer"];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   # auch moeglich: Sensor mit der Liste der zu nutzenden Readings.
   # $rooms->{wohnzimmer}->{sensors}=["wz_raumsensor:temperature,humidity",...
@@ -349,7 +349,11 @@ my $sensors;
   $sensors->{virtual_wz_fenster}->{type}     = "virtual";
   $sensors->{virtual_wz_fenster}->{location} = "wohnzimmer";
   $sensors->{virtual_wz_fenster}->{comment}  = "Wohnzimmer: Fenster: Zustand und Sonne";
-  $sensors->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state","eg_wz_rl01:level","twilight_sensor:azimuth,elevation","virtual_umwelt_sensor"];
+  $sensors->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state",
+                                                "eg_wz_rl01:level",
+                                                "twilight_sensor:azimuth,elevation",
+                                                "virtual_umwelt_sensor",
+                                                "wz_ms_sensor:motiontime,motion15m,motion1h"];
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.10}";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
   $sensors->{virtual_wz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
@@ -382,7 +386,11 @@ my $sensors;
   $sensors->{virtual_wz_terrassentuer}->{type}     = "virtual";
   $sensors->{virtual_wz_terrassentuer}->{location} = "wohnzimmer";
   $sensors->{virtual_wz_terrassentuer}->{comment}  = "Wohnzimmer: Terrassentuer: Zustand und Sonne";
-  $sensors->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk01:state","eg_wz_rl02:level","twilight_sensor:azimuth,elevation","virtual_umwelt_sensor"]; # TODO: Kombiniertes 2-KontaktSensor
+  $sensors->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk:state",
+                                                      "eg_wz_rl02:level",
+                                                      "twilight_sensor:azimuth,elevation",
+                                                      "virtual_umwelt_sensor",
+                                                      "wz_ms_sensor:motiontime,motion15m,motion1h"]; # TODO: Kombiniertes 2-KontaktSensor
   $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{ValueFn} = "{2.07}";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{alias}   = "Hoehe";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
@@ -399,7 +407,7 @@ my $sensors;
   #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
   #$sensors->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
-  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{FnParams} = ['eg_wz_tk01:state']; # TODO: Kombiniertes 2-KontaktSensor
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{FnParams} = ['eg_wz_tk:state']; # Kombiniertes 2-KontaktSensor
   $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{alias}   = "gesichert";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
@@ -732,7 +740,7 @@ sub HAL_ReadingTimeStrValueFn($$;$) {
   if($t) {
   	if(ref $t eq ref {}) {
 		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
-    	$t->{value} = sec2Dauer($t);
+    	$t->{value} = sec2Dauer($t->{value});
     	return $t;
     } else {
     	# Scalar-Wert annehmen
@@ -881,6 +889,51 @@ sub HAL_MotionValueFn($$) {
   	$ret->{time} = TimeNow();
   	return $ret;
   }
+
+# ValueFn: Kombiniert State-Readings zweier (oder auch mhr) Fenstersensoren.
+#   Es wird der 'hichste' Stand aller Sensoren ausgegeben.
+#   Reihenfolge: open > tilted > closed
+# FnParams: Liste der Sensoren mit Readings: sensorName:readingName
+# Params: Dev-Hash, Record-HASH  
+sub HAL_WinCombiStateValueFn($$) {
+	  my ($device, $record) = @_;
+  	
+  	my $senList = $record->{FnParams};
+  	my $retVal = 'closed';
+  	my $retTime = undef;
+    foreach my $senSpec (@{$senList}) {
+    	my($sensorName,$readingName) = split(/:/, $senSpec);
+    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+    	my $state = $sRec->{value};
+    	my $time = $sRec->{time};
+    	if($state eq 'open') {
+    		if($retVal eq 'closed' || $retVal eq 'tilted') {
+    			$retVal = $state;
+    		  $retTime = $time;
+    	  } else { # gleiche
+    	  	$retTime = $time if($retTime lt $time);
+    	  }
+    	} elsif ($state eq 'tilted') {
+      	if($retVal eq 'closed') {
+    			$retVal = $state;
+    		  $retTime = $time;
+    	  } elsif ($retVal eq 'open') {
+    	  	# NOP
+      	} else { # gleiche
+    	  	$retTime = $time if($retTime lt $time);
+    	  }
+    	} else { # closed
+    		if($retVal eq 'closed') {
+    		  $retTime = $time if($retTime lt $time);
+    	  }
+    	}
+    }    	
+    
+    my $ret;
+    $ret->{value} = $retVal;
+  	$ret->{time} = $retTime;
+  	return $ret;
+}
     
 sub HAL_round0($) {
 	my($val)=@_;
@@ -1507,6 +1560,26 @@ sub HAL_round2($) {
   $sensors->{eg_wz_tk02}->{readings}->{statetime}->{FnParams}  = "state";
   $sensors->{eg_wz_tk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $sensors->{eg_wz_tk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  
+  $sensors->{eg_wz_tk}->{alias}     ="Terrassentürkontakt Kombiniert";
+  $sensors->{eg_wz_tk}->{type}      ="virtual";
+  $sensors->{eg_wz_tk}->{location}  ="wohnzimmer";
+  $sensors->{eg_wz_tk}->{readings}->{state}         ->{ValueFn}   ="HAL_WinCombiStateValueFn";
+  $sensors->{eg_wz_tk}->{readings}->{state}         ->{FnParams}   =["eg_wz_tk01:state","eg_wz_tk02:state"];
+  $sensors->{eg_wz_tk}->{readings}->{state}         ->{alias}     ="Fensterzustand";
+  $sensors->{eg_wz_tk}->{readings}->{state}         ->{unit_type} ="ENUM: closed,open";
+  $sensors->{eg_wz_tk}->{readings}->{state1}        ->{link}   = "eg_wz_tk01:state"; # TODO Link
+  $sensors->{eg_wz_tk}->{readings}->{state2}        ->{link}   = "eg_wz_tk02:state";
+  $sensors->{eg_wz_tk}->{readings}->{statetime1}    ->{link}   = "eg_wz_tk01:statetime";
+  $sensors->{eg_wz_tk}->{readings}->{statetime2}    ->{link}   = "eg_wz_tk02:statetime";
+  $sensors->{eg_wz_tk}->{readings}->{statetime1_str}->{link}   = "eg_wz_tk01:statetime_str";
+  $sensors->{eg_wz_tk}->{readings}->{statetime2_str}->{link}   = "eg_wz_tk02:statetime_str";
+  $sensors->{eg_wz_tk}->{readings}->{statetime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
+  $sensors->{eg_wz_tk}->{readings}->{statetime_str} ->{FnParams}  = "state";
+  $sensors->{eg_wz_tk}->{readings}->{statetime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
+  $sensors->{eg_wz_tk}->{readings}->{statetime}     ->{FnParams}  = "state";
+  $sensors->{eg_wz_tk}->{readings}->{statetime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
+  $sensors->{eg_wz_tk}->{readings}->{statetime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   
   $sensors->{og_bz_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{og_bz_fk01}->{fhem_name} ="OG_BZ_FK01.Fenster";
