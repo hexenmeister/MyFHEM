@@ -153,7 +153,7 @@ sub actFensterSabotageKontakt($$) {
 # (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf AUTOMATIC/NORMAL)
 sub actHomeAutomaticOn() {
 	# Derzeit keine globale Automatik, daher delegieren
-	setBeschattungAutomaticOn();
+	setBeschattungAutomatic();
 	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
 	
 	# Hier (Sprach)Meldungen
@@ -181,7 +181,7 @@ sub actHomeAutomaticOff() {
 # aufgerufen werden. Damit wird erreicht, dass alle Uebersteuerungen irgendwann 
 # in einen normalen Zustand uebergehen.
 sub resetAutomatikControls() {
-	setBeschattungAutomaticOn();
+	setBeschattungAutomatic();
 	setHomePresence_Automatic();
 	#setHomePresence_Present();
 	setDayNightRolloAutomaticOn();
@@ -192,28 +192,33 @@ sub resetAutomatikControls() {
 # Defaultwerte (AUTOMATIC). Sie soll beim FHEM-Start aufgerufen werden (global:INITIALIZED).
 sub setAllAutomatikControlsDefaults() {
 	# TODO: future: Pruefen, ob z.B. Status "Verreist" bereucksichtigt werden soll
-	if(Value(DEVICE_NAME_CTRL_BESCHATTUNG) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"STATE","???") eq "???") {
+	if(Value(DEVICE_NAME_CTRL_BESCHATTUNG) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"state","???") eq "???") {
 	  setValue(DEVICE_NAME_CTRL_BESCHATTUNG, NORMAL);
 	}
 	
-	if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ANWESENHEIT,"STATE","???") eq "???") {
+	if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ANWESENHEIT,"state","???") eq "???") {
     setValue(DEVICE_NAME_CTRL_ANWESENHEIT, AUTOMATIC);
   }
 	#setHomePresence_Present();
 	
-	if(Value(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT,"STATE","???") eq "???") {
+	if(Value(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT,"state","???") eq "???") {
     setValue(DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT, AUTOMATIC);
   }
 	
-	if(Value(DEVICE_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq "???") {
+	if(Value(DEVICE_NAME_CTRL_ZIRK_PUMPE) eq "???" ||  ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"state","???") eq "???") {
     setValue(DEVICE_NAME_CTRL_ZIRK_PUMPE, AUTOMATIC);
   }
 }
 
+# Liefert aktuellen Modus der Beschattungsautomatik
+sub getBeschattungMode() {
+	return Value(DEVICE_NAME_CTRL_BESCHATTUNG);
+}
+
 # Schatet Beschattung-Automatik ein (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf AUTOMATIC)
-sub setBeschattungAutomaticOn() {
+sub setBeschattungAutomatic() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
-	if(ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq '???' || ReadingsVal(DEVICE_NAME_CTRL_ZIRK_PUMPE,"STATE","???") eq DISABLED) {
+	if(ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"state","???") eq '???' || ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"state","???") eq DISABLED) {
   	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, NORMAL);
   }
 }
@@ -346,9 +351,10 @@ sub automationHeartbeat() {
 	
 	# Beschattung:
 	#TODO: Universelle Namen
-	 #checkFensterBeschattung("virtual_wz_fenster", "wz_rollo_l");
-	 #checkFensterBeschattung("virtual_wz_terrassentuer", "wz_rollo_r");
-	 #checkFensterBeschattung("virtual_ku_fenster", "ku_rollo");
+	 my $bMode = getBeschattungMode();
+	 checkFensterBeschattung("virtual_wz_fenster", "wz_rollo_l",$bMode);
+	 checkFensterBeschattung("virtual_wz_terrassentuer", "wz_rollo_r",$bMode);
+	 checkFensterBeschattung("virtual_ku_fenster", "ku_rollo",$bMode);
 	 
 	# TODO: 
 	
@@ -360,8 +366,23 @@ sub automationHeartbeat() {
 
 # Prueft, ob Beschattung des gegebenen Fenster notwendig (und gewuenscht) ist
 # Return: -1 -> Error, 0 -> keine Aenderung, 1 -> Beschattung aktiviert, 2 -> Beschattung aufgehoben
-sub checkFensterBeschattung($$) {
-	my($sensorName, $rolloName) = @_;
+sub checkFensterBeschattung($$$) {
+	my($sensorName, $rolloName, $mode) = @_;
+	
+	if($mode eq DISABLED) {
+		Log 3, "Automation: checkFensterBeschattung: disabled";
+		return -9;
+	}
+	
+	# Hack: Vorerst ueber die Zeit steuern, damit diese Funktion nicht der Nacht-Automatik in die Quere kommt.
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+	if($hour <= 10 || $hour >= 18) {
+		Log 3, "Automation: checkFensterBeschattung: disabled (night mode)";
+		return -99;
+	}
+	#Log 3, "Automation: checkFensterBeschattung: TEST";
+	#return -99;
+	
 	# Wenn Sonne ins Fenster scheint (> 1M? Einstellbar machen?)
 	# Wenn draussen > 25 Grad ist
 	# Wenn Aussenhelligkit > 40000 (?)
