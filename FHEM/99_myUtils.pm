@@ -1640,6 +1640,16 @@ sub isWeOrHoliday(;$$) {
   return $we;
 }
 
+sub IstGewitter($)
+{
+  my $dev = @_;
+  my $curTimestamp=time();
+  if (  (ReadingsVal($dev,"Warn_0_Start","") le $curTimestamp) &&  (ReadingsVal($dev,"Warn_0_End","") ge $curTimestamp) && (ReadingsVal($dev,"Warn_0_Type","") eq 7)  ) {
+    return 'on';
+  } else {
+    return 'off';
+  }
+}
 
 
 1;
