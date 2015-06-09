@@ -383,6 +383,15 @@ sub checkFensterBeschattung($$$) {
 	#Log 3, "Automation: checkFensterBeschattung: TEST";
 	#return -99;
 	
+	if($mode eq CONSERVATIVE) {
+  	my $prRec = HAL_getSensorValueRecord($sensorName,'presence');
+	  if($prRec) {
+		  if($prRec->{value}) {
+		    return -8;
+		  }
+	  }
+	}
+	
 	# Wenn Sonne ins Fenster scheint (> 1M? Einstellbar machen?)
 	# Wenn draussen > 25 Grad ist
 	# Wenn Aussenhelligkit > 40000 (?)
