@@ -381,7 +381,8 @@ my $sensors;
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $sensors->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
-
+  $sensors->{virtual_wz_fenster}->{readings}->{presence}->{link} = "wz_ms_sensor:motion15m"; # PIR als Presence-Sensor verwenden
+  
   $sensors->{virtual_wz_terrassentuer}->{alias}    = "Wohnzimmer Terrassentuer";
   $sensors->{virtual_wz_terrassentuer}->{type}     = "virtual";
   $sensors->{virtual_wz_terrassentuer}->{location} = "wohnzimmer";
@@ -418,6 +419,7 @@ my $sensors;
   $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{FnParams} = [2.07, 0.58, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $sensors->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
+  $sensors->{virtual_wz_terrassentuer}->{readings}->{presence}->{link} = "wz_ms_sensor:motion15m"; # PIR als Presence-Sensor verwenden
 
   $sensors->{virtual_ku_fenster}->{alias}    = "Kueche Fenster";
   $sensors->{virtual_ku_fenster}->{type}     = "virtual";
