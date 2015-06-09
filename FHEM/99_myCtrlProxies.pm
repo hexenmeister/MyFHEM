@@ -71,7 +71,7 @@ my $rooms;
   
   $rooms->{paula}->{alias}="Paulas Zimmer";
   $rooms->{paula}->{fhem_name}="Paula";
-  $rooms->{paula}->{sensors}=["ka_raumsensor","ka_wandthermostat","og_ka_fk01","og_ka_fk02"];
+  $rooms->{paula}->{sensors}=["ka_raumsensor","ka_wandthermostat","og_ka_fk"];#,"og_ka_fk01","og_ka_fk02"
   $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{hanna}->{alias}="Hannas Zimmer";
@@ -1566,9 +1566,9 @@ sub HAL_round2($) {
   $sensors->{eg_wz_tk}->{location}  ="wohnzimmer";
   $sensors->{eg_wz_tk}->{readings}->{state}         ->{ValueFn}   ="HAL_WinCombiStateValueFn";
   $sensors->{eg_wz_tk}->{readings}->{state}         ->{FnParams}   =["eg_wz_tk01:state","eg_wz_tk02:state"];
-  $sensors->{eg_wz_tk}->{readings}->{state}         ->{alias}     ="Fensterzustand";
+  $sensors->{eg_wz_tk}->{readings}->{state}         ->{alias}     ="Terrassentuerzustand";
   $sensors->{eg_wz_tk}->{readings}->{state}         ->{unit_type} ="ENUM: closed,open";
-  $sensors->{eg_wz_tk}->{readings}->{state1}        ->{link}   = "eg_wz_tk01:state"; # TODO Link
+  $sensors->{eg_wz_tk}->{readings}->{state1}        ->{link}   = "eg_wz_tk01:state";
   $sensors->{eg_wz_tk}->{readings}->{state2}        ->{link}   = "eg_wz_tk02:state";
   $sensors->{eg_wz_tk}->{readings}->{statetime1}    ->{link}   = "eg_wz_tk01:statetime";
   $sensors->{eg_wz_tk}->{readings}->{statetime2}    ->{link}   = "eg_wz_tk02:statetime";
@@ -1620,6 +1620,26 @@ sub HAL_round2($) {
   $sensors->{og_sz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $sensors->{og_sz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $sensors->{og_sz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  
+  $sensors->{og_ka_fk}->{alias}     ="Fensterkontakt Kombiniert";
+  $sensors->{og_ka_fk}->{type}      ="virtual";
+  $sensors->{og_ka_fk}->{location}  ="wohnzimmer";
+  $sensors->{og_ka_fk}->{readings}->{state}         ->{ValueFn}   ="HAL_WinCombiStateValueFn";
+  $sensors->{og_ka_fk}->{readings}->{state}         ->{FnParams}   =["og_ka_fk01:state","og_ka_fk02:state"];
+  $sensors->{og_ka_fk}->{readings}->{state}         ->{alias}     ="Fensterzustand";
+  $sensors->{og_ka_fk}->{readings}->{state}         ->{unit_type} ="ENUM: closed,open";
+  $sensors->{og_ka_fk}->{readings}->{state1}        ->{link}   = "og_ka_fk01:state";
+  $sensors->{og_ka_fk}->{readings}->{state2}        ->{link}   = "og_ka_fk02:state";
+  $sensors->{og_ka_fk}->{readings}->{statetime1}    ->{link}   = "og_ka_fk01:statetime";
+  $sensors->{og_ka_fk}->{readings}->{statetime2}    ->{link}   = "og_ka_fk02:statetime";
+  $sensors->{og_ka_fk}->{readings}->{statetime1_str}->{link}   = "og_ka_fk01:statetime_str";
+  $sensors->{og_ka_fk}->{readings}->{statetime2_str}->{link}   = "og_ka_fk02:statetime_str";
+  $sensors->{og_ka_fk}->{readings}->{statetime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
+  $sensors->{og_ka_fk}->{readings}->{statetime_str} ->{FnParams}  = "state";
+  $sensors->{og_ka_fk}->{readings}->{statetime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
+  $sensors->{og_ka_fk}->{readings}->{statetime}     ->{FnParams}  = "state";
+  $sensors->{og_ka_fk}->{readings}->{statetime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
+  $sensors->{og_ka_fk}->{readings}->{statetime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   
   $sensors->{og_ka_fk01}->{alias}     ="Fensterkontakt";
   $sensors->{og_ka_fk01}->{fhem_name} ="OG_KA_FK01.Fenster";
