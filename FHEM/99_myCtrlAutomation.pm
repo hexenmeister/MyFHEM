@@ -149,29 +149,68 @@ sub actFensterSabotageKontakt($$) {
 #}
 
 # Methode für den taster
-# Schatet globale Haus-Automatik ein 
+# Schaltet globale Haus-Automatik ein 
 # (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf AUTOMATIC/NORMAL)
 sub actHomeAutomaticOn() {
+	
+	# Bestaetigungston
+	voiceActAutomatik(1);
+	
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomatic();
 	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
 	
-	# Hier (Sprach)Meldungen
-	voiceActGenericUserEvent();
+	#TODO: Weiteres
 
 }
 
 # Methode für den taster
-# Schatet globale Haus-Automatik aus 
+# Schaltet globale Haus-Automatik aus 
 # (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf DISABLED)
 sub actHomeAutomaticOff() {
+	
+	# Bestaetigungston
+	voiceActAutomatik(2);
+	
 	# Derzeit keine globale Automatik, daher delegieren
 	setBeschattungAutomaticOff(); # ?
 	
-	# Hier (Sprach)Meldungen
-	voiceActLeaveHome();
+	#TODO: Weiteres
+	
   
 }
+
+# Methode für den taster
+# Schaltet Presence
+sub actHomePresenceShort() {
+	setHomePresence_Present();
+	
+	#Halloween TEMP
+	if(!voiceHalloween(1)) {
+	  #wenn die Halloween-Schaltung inaktiv
+	  # andere Aktionen
+	  
+	  # Hier (Sprach)Meldungen
+	  voiceActGenericUserEvent();
+	  
+	}
+}
+
+# Methode für den taster
+# Schaltet Presence
+sub actHomePresenceLong() {
+	setHomePresence_Absent();
+	
+	#Halloween TEMP
+	if(!voiceHalloween(2)) {
+	  #wenn die Halloween-Schaltung inaktiv
+	  # andere Aktionen
+	  
+	  # Hier (Sprach)Meldungen
+	  voiceActLeaveHome();
+	}
+}
+
 
 
 # --- User Service Utils ------------------------------------------------------
@@ -239,16 +278,12 @@ sub setHomePresence_Automatic() {
 sub setHomePresence_Present() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
 	setValue(DEVICE_NAME_CTRL_ANWESENHEIT, PRESENT);
-	#Halloween TEMP
-	voiceHalloween(1);
 }
 
 # Setzt PRESENCE-Status auf abwesend (niemand ist zuhause)
 sub setHomePresence_Absent() {
 	# Erstmal nur Wert setzen. ggf später eine Aktion ausloesen
   setValue(DEVICE_NAME_CTRL_ANWESENHEIT, ABSENT);
-  #Halloween TEMP
-	voiceHalloween(2);
 }
 
 # Schatet Tag/Nacht-Rolladen-Automatik ein (setzt DEVICE_NAME_CTRL_ROLLADEN_DAY_NIGHT auf AUTOMATIC)
@@ -356,8 +391,12 @@ sub automationHeartbeat() {
 	 checkFensterBeschattung("virtual_wz_terrassentuer", "wz_rollo_r",$bMode);
 	 checkFensterBeschattung("virtual_ku_fenster", "ku_rollo",$bMode);
 	 
-	# TODO: 
-	
+	 checkFensterBeschattung("virtual_sz_fenster", "sz_rollo",$bMode);
+	 checkFensterBeschattung("virtual_bz_fenster", "bz_rollo",$bMode);
+	 checkFensterBeschattung("virtual_ka_fenster", "ka_rollo",$bMode);
+	 checkFensterBeschattung("virtual_kb_fenster", "kb_rollo",$bMode);
+	# TODO
+
 }
 
 # --- User Methods ------------------------------------------------------------
@@ -370,14 +409,14 @@ sub checkFensterBeschattung($$$) {
 	my($sensorName, $rolloName, $mode) = @_;
 	
 	if($mode eq DISABLED) {
-		Log 3, "Automation: checkFensterBeschattung: disabled";
+		Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled";
 		return -9;
 	}
 	
 	# Hack: Vorerst ueber die Zeit steuern, damit diese Funktion nicht der Nacht-Automatik in die Quere kommt.
 	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
 	if($hour <= 10 || $hour >= 18) {
-		Log 3, "Automation: checkFensterBeschattung: disabled (night mode)";
+		Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled (night mode)";
 		return -99;
 	}
 	#Log 3, "Automation: checkFensterBeschattung: TEST";
@@ -451,7 +490,7 @@ sub checkFensterBeschattung($$$) {
   Log 3, "Automation: checkFensterBeschattung: Sensor: $sensorName, SunRange: $sr, Lum: $lum, Temp: $tem, Level: $level";
 	
 	# Grenzwerte: TODO: Ggf. ins SensorRecord packen
-	my $limMaxLum = 25000; 
+	my $limMaxLum = 15000; 
 	my $limMinLum = $limMaxLum*0.9;
 	my $limMaxTem = 20;
 	my $limMinTem = $limMaxTem - 1;
