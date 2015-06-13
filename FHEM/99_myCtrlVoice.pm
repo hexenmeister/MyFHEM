@@ -18,7 +18,8 @@ use constant {
  NOTIFICATION_MSG_INFO1 => ":cm/notifications/Merope.ogg:",
  NOTIFICATION_MSG_INFO2 => ":cm/notifications/pixiedust.ogg:",
  NOTIFICATION_MSG_WARN => ":cm/notifications/Naughty.ogg:",
- 
+ NOTIFICATION_AUTOMATIC_ON  => ":cm/notifications/Castor.ogg:",
+ NOTIFICATION_AUTOMATIC_OFF => ":cm/notifications/Mira.ogg:",
 };
 
 sub
@@ -659,7 +660,27 @@ sub voiceMorningGreeting() {
 }
 
 
+sub voiceActAutomatik($) {
+	my ($mode) = @_;
+
+  if($mode eq "1") {
+	  # ON
+    speak(NOTIFICATION_AUTOMATIC_ON,0);
+    return 1;
+  } elsif($mode eq "2") {
+  	# OFF
+    speak(NOTIFICATION_AUTOMATIC_OFF,0);
+    return 1;
+  } else {
+  	# Unknown
+  	voiceNotificationFail();
+  }
+  
+  
+}
+
 # TODO:
+
 
 
 
