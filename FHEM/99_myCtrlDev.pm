@@ -66,6 +66,9 @@ require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 #sub tHAL_doAction($$);
 #sub tHAL_DeviceSetFn($@);
 
+# Internal
+sub tHAL_expandTemplates($$);
+
 
 #--- Definitions --------------------------------------------------------------
 my $tHAL_defs  = {};
@@ -75,6 +78,7 @@ my $devices   = {};
 #my $sensors   = {};
 my $actions   = {};
 my $scenarios = {};
+my $templates = {};
 
 $tHAL_defs->{rooms}     = $rooms;
 $tHAL_defs->{devices}   = $devices;
@@ -82,6 +86,7 @@ $tHAL_defs->{devices}   = $devices;
 #$tHAL_defs->{sensors}   = $sensors;
 $tHAL_defs->{actions}   = $actions;
 $tHAL_defs->{scenarios} = $scenarios;
+$tHAL_defs->{templates}   = $templates;
 
 my $sensornames;
 my $actornames;
@@ -1975,7 +1980,8 @@ sub tHAL_WinCombiStateValueFn($$) {
 
 
 #--- Methods: Base ------------------------------------------------------------
-
+  
+ # >>> Commands
 my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|dump]",
             "sensor (sensorname) all*|(readingname) [plain*|full|value|time|dump]",
             "rooms",
@@ -1983,6 +1989,11 @@ my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|dump]
 sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
+  
+  # Templates anwenden
+  tHAL_expandTemplates($devices, $templates);
+  
+  # Console-Commandos registrieren
   my %lhash = ( Fn=>"CommandMGet",
                 Hlp=>join(",",@usage).",request sensor values"); 
   $cmds{mget} = \%lhash;
@@ -2012,6 +2023,7 @@ sub CommandMGet($$$) {
 	my $rname = shift(@line);
 	
 	my $showmod = shift(@line);
+	$showmod = '' unless defined $showmod;
 	
 	my $ret;
 	
@@ -2135,6 +2147,67 @@ sub CommandMGet_format($$) {
 }
 
 
+ #>>> Templates
+sub merge_hash_recursive($$) {
+	my($hash, $template) = @_;
+  #Log3 "TEST", 3, 'ENTER';
+  if(!defined($hash) || !defined($template)) { return };
+  
+	foreach my $key (keys($template)) {
+		my $t = $template->{$key};
+		#Log3 "TEST", 3, 'Key: '.$key;
+		if(defined($t)) {
+			if(defined($hash->{$key}) && (ref $hash->{$key} ne ref $t)) {
+				#Log3 "TEST", 3, 'Verschiedenen Typen -> ignore';
+				# Verschiedenen Typen -> ignore
+			} elsif(ref $t eq "HASH") {
+				#Log3 "TEST", 3, 'HASH';
+				if(!defined($hash->{$key})) {
+					#Log3 "TEST", 3, 'create empty hash';
+					$hash->{$key}={};
+				}
+  			merge_hash_recursive($hash->{$key},$template->{$key});
+  		} elsif(ref $t eq "ARRAY") {
+  			#Log3 "TEST", 3, 'ARRAY';
+  			if(!defined($hash->{$key})) {
+  				#Log3 "TEST", 3, 'copy array';
+  				my @a = @$t;
+					$hash->{$key}=\@a;
+				} else {
+					# Nicht leere Arrays ignorieren
+					#Log3 "TEST", 3, 'ignore';
+				}
+  		} else {
+  			#Log3 "TEST", 3, 'SCALAR';
+  			# Scalar
+  			if(!defined($hash->{$key})) {
+  				#Log3 "TEST", 3, 'copy value';
+  				$hash->{$key}=$t;
+  			} else {
+  			  # sonst ignorieren
+  			  #Log3 "TEST", 3, 'ignore';
+  		  }
+  		}
+		}
+	}
+}
+
+sub tHAL_expandTemplates($$) {
+	my($tab,$templates) = @_;
+	
+	foreach my $key (keys($tab)) {
+		my $subTab = $tab->{$key};
+		my $desiredTemplates = $subTab->{templates};
+		if(defined($desiredTemplates)) {
+      foreach my $tName (@$desiredTemplates) {
+			  merge_hash_recursive($subTab, $templates->{$tName});
+		  }
+		}
+	}
+}
+
+ #>>> Data
+
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Reading-Name
 # return ReadingsRecord
@@ -2202,7 +2275,7 @@ sub tHAL_getRoomReadingRecord_($$$) {
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
-		Log 3,"+++++++++++++++++> >>> ".$sName." > :: ".$readingName;
+		#Log 3,"+++++++++++++++++> >>> ".$sName." > :: ".$readingName;
 		# Pruefen, ob in den sName auch Reading(s) angegeben sind (in Raumdefinition)
 		my($tsname,$trname) = split(/:/,$sName);
 		if($trname) {
@@ -2857,5 +2930,45 @@ sub tHAL_getReadingTime($) {
 #    return ""; # pass through cmd to device
 #  }
 #}
+
+#--- TEST ---------------------------------------------------------------------
+#--- Methods: Console Command -------------------------------------------------
+ # >>> Test
+  my $template;
+  $template->{t1}->{test}      =">Test";
+  $template->{t1}->{test2}     =">Test2";
+  $template->{t1}->{testA}     =[">Test2"];
+  $template->{t1}->{type}      =">HomeMatic compatible";
+  $template->{t1}->{location}  =">test";
+  $template->{t1}->{set}->{1}  =">test1";
+  $template->{t1}->{set}->{2}  =">test2";
+  $template->{t1}->{readings}->{temperature} ->{reading}  =">temperature";
+  $template->{t1}->{readings}->{temperature} ->{unit}     =">°C";
+  $template->{t1}->{readings}->{bat} ->{reading}  =">bat";
+  $template->{t1}->{readings}->{bat} ->{unit}     =">v";
+  
+  my $test;
+  $test->{sname}->{name}      = "Name";
+  $test->{sname}->{templates} = ["t1"];
+  $test->{sname}->{loacation} = "umwelt";
+  $test->{sname}->{readings}->{temperature}->{asd}  = "ASD";
+  $test->{sname}->{readings}->{humidity}->{asd}  = "DSF";
+ 
+  $test->{sname2}->{name}      = "Name2";
+  $test->{sname2}->{templates} = ["t1"];
+  $test->{sname2}->{loacation} = "umwelt2";
+  $test->{sname2}->{readings}->{temperature}->{asd}  = "ASD2";
+  $test->{sname2}->{readings}->{humidity}->{asd}  = "DSF2";
+  
+
+sub sTest() {
+	#merge_hash_recursive($test->{sname}, $template->{t1});
+	#merge_hash_recursive($test->{sname2}, $template->{t1});
+	
+	tHAL_expandTemplates($test, $template);
+	
+	return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
+}
+
 
 1;
