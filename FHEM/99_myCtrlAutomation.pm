@@ -491,7 +491,7 @@ sub checkFensterBeschattung($$$) {
 	
 	# Grenzwerte: TODO: Ggf. ins SensorRecord packen
 	my $limMaxLum = 15000; 
-	my $limMinLum = $limMaxLum*0.9;
+	my $limMinLum = $limMaxLum*0.7;
 	my $limMaxTem = 20;
 	my $limMinTem = $limMaxTem - 1;
 	my $limMaxSR = 1;
