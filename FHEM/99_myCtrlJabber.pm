@@ -149,6 +149,11 @@ sendJabberAnswer()
   	$newmsg.="ok";
   }
   
+  if($cmd eq "mget" || $cmd eq "get" || $cmd eq "mg") {
+    my $cmd_tail = join(" ",@cmd_list);
+    $newmsg.=fhem("mget ".$cmd_tail);
+  }
+  
   if(defined($newmsg)) {
     fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " ".$newmsg);
   } else {
