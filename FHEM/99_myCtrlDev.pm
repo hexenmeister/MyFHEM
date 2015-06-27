@@ -14,64 +14,64 @@ use POSIX;
 sub myCtrlDev_Initialize($$);
 
 # Rooms
-sub tHAL_getRooms();
-sub tHAL_getRoomRecord($);
-sub tHAL_getRoomNames();
-#sub tHAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
-#sub tHAL_getActions(;$); # <DevName>
+sub HAL_getRooms();
+sub HAL_getRoomRecord($);
+sub HAL_getRoomNames();
+#sub HAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
+#sub HAL_getActions(;$); # <DevName>
 
-sub tHAL_getRoomSensorNames($);
-sub tHAL_getRoomOutdoorSensorNames($);
-sub tHAL_getRoomSensorReadingsList($;$);
-sub tHAL_getRoomOutdoorSensorReadingsList($;$);
+sub HAL_getRoomSensorNames($);
+sub HAL_getRoomOutdoorSensorNames($);
+sub HAL_getRoomSensorReadingsList($;$);
+sub HAL_getRoomOutdoorSensorReadingsList($;$);
 
-sub tHAL_getRoomReadingRecord($$);
-sub tHAL_getRoomOutdoorReadingRecord($$);
-sub tHAL_getRoomReadingValue($$;$$);
+sub HAL_getRoomReadingRecord($$);
+sub HAL_getRoomOutdoorReadingRecord($$);
+sub HAL_getRoomReadingValue($$;$$);
 
 # Device
-sub tHAL_getDeviceTab();
+sub HAL_getDeviceTab();
 
 # Actors
-sub tHAL_getActorNames();
+sub HAL_getActorNames();
 
 # Sensoren
-#sub tHAL_getSensors();
-sub tHAL_getSensorNames();
-sub tHAL_getSensorRecord($);
-sub tHAL_getSensorReadingsList($);
-sub tHAL_getSensorReadingRecord($$);
-sub tHAL_getSensorValueRecord($$);
-sub tHAL_getSensorReadingValue($$);
-sub tHAL_getSensorReadingUnit($$);
-sub tHAL_getSensorReadingTime($$);
+#sub HAL_getSensors();
+sub HAL_getSensorNames();
+sub HAL_getSensorRecord($);
+sub HAL_getSensorReadingsList($);
+sub HAL_getSensorReadingRecord($$);
+sub HAL_getSensorValueRecord($$);
+sub HAL_getSensorReadingValue($$);
+sub HAL_getSensorReadingUnit($$);
+sub HAL_getSensorReadingTime($$);
 
-#TODO sub tHAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
+#TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
 # 
-#sub tHAL_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
+#sub HAL_getDevices(;$$$);# <DevName/undef>(undef => alles) [<Type>][<room>]
 
 # Readings
-sub tHAL_getReadingRecord($); # "sname:rname" => tHAL_getSensorValueRecord
-sub tHAL_getReadingValue($);  # "sname:rname" => tHAL_getSensorReadingValue
-sub tHAL_getReadingUnit($);   # "sname:rname" => tHAL_getSensorReadingUnit
-sub tHAL_getReadingTime($);   # "sname:rname" => tHAL_getSensorReadingTime
-sub tHAL_getReadingsValueRecord($$);
+sub HAL_getReadingRecord($); # "sname:rname" => HAL_getSensorValueRecord
+sub HAL_getReadingValue($);  # "sname:rname" => HAL_getSensorReadingValue
+sub HAL_getReadingUnit($);   # "sname:rname" => HAL_getSensorReadingUnit
+sub HAL_getReadingTime($);   # "sname:rname" => HAL_getSensorReadingTime
+sub HAL_getReadingsValueRecord($$);
 #
 
 require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 # Action
-#sub tHAL_doAllActions();
-#sub tHAL_doAction($$);
-#sub tHAL_DeviceSetFn($@);
+#sub HAL_doAllActions();
+#sub HAL_doAction($$);
+#sub HAL_DeviceSetFn($@);
 
 # Internal
-sub tHAL_expandTemplates($$);
+sub HAL_expandTemplates($$);
 
 
 #--- Definitions --------------------------------------------------------------
-my $tHAL_defs  = {};
+my $HAL_defs  = {};
 my $rooms     = {};
 my $devices   = {};
 #my $actors    = {};
@@ -80,13 +80,13 @@ my $actions   = {};
 my $scenarios = {};
 my $templates = {};
 
-$tHAL_defs->{rooms}     = $rooms;
-$tHAL_defs->{devices}   = $devices;
-#$tHAL_defs->{actors}    = $actors;
-#$tHAL_defs->{sensors}   = $sensors;
-$tHAL_defs->{actions}   = $actions;
-$tHAL_defs->{scenarios} = $scenarios;
-$tHAL_defs->{templates}   = $templates;
+$HAL_defs->{rooms}     = $rooms;
+$HAL_defs->{devices}   = $devices;
+#$HAL_defs->{actors}    = $actors;
+#$HAL_defs->{sensors}   = $sensors;
+$HAL_defs->{actions}   = $actions;
+$HAL_defs->{scenarios} = $scenarios;
+$HAL_defs->{templates}   = $templates;
 
 my $sensornames;
 my $actornames;
@@ -215,31 +215,89 @@ my $actornames;
 
 
 # >>> Sensoren
+  #$templates->{global};
+  
+  # >>> HM Templates
+  $templates->{hm}->{type}='HomeMatic';
+  # >>> Dirks Homebrew
+  $templates->{hm_raumsensor_general}->{type}='HomeMatic compatible';
+  # >>> mit Bat-Messung
+  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{unit}     ="V";
+  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{alias}    ="Batterie-Spannung";
+  $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
+  # >>> ... mit Lux-Messung
+  $templates->{hm_raumsensor_licht};
+  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{reading}  ="luminosity";
+  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
+  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{unit}     ="Lx (*)";
+  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{act_cycle} ="600"; 
+  # >>> ... mit Temp/Hum
+  $templates->{hm_raumsensor_th};
+  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{reading}  ="temperature";
+  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{unit}     ="°C";
+  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
+  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  
   $devices->{wz_raumsensor}->{alias}     ="WZ Raumsensor";
   $devices->{wz_raumsensor}->{fhem_name} ="EG_WZ_KS01";
   $devices->{wz_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{wz_raumsensor}->{location}  ="wohnzimmer";
-  $devices->{wz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{wz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{wz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{wz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{wz_raumsensor}->{templates}  =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{act_cycle} ="600"; 
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{alias}    ="Luftdruck";
-  $devices->{wz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{wz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{wz_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
-  $devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{wz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
+  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  #$devices->{wz_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
+  #$devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
+  #$devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  #$devices->{wz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  #<<<
+  
+  $devices->{ku_raumsensor}->{alias}     ="KU Raumsensor";
+  $devices->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
+  $devices->{ku_raumsensor}->{type}      ="HomeMatic compatible";
+  $devices->{ku_raumsensor}->{location}  ="kueche";
+  $devices->{ku_raumsensor}->{readings}->{temperature} ->{reading}   ="temperature";
+  $devices->{ku_raumsensor}->{readings}->{temperature} ->{alias}     ="Temperatur";
+  $devices->{ku_raumsensor}->{readings}->{temperature} ->{unit}      ="°C";
+  $devices->{ku_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{reading}   ="humidity";
+  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{alias}     ="Luftfeuchtigkeit"; 
+  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{unit}      ="% rH";
+  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
+  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
+  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
+  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
+  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
+  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{unit}      ="V";
+  $devices->{ku_raumsensor}->{readings}->{bat_status}  ->{reading}   ="battery";
+  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{reading}   ="dewpoint";
+  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{unit}      ="°C";
+  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{alias}     ="Taupunkt";
   #<<<
   
   $devices->{eg_fl_raumsensor}->{alias}     ="EG Flur Raumsensor";
@@ -385,7 +443,7 @@ my $actornames;
   $devices->{virtual_sun_sensor}->{location}    ="umwelt";
   $devices->{virtual_sun_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
   $devices->{virtual_sun_sensor}->{composite} =["twilight_sensor","virtual_umwelt_sensor:luminosity"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{virtual_sun_sensor}->{readings}->{sun}->{ValueFn} = "tHAL_SunValueFn";
+  $devices->{virtual_sun_sensor}->{readings}->{sun}->{ValueFn} = "HAL_SunValueFn";
   $devices->{virtual_sun_sensor}->{readings}->{sun}->{FnParams} = [["um_vh_licht:luminosity",10,15], ["um_hh_licht_th:luminosity",10,15], ["um_vh_bw_licht:brightness",120,130]]; # Liste der Lichtsensoren zur Auswertung mit Grenzwerten (je 2 wg. Histerese)
   $devices->{virtual_sun_sensor}->{readings}->{sun}->{alias} = "Virtuelle Sonne";
   $devices->{virtual_sun_sensor}->{readings}->{sun}->{comment} = "gibt an, ob die 'Sonne' scheint, oder ob es genuegend dunkel ist (z.B. Rolladensteuerung).";
@@ -417,17 +475,17 @@ my $actornames;
   $devices->{virtual_umwelt_sensor}->{type}        ="virtual";
   $devices->{virtual_umwelt_sensor}->{location}    ="umwelt";
   $devices->{virtual_umwelt_sensor}->{comment}     ="Virtueller Sensor: Berechnet Max. Helligkeit mehreren Sensoren, Durchschnittstemperatur etc.";
-  $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "tHAL_MaxReadingValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "tHAL_MinReadingValueFn";
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "tHAL_round1";
+  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
-  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "tHAL_AvgReadingValueFn";
-  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "tHAL_round1";
+  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity", "hg_sensor:humidity"];
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
@@ -452,15 +510,15 @@ my $actornames;
   $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_wz_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_wz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{secure}->{FnParams} = ['eg_wz_fk01:state'];
   $devices->{virtual_wz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_wz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315]; # zu beachtender Winkel (Azimuth): von, bis
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -491,15 +549,15 @@ my $actornames;
   #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
   #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
   #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{FnParams} = ['eg_wz_tk:state']; # Kombiniertes 2-KontaktSensor
   $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{FnParams} = [195,315]; # Beachten Winkel (Azimuth): von, bis
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{FnParams} = [2.07, 0.58, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -526,15 +584,15 @@ my $actornames;
   #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
   #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
   #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
-  $devices->{virtual_ku_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_ku_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{secure}->{FnParams} = ['eg_ku_fk01:state'];
   $devices->{virtual_ku_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_ku_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -553,15 +611,15 @@ my $actornames;
   $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_sz_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_sz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{secure}->{FnParams} = ['og_sz_fk01:state'];
   $devices->{virtual_sz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_sz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315];
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -580,15 +638,15 @@ my $actornames;
   $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_bz_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_bz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{secure}->{FnParams} = ['og_bz_fk01:state'];
   $devices->{virtual_bz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_bz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -607,15 +665,15 @@ my $actornames;
   $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_ka_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_ka_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_ka_fenster}->{readings}->{secure}->{FnParams} = ['og_ka_fk01:state'];
   $devices->{virtual_ka_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_ka_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{FnParams} = [195,315];
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -634,15 +692,15 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
   $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
   $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_kb_fenster}->{readings}->{secure}->{ValueFn} = 'tHAL_WinSecureStateValueFn';
+  $devices->{virtual_kb_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_kb_fenster}->{readings}->{secure}->{FnParams} = ['og_kb_fk01:state'];
   $devices->{virtual_kb_fenster}->{readings}->{secure}->{alias}   = "gesichert";
   $devices->{virtual_kb_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{ValueFn} = 'tHAL_WinSunnySideValueFn';
+  $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'tHAL_WinSunRoomRange';
+  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -850,28 +908,28 @@ my $actornames;
   $devices->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $devices->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $devices->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{ga_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "tHAL_MotionTimeStrValueFn";
-  $devices->{ga_sensor}->{readings}->{motiontime}->{ValueFn}   = "tHAL_MotionTimeValueFn";
+  $devices->{ga_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $devices->{ga_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$devices->{ga_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
   $devices->{ga_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $devices->{ga_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{ga_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $devices->{ga_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $devices->{ga_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion15m}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{ga_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{ga_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $devices->{ga_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $devices->{ga_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion1h}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{ga_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{ga_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $devices->{ga_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $devices->{ga_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion12h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{ga_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{ga_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $devices->{ga_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $devices->{ga_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion24h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{ga_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{ga_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{ga_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{ga_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
@@ -889,28 +947,28 @@ my $actornames;
   $devices->{wz_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $devices->{wz_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $devices->{wz_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{wz_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "tHAL_MotionTimeStrValueFn";
-  $devices->{wz_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "tHAL_MotionTimeValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$devices->{wz_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
   $devices->{wz_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $devices->{wz_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  $devices->{wz_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{wz_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $devices->{wz_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $devices->{wz_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{wz_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{wz_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $devices->{wz_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $devices->{wz_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{wz_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{wz_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $devices->{wz_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $devices->{wz_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{wz_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{wz_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $devices->{wz_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $devices->{wz_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{wz_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{wz_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{wz_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{wz_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{wz_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
@@ -928,28 +986,28 @@ my $actornames;
   $devices->{fl_eg_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "tHAL_MotionTimeStrValueFn";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "tHAL_MotionTimeValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$devices->{fl_eg_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
   $devices->{fl_eg_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $devices->{fl_eg_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $devices->{fl_eg_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $devices->{fl_eg_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{fl_eg_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_eg_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{fl_eg_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{fl_eg_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
@@ -967,58 +1025,33 @@ my $actornames;
   $devices->{fl_og_ms_sensor}->{readings}->{motion}      ->{reading}   ="motion";
   $devices->{fl_og_ms_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $devices->{fl_og_ms_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{fl_og_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "tHAL_MotionTimeStrValueFn";
-  $devices->{fl_og_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "tHAL_MotionTimeValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$devices->{fl_og_ms_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
   $devices->{fl_og_ms_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $devices->{fl_og_ms_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  $devices->{fl_og_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{fl_og_ms_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $devices->{fl_og_ms_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{fl_og_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_og_ms_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $devices->{fl_og_ms_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{fl_og_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{fl_og_ms_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $devices->{fl_og_ms_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{fl_og_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_og_ms_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $devices->{fl_og_ms_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
   #<<<
-  
-  $devices->{ku_raumsensor}->{alias}     ="KU Raumsensor";
-  $devices->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
-  $devices->{ku_raumsensor}->{type}      ="HomeMatic compatible";
-  $devices->{ku_raumsensor}->{location}  ="kueche";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{reading}   ="temperature";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{alias}     ="Temperatur";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{unit}      ="°C";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{reading}   ="humidity";
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{alias}     ="Luftfeuchtigkeit"; 
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{unit}      ="% rH";
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{reading}   ="luminosity";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $devices->{ku_raumsensor}->{readings}->{bat_status}  ->{reading}   ="battery";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{reading}   ="dewpoint";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{unit}      ="°C";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{alias}     ="Taupunkt";
-  #<<<
-  
+    
   $devices->{um_vh_licht}->{alias}     ="VH Aussensensor";
   $devices->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
   $devices->{um_vh_licht}->{type}      ="HomeMatic compatible";
@@ -1078,31 +1111,31 @@ my $actornames;
   $devices->{um_vh_bw_motion}->{readings}->{motion}      ->{reading}   ="motion";
   $devices->{um_vh_bw_motion}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
   $devices->{um_vh_bw_motion}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{um_vh_bw_motion}->{readings}->{motiontime_str}->{ValueFn}   = "tHAL_MotionTimeStrValueFn";
-  $devices->{um_vh_bw_motion}->{readings}->{motiontime}->{ValueFn}   = "tHAL_MotionTimeValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$devices->{um_vh_bw_motion}->{readings}->{motiontime}->{FnParams}  = "motion";
   $devices->{um_vh_bw_motion}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $devices->{um_vh_bw_motion}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
   $devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{reading}   ="battery";
   $devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
   $devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{unit_type} ="ENUM: ok,low";
-  $devices->{um_vh_bw_motion}->{readings}->{motion1m}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{um_vh_bw_motion}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $devices->{um_vh_bw_motion}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $devices->{um_vh_bw_motion}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{um_vh_bw_motion}->{readings}->{motion15m}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{um_vh_bw_motion}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $devices->{um_vh_bw_motion}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $devices->{um_vh_bw_motion}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{um_vh_bw_motion}->{readings}->{motion1h}->{ValueFn}   = "tHAL_MotionValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $devices->{um_vh_bw_motion}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $devices->{um_vh_bw_motion}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $devices->{um_vh_bw_motion}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{um_vh_bw_motion}->{readings}->{motion12h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{um_vh_bw_motion}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $devices->{um_vh_bw_motion}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $devices->{um_vh_bw_motion}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{um_vh_bw_motion}->{readings}->{motion24h}->{ValueFn}  = "tHAL_MotionValueFn";
+  $devices->{um_vh_bw_motion}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $devices->{um_vh_bw_motion}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{um_vh_bw_motion}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{um_vh_bw_motion}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
@@ -1114,7 +1147,7 @@ my $actornames;
   $devices->{um_vh_owts01}->{location}  ="umwelt";
   $devices->{um_vh_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $devices->{um_vh_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='tHAL_round1';
+  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $devices->{um_vh_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
@@ -1124,7 +1157,7 @@ my $actornames;
   $devices->{eg_ga_owts01}->{location}  ="garage";
   $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='tHAL_round1';
+  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
@@ -1134,7 +1167,7 @@ my $actornames;
   $devices->{eg_fl_owts01}->{location}  ="eg_flur";
   $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='tHAL_round1';
+  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
@@ -1144,7 +1177,7 @@ my $actornames;
   $devices->{eg_wc_owts01}->{location}  ="wc";
   $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='tHAL_round1';
+  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
@@ -1154,7 +1187,7 @@ my $actornames;
   $devices->{eg_ha_owts01}->{location}  ="hwr";
   $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
   $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='tHAL_round1';
+  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
   $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
@@ -1181,9 +1214,9 @@ my $actornames;
   $devices->{eg_ku_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{eg_ku_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_ku_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{eg_ku_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_ku_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_ku_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_ku_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_ku_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_ku_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{eg_ku_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_ku_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1193,16 +1226,16 @@ my $actornames;
   $devices->{eg_wz_rl}->{alias}     ="Rollos Kombiniert";
   $devices->{eg_wz_rl}->{type}      ="virtual";
   $devices->{eg_wz_rl}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_rl}->{readings}->{level}         ->{ValueFn}   ="tHAL_AvgReadingValueFn";
+  $devices->{eg_wz_rl}->{readings}->{level}         ->{ValueFn}   ="HAL_AvgReadingValueFn";
   $devices->{eg_wz_rl}->{readings}->{level}         ->{FnParams}  =["eg_wz_rl01:level","eg_wz_rl02:level"];
-  $devices->{eg_wz_rl}->{readings}->{level}         ->{ValueFilterFn} = "tHAL_round0";
+  $devices->{eg_wz_rl}->{readings}->{level}         ->{ValueFilterFn} = "HAL_round0";
   $devices->{eg_wz_rl}->{readings}->{level}         ->{alias}     ="Rollostand Durchschnitt";
   $devices->{eg_wz_rl}->{readings}->{level}         ->{unit}      ="%";
   $devices->{eg_wz_rl}->{readings}->{level1}        ->{link}      = "eg_wz_rl01:level";
   $devices->{eg_wz_rl}->{readings}->{level2}        ->{link}      = "eg_wz_rl02:level";
-  $devices->{eg_wz_rl}->{readings}->{leveltime_str} ->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_rl}->{readings}->{leveltime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_wz_rl}->{readings}->{leveltime_str} ->{FnParams}  = "level";
-  $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{FnParams}  = "level";
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1241,9 +1274,9 @@ my $actornames;
   $devices->{eg_wz_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{eg_wz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{eg_wz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_wz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_wz_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_wz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_wz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{eg_wz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1262,9 +1295,9 @@ my $actornames;
   $devices->{eg_wz_tk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{eg_wz_tk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_tk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_wz_tk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_wz_tk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_wz_tk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_wz_tk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{eg_wz_tk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_tk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1283,9 +1316,9 @@ my $actornames;
   $devices->{eg_wz_tk02}->{readings}->{state}        ->{reading}   ="state";
   $devices->{eg_wz_tk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk02}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_tk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_wz_tk02}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_wz_tk02}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_wz_tk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_wz_tk02}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{eg_wz_tk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_tk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1294,7 +1327,7 @@ my $actornames;
   $devices->{eg_wz_tk}->{alias}     ="Terrassentürkontakt Kombiniert";
   $devices->{eg_wz_tk}->{type}      ="virtual";
   $devices->{eg_wz_tk}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_tk}->{readings}->{state}         ->{ValueFn}   ="tHAL_WinCombiStateValueFn";
+  $devices->{eg_wz_tk}->{readings}->{state}         ->{ValueFn}   ="HAL_WinCombiStateValueFn";
   $devices->{eg_wz_tk}->{readings}->{state}         ->{FnParams}   =["eg_wz_tk01:state","eg_wz_tk02:state"];
   $devices->{eg_wz_tk}->{readings}->{state}         ->{alias}     ="Terrassentuerzustand";
   $devices->{eg_wz_tk}->{readings}->{state}         ->{unit_type} ="ENUM: closed,open";
@@ -1304,9 +1337,9 @@ my $actornames;
   $devices->{eg_wz_tk}->{readings}->{statetime2}    ->{link}   = "eg_wz_tk02:statetime";
   $devices->{eg_wz_tk}->{readings}->{statetime1_str}->{link}   = "eg_wz_tk01:statetime_str";
   $devices->{eg_wz_tk}->{readings}->{statetime2_str}->{link}   = "eg_wz_tk02:statetime_str";
-  $devices->{eg_wz_tk}->{readings}->{statetime_str} ->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_tk}->{readings}->{statetime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{eg_wz_tk}->{readings}->{statetime_str} ->{FnParams}  = "state";
-  $devices->{eg_wz_tk}->{readings}->{statetime}     ->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{eg_wz_tk}->{readings}->{statetime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{eg_wz_tk}->{readings}->{statetime}     ->{FnParams}  = "state";
   $devices->{eg_wz_tk}->{readings}->{statetime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_tk}->{readings}->{statetime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1335,9 +1368,9 @@ my $actornames;
   $devices->{og_bz_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{og_bz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{og_bz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{og_bz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_bz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_bz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{og_bz_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_bz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_bz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{og_bz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_bz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1366,9 +1399,9 @@ my $actornames;
   $devices->{og_sz_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{og_sz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{og_sz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{og_sz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_sz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_sz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{og_sz_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_sz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_sz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{og_sz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_sz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1387,7 +1420,7 @@ my $actornames;
   $devices->{og_ka_fk}->{alias}     ="Fensterkontakt Kombiniert";
   $devices->{og_ka_fk}->{type}      ="virtual";
   $devices->{og_ka_fk}->{location}  ="hanna";
-  $devices->{og_ka_fk}->{readings}->{state}         ->{ValueFn}   ="tHAL_WinCombiStateValueFn";
+  $devices->{og_ka_fk}->{readings}->{state}         ->{ValueFn}   ="HAL_WinCombiStateValueFn";
   $devices->{og_ka_fk}->{readings}->{state}         ->{FnParams}   =["og_ka_fk01:state","og_ka_fk02:state"];
   $devices->{og_ka_fk}->{readings}->{state}         ->{alias}     ="Fensterzustand";
   $devices->{og_ka_fk}->{readings}->{state}         ->{unit_type} ="ENUM: closed,open";
@@ -1397,9 +1430,9 @@ my $actornames;
   $devices->{og_ka_fk}->{readings}->{statetime2}    ->{link}   = "og_ka_fk02:statetime";
   $devices->{og_ka_fk}->{readings}->{statetime1_str}->{link}   = "og_ka_fk01:statetime_str";
   $devices->{og_ka_fk}->{readings}->{statetime2_str}->{link}   = "og_ka_fk02:statetime_str";
-  $devices->{og_ka_fk}->{readings}->{statetime_str} ->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_ka_fk}->{readings}->{statetime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_ka_fk}->{readings}->{statetime_str} ->{FnParams}  = "state";
-  $devices->{og_ka_fk}->{readings}->{statetime}     ->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_ka_fk}->{readings}->{statetime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_ka_fk}->{readings}->{statetime}     ->{FnParams}  = "state";
   $devices->{og_ka_fk}->{readings}->{statetime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_ka_fk}->{readings}->{statetime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1418,9 +1451,9 @@ my $actornames;
   $devices->{og_ka_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{og_ka_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{og_ka_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{og_ka_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_ka_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_ka_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{og_ka_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_ka_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_ka_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{og_ka_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_ka_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1439,9 +1472,9 @@ my $actornames;
   $devices->{og_ka_fk02}->{readings}->{state}        ->{reading}   ="state";
   $devices->{og_ka_fk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{og_ka_fk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{og_ka_fk02}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_ka_fk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_ka_fk02}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{og_ka_fk02}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_ka_fk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_ka_fk02}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{og_ka_fk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_ka_fk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1470,9 +1503,9 @@ my $actornames;
   $devices->{og_kb_fk01}->{readings}->{state}        ->{reading}   ="state";
   $devices->{og_kb_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{og_kb_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  $devices->{og_kb_fk01}->{readings}->{statetime_str}->{ValueFn}   = "tHAL_ReadingTimeStrValueFn";
+  $devices->{og_kb_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
   $devices->{og_kb_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{og_kb_fk01}->{readings}->{statetime}->{ValueFn}   = "tHAL_ReadingTimeValueFn";
+  $devices->{og_kb_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
   $devices->{og_kb_fk01}->{readings}->{statetime}->{FnParams}  = "state";
   $devices->{og_kb_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{og_kb_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
@@ -1483,17 +1516,17 @@ my $actornames;
 
 #--- Methods: Utils ------------------------------------------------------------
 
-sub tHAL_round0($) {
+sub HAL_round0($) {
 	my($val)=@_;
 	return rundeZahl0($val);
 }
   
-sub tHAL_round1($) {
+sub HAL_round1($) {
 	my($val)=@_;
 	return rundeZahl1($val);
 }
 
-sub tHAL_round2($) {
+sub HAL_round2($) {
 	my($val)=@_;
 	return rundeZahl2($val);
 }
@@ -1503,28 +1536,28 @@ sub tHAL_round2($) {
 
 # ValueFn: Berechnet, wieweit die Sonne aktuell ins Zimmer hineinstrahlt (am Boden). Beruecksichtigt nur Azimuth/Elevation, nicht die aktuelle Intensitaet.
 # FnParams: Fensterhoehe (Oberkante)
-sub tHAL_WinSunRoomRange($$) {
+sub HAL_WinSunRoomRange($$) {
 	my ($device, $record) = @_;
 	my $params = $record->{FnParams};
 	
 	my $val = 0;
 	my $msg = undef;
 	
-	my $sRec = tHAL_getSensorValueRecord($device->{name},'sunny_side');
+	my $sRec = HAL_getSensorValueRecord($device->{name},'sunny_side');
 	if($sRec) {
 		my $sside = $sRec->{value};
 		if($sside==0) {
 			$val = 0;
 		  $msg = $sRec->{message};
 		} else {
-			$sRec = tHAL_getSensorValueRecord($device->{name},'elevation');
+			$sRec = HAL_getSensorValueRecord($device->{name},'elevation');
 			if($sRec) {
       my $elevation = $sRec->{value};
   		  my $height = @{$params}[0];
 	      $val = $height/tan(deg2rad($elevation));
 	      
 	      # Korrekturfaktor Wanddicke
-	      #my $cf = tHAL_getSensorReadingValue($device->{name},'cf_wall_thickness');
+	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_wall_thickness');
 	      my $cf = @{$params}[1];
 	      #if($cf) {
 	      #	$val-=$cf;
@@ -1534,7 +1567,7 @@ sub tHAL_WinSunRoomRange($$) {
 	      # Winkel: Elevation bei 90° Winkel zu Fenster
 	      my $cfW = @{$params}[2];
 	      if($cfW) {
-	      	my $aRec = tHAL_getSensorValueRecord($device->{name},'azimuth');
+	      	my $aRec = HAL_getSensorValueRecord($device->{name},'azimuth');
 	      	if($aRec) {
 	      		my $azimuth = $aRec->{value};
 		      	my $winkel = abs($azimuth-$cfW);
@@ -1552,13 +1585,13 @@ sub tHAL_WinSunRoomRange($$) {
 	      }
 
 	      # Korrekturfaktor Anpassung
-	      #my $cf = tHAL_getSensorReadingValue($device->{name},'cf_sun_room_range');
+	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_sun_room_range');
 	      #if($cf) {
 	      #	$val*=$cf;
 	      #}
 	      
 	      #Log 3,'>------------>Val: '.$val;
-	  	  $val=tHAL_round2($val);
+	  	  $val=HAL_round2($val);
 	  	  #Log 3,'>------------>Val: '.$val;
 	  	  
 		    $msg = "elevation: $elevation, height: $height";
@@ -1583,20 +1616,20 @@ sub tHAL_WinSunRoomRange($$) {
 
 # ValueFn: Prueft, ob das Fenster auf der Sonnenseite ist (Sonne ist zum Fenster zugewandt: Azimut) und nicht Nacht ist (Elevation).
 # FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
-sub tHAL_WinSunnySideValueFn($$) {
+sub HAL_WinSunnySideValueFn($$) {
 	my ($device, $record) = @_;
 	my $params = $record->{FnParams};
 	
 	my $val = 0;
 	my $msg = undef;
 	
-	my $sRec = tHAL_getSensorValueRecord($device->{name},'elevation');
+	my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
 	if($sRec) {
 		if($sRec->{value} < 10) { # XXX fester Wert für Sonnenwinkel. 10 OK?
 			$val = 0;
 	    $msg = 'dark: elevation';
 		} else {
-			$sRec = tHAL_getSensorValueRecord($device->{name},'azimuth');
+			$sRec = HAL_getSensorValueRecord($device->{name},'azimuth');
 			if($sRec) {
 				my $t = $sRec->{value};
 				if($t > @{$params}[0] && $t < @{$params}[1]) {
@@ -1627,7 +1660,7 @@ sub tHAL_WinSunnySideValueFn($$) {
   
 # ValueFn: Fragt angegebene (Fenster)Sensoren ab un liefert den Sicherheitsstand (ob alles geschlossen ist).
 # FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
-sub tHAL_WinSecureStateValueFn($$) {
+sub HAL_WinSecureStateValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	
@@ -1636,7 +1669,7 @@ sub tHAL_WinSecureStateValueFn($$) {
 	
 	foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
   	if(!defined($sRec)) {
   		$secure=0;
   		$msg = 'error: undefined sensor';
@@ -1665,7 +1698,7 @@ sub tHAL_WinSecureStateValueFn($$) {
   
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Durchschnittswert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
-sub tHAL_AvgReadingValueFn($$) {
+sub HAL_AvgReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	# keine 'dead' Sensoren verwenden. 
@@ -1676,7 +1709,7 @@ sub tHAL_AvgReadingValueFn($$) {
   my $aCnt = 0;
   foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
   	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', val: '. $sRec->{value}.', alive: '.$sRec->{alive};
   	if($sRec->{alive}) {
   		$aCnt += 1;
@@ -1706,7 +1739,7 @@ sub tHAL_AvgReadingValueFn($$) {
 
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Min. Wert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
-sub tHAL_MinReadingValueFn($$) {
+sub HAL_MinReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	# keine 'dead' Sensoren verwenden. 
@@ -1716,7 +1749,7 @@ sub tHAL_MinReadingValueFn($$) {
   my $mVal = undef;
   foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
   	if($sRec->{alive}) {
   		my $sVal = $sRec->{value};
   		if(!defined($mVal) || $sVal<$mVal) {
@@ -1737,7 +1770,7 @@ sub tHAL_MinReadingValueFn($$) {
 
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Max. Wert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
-sub tHAL_MaxReadingValueFn($$) {
+sub HAL_MaxReadingValueFn($$) {
 	my ($device, $record) = @_;
 	my $senList = $record->{FnParams};
 	# keine 'dead' Sensoren verwenden.
@@ -1747,7 +1780,7 @@ sub tHAL_MaxReadingValueFn($$) {
   my $mVal = undef;
   foreach my $a (@{$senList}) {
   	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
   	if($sRec->{alive}) {
   		my $sVal = $sRec->{value};
   		if(!defined($mVal) || $sVal>$mVal) {
@@ -1771,14 +1804,14 @@ sub tHAL_MaxReadingValueFn($$) {
 #    berechnet die vergangene Zeitspanne. Ausgabe menschenlesbar
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
-sub tHAL_ReadingTimeStrValueFn($$;$) {
+sub HAL_ReadingTimeStrValueFn($$;$) {
 	my ($device, $record, $default) = @_;
 	my $rName = $record->{FnParams};
   $rName = $default unless $rName;
   if(!defined($rName)){
   	return undef;
   }
-  my $t = tHAL_ReadingTimeValueFn($device, $record,$rName);
+  my $t = HAL_ReadingTimeValueFn($device, $record,$rName);
   
   if($t) {
   	if(ref $t eq ref {}) {
@@ -1797,9 +1830,9 @@ sub tHAL_ReadingTimeStrValueFn($$;$) {
 #    berechnet die vergangene Zeitspanne. Ausgabe menschenlesbar
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
-sub tHAL_MotionTimeStrValueFn($$) {
+sub HAL_MotionTimeStrValueFn($$) {
 	my ($device, $record) = @_;
-  my $t = tHAL_MotionTimeValueFn($device, $record);
+  my $t = HAL_MotionTimeValueFn($device, $record);
   if($t) {
   	if(ref $t eq ref {}) {
 		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
@@ -1817,9 +1850,9 @@ sub tHAL_MotionTimeStrValueFn($$) {
 #    berechnet die vergangene Zeitspanne. Ausgabe: Zahl in Sekunden
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
-sub tHAL_MotionTimeValueFn($$) {
+sub HAL_MotionTimeValueFn($$) {
   my ($device, $record) = @_;
-  return tHAL_ReadingTimeValueFn($device, $record,'motion');
+  return HAL_ReadingTimeValueFn($device, $record,'motion');
 }
 
 # ValueFn: Benutzt Time der angegebenen Reading 
@@ -1827,7 +1860,7 @@ sub tHAL_MotionTimeValueFn($$) {
 #    berechnet die vergangene Zeitspanne. Ausgabe: Zahl in Sekunden
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
-sub tHAL_ReadingTimeValueFn($$;$) {
+sub HAL_ReadingTimeValueFn($$;$) {
 	my ($device, $record, $default) = @_;
 	my $rName = $record->{FnParams};
   my $devName = $device->{name};
@@ -1835,7 +1868,7 @@ sub tHAL_ReadingTimeValueFn($$;$) {
   if(!defined($rName)){
   	return undef;
   }
-  my $mTime = tHAL_getSensorReadingTime($devName, $rName);    
+  my $mTime = HAL_getSensorReadingTime($devName, $rName);    
   
   if($mTime) {
   	my $dTime = dateTime2dec($mTime);
@@ -1855,12 +1888,12 @@ sub tHAL_ReadingTimeValueFn($$;$) {
 #   wird 1 (true), ansonsten 0 (false) zurückgegeben.
 # FnParams: Zeit in Sekunden [, Readingname] 
 # Params: Dev-Hash, Record-HASH
-sub tHAL_MotionValueFn($$) {
+sub HAL_MotionValueFn($$) {
 	my ($device, $record) = @_;
 	my ($pTime,$rName) = @{$record->{FnParams}};
   my $devName = $device->{name};
   $rName = "motion" unless $rName;
-  my $mTime = tHAL_getSensorReadingTime($devName, $rName);    
+  my $mTime = HAL_getSensorReadingTime($devName, $rName);    
   #Log 3,'>------------>Name: '.$devName.', Reading: '.$rName.', time: '.$mTime;
 
   if($mTime) {
@@ -1878,7 +1911,7 @@ sub tHAL_MotionValueFn($$) {
 }
 
   #TODO:
-  sub tHAL_SunValueFn($$) {
+  sub HAL_SunValueFn($$) {
   	my ($device, $record) = @_;
   	#my $oRecord=$_[1];
   	my $senList = $record->{FnParams};
@@ -1894,7 +1927,7 @@ sub tHAL_MotionValueFn($$) {
     	my $senLim1 = $a->[1];
     	my $senLim2 = $a->[2];
     	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', Lim1/2: '.$senLim1.'/'.$senLim2;
-    	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
     	if($sRec->{alive}) {
     		my $sVal = $sRec->{value};
     		#Log 3,'>------------>sVal: '.$sVal;
@@ -1938,7 +1971,7 @@ sub tHAL_MotionValueFn($$) {
 #   Reihenfolge: open > tilted > closed
 # FnParams: Liste der Sensoren mit Readings: sensorName:readingName
 # Params: Dev-Hash, Record-HASH  
-sub tHAL_WinCombiStateValueFn($$) {
+sub HAL_WinCombiStateValueFn($$) {
 	  my ($device, $record) = @_;
   	
   	my $senList = $record->{FnParams};
@@ -1946,7 +1979,7 @@ sub tHAL_WinCombiStateValueFn($$) {
   	my $retTime = undef;
     foreach my $senSpec (@{$senList}) {
     	my($sensorName,$readingName) = split(/:/, $senSpec);
-    	my $sRec = tHAL_getSensorValueRecord($sensorName,$readingName);
+    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
     	my $state = $sRec->{value};
     	my $time = $sRec->{time};
     	if($state eq 'open') {
@@ -1985,13 +2018,15 @@ sub tHAL_WinCombiStateValueFn($$) {
 my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|dump]",
             "sensor (sensorname) all*|(readingname) [plain*|full|value|time|dump]",
             "rooms",
-            "sensors [(roomname)]");
+            "sensors [(roomname)]",
+            "dump (roomname|sensorname)");
+my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1};
 sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
   
   # Templates anwenden
-  tHAL_expandTemplates($devices, $templates);
+  HAL_expandTemplates($devices, $templates);
   
   # Console-Commandos registrieren
   my %lhash = ( Fn=>"CommandMGet",
@@ -2010,7 +2045,8 @@ sub CommandMGet($$$) {
 	
 	my $modifier = $line[0];
 	my $devname;
-	if($modifier ne 'room' && $modifier ne 'sensor' && $modifier ne 'rooms' && $modifier ne 'sensors') {
+	#if($modifier ne 'room' && $modifier ne 'sensor' && $modifier ne 'rooms' && $modifier ne 'sensors') {
+	if(!$mget_mods->{$modifier}) {
 		# Default is room
 		$modifier = 'room';
 	} else {
@@ -2036,7 +2072,7 @@ sub CommandMGet($$$) {
 			$rname = 'all';
 		}
 	  if($rname eq 'all') {
-			my @readings = tHAL_getRoomSensorReadingsList($devname);
+			my @readings = HAL_getRoomSensorReadingsList($devname);
 			foreach $rname (@readings) {
 				$ret->{$rname}=CommandMGet_room($devname,$rname,$showmod);
 			}
@@ -2052,7 +2088,7 @@ sub CommandMGet($$$) {
 			$rname = 'all';
 		}
 		if($rname eq 'all') {
-			my @readings = tHAL_getSensorReadingsList($devname);
+			my @readings = HAL_getSensorReadingsList($devname);
 			foreach $rname (@readings) {
 				$ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod);
 			}
@@ -2060,65 +2096,85 @@ sub CommandMGet($$$) {
 			return CommandMGet_sensor($devname,$rname,$showmod);
 		}
 	} elsif($modifier eq 'rooms') {
-		my $rooms = tHAL_getRoomNames();
+		my $rooms = HAL_getRoomNames();
 		foreach my $roomname (@$rooms) {
 			$ret->{$roomname}=undef;
 		}
   } elsif($modifier eq 'sensors') {
   	my $sensors;
   	if(!defined($devname)) {
-      $sensors = tHAL_getSensorNames();
+      $sensors = HAL_getSensorNames();
     } else {
-    	$sensors = tHAL_getRoomSensorNames($devname);
+    	$sensors = HAL_getRoomSensorNames($devname);
     }
 		foreach my $sensorname (@$sensors) {
 			$ret->{$sensorname}=undef;
 		}
+  } elsif($modifier eq 'dump') {
+  	my $rec;
+  	my $type;
+    if($rec=HAL_getRoomRecord($devname)) {
+      $type='ROOM';
+    } elsif($rec=HAL_getSensorRecord($devname)) {
+      $type='SENSOR';
+    #} elsif($rec=HAL_getActorRecord($devname)) {
+    #  #TODO: Actor
+    #  $type='ACTOR';
+    } elsif($rec=$templates->{$devname}) {
+      $type='TEMPLATE' unless $type;
+    } else {
+      return 'unknown device' unless $rec;
+    }
+    return $type."\n".Dumper($rec);
   } else {
 		return 'unknown command';
 	}
 	
 	my $str='';
-	foreach my $key (sort(keys($ret))) {
-		if($showmod ne 'full') {
-      $str.="$key";
-    }
-		my $val = $ret->{$key};
-		if(defined($val)) {
-			if($showmod ne 'full') {
-        $str.=' = ';
+	if(ref $ret eq 'HASH') {
+	  foreach my $key (sort(keys($ret))) {
+		  if($showmod ne 'full') {
+        $str.="$key";
       }
-      $str.=$val;
-    }
-		$str.="\n";
-	}
+	  	my $val = $ret->{$key};
+		  if(defined($val)) {
+			  if($showmod ne 'full') {
+          $str.=' = ';
+        }
+        $str.=$val;
+      }
+		  $str.="\n";
+	  }
+  } else {
+  	return 'no device found';
+  }
 	return $str;
 }
 
 sub CommandMGet_room($$$) {
 	my($name, $readingname, $mod) = @_;
 
-	my $record = tHAL_getRoomReadingRecord($name, $readingname);
+	my $record = HAL_getRoomReadingRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown room or reading: $name:$readingname";
 	}
 	
 	return CommandMGet_format($record,$mod);
 	
-	#return tHAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
+	#return HAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
 }
 
 sub CommandMGet_sensor($$$) {
 	my($name, $readingname, $mod) = @_;
 
-	my $record = tHAL_getSensorValueRecord($name, $readingname);
+	my $record = HAL_getSensorValueRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown sensor or reading: $name:$readingname";
 	}
 	
 	return CommandMGet_format($record,$mod);
 	
-	#return tHAL_getSensorReadingValue($name, $readingname);
+	#return HAL_getSensorReadingValue($name, $readingname);
 }
 
 #[plain*|full|value|time|dump]
@@ -2192,10 +2248,11 @@ sub merge_hash_recursive($$) {
 	}
 }
 
-sub tHAL_expandTemplates($$) {
+sub HAL_expandTemplates($$) {
 	my($tab,$templates) = @_;
 	
 	foreach my $key (keys($tab)) {
+		#Log3 "myCtrlDev", 3, ">>>ExpandTemplates: $key";
 		my $subTab = $tab->{$key};
 		my $desiredTemplates = $subTab->{templates};
 		if(defined($desiredTemplates)) {
@@ -2211,27 +2268,27 @@ sub tHAL_expandTemplates($$) {
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Reading-Name
 # return ReadingsRecord
-sub tHAL_getRoomReadingRecord($$) {
+sub HAL_getRoomReadingRecord($$) {
 	my ($roomName, $readingName) = @_;
-	return tHAL_getRoomReadingRecord_($roomName, $readingName, "");
+	return HAL_getRoomReadingRecord_($roomName, $readingName, "");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Reading-Name
 # return ReadingsRecord
-sub tHAL_getRoomOutdoorReadingRecord($$) {
+sub HAL_getRoomOutdoorReadingRecord($$) {
 	my ($roomName, $readingName) = @_;
-	return tHAL_getRoomReadingRecord_($roomName, $readingName, "_outdoor");
+	return HAL_getRoomReadingRecord_($roomName, $readingName, "_outdoor");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte und Sensorliste (Internal)
 # Param Room-Name, Reading-Name, Name der Liste (sensors, sensors_outdoor)
 # return ReadingsRecord
-sub tHAL_getRoomReadingRecord_($$$) {
+sub HAL_getRoomReadingRecord_($$$) {
 	my ($roomName, $readingName, $listNameSuffix) = @_;
 	my $listName.="sensors".$listNameSuffix;
 		
-	my $sensorList = tHAL_getRoomSensorNames_($roomName, $listName);	#tHAL_getRoomSensorNames($roomName);
+	my $sensorList = HAL_getRoomSensorNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
 	# Wenn Reading mit Sensorname ubergeben wurde
@@ -2263,9 +2320,9 @@ sub tHAL_getRoomReadingRecord_($$$) {
 		}
 		if(!$found) { return undef };
 		#Log 3,"+++++++++++++++++> >>> ".$tsname." > :: ".$trname;
-		my $rec = tHAL_getSensorValueRecord($tsname, $trname);
+		my $rec = HAL_getSensorValueRecord($tsname, $trname);
 		if(defined $rec) {
-			my $roomRec=tHAL_getRoomRecord($roomName);
+			my $roomRec=HAL_getRoomRecord($roomName);
 			$rec->{room_alias}=$roomRec->{alias};
 			$rec->{room_fhem_name}=$roomRec->{fhem_name};
 			# XXX: ggf. weitere Room Eigenschaften
@@ -2290,18 +2347,18 @@ sub tHAL_getRoomReadingRecord_($$$) {
 			}
 			if(!$found) { next; }
 		  
-		  my $rec = tHAL_getSensorValueRecord($tsname, $readingName);
+		  my $rec = HAL_getSensorValueRecord($tsname, $readingName);
 	  	if(defined $rec) {
-		  	my $roomRec=tHAL_getRoomRecord($roomName);
+		  	my $roomRec=HAL_getRoomRecord($roomName);
 			  $rec->{room_alias}=$roomRec->{alias};
 			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
 			  # XXX: ggf. weitere Room Eigenschaften
 			  return $rec;
 		  }
 		} else {
-  		my $rec = tHAL_getSensorValueRecord($sName, $readingName);
+  		my $rec = HAL_getSensorValueRecord($sName, $readingName);
 	  	if(defined $rec) {
-		  	my $roomRec=tHAL_getRoomRecord($roomName);
+		  	my $roomRec=HAL_getRoomRecord($roomName);
 			  $rec->{room_alias}=$roomRec->{alias};
 			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
 			  # XXX: ggf. weitere Room Eigenschaften
@@ -2319,17 +2376,17 @@ sub tHAL_getRoomReadingRecord_($$$) {
 # return ReadingsWert
 # Wenn kein Wert gefunden werden kann, wird Default1 zurückgageben (wenn angegeben, ansonsten undef)
 # Wenn Default2 angegeben, dann wird dieser zurückgegeben, falls Raum nicht bekannt ist, ansonsten Default1 (wenn nicht angegeben - undef)
-sub tHAL_getRoomReadingValue($$;$$) {
+sub HAL_getRoomReadingValue($$;$$) {
 	my ($roomName, $readingName, $def1, $def2) = @_;
 	
 	$def2 = $def1 unless defined($def2); 
 	
-	my $sensorList = tHAL_getRoomSensorNames($roomName);
+	my $sensorList = HAL_getRoomSensorNames($roomName);
 	return $def2 unless $sensorList;
 	
 	foreach my $sName (@$sensorList) {
 		if(!defined($sName)) {next;} 
-		my $val = tHAL_getSensorReadingValue($sName, $readingName);
+		my $val = HAL_getSensorReadingValue($sName, $readingName);
 		if(defined $val) {return $val;}
 	}
 	
@@ -2347,35 +2404,37 @@ sub tHAL_getRoomReadingValue($$;$$) {
 #  X->{name}->{readings}->{<readings_name>} ->{reading}  ="temperature";
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
-sub tHAL_getSensorRecord($)
+sub HAL_getSensorRecord($)
 {
 	my ($name) = @_;
 	return undef unless $name;
-	my $ret = tHAL_getDeviceTab()->{$name};
-	$ret->{name} = $name; # Name hinzufuegen
+	my $ret = HAL_getDeviceTab()->{$name};
+	if($ret) {
+  	$ret->{name} = $name; # Name hinzufuegen
+  }
 	return $ret;
 }
 
 # Liefert HASH mit Sensor-Definitionen
-sub tHAL_getDeviceTab() {
+sub HAL_getDeviceTab() {
   return $devices;
 }
 
 # Liefert Liste der Sensornamen.
-sub tHAL_getSensorNames() {
-	tHAL_initDeviceNames_() unless defined($sensornames);
+sub HAL_getSensorNames() {
+	HAL_initDeviceNames_() unless defined($sensornames);
 	return $sensornames;
 }
 
 # Liefert Liste der Actornamen.
-sub tHAL_getActorNames() {
-	tHAL_initDeviceNames_() unless defined($actornames);
+sub HAL_getActorNames() {
+	HAL_initDeviceNames_() unless defined($actornames);
 	return $actornames;
 }
 
 # Initialisiert Listen der Sensor/Actor-Names
-sub tHAL_initDeviceNames_() {
-	my $r = tHAL_getDeviceTab();
+sub HAL_initDeviceNames_() {
+	my $r = HAL_getDeviceTab();
 	foreach my $name (keys %{$r}) {
 	  if(defined($r->{$name}->{readings})) {
 	  	push(@$sensornames,$name);
@@ -2394,21 +2453,23 @@ sub tHAL_initDeviceNames_() {
 # Definiert nutzbare Sensoren. Reihenfolge gibt Priorität an. <= ODER BRAUCHT MAN NUR DIE EINZEL-READING-DEFINITIONEN?
 #  X->{name}->{sensors}   =(<Liste der Namen>);
 #  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
-sub tHAL_getRoomRecord($) {
+sub HAL_getRoomRecord($) {
 	my ($name) = @_;
-	my $ret = tHAL_getRooms()->{$name};
-	$ret->{name} = $name; # Name hinzufuegen
+	my $ret = HAL_getRooms()->{$name};
+	if($ret) {
+  	$ret->{name} = $name; # Name hinzufuegen
+  }
 	return $ret;
 }
 
 # Liefert HASH mit Raum-Definitionen
-sub tHAL_getRooms() {
+sub HAL_getRooms() {
   return $rooms;
 }
 
 # Liefert Liste der Raumnamen.
-sub tHAL_getRoomNames() {
-	my $r = tHAL_getRooms();
+sub HAL_getRoomNames() {
+	my $r = HAL_getRooms();
 	my @ret = keys($r);
 	
 	return \@ret;
@@ -2416,28 +2477,28 @@ sub tHAL_getRoomNames() {
 
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
 # Param: Raumname
-#  Beispiel:   {tHAL_getRoomSensorNames("wohnzimmer")->[0]}
-sub tHAL_getRoomSensorNames($)
+#  Beispiel:   {HAL_getRoomSensorNames("wohnzimmer")->[0]}
+sub HAL_getRoomSensorNames($)
 {
 	my ($roomName) = @_;
-  return tHAL_getRoomSensorNames_($roomName,"sensors");	
+  return HAL_getRoomSensorNames_($roomName,"sensors");	
 }
 
 # liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
 # Param: Raumname
-#  Beispiel:  {tHAL_getRoomSensorNames("wohnzimmer")->[0]}
-sub tHAL_getRoomOutdoorSensorNames($)
+#  Beispiel:  {HAL_getRoomSensorNames("wohnzimmer")->[0]}
+sub HAL_getRoomOutdoorSensorNames($)
 {
 	my ($roomName) = @_;
-  return tHAL_getRoomSensorNames_($roomName,"sensors_outdoor");	
+  return HAL_getRoomSensorNames_($roomName,"sensors_outdoor");	
 }
 
 # liefert Referenz der Liste der Sensors in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-sub tHAL_getRoomSensorNames_($$)
+sub HAL_getRoomSensorNames_($$)
 {
 	my ($roomName, $listName) = @_;
-	my $roomRec=tHAL_getRoomRecord($roomName);
+	my $roomRec=HAL_getRoomRecord($roomName);
 	return undef unless $roomRec;
 	my $sensorList=$roomRec->{$listName};
 	return undef unless $sensorList;
@@ -2449,18 +2510,18 @@ sub tHAL_getRoomSensorNames_($$)
 # Param: Raumname, 
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
-sub tHAL_getRoomSensorReadingsList($;$) {
+sub HAL_getRoomSensorReadingsList($;$) {
 	my ($roomName,$withSensorNames) = @_;
-  return tHAL_getRoomSensorReadingsList_($roomName,'sensors',$withSensorNames);
+  return HAL_getRoomSensorReadingsList_($roomName,'sensors',$withSensorNames);
 }
 
 # liefert liste aller veruegbaren Readings in einem Raum für Außenbereich
 # Param: Raumname, 
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
-sub tHAL_getRoomOutdoorSensorReadingsList($;$) {
+sub HAL_getRoomOutdoorSensorReadingsList($;$) {
 	my ($roomName,$withSensorNames) = @_;
-  return tHAL_getRoomSensorReadingsList_($roomName,'sensors_outdoor',$withSensorNames);
+  return HAL_getRoomSensorReadingsList_($roomName,'sensors_outdoor',$withSensorNames);
 }
 
 # liefert liste aller veruegbaren Readings in einem Raum
@@ -2468,15 +2529,15 @@ sub tHAL_getRoomOutdoorSensorReadingsList($;$) {
 #        Liste (sensors, sensors_outdoor)
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
-sub tHAL_getRoomSensorReadingsList_($$;$) {
+sub HAL_getRoomSensorReadingsList_($$;$) {
 	my ($roomName,$listName,$withSensorNames) = @_;
 	
-	my $snames = tHAL_getRoomSensorNames_($roomName,$listName);
+	my $snames = HAL_getRoomSensorNames_($roomName,$listName);
 	my @rnames = ();
 	#Log 3,"+++++++++++++++++> SNames: ".Dumper($snames);
 	foreach my $sname (@{$snames}) {
 		#Log 3,"+++++++++++++++++> Name:".$sname." | ".Dumper($sname);
-		my @tnames = tHAL_getSensorReadingsList($sname);
+		my @tnames = HAL_getSensorReadingsList($sname);
 		if($withSensorNames) {
 			@tnames = map {$sname.':'.$_} @tnames;
 		}
@@ -2495,35 +2556,35 @@ sub tHAL_getRoomSensorReadingsList_($$;$) {
 #### TODO: Sind die Methoden, die Hashesliste zurückgeben überhaupt notwendig?
 ## liefert Liste der Sensors in einem Raum (Array of Hashes)
 ## Param: Raumname
-##  Beispiel:  {(tHAL_getRoomSensors("wohnzimmer"))[0]->{alias}}
-#sub tHAL_getRoomSensors($)
+##  Beispiel:  {(HAL_getRoomSensors("wohnzimmer"))[0]->{alias}}
+#sub HAL_getRoomSensors($)
 #{
 #	my ($roomName) = @_;
-#  return tHAL_getRoomSensors_($roomName,"sensors");	
+#  return HAL_getRoomSensors_($roomName,"sensors");	
 #}
 #
 ## liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
 ## Param: Raumname
-##  Beispiel:  {(tHAL_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
-#sub tHAL_getRoomOutdoorSensors($)
+##  Beispiel:  {(HAL_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
+#sub HAL_getRoomOutdoorSensors($)
 #{
 #	my ($roomName) = @_;
-#  return tHAL_getRoomSensors_($roomName,"sensors_outdoor");	
+#  return HAL_getRoomSensors_($roomName,"sensors_outdoor");	
 #}
 #
 ## liefert Liste der Sensors in einem Raum (Array of Hashes)
 ## Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-#sub tHAL_getRoomSensors_($$)
+#sub HAL_getRoomSensors_($$)
 #{
 #	my ($roomName, $listName) = @_;
-#	my $roomRec=tHAL_getRoomRecord($roomName);
+#	my $roomRec=HAL_getRoomRecord($roomName);
 #	return undef unless $roomRec;
 #	my $sensorList=$roomRec->{$listName};
 #	return undef unless $sensorList;
 #	
 #	my @ret;
 #	foreach my $sName (@{$sensorList}) {
-#		my $sRec = tHAL_getSensorRecord($sName);
+#		my $sRec = HAL_getSensorRecord($sName);
 #		push(@ret, \%{$sRec}) if $sRec ;
 #	}
 #	
@@ -2533,10 +2594,10 @@ sub tHAL_getRoomSensorReadingsList_($$;$) {
 
 # parameters: name
 # liefert Array : Liste aller Readings eines Sensor-Device (auch composite)
-sub tHAL_getSensorReadingsList($) {
+sub HAL_getSensorReadingsList($) {
 	my ($name) = @_;
 	
-	my $record = tHAL_getSensorRecord($name);
+	my $record = HAL_getSensorRecord($name);
 	
 	if(defined($record)) {
 		# Eigene Readings
@@ -2548,7 +2609,7 @@ sub tHAL_getSensorReadingsList($) {
 	  foreach my $composite_rec (@{$composites}) {
 		  my($composite_name,$composite_readings_names)= split(/:/,$composite_rec);
 		  if($composite_name) {
-		  	my @composite_readings = tHAL_getSensorReadingsList($composite_name);
+		  	my @composite_readings = HAL_getSensorReadingsList($composite_name);
   		  if(defined($composite_readings_names)) {
   		  	my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
 	  	  	@composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
@@ -2565,7 +2626,7 @@ sub tHAL_getSensorReadingsList($) {
 
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
 # liefert Device und Reading Recors als Array 
-sub tHAL_getSensorReadingCompositeRecord_intern($$)
+sub HAL_getSensorReadingCompositeRecord_intern($$)
 {
 	my ($device_record,$reading) = @_;
 	return (undef, undef) unless $device_record;
@@ -2594,8 +2655,8 @@ sub tHAL_getSensorReadingCompositeRecord_intern($$)
 			  next;
 		  }
 		}
-		my $new_device_record = tHAL_getSensorRecord($composite_name);
-		my ($new_device_record2, $new_single_reading_record) = tHAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
+		my $new_device_record = HAL_getSensorRecord($composite_name);
+		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
 			$new_single_reading_record->{reading_name} = $reading;
 			return ($new_device_record2, $new_single_reading_record);
@@ -2610,13 +2671,13 @@ sub tHAL_getSensorReadingCompositeRecord_intern($$)
 # record:
 #  X->{reading} = "<fhem_device_reading_name>";
 #  X->{unit} = "";
-sub tHAL_getSensorReadingRecord($$)
+sub HAL_getSensorReadingRecord($$)
 {
 	my ($name, $reading) = @_;
-	my $record = tHAL_getSensorRecord($name);
+	my $record = HAL_getSensorRecord($name);
 	
 	if(defined($record)) {
-    return tHAL_getSensorReadingCompositeRecord_intern($record,$reading);
+    return HAL_getSensorReadingCompositeRecord_intern($record,$reading);
   }
 	return (undef, undef);
 }
@@ -2631,19 +2692,19 @@ sub tHAL_getSensorReadingRecord($$)
 # X->{fhem_name}
 # X->{reading}
 # X->...
-sub tHAL_getSensorValueRecord($$)
+sub HAL_getSensorValueRecord($$)
 {
 	my ($name, $reading) = @_;
   # Sensor/Reading-Record suchen
-  my ($device, $record) = tHAL_getSensorReadingRecord($name,$reading);
+  my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
   
-  return tHAL_getReadingsValueRecord($device, $record);
+  return HAL_getReadingsValueRecord($device, $record);
 }
 
 # Liefert ValueRecord (ermittelter Wert und andere SensorReadingDaten)
 # Param: Device-Hash, Reading-Hash
 # Return: Value-Hash
-sub tHAL_getReadingsValueRecord($$) {
+sub HAL_getReadingsValueRecord($$) {
 	my ($device, $record) = @_;
 	
 	#Log 3,"+++++++++++++++++> ".Dumper($device);
@@ -2660,7 +2721,7 @@ sub tHAL_getReadingsValueRecord($$) {
 			
 			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
 			return undef unless $readingName;
-			return tHAL_getSensorValueRecord($sensorName,$readingName);
+			return HAL_getSensorValueRecord($sensorName,$readingName);
 		} 
 		
 		my $valueFn =  $record->{ValueFn};
@@ -2765,10 +2826,10 @@ sub tHAL_getReadingsValueRecord($$) {
 # Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
 # parameters: name, reading name
 # returns current readings value
-sub tHAL_getSensorReadingValue($$)
+sub HAL_getSensorReadingValue($$)
 {
 	my ($name, $reading) = @_;
-	my $h = tHAL_getSensorValueRecord($name, $reading);
+	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{value};
 }
@@ -2776,15 +2837,15 @@ sub tHAL_getSensorReadingValue($$)
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading das Unit-String aus
 # parameters: name, reading name
 # returns readings unit
-sub tHAL_getSensorReadingUnit($$)
+sub HAL_getSensorReadingUnit($$)
 {
 	my ($name, $reading) = @_;
-	my $h = tHAL_getSensorValueRecord($name, $reading);
+	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{unit};
 	
 	# Sensor/Reading-Record suchen
-	my ($device, $record) = tHAL_getSensorReadingRecord($name,$reading);
+	my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
 	if (defined($record)) {
 	  return $record->{unit};
 	}
@@ -2794,44 +2855,44 @@ sub tHAL_getSensorReadingUnit($$)
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus
 # parameters: name, reading name
 # returns current readings time
-sub tHAL_getSensorReadingTime($$)
+sub HAL_getSensorReadingTime($$)
 {
 	my ($name, $reading) = @_;
-	my $h = tHAL_getSensorValueRecord($name, $reading);
+	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{time};
 }
 
 # Liefert Record fuer eine Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
-sub tHAL_getReadingRecord($) {
+sub HAL_getReadingRecord($) {
 	my($readingSpec) = @_;
 	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return tHAL_getSensorValueRecord($sNamem,$rName);
+	return HAL_getSensorValueRecord($sNamem,$rName);
 }
 
 # Liefert Value einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
-sub tHAL_getReadingValue($) {
+sub HAL_getReadingValue($) {
 	my($readingSpec) = @_;
 	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return tHAL_getSensorReadingValue($sNamem,$rName);
+	return HAL_getSensorReadingValue($sNamem,$rName);
 }
 
 # Liefert Unit einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
-sub tHAL_getReadingUnit($) {
+sub HAL_getReadingUnit($) {
 	my($readingSpec) = @_;
 	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return tHAL_getSensorReadingUnit($sNamem,$rName);
+	return HAL_getSensorReadingUnit($sNamem,$rName);
 }
 
 # Liefert Time einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
-sub tHAL_getReadingTime($) {
+sub HAL_getReadingTime($) {
 	my($readingSpec) = @_;
 	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return tHAL_getSensorReadingTime($sNamem,$rName);
+	return HAL_getSensorReadingTime($sNamem,$rName);
 }
 
 #------------------------------------------------------------------------------
@@ -2842,11 +2903,11 @@ sub tHAL_getReadingTime($) {
 # Alle Aktionen aus der Tabelle ausfuehren.
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
-#sub tHAL_doAllActions() {
+#sub HAL_doAllActions() {
 #	Main:Log 3, "PROXY_CTRL:--------> do all ";
 #	foreach my $act (keys %{$actTab}) {
 #		my $cTab = $actTab->{$act};
-#		tHAL_doAction($cTab, $act);
+#		HAL_doAction($cTab, $act);
 #	}
 #}
 
@@ -2854,7 +2915,7 @@ sub tHAL_getReadingTime($) {
 # Eine bestimmte Aktion ausfuehren.
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
-#sub tHAL_doAction($$) {
+#sub HAL_doAction($$) {
 #	my ($cTab, $actName) = @_;
 #	
 #	Log 3, "PROXY_CTRL:--------> do ".$actName;
@@ -2876,13 +2937,13 @@ sub tHAL_getReadingTime($) {
 #	if(@devList) {
 #	 	foreach my $dev (@devList) {
 #	 		Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
-#		  tHAL_DeviceSetFn($dev, $actName);
+#		  HAL_DeviceSetFn($dev, $actName);
 #	  }
 #	} else {
 #	  foreach my $dev (keys %{$devTab}) {     
 #	  	Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
 #  	  if($dev ne 'DEFAULT') {
-#  	  	tHAL_DeviceSetFn($dev, $actName, "www"); #?
+#  	  	HAL_DeviceSetFn($dev, $actName, "www"); #?
 #  	  }
 #    }
 #	}
@@ -2899,7 +2960,7 @@ sub tHAL_getReadingTime($) {
 # starke Sonneneinstrahlung?, aus richtiger Richtung?)
 # und auch wie stark (wie weit soll Rollo heruntergefahren werden).
 ###############################################################################
-#sub tHAL_DeviceSetFn($@) {
+#sub HAL_DeviceSetFn($@) {
 #	my ($DEVICE,@a) = @_;
 #	my $CMD = $a[0];
 #  my $ARGS = join(" ", @a[1..$#a]);
@@ -2916,7 +2977,7 @@ sub tHAL_getReadingTime($) {
 
 # Zur Verwendung in ReadingProxy. Prüft (transparent) ob und wie ein Befehl ausgeführt werden soll.
 # TODO
-#sub tHAL_SetProxyFn($@) {
+#sub HAL_SetProxyFn($@) {
 #	my ($DEVICE,@a) = @_;
 #	my $CMD = $a[0];
 #  my $ARGS = join(" ", @a[1..$#a]);
@@ -2965,7 +3026,7 @@ sub sTest() {
 	#merge_hash_recursive($test->{sname}, $template->{t1});
 	#merge_hash_recursive($test->{sname2}, $template->{t1});
 	
-	tHAL_expandTemplates($test, $template);
+	HAL_expandTemplates($test, $template);
 	
 	return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
 }
