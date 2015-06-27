@@ -1,4 +1,4 @@
-# Created by FHEM/98_SVG.pm, 2014-05-18 23:36:13
+# Sonnen-Unter- und -Aufgangzeiten plotten
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time
@@ -25,4 +25,3 @@ set y2range [12:22]
 plot "<IN>" using 1:2 axes x1y1 title 'Sonnenaufgang' ls l6fill lw 1 with lines,\
      "<IN>" using 1:2 axes x1y2 title 'Sonnenuntergang' ls l0 lw 1 with lines,\
      "<IN>" using 1:2 axes x1y2 title '' ls l4fill lw 1 with lines
-
