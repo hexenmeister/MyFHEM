@@ -257,14 +257,23 @@ sub getBeschattungMode() {
 # Schatet Beschattung-Automatik ein (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf AUTOMATIC)
 sub setBeschattungAutomatic() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	my $lastBMode=getCtrlData("ctrl_last_automatic_mode_beschattung");
+	if(!defined($lastBMode)) {
+    $lastBMode = NORMAL;
+  }
+	
 	if(ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"state","???") eq '???' || ReadingsVal(DEVICE_NAME_CTRL_BESCHATTUNG,"state","???") eq DISABLED) {
-  	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, NORMAL);
+  	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, $lastBMode);
   }
 }
 
 # Schatet Beschattung-Automatik aus (setzt DEVICE_NAME_CTRL_BESCHATTUNG auf DISABLED)
 sub setBeschattungAutomaticOff() {
 	# Erstmal nur Wert ssetzen. ggf später eine Aktion ausloesen
+	my $lastBMode=getBeschattungMode();
+	if($lastBMode ne DISABLED) {
+    putCtrlData("ctrl_last_automatic_mode_beschattung", $lastBMode);
+  }
 	setValue(DEVICE_NAME_CTRL_BESCHATTUNG, DISABLED);
 }
 
