@@ -217,6 +217,10 @@ my $actornames;
 # >>> Sensoren
   #$templates->{global};
   
+  # >>> Virtual Devices
+  #$templates->{virtual};
+  $templates->{virtual}->{location}  ="virtual";
+  
   # >>> HM Templates
   $templates->{hm}->{type}='HomeMatic';
   # >>> Dirks Homebrew
@@ -228,13 +232,13 @@ my $actornames;
   $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{reading}  ="battery";
   $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
   # >>> ... mit Lux-Messung
-  $templates->{hm_raumsensor_licht};
+  #$templates->{hm_raumsensor_licht};
   $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{reading}  ="luminosity";
   $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
   $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{unit}     ="Lx (*)";
   $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{act_cycle} ="600"; 
   # >>> ... mit Temp/Hum
-  $templates->{hm_raumsensor_th};
+  #$templates->{hm_raumsensor_th};
   $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{reading}  ="temperature";
   $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{unit}     ="°C";
   $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
@@ -247,195 +251,72 @@ my $actornames;
   $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
+  # >>> Devices
+  #$devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
+  #$devices->{vr_luftdruck}->{fhem_name} ="EG_WZ_KS01";
+  #$devices->{vr_luftdruck}->{type}      ="HomeMatic compatible";
+  #$devices->{vr_luftdruck}->{location}  ="virtual";
+  #$devices->{vr_luftdruck}->{templates} =['hm_raumsensor_general','hm','global'];
+  #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{reading}  ="pressure";
+  #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{unit}     ="hPa";
+  #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{act_cycle} ="600"; 
+  #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{alias}     ="Luftdruck";
+  
+  $devices->{vr_luftdruck}->{alias}                        ="Luftdrucksensor";
+  $devices->{vr_luftdruck}->{readings}->{pressure}->{link} ="wz_raumsensor:pressure";
+  $devices->{vr_luftdruck}->{templates}                    =['virtual','global'];
+  #<<<
+  
   $devices->{wz_raumsensor}->{alias}     ="WZ Raumsensor";
   $devices->{wz_raumsensor}->{fhem_name} ="EG_WZ_KS01";
-  $devices->{wz_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{wz_raumsensor}->{location}  ="wohnzimmer";
-  $devices->{wz_raumsensor}->{templates}  =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{wz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{act_cycle} ="600"; 
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{alias}    ="Luftdruck";
-  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  #$devices->{wz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  #$devices->{wz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  #$devices->{wz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  #$devices->{wz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  #$devices->{wz_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
-  #$devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  #$devices->{wz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  #$devices->{wz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
   #<<<
   
   $devices->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $devices->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
-  $devices->{ku_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{ku_raumsensor}->{location}  ="kueche";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{reading}   ="temperature";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{alias}     ="Temperatur";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{unit}      ="°C";
-  $devices->{ku_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{reading}   ="humidity";
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{alias}     ="Luftfeuchtigkeit"; 
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{unit}      ="% rH";
-  $devices->{ku_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{reading}   ="luminosity";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
-  $devices->{ku_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
-  $devices->{ku_raumsensor}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $devices->{ku_raumsensor}->{readings}->{bat_status}  ->{reading}   ="battery";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{reading}   ="dewpoint";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{unit}      ="°C";
-  $devices->{ku_raumsensor}->{readings}->{dewpoint}    ->{alias}     ="Taupunkt";
+  $devices->{ku_raumsensor}->{templates}  =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{eg_fl_raumsensor}->{alias}     ="EG Flur Raumsensor";
   $devices->{eg_fl_raumsensor}->{fhem_name} ="EG_FL_KS01";
-  $devices->{eg_fl_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{eg_fl_raumsensor}->{location}  ="eg_flur";
-  $devices->{eg_fl_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{eg_fl_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{eg_fl_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{eg_fl_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{eg_fl_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{eg_fl_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{eg_fl_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{eg_fl_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{eg_fl_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{eg_fl_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{eg_fl_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{eg_fl_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{eg_fl_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{eg_fl_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
-  $devices->{eg_fl_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{eg_fl_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{eg_fl_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{eg_fl_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{og_fl_raumsensor}->{alias}     ="OG Flur Raumsensor";
   $devices->{og_fl_raumsensor}->{fhem_name} ="OG_FL_KS01";
-  $devices->{og_fl_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{og_fl_raumsensor}->{location}  ="og_flur";
-  $devices->{og_fl_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{og_fl_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{og_fl_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{og_fl_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{og_fl_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{og_fl_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{og_fl_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{og_fl_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{og_fl_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{og_fl_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{og_fl_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{og_fl_raumsensor}->{readings}->{luminosity}    ->{act_cycle} ="600"; 
-  $devices->{og_fl_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{og_fl_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{og_fl_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{og_fl_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{sz_raumsensor}->{alias}     ="Schlafzimmer Raumsensor";
   $devices->{sz_raumsensor}->{fhem_name} ="OG_SZ_KS01";
-  $devices->{sz_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{sz_raumsensor}->{location}  ="schlafzimmer";
-  $devices->{sz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{sz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{sz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{sz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{sz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{sz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{sz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{sz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{sz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{sz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{sz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{sz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{sz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{sz_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{sz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{sz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{sz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{sz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{bz_raumsensor}->{alias}     ="Badezimmer Raumsensor";
   $devices->{bz_raumsensor}->{fhem_name} ="OG_BZ_KS01";
-  $devices->{bz_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{bz_raumsensor}->{location}  ="badezimmer";
-  $devices->{bz_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{bz_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{bz_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{bz_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{bz_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{bz_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{bz_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{bz_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{bz_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{bz_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{bz_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{bz_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{bz_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{bz_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{bz_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{bz_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{bz_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{bz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{ka_raumsensor}->{alias}     ="Kinderzimmer1 Raumsensor";
   $devices->{ka_raumsensor}->{fhem_name} ="OG_KA_KS01";
-  $devices->{ka_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{ka_raumsensor}->{location}  ="paula";
-  $devices->{ka_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{ka_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{ka_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{ka_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{ka_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{ka_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{ka_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{ka_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{ka_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{ka_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{ka_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{ka_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{ka_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{ka_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{ka_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{ka_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{ka_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{ka_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{kb_raumsensor}->{alias}     ="Kinderzimmer2 Raumsensor";
   $devices->{kb_raumsensor}->{fhem_name} ="OG_KB_KS01";
-  $devices->{kb_raumsensor}->{type}      ="HomeMatic compatible";
   $devices->{kb_raumsensor}->{location}  ="hanna";
-  $devices->{kb_raumsensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{kb_raumsensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{kb_raumsensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{kb_raumsensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{kb_raumsensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{kb_raumsensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{kb_raumsensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{kb_raumsensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{kb_raumsensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{kb_raumsensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $devices->{kb_raumsensor}->{readings}->{luminosity}  ->{reading}  ="luminosity";
-  $devices->{kb_raumsensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{kb_raumsensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{kb_raumsensor}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{kb_raumsensor}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $devices->{kb_raumsensor}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $devices->{kb_raumsensor}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $devices->{kb_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
 
   $devices->{virtual_sun_sensor}->{alias}       ="Virtueller Sonnen-Sensor";
@@ -704,15 +585,6 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
-  #<<<
-  
-  $devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
-  $devices->{vr_luftdruck}->{fhem_name} ="EG_WZ_KS01";
-  $devices->{vr_luftdruck}->{type}      ="HomeMatic compatible";
-  $devices->{vr_luftdruck}->{location}  ="virtual";
-  $devices->{vr_luftdruck}->{readings}->{pressure}    ->{reading}  ="pressure";
-  $devices->{vr_luftdruck}->{readings}->{pressure}    ->{unit}     ="hPa";
-  $devices->{vr_luftdruck}->{readings}->{pressure}    ->{alias}     ="Luftdruck";
   #<<<
   
   $devices->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
@@ -2634,6 +2506,11 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 	
 	my $readings_record = $device_record->{readings};
 	my $single_reading_record = $readings_record->{$reading};
+	
+	if(defined($single_reading_record) && ref($single_reading_record ne 'HASH')) {
+		#Log 3,"+++++++++++++++++> R:".$reading." SR: ".Dumper($single_reading_record);
+		return (undef, undef);
+	}
 	
 	if ($single_reading_record) {
 		$single_reading_record->{reading_name} = $reading;
