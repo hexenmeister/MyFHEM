@@ -318,6 +318,23 @@ my $actornames;
   $devices->{kb_raumsensor}->{location}  ="hanna";
   $devices->{kb_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
   #<<<
+  
+  $devices->{um_vh_licht}->{alias}     ="VH Aussensensor";
+  $devices->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
+  $devices->{um_vh_licht}->{location}  ="umwelt";
+  $devices->{um_vh_licht}->{templates} =['hm_raumsensor_bat','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  #$devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity";
+  #<<<
+  
+  $devices->{um_hh_licht_th}->{alias}     ="HH Aussensensor";
+  $devices->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
+  $devices->{um_hh_licht_th}->{location}  ="umwelt";
+  $devices->{um_hh_licht_th}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  #$devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity"; 
+  #<<<
+  
 
   $devices->{virtual_sun_sensor}->{alias}       ="Virtueller Sonnen-Sensor";
   $devices->{virtual_sun_sensor}->{type}        ="virtual";
@@ -922,48 +939,6 @@ my $actornames;
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $devices->{fl_og_ms_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
-  #<<<
-    
-  $devices->{um_vh_licht}->{alias}     ="VH Aussensensor";
-  $devices->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
-  $devices->{um_vh_licht}->{type}      ="HomeMatic compatible";
-  $devices->{um_vh_licht}->{location}  ="umwelt";
-  #$devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
-  $devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity";
-  $devices->{um_vh_licht}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
-  $devices->{um_vh_licht}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
-  $devices->{um_vh_licht}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{um_vh_licht}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
-  $devices->{um_vh_licht}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
-  $devices->{um_vh_licht}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $devices->{um_vh_licht}->{readings}->{bat_status}  ->{reading}   ="battery";
-  #<<<
-  
-  $devices->{um_hh_licht_th}->{alias}     ="HH Aussensensor";
-  $devices->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
-  $devices->{um_hh_licht_th}->{type}      ="HomeMatic compatible";
-  $devices->{um_hh_licht_th}->{location}  ="umwelt";
-  #$devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
-  $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity"; 
-  $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{alias}     ="Lichtintesität";
-  $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{unit}      ="Lx (*)";
-  $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{act_cycle} ="600"; 
-  $devices->{um_hh_licht_th}->{readings}->{bat_voltage} ->{reading}   ="batVoltage";
-  $devices->{um_hh_licht_th}->{readings}->{bat_voltage} ->{alias}     ="Batteriespannung";
-  $devices->{um_hh_licht_th}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $devices->{um_hh_licht_th}->{readings}->{bat_status}  ->{reading}   ="battery";
-  $devices->{um_hh_licht_th}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
-  $devices->{um_hh_licht_th}->{readings}->{temperature} ->{reading}   ="temperature";
-  $devices->{um_hh_licht_th}->{readings}->{temperature} ->{alias}     ="Temperatur";
-  $devices->{um_hh_licht_th}->{readings}->{temperature} ->{unit}      ="°C";
-  $devices->{um_hh_licht_th}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{um_hh_licht_th}->{readings}->{humidity}    ->{reading}   ="humidity";
-  $devices->{um_hh_licht_th}->{readings}->{humidity}    ->{alias}     ="Luftfeuchtigkeit"; 
-  $devices->{um_hh_licht_th}->{readings}->{humidity}    ->{unit}      ="% rH";
-  $devices->{um_hh_licht_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{um_hh_licht_th}->{readings}->{dewpoint}    ->{reading}   ="dewpoint";
-  $devices->{um_hh_licht_th}->{readings}->{dewpoint}    ->{unit}      ="°C";
-  $devices->{um_hh_licht_th}->{readings}->{dewpoint}    ->{alias}     ="Taupunkt";
   #<<<
   
   $devices->{um_vh_bw_licht}->{alias}     ="Bewegungsmelder (Vorgarten)";
@@ -2005,14 +1980,15 @@ sub CommandMGet($$$) {
 	my $str='';
 	if(ref $ret eq 'HASH') {
 	  foreach my $key (sort(keys($ret))) {
-		  if($showmod ne 'full') {
-        $str.="$key";
-      }
+		  #if($showmod ne 'full') {
+      #  $str.="$key";
+      #}
+      $str.=sprintf("%-12s", $key);
 	  	my $val = $ret->{$key};
 		  if(defined($val)) {
-			  if($showmod ne 'full') {
+			  #if($showmod ne 'full') {
           $str.=' = ';
-        }
+        #}
         $str.=$val;
       }
 		  $str.="\n";
@@ -2066,7 +2042,8 @@ sub CommandMGet_format($$) {
 	}
 	
 	if($mod eq 'full') {
-		return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{reading}.' = '.$record->{value}.' '.$record->{unit};
+		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{reading}.' = '.$record->{value}.' '.$record->{unit};
+		return sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
 	}
 	
 	if($mod eq 'dump') {
