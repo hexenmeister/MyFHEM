@@ -219,37 +219,54 @@ my $actornames;
   
   # >>> Virtual Devices
   #$templates->{virtual};
-  $templates->{virtual}->{location}  ="virtual";
-  
+  $templates->{virtual}->{location}  =':virtual';
+
   # >>> HM Templates
   $templates->{hm}->{type}='HomeMatic';
+  $templates->{hm_channel}->{type}='HomeMatic Channel';
+  $templates->{hm_channel}->{location}=':channel';
   # >>> Dirks Homebrew
   $templates->{hm_raumsensor_general}->{type}='HomeMatic compatible';
   # >>> mit Bat-Messung
-  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{reading}  ="batVoltage";
-  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{unit}     ="V";
-  $templates->{hm_raumsensor_bat}->{readings}->{bat_voltage} ->{alias}    ="Batterie-Spannung";
-  $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{reading}  ="battery";
-  $templates->{hm_raumsensor_bat}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
+  $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{reading} ="batVoltage";
+  $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{unit}    ="V";
+  $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{alias}   ="Batterie-Spannung";
+  # >>>
+  $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{reading}   ="batteryLevel";
+  $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{unit}      ="V";
+  $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{alias}     ="Batterie-Spannung";
+  # >>>
+  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{reading}       ="R-lowBatLimitRT";
+  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
+  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{unit}          ="V";
+  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
+  # >>>
+  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{reading}       ="R-lowBatLimitTHPL";
+  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
+  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{unit}          ="V";
+  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
+  # >>>
+  $templates->{readings_bat_status}->{readings}->{bat_status}  ->{reading}  ="battery";
+  $templates->{readings_bat_status}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
   # >>> ... mit Lux-Messung
-  #$templates->{hm_raumsensor_licht};
-  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{reading}  ="luminosity";
-  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
-  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{unit}     ="Lx (*)";
-  $templates->{hm_raumsensor_licht}->{readings}->{luminosity}->{act_cycle} ="600"; 
+  #$templates->{readings_lux};
+  $templates->{readings_lux}->{readings}->{luminosity}->{reading}  ="luminosity";
+  $templates->{readings_lux}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
+  $templates->{readings_lux}->{readings}->{luminosity}->{unit}     ="Lx (*)";
+  $templates->{readings_lux}->{readings}->{luminosity}->{act_cycle} ="600"; 
   # >>> ... mit Temp/Hum
-  #$templates->{hm_raumsensor_th};
-  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{reading}  ="temperature";
-  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{unit}     ="°C";
-  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $templates->{hm_raumsensor_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
-  $templates->{hm_raumsensor_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $templates->{hm_raumsensor_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$templates->{readings_th};
+  $templates->{readings_th}->{readings}->{temperature} ->{reading}  ="temperature";
+  $templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
+  $templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $templates->{readings_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  $templates->{readings_th}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $templates->{readings_th}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $templates->{readings_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
+  $templates->{readings_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   
   # >>> Devices
   #$devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
@@ -270,7 +287,7 @@ my $actornames;
   $devices->{wz_raumsensor}->{alias}     ="WZ Raumsensor";
   $devices->{wz_raumsensor}->{fhem_name} ="EG_WZ_KS01";
   $devices->{wz_raumsensor}->{location}  ="wohnzimmer";
-  $devices->{wz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{wz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{act_cycle} ="600"; 
@@ -280,60 +297,182 @@ my $actornames;
   $devices->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $devices->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
   $devices->{ku_raumsensor}->{location}  ="kueche";
-  $devices->{ku_raumsensor}->{templates}  =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{ku_raumsensor}->{templates}  =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{eg_fl_raumsensor}->{alias}     ="EG Flur Raumsensor";
   $devices->{eg_fl_raumsensor}->{fhem_name} ="EG_FL_KS01";
   $devices->{eg_fl_raumsensor}->{location}  ="eg_flur";
-  $devices->{eg_fl_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{eg_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{og_fl_raumsensor}->{alias}     ="OG Flur Raumsensor";
   $devices->{og_fl_raumsensor}->{fhem_name} ="OG_FL_KS01";
   $devices->{og_fl_raumsensor}->{location}  ="og_flur";
-  $devices->{og_fl_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{og_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{sz_raumsensor}->{alias}     ="Schlafzimmer Raumsensor";
   $devices->{sz_raumsensor}->{fhem_name} ="OG_SZ_KS01";
   $devices->{sz_raumsensor}->{location}  ="schlafzimmer";
-  $devices->{sz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{sz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{bz_raumsensor}->{alias}     ="Badezimmer Raumsensor";
   $devices->{bz_raumsensor}->{fhem_name} ="OG_BZ_KS01";
   $devices->{bz_raumsensor}->{location}  ="badezimmer";
-  $devices->{bz_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{bz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{ka_raumsensor}->{alias}     ="Kinderzimmer1 Raumsensor";
   $devices->{ka_raumsensor}->{fhem_name} ="OG_KA_KS01";
   $devices->{ka_raumsensor}->{location}  ="paula";
-  $devices->{ka_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{ka_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{kb_raumsensor}->{alias}     ="Kinderzimmer2 Raumsensor";
   $devices->{kb_raumsensor}->{fhem_name} ="OG_KB_KS01";
   $devices->{kb_raumsensor}->{location}  ="hanna";
-  $devices->{kb_raumsensor}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{kb_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #<<<
   
   $devices->{um_vh_licht}->{alias}     ="VH Aussensensor";
   $devices->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
   $devices->{um_vh_licht}->{location}  ="umwelt";
-  $devices->{um_vh_licht}->{templates} =['hm_raumsensor_bat','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{um_vh_licht}->{templates} =['readings_bat_status','readings_bat_voltage','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #$devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
+  # Umgerechnete Lichtintensitaet verwenden (wg. der 26%-durchlaessiger Folie)
   $devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity";
   #<<<
   
   $devices->{um_hh_licht_th}->{alias}     ="HH Aussensensor";
   $devices->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
   $devices->{um_hh_licht_th}->{location}  ="umwelt";
-  $devices->{um_hh_licht_th}->{templates} =['hm_raumsensor_bat','hm_raumsensor_th','hm_raumsensor_licht','hm_raumsensor_general','hm','global'];
+  $devices->{um_hh_licht_th}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
   #$devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
   $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity"; 
   #<<<
+  
+  $devices->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
+  $devices->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
+  #$devices->{wz_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{wz_wandthermostat}->{location}  ="wohnzimmer";
+  $devices->{wz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','readings_bat_status','hm','global'];
+  $devices->{wz_wandthermostat}->{composite} =["wz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  #$devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  #$devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  #$devices->{wz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
+  $devices->{wz_wandthermostat_climate}->{fhem_name} ="EG_WZ_WT01_Climate";
+  $devices->{wz_wandthermostat_climate}->{templates} =['readings_th','hm_channel','global'];  
+  #$devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  $devices->{sz_wandthermostat}->{alias}     ="SZ Wandthermostat";
+  $devices->{sz_wandthermostat}->{fhem_name} ="OG_SZ_WT01";
+  $devices->{sz_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{sz_wandthermostat}->{location}  ="schlafzimmer";
+  $devices->{sz_wandthermostat}->{composite} =["sz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $devices->{sz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{sz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
+  $devices->{sz_wandthermostat_climate}->{fhem_name} ="OG_SZ_WT01_Climate";
+  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  $devices->{dz_wandthermostat}->{alias}     ="DZ Wandthermostat";
+  $devices->{dz_wandthermostat}->{fhem_name} ="OG_DZ_WT01";
+  $devices->{dz_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{dz_wandthermostat}->{location}  ="duschbad";
+  $devices->{dz_wandthermostat}->{composite} =["dz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $devices->{dz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{dz_wandthermostat_climate}->{alias}     ="DZ Wandthermostat (Ch)";
+  $devices->{dz_wandthermostat_climate}->{fhem_name} ="OG_DZ_WT01_Climate";
+  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  $devices->{bz_wandthermostat}->{alias}     ="BZ Wandthermostat";
+  $devices->{bz_wandthermostat}->{fhem_name} ="OG_BZ_WT01";
+  $devices->{bz_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{bz_wandthermostat}->{location}  ="badezimmer";
+  $devices->{bz_wandthermostat}->{composite} =["bz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $devices->{bz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{bz_wandthermostat_climate}->{alias}     ="BZ Wandthermostat (Ch)";
+  $devices->{bz_wandthermostat_climate}->{fhem_name} ="OG_BZ_WT01_Climate";
+  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  $devices->{ka_wandthermostat}->{alias}     ="KA Wandthermostat";
+  $devices->{ka_wandthermostat}->{fhem_name} ="OG_KA_WT01";
+  $devices->{ka_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{ka_wandthermostat}->{location}  ="paula";
+  $devices->{ka_wandthermostat}->{composite} =["ka_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $devices->{ka_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{ka_wandthermostat_climate}->{alias}     ="KA Wandthermostat (Ch)";
+  $devices->{ka_wandthermostat_climate}->{fhem_name} ="OG_KA_WT01_Climate";
+  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  $devices->{kb_wandthermostat}->{alias}     ="KB Wandthermostat";
+  $devices->{kb_wandthermostat}->{fhem_name} ="OG_KA_WT01";
+  $devices->{kb_wandthermostat}->{type}      ="HomeMatic";
+  $devices->{kb_wandthermostat}->{location}  ="hanna";
+  $devices->{kb_wandthermostat}->{composite} =["kb_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
+  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
+  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
+  $devices->{kb_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
+  $devices->{kb_wandthermostat_climate}->{alias}     ="KB Wandthermostat (Ch)";
+  $devices->{kb_wandthermostat_climate}->{fhem_name} ="OG_KB_WT01_Climate";
+  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
+  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
+  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
+  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #<<<
+  
+  
+  
+  
+  
   
 
   $devices->{virtual_sun_sensor}->{alias}       ="Virtueller Sonnen-Sensor";
@@ -602,120 +741,6 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
-  #<<<
-  
-  $devices->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
-  $devices->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
-  $devices->{wz_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{wz_wandthermostat}->{location}  ="wohnzimmer";
-  $devices->{wz_wandthermostat}->{composite} =["wz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{wz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
-  $devices->{wz_wandthermostat_climate}->{fhem_name} ="EG_WZ_WT01_Climate";
-  $devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #<<<
-  
-  $devices->{sz_wandthermostat}->{alias}     ="SZ Wandthermostat";
-  $devices->{sz_wandthermostat}->{fhem_name} ="OG_SZ_WT01";
-  $devices->{sz_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{sz_wandthermostat}->{location}  ="schlafzimmer";
-  $devices->{sz_wandthermostat}->{composite} =["sz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{sz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
-  $devices->{sz_wandthermostat_climate}->{fhem_name} ="OG_SZ_WT01_Climate";
-  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #<<<
-  
-  $devices->{dz_wandthermostat}->{alias}     ="DZ Wandthermostat";
-  $devices->{dz_wandthermostat}->{fhem_name} ="OG_DZ_WT01";
-  $devices->{dz_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{dz_wandthermostat}->{location}  ="duschbad";
-  $devices->{dz_wandthermostat}->{composite} =["dz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{dz_wandthermostat_climate}->{alias}     ="DZ Wandthermostat (Ch)";
-  $devices->{dz_wandthermostat_climate}->{fhem_name} ="OG_DZ_WT01_Climate";
-  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #<<<
-  
-  $devices->{bz_wandthermostat}->{alias}     ="BZ Wandthermostat";
-  $devices->{bz_wandthermostat}->{fhem_name} ="OG_BZ_WT01";
-  $devices->{bz_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{bz_wandthermostat}->{location}  ="badezimmer";
-  $devices->{bz_wandthermostat}->{composite} =["bz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{bz_wandthermostat_climate}->{alias}     ="BZ Wandthermostat (Ch)";
-  $devices->{bz_wandthermostat_climate}->{fhem_name} ="OG_BZ_WT01_Climate";
-  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #<<<
-  
-  $devices->{ka_wandthermostat}->{alias}     ="KA Wandthermostat";
-  $devices->{ka_wandthermostat}->{fhem_name} ="OG_KA_WT01";
-  $devices->{ka_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{ka_wandthermostat}->{location}  ="paula";
-  $devices->{ka_wandthermostat}->{composite} =["ka_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{ka_wandthermostat_climate}->{alias}     ="KA Wandthermostat (Ch)";
-  $devices->{ka_wandthermostat_climate}->{fhem_name} ="OG_KA_WT01_Climate";
-  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  #<<<
-  
-  $devices->{kb_wandthermostat}->{alias}     ="KB Wandthermostat";
-  $devices->{kb_wandthermostat}->{fhem_name} ="OG_KA_WT01";
-  $devices->{kb_wandthermostat}->{type}      ="HomeMatic";
-  $devices->{kb_wandthermostat}->{location}  ="hanna";
-  $devices->{kb_wandthermostat}->{composite} =["kb_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
-  $devices->{kb_wandthermostat_climate}->{alias}     ="KB Wandthermostat (Ch)";
-  $devices->{kb_wandthermostat_climate}->{fhem_name} ="OG_KB_WT01_Climate";
-  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   #<<<
   
   $devices->{hg_sensor}->{alias}     ="Garten-Sensor";
