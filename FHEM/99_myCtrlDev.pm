@@ -67,8 +67,8 @@ require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 #sub HAL_DeviceSetFn($@);
 
 # Internal
-sub HAL_expandTemplates($$);
-
+sub HAL_expandTemplates($);
+sub HAL_applyTemplates($$);
 
 #--- Definitions --------------------------------------------------------------
 my $HAL_defs  = {};
@@ -267,6 +267,21 @@ my $actornames;
   $templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  # >>> ... mit Temp/Hum mit 'measured-temp'
+  #$templates->{readings_th2};
+  $templates->{readings_th2}->{templates}=['readings_th'];
+  $templates->{readings_th2}->{readings}->{temperature} ->{reading}  ="measured-temp";
+  #$templates->{readings_th2}->{readings}->{temperature} ->{unit}     ="°C";
+  #$templates->{readings_th2}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$templates->{readings_th2}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  #$templates->{readings_th2}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$templates->{readings_th2}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$templates->{readings_th2}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
+  #$templates->{readings_th2}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  
   
   # >>> Devices
   #$devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
@@ -355,42 +370,23 @@ my $actornames;
   
   $devices->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
   $devices->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
-  #$devices->{wz_wandthermostat}->{type}      ="HomeMatic";
   $devices->{wz_wandthermostat}->{location}  ="wohnzimmer";
   $devices->{wz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','readings_bat_status','hm','global'];
   $devices->{wz_wandthermostat}->{composite} =["wz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  #$devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  #$devices->{wz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  #$devices->{wz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
   $devices->{wz_wandthermostat_climate}->{fhem_name} ="EG_WZ_WT01_Climate";
-  $devices->{wz_wandthermostat_climate}->{templates} =['readings_th','hm_channel','global'];  
-  #$devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  #$devices->{wz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{wz_wandthermostat_climate}->{templates} =['readings_th2','hm_channel','global'];  
   #<<<
   
   $devices->{sz_wandthermostat}->{alias}     ="SZ Wandthermostat";
   $devices->{sz_wandthermostat}->{fhem_name} ="OG_SZ_WT01";
   $devices->{sz_wandthermostat}->{type}      ="HomeMatic";
   $devices->{sz_wandthermostat}->{location}  ="schlafzimmer";
+  $devices->{sz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','readings_bat_status','hm','global'];
   $devices->{sz_wandthermostat}->{composite} =["sz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{sz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{sz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
   $devices->{sz_wandthermostat_climate}->{fhem_name} ="OG_SZ_WT01_Climate";
-  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{sz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{sz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{sz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{sz_wandthermostat_climate}->{templates} =['readings_th2','hm_channel','global'];  
   #<<<
   
   $devices->{dz_wandthermostat}->{alias}     ="DZ Wandthermostat";
@@ -514,18 +510,28 @@ my $actornames;
   $devices->{virtual_umwelt_sensor}->{comment}     ="Virtueller Sensor: Berechnet Max. Helligkeit mehreren Sensoren, Durchschnittstemperatur etc.";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{unit} = "Lx";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{unit} = "°C";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity", "hg_sensor:humidity"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{unit} = "% rH";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
+  $devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{ValueFn} = "HAL_TaupunktValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{unit} = "°C";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{FnParams} = ["temperature", "humidity"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{alias}   = "Taupunkt";
+  $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{ValueFn} = "HAL_AbsFeuchteValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{unit} = "g/m3";
+  $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
   #<<<
   
   # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
@@ -555,7 +561,7 @@ my $actornames;
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315]; # zu beachtender Winkel (Azimuth): von, bis
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -594,7 +600,7 @@ my $actornames;
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{FnParams} = [195,315]; # Beachten Winkel (Azimuth): von, bis
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{FnParams} = [2.07, 0.58, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -629,7 +635,7 @@ my $actornames;
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -656,7 +662,7 @@ my $actornames;
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315];
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -683,7 +689,7 @@ my $actornames;
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -710,7 +716,7 @@ my $actornames;
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{FnParams} = [195,315];
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -737,7 +743,7 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRange';
+  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
@@ -1403,12 +1409,121 @@ sub HAL_round2($) {
 	return rundeZahl2($val);
 }
 
+# Taupunkt-MEthoden entnommen aus dewpoint-Modul
+# -----------------------------
+# Dewpoint calculation.
+# see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
+sub HAL_dewpoint($$) {
+  my ($temperature, $humidity) = @_;
+  my $dp;
+  my $A = 17.2694;
+  my $B = ($temperature > 0) ? 237.3 : 265.5;
+  my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
+  my $e = $humidity/ 100 * $es;
+  if ($e == 0) {
+    Log 1, "Error: dewpoint() e==0: temp=$temperature, hum=$humidity";
+    return 0;
+  }
+  my $e1 = $e / 610.78;
+  my $f = log( $e1 ) / $A;
+  my $f1 = 1 - $f;
+  if ($f1 == 0) {
+  Log 1, "Error: dewpoint() (1-f)==0: temp=$temperature, hum=$humidity";
+  return 0;
+  }
+  $dp = $B * $f / $f1  ;
+  return $dp ;
+}
+
+sub HAL_absFeuchte ($$) {
+	# Formeln von http://kellerlueftung.blogspot.de/p/blog-page_9.html
+	#             http://www.wettermail.de/wetter/feuchte.html
+  my ($T, $rh) = @_;
+  if (($rh < 0) || ($rh > 110)){
+    Log 1, "Error dewpoint: humidity invalid: $rh";
+    return "";
+	}
+	# a = 7.5, b = 237.3 für T >= 0
+	# a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  my $a = ($T > 0) ? 7.5 : 7.6;
+  my $b = ($T > 0) ? 237.3 : 240.7;
+	my $SDD = 6.1078 * 10**(($a*$T)/($b+$T));
+	my $DD  = $rh/100 * $SDD;
+	my $AF  = (10**5) * (18.016 / 8314.3) * ($DD / (273.15 + $T));
+	my $af  = sprintf( "%.1f",$AF);
+  return $af; # $aF = absolute Feuchte in g Wasserdampf pro m3 Luft
+}
 
 #--- Methods: User ------------------------------------------------------------
+# ValueFn: Berechnet Taupunkt aus Temperatur und Feuchte
+# FnParams: Namen der Readings fuer Temperatur und Feuchte (default: 'temperature' und 'humidity')
+sub HAL_TaupunktValueFn($$) {
+	my ($device, $record) = @_;
+	my $params = $record->{FnParams};
+  my $tempReading = "temperature";
+  my $humReading = "humidity";
+  if($params) {
+  	$tempReading = @{$params}[0];
+  	$humReading = @{$params}[1];
+  }
+  
+  my $tRec = HAL_getSensorValueRecord($device->{name},$tempReading);
+  my $hRec = HAL_getSensorValueRecord($device->{name},$humReading);
+  if($tRec && $hRec) {
+    my $temp = $tRec->{value};
+    my $hum  = $hRec->{value};
+    my $time = $tRec->{time};
+
+    if($temp && $hum) {
+		  my $val = HAL_dewpoint($temp, $hum);
+		  my $ret;
+			$ret->{value} = HAL_round0($val);
+			$ret->{time} = $time;#TimeNow();
+			$ret->{reading_name} = $record->{name};
+			$ret->{unit} = '°C';
+			return $ret;
+	  }
+  }
+
+  return undef;
+}
+
+# ValueFn: Berechnet Abs.Feuchte Taupunkt aus Temperatur und Feuchte
+# FnParams: Namen der Readings fuer Temperatur und Feuchte (default: 'temperature' und 'humidity')
+sub HAL_AbsFeuchteValueFn($$) {
+	my ($device, $record) = @_;
+	my $params = $record->{FnParams};
+  my $tempReading = "temperature";
+  my $humReading = "humidity";
+  if($params) {
+  	$tempReading = @{$params}[0];
+  	$humReading = @{$params}[1];
+  }
+  
+  my $tRec = HAL_getSensorValueRecord($device->{name},$tempReading);
+  my $hRec = HAL_getSensorValueRecord($device->{name},$humReading);
+  if($tRec && $hRec) {
+    my $temp = $tRec->{value};
+    my $hum  = $hRec->{value};
+    my $time = $tRec->{time};
+
+    if($temp && $hum) {
+		  my $val = HAL_absFeuchte($temp, $hum);
+		  my $ret;
+			$ret->{value} = HAL_round0($val);
+			$ret->{time} = $time;#TimeNow();
+			$ret->{reading_name} = $record->{name};
+			$ret->{unit} = 'g/m3';
+			return $ret;
+	  }
+  }
+		      
+  return undef;
+}
 
 # ValueFn: Berechnet, wieweit die Sonne aktuell ins Zimmer hineinstrahlt (am Boden). Beruecksichtigt nur Azimuth/Elevation, nicht die aktuelle Intensitaet.
 # FnParams: Fensterhoehe (Oberkante)
-sub HAL_WinSunRoomRange($$) {
+sub HAL_WinSunRoomRangeValueFn($$) {
 	my ($device, $record) = @_;
 	my $params = $record->{FnParams};
 	
@@ -1897,8 +2012,10 @@ sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
   
+  # Templates
+  HAL_expandTemplates($templates);
   # Templates anwenden
-  HAL_expandTemplates($devices, $templates);
+  HAL_applyTemplates($devices, $templates);
   
   # Console-Commandos registrieren
   my %lhash = ( Fn=>"CommandMGet",
@@ -1909,7 +2026,7 @@ sub myCtrlDev_Initialize($$)
 # Verarbeitungsroutine für mger Befehl
 sub CommandMGet($$$) {
 	my($hash, $param, $cmd) = @_;
-	my @line = split(/ /,$param);
+	my @line = split(/\s+/,$param);
 	
 	if(scalar(@line)==0) {
 		return "Usage: $cmd ".join("\n",@usage);
@@ -2078,6 +2195,9 @@ sub CommandMGet_format($$) {
 
 
  #>>> Templates
+ 
+# Füght einem Hash Zweige/werte aus dem anderen zu, aber nur, wenn Werte (Blaetter) noch nicht vorhanden waren.
+# Params: Zu aendernder Hash, Template-Hash
 sub merge_hash_recursive($$) {
 	my($hash, $template) = @_;
   #Log3 "TEST", 3, 'ENTER';
@@ -2122,7 +2242,37 @@ sub merge_hash_recursive($$) {
 	}
 }
 
-sub HAL_expandTemplates($$) {
+# Template-Tab rekursiv erweitern (Templates mit Templates)
+# Param: Template-Tab-Hash
+sub HAL_expandTemplates($) {
+	my($templates) = @_;
+	foreach my $key (keys($templates)) {
+		my $subTab = $templates->{$key};
+		HAL_expandTemplates_intern($templates, $subTab);
+	}
+}
+# Interne Routine fuer expandTemplates (ein Zweig verarbeiten (rekursiv))
+sub HAL_expandTemplates_intern($$) {
+	my($templates, $tab) = @_;
+	#Log3 "TEST", 3, 'expand_intern'.Dumper($templates);
+	#Log3 "TEST", 3, 'expand_intern: --->';
+	return unless defined $tab;
+	my $desiredTemplates = $tab->{templates};
+	if(defined($desiredTemplates) && ref($desiredTemplates) eq 'ARRAY') {
+    foreach my $tName (@$desiredTemplates) {
+    	#Log3 "TEST", 3, 'expand_intern: apply '.$tName;
+    	my $node = $templates->{$tName};
+    	HAL_expandTemplates_intern($templates, $node);
+    	#Log3 "TEST", 3, 'expand_intern'.Dumper($templates)."\n\n".Dumper($node);
+		  merge_hash_recursive($tab, $node);
+	  }
+	  delete($tab->{templates});
+	}
+}
+
+# Geht die Liste der Devices durch und wendet angegebenen Tempates an (Zweige ergaenzen/einfuegen)
+# Params: Dev-Hash, Templates-Hash
+sub HAL_applyTemplates($$) {
 	my($tab,$templates) = @_;
 	
 	foreach my $key (keys($tab)) {
@@ -2131,7 +2281,8 @@ sub HAL_expandTemplates($$) {
 		my $desiredTemplates = $subTab->{templates};
 		if(defined($desiredTemplates)) {
       foreach my $tName (@$desiredTemplates) {
-			  merge_hash_recursive($subTab, $templates->{$tName});
+      	my $tNode = $templates->{$tName};
+			  merge_hash_recursive($subTab, $tNode);
 		  }
 		}
 	}
@@ -2874,40 +3025,39 @@ sub HAL_getReadingTime($) {
 #--- TEST ---------------------------------------------------------------------
 #--- Methods: Console Command -------------------------------------------------
  # >>> Test
-  my $template;
-  $template->{t1}->{test}      =">Test";
-  $template->{t1}->{test2}     =">Test2";
-  $template->{t1}->{testA}     =[">Test2"];
-  $template->{t1}->{type}      =">HomeMatic compatible";
-  $template->{t1}->{location}  =">test";
-  $template->{t1}->{set}->{1}  =">test1";
-  $template->{t1}->{set}->{2}  =">test2";
-  $template->{t1}->{readings}->{temperature} ->{reading}  =">temperature";
-  $template->{t1}->{readings}->{temperature} ->{unit}     =">°C";
-  $template->{t1}->{readings}->{bat} ->{reading}  =">bat";
-  $template->{t1}->{readings}->{bat} ->{unit}     =">v";
-  
-  my $test;
-  $test->{sname}->{name}      = "Name";
-  $test->{sname}->{templates} = ["t1"];
-  $test->{sname}->{loacation} = "umwelt";
-  $test->{sname}->{readings}->{temperature}->{asd}  = "ASD";
-  $test->{sname}->{readings}->{humidity}->{asd}  = "DSF";
+ # my $template;
+ # $template->{t1}->{test}      =">Test";
+ # $template->{t1}->{test2}     =">Test2";
+ # $template->{t1}->{testA}     =[">Test2"];
+ # $template->{t1}->{type}      =">HomeMatic compatible";
+ # $template->{t1}->{location}  =">test";
+ # $template->{t1}->{set}->{1}  =">test1";
+ # $template->{t1}->{set}->{2}  =">test2";
+ # $template->{t1}->{readings}->{temperature} ->{reading}  =">temperature";
+ # $template->{t1}->{readings}->{temperature} ->{unit}     =">°C";
+ # $template->{t1}->{readings}->{bat} ->{reading}  =">bat";
+ # $template->{t1}->{readings}->{bat} ->{unit}     =">v";
+ # 
+ # my $test;
+ # $test->{sname}->{name}      = "Name";
+ # $test->{sname}->{templates} = ["t1"];
+ # $test->{sname}->{loacation} = "umwelt";
+ # $test->{sname}->{readings}->{temperature}->{asd}  = "ASD";
+ # $test->{sname}->{readings}->{humidity}->{asd}  = "DSF";
+ #
+ # $test->{sname2}->{name}      = "Name2";
+ # $test->{sname2}->{templates} = ["t1"];
+ # $test->{sname2}->{loacation} = "umwelt2";
+ # $test->{sname2}->{readings}->{temperature}->{asd}  = "ASD2";
+ # $test->{sname2}->{readings}->{humidity}->{asd}  = "DSF2";
  
-  $test->{sname2}->{name}      = "Name2";
-  $test->{sname2}->{templates} = ["t1"];
-  $test->{sname2}->{loacation} = "umwelt2";
-  $test->{sname2}->{readings}->{temperature}->{asd}  = "ASD2";
-  $test->{sname2}->{readings}->{humidity}->{asd}  = "DSF2";
-  
-
 sub sTest() {
 	#merge_hash_recursive($test->{sname}, $template->{t1});
 	#merge_hash_recursive($test->{sname2}, $template->{t1});
 	
-	HAL_expandTemplates($test, $template);
-	
-	return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
+	HAL_expandTemplates($templates);
+	return Dumper($templates);
+	#return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
 }
 
 
