@@ -418,14 +418,16 @@ sub checkFensterBeschattung($$$) {
 	my($sensorName, $rolloName, $mode) = @_;
 	
 	if($mode eq DISABLED) {
-		Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled";
+		#Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled";
+		Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => disabled";
 		return -9;
 	}
 	
 	# Hack: Vorerst ueber die Zeit steuern, damit diese Funktion nicht der Nacht-Automatik in die Quere kommt.
 	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-	if($hour <= 10 || $hour >= 18) {
-		Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled (night mode)";
+	if($hour < 10 || $hour >= 18) {
+		#Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled (night mode)";
+		Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => disabled by time interval (night mode)";
 		return -99;
 	}
 	#Log 3, "Automation: checkFensterBeschattung: TEST";
@@ -435,6 +437,8 @@ sub checkFensterBeschattung($$$) {
   	my $prRec = HAL_getSensorValueRecord($sensorName,'presence');
 	  if($prRec) {
 		  if($prRec->{value}) {
+		  	#Log 3, "Automation: ($sensorName) checkFensterBeschattung: disabled by presence (conservative mode)";
+		  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => disabled by presence (conservative mode)";
 		    return -8;
 		  }
 	  }
@@ -514,8 +518,9 @@ sub checkFensterBeschattung($$$) {
 			  # Rollo: TODO Berechnen
 			  if($level>30) { # TODO: ? Manuelle Eingriffe erkennen
 			  	$doClose=1;
-			  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => Beschattung";
+			  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => Beschattung aktivieren";
 			    notGreaterThen($rolloName, 'schatten');
+			    #notGreaterThen($rolloName, 45);
 			  }
 			} else {
 				Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => Temperatur (to low): ".$tem;
