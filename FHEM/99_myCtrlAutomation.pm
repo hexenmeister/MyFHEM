@@ -444,6 +444,16 @@ sub checkFensterBeschattung($$$) {
 	  }
 	}
 	
+	my $wstruct = previewGenericCtrlBlock("ctrl_last_window_beschattung_".$sensorName);
+	
+	my $dauer = $wstruct ->{SINCE_LAST_SEC};
+  my $zustand = $wstruct ->{LAST_STATE};
+  
+  if(defined($zustand) && $dauer<900) { # nicht öffters als 15 Minuten aendern (der ersten Aufruf beruecksichtigen)
+  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => disabled by interval (too short)";
+  	return -7;
+  }
+	
 	# Wenn Sonne ins Fenster scheint (> 1M? Einstellbar machen?)
 	# Wenn draussen > 25 Grad ist
 	# Wenn Aussenhelligkit > 40000 (?)
@@ -469,7 +479,7 @@ sub checkFensterBeschattung($$$) {
 	}
 	
 	#luminosity
-	my $lRec = HAL_getSensorValueRecord($sensorName,"luminosity");
+	my $lRec = HAL_getSensorValueRecord($sensorName,"outdoor_luminosity");
 	my $lum=-1;
 	if($lRec) {
 		$lum=$lRec->{value};
@@ -480,7 +490,7 @@ sub checkFensterBeschattung($$$) {
 	}
 	
 	#temperature
-  my $tRec = HAL_getSensorValueRecord($sensorName,"temperature");
+  my $tRec = HAL_getSensorValueRecord($sensorName,"outdoor_temperature");
   my $tem=-1;
 	if($tRec) {
 		$tem=$tRec->{value};
@@ -519,6 +529,7 @@ sub checkFensterBeschattung($$$) {
 			  if($level>30) { # TODO: ? Manuelle Eingriffe erkennen
 			  	$doClose=1;
 			  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => Beschattung aktivieren";
+			  	getGenericCtrlBlock("ctrl_last_window_beschattung_".$sensorName,"activate");
 			    notGreaterThen($rolloName, 'schatten');
 			    #notGreaterThen($rolloName, 45);
 			  }
@@ -541,6 +552,7 @@ sub checkFensterBeschattung($$$) {
 	 	  	$doOpen=1;
 	 	  	# TODO: Rollo notwenigen Level berechnen
 			  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => Beschattung aufheben";
+			  	getGenericCtrlBlock("ctrl_last_window_beschattung_".$sensorName,"deactivate");
 			    notLesserThen($rolloName, 'hoch');
 	 	  } else {
 	 	  	Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => keine Aufhebeung";
