@@ -128,7 +128,7 @@ my $actornames;
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
-  $rooms->{kueche}->{sensors}   = ["ku_raumsensor","eg_ku_fk01","virtual_ku_fenster","eg_ku_rl01"];
+  $rooms->{kueche}->{sensors}   = ["ku_raumsensor","eg_ku_fk01","virtual_ku_fenster","eg_ku_rl01",'virtual_raum_sensor_ku'];
   $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht_th","hg_sensor"]; 
 
   $rooms->{wc}->{alias}     = "Gäste WC";
@@ -159,12 +159,12 @@ my $actornames;
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
   $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
-  $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor","sz_wandthermostat","og_sz_fk01","og_sz_rl01","virtual_sz_fenster"];
+  $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor","sz_wandthermostat","og_sz_fk01","og_sz_rl01","virtual_sz_fenster",'virtual_raum_sensor_sz'];
   $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{badezimmer}->{alias}="Badezimmer";
   $rooms->{badezimmer}->{fhem_name}="Badezimmer";
-  $rooms->{badezimmer}->{sensors}=["bz_raumsensor","bz_wandthermostat","og_bz_fk01","og_bz_rl01","virtual_bz_fenster"];
+  $rooms->{badezimmer}->{sensors}=["bz_raumsensor","bz_wandthermostat","og_bz_fk01","og_bz_rl01","virtual_bz_fenster",'virtual_raum_sensor_bz'];
   $rooms->{badezimmer}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{duschbad}->{alias}="Duschbad";
@@ -174,12 +174,12 @@ my $actornames;
   
   $rooms->{paula}->{alias}     = "Paulas Zimmer";
   $rooms->{paula}->{fhem_name} = "Paula";
-  $rooms->{paula}->{sensors}   = ["ka_raumsensor","ka_wandthermostat","og_ka_fk","og_ka_rl01","virtual_ka_fenster"];#,"og_ka_fk01","og_ka_fk02"
+  $rooms->{paula}->{sensors}   = ["ka_raumsensor","ka_wandthermostat","og_ka_fk","og_ka_rl01","virtual_ka_fenster",'virtual_raum_sensor_ka'];#,"og_ka_fk01","og_ka_fk02"
   $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
   
   $rooms->{hanna}->{alias}     = "Hannas Zimmer";
   $rooms->{hanna}->{fhem_name} = "Hanna";
-  $rooms->{hanna}->{sensors}   = ["kb_raumsensor","kb_wandthermostat","og_kb_fk01","og_kb_rl01","virtual_kb_fenster"];
+  $rooms->{hanna}->{sensors}   = ["kb_raumsensor","kb_wandthermostat","og_kb_fk01","og_kb_rl01","virtual_kb_fenster",'virtual_raum_sensor_kb'];
   $rooms->{hanna}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{ar}->{alias}     = "OG Abstellraum";
@@ -540,6 +540,42 @@ my $actornames;
   $devices->{virtual_raum_sensor_wz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
   $devices->{virtual_raum_sensor_wz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
   #$devices->{virtual_raum_sensor_wz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+
+  $devices->{virtual_raum_sensor_ku}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_ku}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_ku}->{location}    ="kueche";
+  $devices->{virtual_raum_sensor_ku}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $devices->{virtual_raum_sensor_ku}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  #$devices->{virtual_raum_sensor_ku}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+
+  $devices->{virtual_raum_sensor_sz}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_sz}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_sz}->{location}    ="schlafzimmer";
+  $devices->{virtual_raum_sensor_sz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  #$devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+  
+  $devices->{virtual_raum_sensor_bz}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_bz}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_bz}->{location}    ="badezimmer";
+  $devices->{virtual_raum_sensor_bz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  #$devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+
+  $devices->{virtual_raum_sensor_ka}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_ka}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_ka}->{location}    ="paula";
+  $devices->{virtual_raum_sensor_ka}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  #$devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+
+  $devices->{virtual_raum_sensor_kb}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_kb}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_kb}->{location}    ="hanna";
+  $devices->{virtual_raum_sensor_kb}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  #$devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
+  
   #TODO: Weitere Räume
   
   # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
