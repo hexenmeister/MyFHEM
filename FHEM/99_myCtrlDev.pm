@@ -218,8 +218,8 @@ my $actornames;
   #$templates->{global};
   
   # >>> Virtual Devices
-  #$templates->{virtual};
   $templates->{virtual}->{location}  =':virtual';
+  $templates->{virtual}->{type}      ='virtual';
 
   # >>> HM Templates
   $templates->{hm}->{type}='HomeMatic';
@@ -227,6 +227,7 @@ my $actornames;
   $templates->{hm_channel}->{location}=':channel';
   # >>> Dirks Homebrew
   $templates->{hm_raumsensor_general}->{type}='HomeMatic compatible';
+  $templates->{hm_raumsensor_general}->{templates}=['hm'];
   # >>> mit Bat-Messung
   $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{reading} ="batVoltage";
   $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{unit}    ="V";
@@ -235,27 +236,28 @@ my $actornames;
   $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{reading}   ="batteryLevel";
   $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{unit}      ="V";
   $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{alias}     ="Batterie-Spannung";
-  # >>>
+  # >>> LowBatLimit-Template
+  $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{reading}       =undef;
+  $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
+  $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{unit}          ="V";
+  $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
+  # >>> LowBatLimit-RT
   $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{reading}       ="R-lowBatLimitRT";
-  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
-  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{unit}          ="V";
-  $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
-  # >>>
+  $templates->{readings_low_bat_limit_rt}->{templates}=['readings_low_bat_limit'];
+  # >>> LowBatLimit-THPL
   $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{reading}       ="R-lowBatLimitTHPL";
-  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
-  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{unit}          ="V";
-  $templates->{readings_low_bat_limit_thpl}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
-  # >>>
+  $templates->{readings_low_bat_limit_thpl}->{templates}=['readings_low_bat_limit'];
+  # >>> 
   $templates->{readings_bat_status}->{readings}->{bat_status}  ->{reading}  ="battery";
   $templates->{readings_bat_status}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
+
   # >>> ... mit Lux-Messung
-  #$templates->{readings_lux};
   $templates->{readings_lux}->{readings}->{luminosity}->{reading}  ="luminosity";
   $templates->{readings_lux}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
   $templates->{readings_lux}->{readings}->{luminosity}->{unit}     ="Lx (*)";
   $templates->{readings_lux}->{readings}->{luminosity}->{act_cycle} ="600"; 
+
   # >>> ... mit Temp/Hum
-  #$templates->{readings_th};
   $templates->{readings_th}->{readings}->{temperature} ->{reading}  ="temperature";
   $templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
@@ -267,20 +269,20 @@ my $actornames;
   $templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $templates->{readings_th}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
+  $templates->{readings_th}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
+  $templates->{readings_th}->{readings}->{absFeuchte}  ->{alias}    ="Absolute Feuchte";
+  
   # >>> ... mit Temp/Hum mit 'measured-temp'
-  #$templates->{readings_th2};
   $templates->{readings_th2}->{templates}=['readings_th'];
   $templates->{readings_th2}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  #$templates->{readings_th2}->{readings}->{temperature} ->{unit}     ="°C";
-  #$templates->{readings_th2}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  #$templates->{readings_th2}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  #$templates->{readings_th2}->{readings}->{humidity}    ->{reading}  ="humidity";
-  #$templates->{readings_th2}->{readings}->{humidity}    ->{unit}     ="% rH";
-  #$templates->{readings_th2}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
-  #$templates->{readings_th2}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  #$templates->{readings_th2}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  
+  #virtual_raum_sensor
+  $templates->{virtual_raum_sensor}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  $templates->{virtual_raum_sensor}->{alias}       ="Virtueller Raumsensor";
+  $templates->{virtual_raum_sensor}->{templates}   =['virtual'];
+  $templates->{virtual_raum_sensor}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+
   
   
   # >>> Devices
@@ -288,7 +290,7 @@ my $actornames;
   #$devices->{vr_luftdruck}->{fhem_name} ="EG_WZ_KS01";
   #$devices->{vr_luftdruck}->{type}      ="HomeMatic compatible";
   #$devices->{vr_luftdruck}->{location}  ="virtual";
-  #$devices->{vr_luftdruck}->{templates} =['hm_raumsensor_general','hm','global'];
+  #$devices->{vr_luftdruck}->{templates} =['hm_raumsensor_general','global'];
   #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{reading}  ="pressure";
   #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{unit}     ="hPa";
   #$devices->{vr_luftdruck}->{readings}->{pressure}    ->{act_cycle} ="600"; 
@@ -302,7 +304,7 @@ my $actornames;
   $devices->{wz_raumsensor}->{alias}     ="WZ Raumsensor";
   $devices->{wz_raumsensor}->{fhem_name} ="EG_WZ_KS01";
   $devices->{wz_raumsensor}->{location}  ="wohnzimmer";
-  $devices->{wz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{wz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{reading}  ="pressure";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{unit}     ="hPa";
   $devices->{wz_raumsensor}->{readings}->{pressure}    ->{act_cycle} ="600"; 
@@ -312,49 +314,49 @@ my $actornames;
   $devices->{ku_raumsensor}->{alias}     ="KU Raumsensor";
   $devices->{ku_raumsensor}->{fhem_name} ="EG_KU_KS01";
   $devices->{ku_raumsensor}->{location}  ="kueche";
-  $devices->{ku_raumsensor}->{templates}  =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{ku_raumsensor}->{templates}  =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{eg_fl_raumsensor}->{alias}     ="EG Flur Raumsensor";
   $devices->{eg_fl_raumsensor}->{fhem_name} ="EG_FL_KS01";
   $devices->{eg_fl_raumsensor}->{location}  ="eg_flur";
-  $devices->{eg_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{eg_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{og_fl_raumsensor}->{alias}     ="OG Flur Raumsensor";
   $devices->{og_fl_raumsensor}->{fhem_name} ="OG_FL_KS01";
   $devices->{og_fl_raumsensor}->{location}  ="og_flur";
-  $devices->{og_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{og_fl_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{sz_raumsensor}->{alias}     ="Schlafzimmer Raumsensor";
   $devices->{sz_raumsensor}->{fhem_name} ="OG_SZ_KS01";
   $devices->{sz_raumsensor}->{location}  ="schlafzimmer";
-  $devices->{sz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{sz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{bz_raumsensor}->{alias}     ="Badezimmer Raumsensor";
   $devices->{bz_raumsensor}->{fhem_name} ="OG_BZ_KS01";
   $devices->{bz_raumsensor}->{location}  ="badezimmer";
-  $devices->{bz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{bz_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{ka_raumsensor}->{alias}     ="Kinderzimmer1 Raumsensor";
   $devices->{ka_raumsensor}->{fhem_name} ="OG_KA_KS01";
   $devices->{ka_raumsensor}->{location}  ="paula";
-  $devices->{ka_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{ka_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{kb_raumsensor}->{alias}     ="Kinderzimmer2 Raumsensor";
   $devices->{kb_raumsensor}->{fhem_name} ="OG_KB_KS01";
   $devices->{kb_raumsensor}->{location}  ="hanna";
-  $devices->{kb_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{kb_raumsensor}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #<<<
   
   $devices->{um_vh_licht}->{alias}     ="VH Aussensensor";
   $devices->{um_vh_licht}->{fhem_name} ="UM_VH_KS01";
   $devices->{um_vh_licht}->{location}  ="umwelt";
-  $devices->{um_vh_licht}->{templates} =['readings_bat_status','readings_bat_voltage','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{um_vh_licht}->{templates} =['readings_bat_status','readings_bat_voltage','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #$devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="luminosity";
   # Umgerechnete Lichtintensitaet verwenden (wg. der 26%-durchlaessiger Folie)
   $devices->{um_vh_licht}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity";
@@ -363,7 +365,7 @@ my $actornames;
   $devices->{um_hh_licht_th}->{alias}     ="HH Aussensensor";
   $devices->{um_hh_licht_th}->{fhem_name} ="UM_HH_KS01";
   $devices->{um_hh_licht_th}->{location}  ="umwelt";
-  $devices->{um_hh_licht_th}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','hm','global'];
+  $devices->{um_hh_licht_th}->{templates} =['readings_bat_status','readings_bat_voltage','readings_th','readings_lux','readings_low_bat_limit_thpl','hm_raumsensor_general','global'];
   #$devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="luminosity";
   $devices->{um_hh_licht_th}->{readings}->{luminosity}  ->{reading}   ="normalizedLuminosity"; 
   #<<<
@@ -534,46 +536,45 @@ my $actornames;
   $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
   #<<<
   
-  $devices->{virtual_raum_sensor_wz}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_wz}->{type}        ="virtual";
+	# >>> Virtuelle Raumsensoren  
+  $devices->{virtual_raum_sensor_wz}->{alias}       ="Virtueller Raumsensor: WZ";
   $devices->{virtual_raum_sensor_wz}->{location}    ="wohnzimmer";
-  $devices->{virtual_raum_sensor_wz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_wz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_wz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
-
-  $devices->{virtual_raum_sensor_ku}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_ku}->{type}        ="virtual";
+  $devices->{virtual_raum_sensor_wz}->{templates}   =['virtual_raum_sensor'];
+  
+  $devices->{virtual_raum_sensor_ku}->{alias}       ="Virtueller Raumsensor: KU";
   $devices->{virtual_raum_sensor_ku}->{location}    ="kueche";
-  $devices->{virtual_raum_sensor_ku}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_ku}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_ku}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
-
+  $devices->{virtual_raum_sensor_ku}->{templates}   =['virtual_raum_sensor'];
+  
   $devices->{virtual_raum_sensor_sz}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_sz}->{type}        ="virtual";
+  #$devices->{virtual_raum_sensor_sz}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_sz}->{location}    ="schlafzimmer";
-  $devices->{virtual_raum_sensor_sz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  $devices->{virtual_raum_sensor_sz}->{templates}   =['virtual_raum_sensor'];
+  #$devices->{virtual_raum_sensor_sz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  #$devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
   #$devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
   
   $devices->{virtual_raum_sensor_bz}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_bz}->{type}        ="virtual";
+  #$devices->{virtual_raum_sensor_bz}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_bz}->{location}    ="badezimmer";
-  $devices->{virtual_raum_sensor_bz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  $devices->{virtual_raum_sensor_bz}->{templates}   =['virtual_raum_sensor'];
+  #$devices->{virtual_raum_sensor_bz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  #$devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
   #$devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
 
   $devices->{virtual_raum_sensor_ka}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_ka}->{type}        ="virtual";
+  #$devices->{virtual_raum_sensor_ka}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_ka}->{location}    ="paula";
-  $devices->{virtual_raum_sensor_ka}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  $devices->{virtual_raum_sensor_ka}->{templates}   =['virtual_raum_sensor'];
+  #$devices->{virtual_raum_sensor_ka}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  #$devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
   #$devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
 
   $devices->{virtual_raum_sensor_kb}->{alias}       ="Virtueller Raumsensor";
-  $devices->{virtual_raum_sensor_kb}->{type}        ="virtual";
+  #$devices->{virtual_raum_sensor_kb}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_kb}->{location}    ="hanna";
-  $devices->{virtual_raum_sensor_kb}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  $devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
+  $devices->{virtual_raum_sensor_kb}->{templates}   =['virtual_raum_sensor'];
+  #$devices->{virtual_raum_sensor_kb}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
+  #$devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
   #$devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
   
   #TODO: Weitere Räume
@@ -1567,7 +1568,7 @@ sub HAL_TaupunktValueFn($$) {
 		  my $ret;
 			$ret->{value} = HAL_round0($val);
 			$ret->{time} = $time;#TimeNow();
-			$ret->{reading_name} = $record->{name};
+			#$ret->{reading_name} = $record->{name};
 			$ret->{unit} = '°C';
 			return $ret;
 	  }
@@ -1600,7 +1601,7 @@ sub HAL_AbsFeuchteValueFn($$) {
 		  my $ret;
 			$ret->{value} = HAL_round0($val);
 			$ret->{time} = $time;#TimeNow();
-			$ret->{reading_name} = $record->{name};
+			#$ret->{reading_name} = $record->{name};
 			$ret->{unit} = 'g/m3';
 			return $ret;
 	  }
@@ -1683,7 +1684,7 @@ sub HAL_WinSunRoomRangeValueFn($$) {
 	my $ret;
 	$ret->{value} = $val;
 	$ret->{time} = TimeNow();
-	$ret->{reading_name} = $record->{name};
+	#$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 	
@@ -1727,7 +1728,7 @@ sub HAL_WinSunnySideValueFn($$) {
 	my $ret;
 	$ret->{value} = $val;
 	$ret->{time} = TimeNow();
-	$ret->{reading_name} = $record->{name};
+	#$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 }
@@ -1765,7 +1766,7 @@ sub HAL_WinSecureStateValueFn($$) {
   my $ret;
 	$ret->{value} = $secure;
 	$ret->{time} = TimeNow();
-	$ret->{reading_name} = $record->{name};
+	#$ret->{reading_name} = $record->{name};
 	$ret->{message} = $msg;
 	return $ret;
 }  
@@ -1806,7 +1807,7 @@ sub HAL_AvgReadingValueFn($$) {
   	$ret->{value} = $retVal;
   	$ret->{unit} = $unit;
   	$ret->{time} = $time;
-  	$ret->{reading_name} = $rname;
+  	#$ret->{reading_name} = $rname;
   	return $ret;
   }
   return undef;
@@ -1839,7 +1840,7 @@ sub HAL_MinReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	$ret->{reading_name} = $rname;
+	#$ret->{reading_name} = $rname;
 	return $ret;
 }
 
@@ -1870,7 +1871,7 @@ sub HAL_MaxReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	$ret->{reading_name} = $rname;
+	#$ret->{reading_name} = $rname;
 	return $ret;
 }
 
@@ -2004,7 +2005,7 @@ sub HAL_TempDiffOutdoorValueFn($$) {
 		  my $ret;
 			$ret->{value} = HAL_round0($val);
 			$ret->{time} = $time;#TimeNow();
-			$ret->{reading_name} = $record->{name};
+			#$ret->{reading_name} = $record->{name};
 			$ret->{unit} = '°C';
 			return $ret;
 	  }
@@ -2782,7 +2783,8 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 	}
 	
 	if ($single_reading_record) {
-		$single_reading_record->{reading_name} = $reading;
+		#$single_reading_record->{reading_name} = $reading;
+		$single_reading_record->{reading}=$reading; #XXX?
 	  return ($device_record, $single_reading_record);
 	}
 	
@@ -2804,7 +2806,8 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 		my $new_device_record = HAL_getSensorRecord($composite_name);
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
-			$new_single_reading_record->{reading_name} = $reading;
+			#$new_single_reading_record->{reading_name} = $reading;
+			$new_single_reading_record->{reading}=$reading; #XXX?
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
@@ -2959,7 +2962,7 @@ sub HAL_getReadingsValueRecord($$) {
     
     $ret->{unit}      =$record->{unit} if defined($record->{unit});
     $ret->{alias}     =$record->{alias}  if defined($record->{alias});
-    $ret->{fhem_name} =$device->{fhem_name};
+    $ret->{fhem_name} =$device->{fhem_name} if defined($device->{fhem_name});
     $ret->{sensor}    =$device->{name};
     $ret->{reading}   =$record->{reading};
     #$ret->{sensor_alias} =$
