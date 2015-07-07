@@ -265,13 +265,15 @@ my $actornames;
   $templates->{readings_th}->{readings}->{humidity}    ->{reading}  ="humidity";
   $templates->{readings_th}->{readings}->{humidity}    ->{unit}     ="% rH";
   $templates->{readings_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
-  $templates->{readings_th}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  $templates->{readings_th}->{readings}->{humidity}    ->{act_cycle} ="600";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $templates->{readings_th}->{readings}->{dewpoint}    ->{act_cycle} ="600";
   $templates->{readings_th}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
   $templates->{readings_th}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
   $templates->{readings_th}->{readings}->{absFeuchte}  ->{alias}    ="Absolute Feuchte";
+  $templates->{readings_th}->{readings}->{absFeuchte}  ->{act_cycle} ="600";
   
   # >>> ... mit Temp/Hum mit 'measured-temp'
   $templates->{readings_th2}->{templates}=['readings_th'];
@@ -842,18 +844,21 @@ my $actornames;
   $devices->{hg_sensor}->{fhem_name} ="GSD_1.4";
   $devices->{hg_sensor}->{type}      ="GSD";
   $devices->{hg_sensor}->{location}  ="garten";
+  $devices->{hg_sensor}->{act_cycle} ="600"; 
   $devices->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
   $devices->{hg_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
   $devices->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{hg_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  #$devices->{hg_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
   $devices->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
   $devices->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{hg_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$devices->{hg_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
   $devices->{hg_sensor}->{readings}->{bat_voltage} ->{reading}  ="batteryLevel";
   $devices->{hg_sensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  #$devices->{hg_sensor}->{readings}->{bat_voltage} ->{act_cycle} ="600"; 
   $devices->{hg_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   $devices->{hg_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
   $devices->{hg_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$devices->{hg_sensor}->{readings}->{dewpoint}    ->{act_cycle} ="600"; 
   #<<<
   
   $devices->{tt_sensor}->{alias}     ="Test-Sensor";
@@ -2783,8 +2788,8 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 	}
 	
 	if ($single_reading_record) {
-		#$single_reading_record->{reading_name} = $reading;
-		$single_reading_record->{reading}=$reading; #XXX?
+		#$single_reading_record->{reading_name} = $reading; Nicht noetig
+		#$single_reading_record->{reading}=$reading; #XXX? So nicht!
 	  return ($device_record, $single_reading_record);
 	}
 	
@@ -2806,8 +2811,8 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 		my $new_device_record = HAL_getSensorRecord($composite_name);
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
-			#$new_single_reading_record->{reading_name} = $reading;
-			$new_single_reading_record->{reading}=$reading; #XXX?
+			#$new_single_reading_record->{reading_name} = $reading; #Nicht noetig
+			#$new_single_reading_record->{reading}=$reading; #XXX? So nicht!
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
@@ -2931,8 +2936,10 @@ sub HAL_getReadingsValueRecord($$) {
     # dead or alive?
     $ret->{status} = 'unknown';
     my $actCycle = $record->{act_cycle};
+    $actCycle = $device->{act_cycle} unless defined $actCycle;
     $actCycle = 0 unless defined $actCycle;
-    my $iactCycle = int($actCycle);
+    my $iactCycle = 0;
+    $iactCycle = int($actCycle) if defined $actCycle;
     if(defined $actCycle && $iactCycle == 0) {
       $ret->{status} = 'alive'; # wenn actCycle == 0 immer alive
     }
@@ -2964,7 +2971,7 @@ sub HAL_getReadingsValueRecord($$) {
     $ret->{alias}     =$record->{alias}  if defined($record->{alias});
     $ret->{fhem_name} =$device->{fhem_name} if defined($device->{fhem_name});
     $ret->{sensor}    =$device->{name};
-    $ret->{reading}   =$record->{reading};
+    $ret->{reading}   =$record->{reading}; #XXX?
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
     return $ret;
