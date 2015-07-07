@@ -61,14 +61,16 @@ sendMeStatusMsg()
 {
 	#my($msg) = @_;
 	my $msg = "Status: Umwelt";
-	$msg=$msg."\n  Ost: ";
-	#TODO: HAL
-	$msg=$msg."T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C";
-	#$msg=$msg."\n  : ".$defs{"GSD_1.4"}{STATE};
-	$msg=$msg."\n  West: ";
-	$msg=$msg."T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
-	$msg=$msg." H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
-	$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
+	$msg.="\nTemperature: ".fhem("mget umwelt temperature value");
+	$msg.="\hLuftfeuchte: ".fhem("mget umwelt humidity value");
+	#$msg=$msg."\n  Ost: ";
+	##TODO: HAL
+	#$msg=$msg."T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C";
+	##$msg=$msg."\n  : ".$defs{"GSD_1.4"}{STATE};
+	#$msg=$msg."\n  West: ";
+	#$msg=$msg."T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
+	#$msg=$msg." H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
+	#$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
 	
 	sendMeJabberMessage($msg);
 }
@@ -98,17 +100,19 @@ sendJabberAnswer()
   
   if($cmd eq "umwelt") {
   	#Log 3, "Jabber: CMD: Umwelt";
-    $newmsg.= "Umwelt";
-	  $newmsg.="\n  Ost: ";
-	  #TODO: HAL
-	  $newmsg.="T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C, ";
-	  $newmsg.="B: ".ReadingsVal("UM_VH_HMBL01.Eingang", "brightness", "---").", ";
-	  $newmsg.="Bat: ".ReadingsVal("UM_VH_HMBL01.Eingang", "battery", "---")." ";
-	  #$newmsg.="\n  : ".$defs{"GSD_1.4"}{STATE};
-	  $newmsg.="\n  West: ";
-	  $newmsg.="T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
-	  $newmsg.=" H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
-	  $newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
+    $newmsg.= "Umwelt\n";
+	  #$newmsg.="\n  Ost: ";
+	  ##TODO: HAL
+	  #$newmsg.="T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C, ";
+	  #$newmsg.="B: ".ReadingsVal("UM_VH_HMBL01.Eingang", "brightness", "---").", ";
+	  #$newmsg.="Bat: ".ReadingsVal("UM_VH_HMBL01.Eingang", "battery", "---")." ";
+	  ##$newmsg.="\n  : ".$defs{"GSD_1.4"}{STATE};
+	  #$newmsg.="\n  West: ";
+	  #$newmsg.="T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
+	  #$newmsg.=" H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
+	  #$newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
+	  #my $newmsg = "Status: Umwelt";
+	  $newmsg.=fhem("mget umwelt all value");
   }
 
   if($cmd eq "system") {
