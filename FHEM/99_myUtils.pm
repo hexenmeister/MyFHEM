@@ -1188,9 +1188,9 @@ sub setReading($$$) {
 sub rundeZahl0($) {
 	my($val)=@_;
 	# Prüfen, ob numerisch
-	if(int($val)>0) {
+	#if(int($val)>0) {
 		$val = int($val+0.5);
-	}
+	#}
 	return $val;
 }
 
