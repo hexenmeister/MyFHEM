@@ -62,7 +62,7 @@ sendMeStatusMsg()
 	#my($msg) = @_;
 	my $msg = "Status: Umwelt";
 	$msg.="\nTemperature: ".fhem("mget umwelt temperature value");
-	$msg.="\hLuftfeuchte: ".fhem("mget umwelt humidity value");
+	$msg.="\nLuftfeuchte: ".fhem("mget umwelt humidity value");
 	#$msg=$msg."\n  Ost: ";
 	##TODO: HAL
 	#$msg=$msg."T: ".ReadingsVal("UM_VH_OWTS01.Luft", "temperature", "---")." C";
@@ -112,7 +112,14 @@ sendJabberAnswer()
 	  #$newmsg.=" H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
 	  #$newmsg.=" Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
 	  #my $newmsg = "Status: Umwelt";
-	  $newmsg.=fhem("mget umwelt all value");
+	  #$newmsg.=fhem("mget umwelt all value");
+	  $newmsg.="\nTemperature: ".fhem("mget umwelt temperature value");
+	  $newmsg.="\nLuftfeuchte: ".fhem("mget umwelt humidity value");
+	  $newmsg.="\nLuftdruck:    ".fhem("mget umwelt pressure value");
+	  $newmsg.="\nLicht:        ".fhem("mget umwelt luminosity value");
+	  $newmsg.="\nTaupunkt:     ".fhem("mget umwelt dewpoint value");
+	  $newmsg.="\nAbs. Feuchte: ".fhem("mget umwelt absFeuchte value");
+	
   }
 
   if($cmd eq "system") {
