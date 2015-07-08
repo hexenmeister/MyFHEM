@@ -525,7 +525,7 @@ my $actornames;
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
-  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity", "hg_sensor:humidity"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity"];#["um_hh_licht_th:humidity", "hg_sensor:humidity"];
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{unit} = "% rH";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
@@ -1572,6 +1572,7 @@ sub HAL_TaupunktValueFn($$) {
 		  my $val = HAL_dewpoint($temp, $hum);
 		  my $ret;
 			$ret->{value} = HAL_round0($val);
+			#Log 3,'>------------>: '.$val.', ROUND: '.$ret->{value};
 			$ret->{time} = $time;#TimeNow();
 			#$ret->{reading_name} = $record->{name};
 			$ret->{unit} = '°C';
@@ -2172,7 +2173,11 @@ sub CommandMGet($$$) {
 	my $showmod = shift(@line);
 	$showmod = '' unless defined $showmod;
 	
-	my $ret;
+	my $showmod2 = shift(@line);
+	#$showmod2 = '' unless defined $showmod2;
+	
+	my $ret=undef;
+	my @retOrder=();
 	
 	if($modifier eq 'room') {
 		if(!defined($devname)) {
@@ -2184,11 +2189,21 @@ sub CommandMGet($$$) {
 		}
 	  if($rname eq 'all') {
 			my @readings = HAL_getRoomSensorReadingsList($devname);
+			$showmod2 = 'r' unless defined $showmod2;
 			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_room($devname,$rname,$showmod);
+				$ret->{$rname}=CommandMGet_room($devname,$rname,$showmod,$showmod2);
 			}
 		} else {
-			return CommandMGet_room($devname,$rname,$showmod);
+			my @readings = split(/,/,$rname);
+			if(@readings && $#readings>0) {
+				@retOrder = @readings;
+				$showmod2 = 'r' unless defined $showmod2;
+				foreach $rname (@readings) {
+				  $ret->{$rname}=CommandMGet_room($devname,$rname,$showmod,$showmod2);
+			  } 
+		  } else {
+			  return CommandMGet_room($devname,$rname,$showmod,$showmod2);
+			}
 		}	
 	} elsif($modifier eq 'sensor') {
 		if(!defined($devname)) {
@@ -2200,11 +2215,21 @@ sub CommandMGet($$$) {
 		}
 		if($rname eq 'all') {
 			my @readings = HAL_getSensorReadingsList($devname);
+			$showmod2 = 'r' unless defined $showmod2;
 			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod);
+				$ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
 			}
 		} else {
-			return CommandMGet_sensor($devname,$rname,$showmod);
+			my @readings = split(/,/,$rname);
+			if(@readings && $#readings>0) {
+				@retOrder = @readings;
+				$showmod2 = 'r' unless defined $showmod2;
+				foreach $rname (@readings) {
+				  $ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
+			  } 
+		  } else {
+		  	return CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
+		  }
 		}
 	} elsif($modifier eq 'rooms') {
 		my $rooms = HAL_getRoomNames();
@@ -2243,19 +2268,20 @@ sub CommandMGet($$$) {
 	
 	my $str='';
 	if(ref $ret eq 'HASH') {
-	  foreach my $key (sort(keys($ret))) {
+		@retOrder = sort(keys($ret)) unless $#retOrder>0;
+		foreach my $key (@retOrder) {
 		  #if($showmod ne 'full') {
       #  $str.="$key";
       #}
-      $str.=sprintf("%-12s", $key);
+      #$str.=sprintf("%-12s", $key);
 	  	my $val = $ret->{$key};
 		  if(defined($val)) {
 			  #if($showmod ne 'full') {
-          $str.=' = ';
+        #  $str.=' : ';
         #}
         $str.=$val;
+        $str.="\n";
       }
-		  $str.="\n";
 	  }
   } else {
   	return 'no device found';
@@ -2263,54 +2289,63 @@ sub CommandMGet($$$) {
 	return $str;
 }
 
-sub CommandMGet_room($$$) {
-	my($name, $readingname, $mod) = @_;
+sub CommandMGet_room($$$$) {
+	my($name, $readingname, $mod, $mod2) = @_;
 
 	my $record = HAL_getRoomReadingRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown room or reading: $name:$readingname";
 	}
 	
-	return CommandMGet_format($record,$mod);
+	return CommandMGet_format($record,$mod,$mod2);
 	
 	#return HAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
 }
 
-sub CommandMGet_sensor($$$) {
-	my($name, $readingname, $mod) = @_;
+sub CommandMGet_sensor($$$$) {
+	my($name, $readingname, $mod, $mod2) = @_;
 
 	my $record = HAL_getSensorValueRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown sensor or reading: $name:$readingname";
 	}
 	
-	return CommandMGet_format($record,$mod);
+	return CommandMGet_format($record,$mod,$mod2);
 	
 	#return HAL_getSensorReadingValue($name, $readingname);
 }
 
 #[plain*|full|value|time|dump]
-sub CommandMGet_format($$) {
-	my($record, $mod) = @_;
+sub CommandMGet_format($$$) {
+	my($record, $mod, $mod2) = @_;
 	
-	if(!$mod || $mod eq 'plain') {
-		return $record->{value};
+	my $prefix = '';
+	$mod2 = '' unless defined $mod2;
+	$prefix .= sprintf("%-12s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
+	$prefix .= sprintf("%-12s : ", $record->{reading}) if($mod2 eq 'reading' || $mod2 eq 'r');
+	
+	if(!$mod || $mod eq 'plain' || $mod eq 'p') {
+		return $prefix.$record->{value};
 	}
 	
-	if($mod eq 'time') {
-		return $record->{time};
+	if($mod eq 'time' || $mod eq 't') {
+		return $prefix.$record->{time};
 	}
 	
-	if($mod eq 'value') {
-		return $record->{value}.' '.$record->{unit};
+	if($mod eq 'value' || $mod eq 'v') {
+		return $prefix.$record->{value}.' '.$record->{unit};
 	}
 	
-	if($mod eq 'full') {
+	if($mod eq 'brief' || $mod eq 'b') {
+		return $prefix.$record->{value}.' '.$record->{unit};
+	}
+	
+	if($mod eq 'full' || $mod eq 'f') {
 		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{reading}.' = '.$record->{value}.' '.$record->{unit};
-		return sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
+		return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
 	}
 	
-	if($mod eq 'dump') {
+	if($mod eq 'dump' || $mod eq 'd') {
 	  return Dumper($record);
 	}
 }
@@ -2789,7 +2824,7 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 	
 	if ($single_reading_record) {
 		#$single_reading_record->{reading_name} = $reading; Nicht noetig
-		#$single_reading_record->{reading}=$reading; #XXX? So nicht!
+		$single_reading_record->{reading}=$reading; #XXX? So nicht! doch?
 	  return ($device_record, $single_reading_record);
 	}
 	
@@ -2812,7 +2847,7 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
 			#$new_single_reading_record->{reading_name} = $reading; #Nicht noetig
-			#$new_single_reading_record->{reading}=$reading; #XXX? So nicht!
+			$new_single_reading_record->{reading}=$reading; #XXX? So nicht! doch?
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
