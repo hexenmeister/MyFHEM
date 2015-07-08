@@ -45,6 +45,8 @@ sub HAL_getSensorValueRecord($$);
 sub HAL_getSensorReadingValue($$);
 sub HAL_getSensorReadingUnit($$);
 sub HAL_getSensorReadingTime($$);
+sub HAL_isSensorAlive($);
+sub HAL_isReadingAlive($$);
 
 #TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
@@ -2234,17 +2236,27 @@ sub CommandMGet($$$) {
 	} elsif($modifier eq 'rooms') {
 		my $rooms = HAL_getRoomNames();
 		foreach my $roomname (@$rooms) {
-			$ret->{$roomname}=undef;
+			$ret->{$roomname}=$roomname;
 		}
   } elsif($modifier eq 'sensors') {
   	my $sensors;
-  	if(!defined($devname)) {
+  	if(!defined($devname) || $devname eq 'all') {
       $sensors = HAL_getSensorNames();
     } else {
     	$sensors = HAL_getRoomSensorNames($devname);
     }
 		foreach my $sensorname (@$sensors) {
-			$ret->{$sensorname}=undef;
+			if(defined($rname)) {
+				if($rname eq 'dead') {
+					if(!HAL_isSensorAlive($sensorname)) {
+            $ret->{$sensorname}=$sensorname;
+          }
+				} else {
+			    return 'unknown modifier: '.$rname;
+			  }
+			} else {
+			  $ret->{$sensorname}=$sensorname;
+			}
 		}
   } elsif($modifier eq 'dump') {
   	my $rec;
@@ -2268,7 +2280,7 @@ sub CommandMGet($$$) {
 	
 	my $str='';
 	if(ref $ret eq 'HASH') {
-		@retOrder = sort(keys($ret)) unless $#retOrder>0;
+		@retOrder = sort(keys($ret)) unless defined(@retOrder) && $#retOrder>0;
 		foreach my $key (@retOrder) {
 		  #if($showmod ne 'full') {
       #  $str.="$key";
@@ -3084,6 +3096,31 @@ sub HAL_getReadingTime($) {
 	my($readingSpec) = @_;
 	my($sNamem,$rName) = split(/:/,$readingSpec);
 	return HAL_getSensorReadingTime($sNamem,$rName);
+}
+
+# Prueft, ob der Sensor alive ist (s. actCycle)
+#  Param: Sensorname
+sub HAL_isSensorAlive($) {
+	my($name) = @_;
+	my @list = HAL_getSensorReadingsList($name);
+	foreach my $reading (@list) {
+		if(!HAL_isReadingAlive($name, $reading)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+# Prueft, ob Reading eines Sensors alive ist (s. actCycle)
+#  Param: Sensorname, Readingname
+sub HAL_isReadingAlive($$) {
+	my($sensor,$reading) = @_;
+
+	my $record = HAL_getSensorValueRecord($sensor,$reading);
+	if($record) {
+		return $record->{alive};
+	}
+	return 0;
 }
 
 #------------------------------------------------------------------------------
