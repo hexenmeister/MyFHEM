@@ -258,8 +258,15 @@ my $actornames;
   $templates->{readings_lux}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
   $templates->{readings_lux}->{readings}->{luminosity}->{unit}     ="Lx (*)";
   $templates->{readings_lux}->{readings}->{luminosity}->{act_cycle} ="600"; 
+  
+  # >>> ... Erweiterung fuer TH-Readings um Taupunkt und ABs.Feuchte
+  $templates->{readings_dewpoint}->{readings}->{dewpoint}->{ValueFn}   = "HAL_TaupunktValueFn";
+  $templates->{readings_dewpoint}->{readings}->{dewpoint}->{alias}     = "Taupunkt";
+  $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{ValueFn} = "HAL_AbsFeuchteValueFn";
+  $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
 
   # >>> ... mit Temp/Hum
+  $templates->{readings_th}->{templates}=['readings_dewpoint'];
   $templates->{readings_th}->{readings}->{temperature} ->{reading}  ="temperature";
   $templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
@@ -268,14 +275,14 @@ my $actornames;
   $templates->{readings_th}->{readings}->{humidity}    ->{unit}     ="% rH";
   $templates->{readings_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
   $templates->{readings_th}->{readings}->{humidity}    ->{act_cycle} ="600";
-  $templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
-  $templates->{readings_th}->{readings}->{dewpoint}    ->{act_cycle} ="600";
-  $templates->{readings_th}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
-  $templates->{readings_th}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
-  $templates->{readings_th}->{readings}->{absFeuchte}  ->{alias}    ="Absolute Feuchte";
-  $templates->{readings_th}->{readings}->{absFeuchte}  ->{act_cycle} ="600";
+  #$templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$templates->{readings_th}->{readings}->{dewpoint}    ->{act_cycle} ="600";
+  #$templates->{readings_th}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
+  #$templates->{readings_th}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
+  #$templates->{readings_th}->{readings}->{absFeuchte}  ->{alias}    ="Absolute Feuchte";
+  #$templates->{readings_th}->{readings}->{absFeuchte}  ->{act_cycle} ="600";
   
   # >>> ... mit Temp/Hum mit 'measured-temp'
   $templates->{readings_th2}->{templates}=['readings_th'];
@@ -539,7 +546,7 @@ my $actornames;
   #$devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{unit} = "g/m3";
   $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
   #<<<
-  
+    
 	# >>> Virtuelle Raumsensoren  
   $devices->{virtual_raum_sensor_wz}->{alias}       ="Virtueller Raumsensor: WZ";
   $devices->{virtual_raum_sensor_wz}->{location}    ="wohnzimmer";
@@ -1576,6 +1583,7 @@ sub HAL_TaupunktValueFn($$) {
 			$ret->{value} = HAL_round0($val);
 			#Log 3,'>------------>: '.$val.', ROUND: '.$ret->{value};
 			$ret->{time} = $time;#TimeNow();
+			#$ret->{time} = TimeNow();
 			#$ret->{reading_name} = $record->{name};
 			$ret->{unit} = '°C';
 			return $ret;
@@ -1800,7 +1808,7 @@ sub HAL_AvgReadingValueFn($$) {
   		my $sVal = $sRec->{value};
   		$aVal += $sVal;
   		if(!defined($unit)) { $unit = $sRec->{unit}; }
-  		if(!defined($rname)) { $rname = $sRec->{reading}; }
+  		if(!defined($rname)) { $rname = $sRec->{name}; }
   		if($time && $sRec->{time}) {
     		if($time lt $sRec->{time}) { $time = $sRec->{time}; }
     	} else {
@@ -1815,7 +1823,7 @@ sub HAL_AvgReadingValueFn($$) {
   	$ret->{value} = $retVal;
   	$ret->{unit} = $unit;
   	$ret->{time} = $time;
-  	#$ret->{reading_name} = $rname;
+  	#$ret->{name} = $rname;
   	return $ret;
   }
   return undef;
@@ -1840,7 +1848,7 @@ sub HAL_MinReadingValueFn($$) {
   		  $mVal = $sVal;
   		  $unit = $sRec->{unit};
   		  $time = $sRec->{time};
-  		  $rname = $sRec->{reading};
+  		  $rname = $sRec->{name};
   		}
   	}
   }
@@ -1848,7 +1856,7 @@ sub HAL_MinReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	#$ret->{reading_name} = $rname;
+	#$ret->{name} = $rname;
 	return $ret;
 }
 
@@ -1871,7 +1879,7 @@ sub HAL_MaxReadingValueFn($$) {
   		  $mVal = $sVal;
   		  $unit = $sRec->{unit};
   		  $time = $sRec->{time};
-  		  $rname = $sRec->{reading};
+  		  $rname = $sRec->{name};
   		}
   	}
   }
@@ -1879,7 +1887,7 @@ sub HAL_MaxReadingValueFn($$) {
 	$ret->{value} = $mVal;
 	$ret->{unit} = $unit;
 	$ret->{time} = $time;
-	#$ret->{reading_name} = $rname;
+	#$ret->{name} = $rname;
 	return $ret;
 }
 
@@ -2127,10 +2135,10 @@ sub HAL_WinCombiStateValueFn($$) {
 #--- Methods: Base ------------------------------------------------------------
   
  # >>> Commands
-my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|dump]",
-            "sensor (sensorname) all*|(readingname) [plain*|full|value|time|dump]",
-            "rooms",
-            "sensors [(roomname)]",
+my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|brief|dump]",
+            "sensor (sensorname) all*|(readingname) [plain*|full|value|time|brief|dump]",
+            "rooms [rexExp|all*]",
+            "sensors [(roomname)|all*] [regExp|dead]",
             "dump (roomname|sensorname)");
 my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1};
 sub myCtrlDev_Initialize($$)
@@ -2178,7 +2186,7 @@ sub CommandMGet($$$) {
 	my $showmod2 = shift(@line);
 	#$showmod2 = '' unless defined $showmod2;
 	
-	my $ret=undef;
+	my $ret={};
 	my @retOrder=();
 	
 	if($modifier eq 'room') {
@@ -2202,11 +2210,12 @@ sub CommandMGet($$$) {
 				$showmod2 = 'r' unless defined $showmod2;
 				foreach $rname (@readings) {
 				  $ret->{$rname}=CommandMGet_room($devname,$rname,$showmod,$showmod2);
-			  } 
+			  }
 		  } else {
 			  return CommandMGet_room($devname,$rname,$showmod,$showmod2);
 			}
-		}	
+		}
+		if(keys($ret)==0) {return 'no rooms found';}
 	} elsif($modifier eq 'sensor') {
 		if(!defined($devname)) {
 			return 'no sensor name provided';
@@ -2233,11 +2242,19 @@ sub CommandMGet($$$) {
 		  	return CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
 		  }
 		}
+		if(keys($ret)==0) {return 'no sensors found';}
 	} elsif($modifier eq 'rooms') {
 		my $rooms = HAL_getRoomNames();
 		foreach my $roomname (@$rooms) {
-			$ret->{$roomname}=$roomname;
+			if(!$devname || $devname eq 'all' || $roomname=~m/^$devname/) {
+				#if($roomname=~m/^$devname/) {
+					$ret->{$roomname}=$roomname;
+				#}
+			#} else {
+        #$ret->{$roomname}=$roomname;
+      }
 		}
+		if(keys($ret)==0) {return 'no rooms found';}
   } elsif($modifier eq 'sensors') {
   	my $sensors;
   	if(!defined($devname) || $devname eq 'all') {
@@ -2246,18 +2263,22 @@ sub CommandMGet($$$) {
     	$sensors = HAL_getRoomSensorNames($devname);
     }
 		foreach my $sensorname (@$sensors) {
-			if(defined($rname)) {
-				if($rname eq 'dead') {
-					if(!HAL_isSensorAlive($sensorname)) {
-            $ret->{$sensorname}=$sensorname;
-          }
-				} else {
-			    return 'unknown modifier: '.$rname;
-			  }
+  			if(defined($rname)) {
+	  			if($rname eq 'dead') {
+		  			if(!HAL_isSensorAlive($sensorname)) {
+              $ret->{$sensorname}=$sensorname;
+            }
+				  } else {
+				  	if($sensorname=~m/^$rname/) {
+			      #return 'unknown modifier: '.$rname;
+			        $ret->{$sensorname}=$sensorname;
+			      }
+			    }
 			} else {
 			  $ret->{$sensorname}=$sensorname;
 			}
 		}
+		if(keys($ret)==0) {return 'no sensors found';}
   } elsif($modifier eq 'dump') {
   	my $rec;
   	my $type;
@@ -2296,7 +2317,7 @@ sub CommandMGet($$$) {
       }
 	  }
   } else {
-  	return 'no device found';
+  	return "internal error";
   }
 	return $str;
 }
@@ -2334,7 +2355,7 @@ sub CommandMGet_format($$$) {
 	my $prefix = '';
 	$mod2 = '' unless defined $mod2;
 	$prefix .= sprintf("%-12s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
-	$prefix .= sprintf("%-12s : ", $record->{reading}) if($mod2 eq 'reading' || $mod2 eq 'r');
+	$prefix .= sprintf("%-12s : ", $record->{name}) if($mod2 eq 'reading' || $mod2 eq 'r');
 	
 	if(!$mod || $mod eq 'plain' || $mod eq 'p') {
 		return $prefix.$record->{value};
@@ -2353,8 +2374,8 @@ sub CommandMGet_format($$$) {
 	}
 	
 	if($mod eq 'full' || $mod eq 'f') {
-		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{reading}.' = '.$record->{value}.' '.$record->{unit};
-		return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
+		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{name}.' = '.$record->{value}.' '.$record->{unit};
+		return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{name});
 	}
 	
 	if($mod eq 'dump' || $mod eq 'd') {
@@ -2836,7 +2857,7 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 	
 	if ($single_reading_record) {
 		#$single_reading_record->{reading_name} = $reading; Nicht noetig
-		$single_reading_record->{reading}=$reading; #XXX? So nicht! doch?
+		$single_reading_record->{name}=$reading; #XXX? So nicht! doch?
 	  return ($device_record, $single_reading_record);
 	}
 	
@@ -2859,7 +2880,7 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
 		if(defined($new_single_reading_record )) {
 			#$new_single_reading_record->{reading_name} = $reading; #Nicht noetig
-			$new_single_reading_record->{reading}=$reading; #XXX? So nicht! doch?
+			$new_single_reading_record->{name}=$reading; #XXX? So nicht! doch?
 			return ($new_device_record2, $new_single_reading_record);
 		}
 	}
@@ -3018,7 +3039,8 @@ sub HAL_getReadingsValueRecord($$) {
     $ret->{alias}     =$record->{alias}  if defined($record->{alias});
     $ret->{fhem_name} =$device->{fhem_name} if defined($device->{fhem_name});
     $ret->{sensor}    =$device->{name};
-    $ret->{reading}   =$record->{reading}; #XXX?
+    $ret->{reading}   =$record->{name}; #XXX?
+    $ret->{record}    =$device->{name}.':'.$record->{name};
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
     return $ret;
