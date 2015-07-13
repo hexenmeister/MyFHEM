@@ -145,18 +145,18 @@ my $actornames;
   
   $rooms->{eg_flur}->{alias}     = "Flur EG";
   $rooms->{eg_flur}->{fhem_name} = "EG_Flur";
-  $rooms->{eg_flur}->{sensors}   = ["eg_fl_raumsensor","fl_eg_ms_sensor"];
+  $rooms->{eg_flur}->{sensors}   = ["eg_fl_raumsensor","fl_eg_ms_sensor",'virtual_raum_sensor_ef'];
   $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
     
   $rooms->{garage}->{alias}     = "Garage";
   $rooms->{garage}->{fhem_name} = "Garage";
-  $rooms->{garage}->{sensors}   = ["eg_ga_owts01","ga_sensor"];
+  $rooms->{garage}->{sensors}   = ["eg_ga_owts01","ga_sensor",'virtual_raum_sensor_ga'];
   $rooms->{garage}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
 
  # > OG
   $rooms->{og_flur}->{alias}="Flur OG";
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
-  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "fl_og_ms_sensor"];
+  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "fl_og_ms_sensor",'virtual_raum_sensor_of'];
   $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
@@ -294,6 +294,30 @@ my $actornames;
   $templates->{virtual_raum_sensor}->{templates}   =['virtual'];
   $templates->{virtual_raum_sensor}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
 
+  # >>> virtual_fenster (f. Beschattung)
+  $templates->{virtual_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
+  $templates->{virtual_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
+  $templates->{virtual_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
+  #$templates->{virtual_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.10}";
+  $templates->{virtual_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
+  $templates->{virtual_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
+  $templates->{virtual_fenster}->{readings}->{dim_top}->{unit} = "m";
+  #$templates->{virtual_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{0.92}";
+  $templates->{virtual_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
+  $templates->{virtual_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
+  $templates->{virtual_fenster}->{readings}->{dim_bottom}->{unit} = "m";
+  $templates->{virtual_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
+  #$templates->{virtual_fenster}->{readings}->{secure}->{FnParams} = ['eg_wz_fk01:state'];
+  $templates->{virtual_fenster}->{readings}->{secure}->{alias}   = "gesichert";
+  $templates->{virtual_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
+  $templates->{virtual_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+  #$templates->{virtual_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315]; # zu beachtender Winkel (Azimuth): von, bis
+  $templates->{virtual_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
+  $templates->{virtual_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
+  $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
+  #$templates->{virtual_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
+  $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
+  $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   
   
   # >>> Devices
@@ -384,108 +408,66 @@ my $actornames;
   $devices->{wz_wandthermostat}->{alias}     ="WZ Wandthermostat";
   $devices->{wz_wandthermostat}->{fhem_name} ="EG_WZ_WT01";
   $devices->{wz_wandthermostat}->{location}  ="wohnzimmer";
-  $devices->{wz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','readings_bat_status','hm','global'];
+  $devices->{wz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{wz_wandthermostat}->{composite} =["wz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
   $devices->{wz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
   $devices->{wz_wandthermostat_climate}->{fhem_name} ="EG_WZ_WT01_Climate";
-  $devices->{wz_wandthermostat_climate}->{templates} =['readings_th2','hm_channel','global'];  
+  $devices->{wz_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
   $devices->{sz_wandthermostat}->{alias}     ="SZ Wandthermostat";
   $devices->{sz_wandthermostat}->{fhem_name} ="OG_SZ_WT01";
-  $devices->{sz_wandthermostat}->{type}      ="HomeMatic";
   $devices->{sz_wandthermostat}->{location}  ="schlafzimmer";
-  $devices->{sz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','readings_bat_status','hm','global'];
+  $devices->{sz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{sz_wandthermostat}->{composite} =["sz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
   $devices->{sz_wandthermostat_climate}->{alias}     ="WZ Wandthermostat (Ch)";
   $devices->{sz_wandthermostat_climate}->{fhem_name} ="OG_SZ_WT01_Climate";
-  $devices->{sz_wandthermostat_climate}->{templates} =['readings_th2','hm_channel','global'];  
+  $devices->{sz_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
   $devices->{dz_wandthermostat}->{alias}     ="DZ Wandthermostat";
   $devices->{dz_wandthermostat}->{fhem_name} ="OG_DZ_WT01";
-  $devices->{dz_wandthermostat}->{type}      ="HomeMatic";
   $devices->{dz_wandthermostat}->{location}  ="duschbad";
+  $devices->{dz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{dz_wandthermostat}->{composite} =["dz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{dz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{dz_wandthermostat_climate}->{alias}     ="DZ Wandthermostat (Ch)";
   $devices->{dz_wandthermostat_climate}->{fhem_name} ="OG_DZ_WT01_Climate";
-  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{dz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{dz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{dz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{dz_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
   $devices->{bz_wandthermostat}->{alias}     ="BZ Wandthermostat";
   $devices->{bz_wandthermostat}->{fhem_name} ="OG_BZ_WT01";
-  $devices->{bz_wandthermostat}->{type}      ="HomeMatic";
   $devices->{bz_wandthermostat}->{location}  ="badezimmer";
+  $devices->{bz_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{bz_wandthermostat}->{composite} =["bz_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{bz_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{bz_wandthermostat_climate}->{alias}     ="BZ Wandthermostat (Ch)";
   $devices->{bz_wandthermostat_climate}->{fhem_name} ="OG_BZ_WT01_Climate";
-  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{bz_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{bz_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{bz_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{bz_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
   $devices->{ka_wandthermostat}->{alias}     ="KA Wandthermostat";
   $devices->{ka_wandthermostat}->{fhem_name} ="OG_KA_WT01";
-  $devices->{ka_wandthermostat}->{type}      ="HomeMatic";
   $devices->{ka_wandthermostat}->{location}  ="paula";
+  $devices->{ka_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{ka_wandthermostat}->{composite} =["ka_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{ka_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{ka_wandthermostat_climate}->{alias}     ="KA Wandthermostat (Ch)";
   $devices->{ka_wandthermostat_climate}->{fhem_name} ="OG_KA_WT01_Climate";
-  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{ka_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{ka_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{ka_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{ka_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
   $devices->{kb_wandthermostat}->{alias}     ="KB Wandthermostat";
   $devices->{kb_wandthermostat}->{fhem_name} ="OG_KA_WT01";
-  $devices->{kb_wandthermostat}->{type}      ="HomeMatic";
   $devices->{kb_wandthermostat}->{location}  ="hanna";
+  $devices->{kb_wandthermostat}->{templates} =['readings_low_bat_limit_rt','readings_bat_level','hm','global'];
   $devices->{kb_wandthermostat}->{composite} =["kb_wandthermostat_climate"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_voltage} ->{unit}     ="V";
-  $devices->{kb_wandthermostat}->{readings}        ->{bat_status}  ->{reading}  ="battery";
   $devices->{kb_wandthermostat_climate}->{alias}     ="KB Wandthermostat (Ch)";
   $devices->{kb_wandthermostat_climate}->{fhem_name} ="OG_KB_WT01_Climate";
-  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{reading}  ="measured-temp";
-  $devices->{kb_wandthermostat_climate}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{kb_wandthermostat_climate}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{kb_wandthermostat_climate}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  $devices->{kb_wandthermostat_climate}->{templates} =['readings_th2','readings_bat_status','hm_channel','global'];  
   #<<<
   
-  
-  
-  
-  
-  
-
+  # >>>
   $devices->{virtual_sun_sensor}->{alias}       ="Virtueller Sonnen-Sensor";
-  $devices->{virtual_sun_sensor}->{type}        ="virtual";
+  $devices->{virtual_sun_sensor}->{templates}=['virtual'];
   $devices->{virtual_sun_sensor}->{location}    ="umwelt";
   $devices->{virtual_sun_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
   $devices->{virtual_sun_sensor}->{composite} =["twilight_sensor","virtual_umwelt_sensor:luminosity"]; # Verbindung mit weitere (logischen) Geräten, die eine Einheit bilden.
@@ -496,8 +478,8 @@ my $actornames;
   #<<<
   
   $devices->{twilight_sensor}->{alias}       ="Virtueller Sonnen-Sensor";
+  $devices->{twilight_sensor}->{templates}=['virtual'];
   $devices->{twilight_sensor}->{fhem_name}   ="T";
-  $devices->{twilight_sensor}->{type}        ="virtual";
   $devices->{twilight_sensor}->{location}    ="umwelt";
   $devices->{twilight_sensor}->{comment}     ="Virtueller Sensor mit (berechneten) Readings zur Steuerungszwecken.";
   $devices->{twilight_sensor}->{readings}->{azimuth} ->{reading}   ="azimuth";
@@ -516,6 +498,9 @@ my $actornames;
   $devices->{twilight_sensor}->{readings}->{sunset} ->{unit}        ="time";
   $devices->{twilight_sensor}->{readings}->{sunset} ->{alias}       ="Sonnenuntergang";
   #<<<
+  
+  
+  
   
   $devices->{virtual_umwelt_sensor}->{alias}       ="Virtuelle Umweltsensoren";
   $devices->{virtual_umwelt_sensor}->{type}        ="virtual";
@@ -557,298 +542,147 @@ my $actornames;
   $devices->{virtual_raum_sensor_ku}->{templates}   =['virtual_raum_sensor'];
   
   $devices->{virtual_raum_sensor_sz}->{alias}       ="Virtueller Raumsensor";
-  #$devices->{virtual_raum_sensor_sz}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_sz}->{location}    ="schlafzimmer";
   $devices->{virtual_raum_sensor_sz}->{templates}   =['virtual_raum_sensor'];
-  #$devices->{virtual_raum_sensor_sz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  #$devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_sz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
   
   $devices->{virtual_raum_sensor_bz}->{alias}       ="Virtueller Raumsensor";
-  #$devices->{virtual_raum_sensor_bz}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_bz}->{location}    ="badezimmer";
   $devices->{virtual_raum_sensor_bz}->{templates}   =['virtual_raum_sensor'];
-  #$devices->{virtual_raum_sensor_bz}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  #$devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_bz}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
 
   $devices->{virtual_raum_sensor_ka}->{alias}       ="Virtueller Raumsensor";
-  #$devices->{virtual_raum_sensor_ka}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_ka}->{location}    ="paula";
   $devices->{virtual_raum_sensor_ka}->{templates}   =['virtual_raum_sensor'];
-  #$devices->{virtual_raum_sensor_ka}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  #$devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_ka}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
 
   $devices->{virtual_raum_sensor_kb}->{alias}       ="Virtueller Raumsensor";
-  #$devices->{virtual_raum_sensor_kb}->{type}        ="virtual";
   $devices->{virtual_raum_sensor_kb}->{location}    ="hanna";
   $devices->{virtual_raum_sensor_kb}->{templates}   =['virtual_raum_sensor'];
-  #$devices->{virtual_raum_sensor_kb}->{comment}     ="Virtueller Sensor: Berechnet Temperaturdifferenz zw. Innen und Außen.";
-  #$devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{ValueFn} = "HAL_TempDiffOutdoorValueFn";
-  #$devices->{virtual_raum_sensor_kb}->{readings}->{outdoor_temp_diff}->{unit} = "°C";
-  
-  #TODO: Weitere Räume
-  
+    
+  $devices->{virtual_raum_sensor_ef}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_ef}->{location}    ="eg_flur";
+  $devices->{virtual_raum_sensor_ef}->{templates}   =['virtual_raum_sensor'];
+
+  $devices->{virtual_raum_sensor_of}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_of}->{location}    ="og_flur";
+  $devices->{virtual_raum_sensor_of}->{templates}   =['virtual_raum_sensor'];
+
+  $devices->{virtual_raum_sensor_ga}->{alias}       ="Virtueller Raumsensor";
+  $devices->{virtual_raum_sensor_ga}->{location}    ="garage";
+  $devices->{virtual_raum_sensor_ga}->{templates}   =['virtual_raum_sensor'];
+  #TODO: ggf. Weitere Räume
+
   # Schatten berechen: fuer X Meter Hohen Gegenstand :  {X/tan(deg2rad(50))}
-  # Fenster-Höhen: WZ: 210 (unten 92), Terrassentuer: 207, Kueche: 212
-  $devices->{virtual_wz_fenster}->{alias}    = "Wohnzimmer Fenster";
-  $devices->{virtual_wz_fenster}->{type}     = "virtual";
-  $devices->{virtual_wz_fenster}->{location} = "wohnzimmer";
-  $devices->{virtual_wz_fenster}->{comment}  = "Wohnzimmer: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: WZ
+  # Fenster-Höhen: WZ: 210 (unten 92), Terrassentuer: 207
+  $devices->{virtual_wz_fenster}->{alias}     = "Wohnzimmer Fenster";
+  $devices->{virtual_wz_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_wz_fenster}->{location}  = "wohnzimmer";
+  $devices->{virtual_wz_fenster}->{comment}   = "Wohnzimmer: Fenster: Zustand und Sonne";
   $devices->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state",
                                                 "eg_wz_rl01:level",
                                                 "twilight_sensor:azimuth,elevation",
                                                 #"virtual_umwelt_sensor",
                                                 "wz_ms_sensor:motiontime,motion15m,motion1h"];
-  
-  $devices->{virtual_wz_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_wz_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_wz_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
   $devices->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.10}";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_top}->{unit} = "m";
   $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{0.92}";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_wz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{secure}->{FnParams} = ['eg_wz_fk01:state'];
-  $devices->{virtual_wz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_wz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315]; # zu beachtender Winkel (Azimuth): von, bis
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_wz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   $devices->{virtual_wz_fenster}->{readings}->{presence}->{link} = "wz_ms_sensor:motion15m"; # PIR als Presence-Sensor verwenden
   #<<<
   
-  $devices->{virtual_wz_terrassentuer}->{alias}    = "Wohnzimmer Terrassentuer";
-  $devices->{virtual_wz_terrassentuer}->{type}     = "virtual";
-  $devices->{virtual_wz_terrassentuer}->{location} = "wohnzimmer";
-  $devices->{virtual_wz_terrassentuer}->{comment}  = "Wohnzimmer: Terrassentuer: Zustand und Sonne";
+  # >>> virtual_fenster: WZ
+  $devices->{virtual_wz_terrassentuer}->{alias}     = "Wohnzimmer Terrassentuer";
+  $devices->{virtual_wz_terrassentuer}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_wz_terrassentuer}->{location}  = "wohnzimmer";
+  $devices->{virtual_wz_terrassentuer}->{comment}   = "Wohnzimmer: Terrassentuer: Zustand und Sonne";
   $devices->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk:state",
                                                       "eg_wz_rl02:level",
                                                       "twilight_sensor:azimuth,elevation",
                                                       #"virtual_umwelt_sensor",
                                                       "wz_ms_sensor:motiontime,motion15m,motion1h"]; # TODO: Kombiniertes 2-KontaktSensor
-  
-  $devices->{virtual_wz_terrassentuer}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-
   $devices->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{ValueFn} = "{2.07}";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{unit} = "m";
   $devices->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{ValueFn} = "{0.12}";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{unit} = "m";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{ValueFn} = "{0.38}";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{alias}   = "Korrekturfaktor Wanddicke";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{comment} = "Korrektur fuer die Wand/Rolladenkasten-Dicke";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_wall_thickness}->{unit} = "m";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
-  #$devices->{virtual_wz_terrassentuer}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{FnParams} = ['eg_wz_tk:state']; # Kombiniertes 2-KontaktSensor
-  $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{FnParams} = [195,315]; # Beachten Winkel (Azimuth): von, bis
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{FnParams} = [2.07, 0.58, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_wz_terrassentuer}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   $devices->{virtual_wz_terrassentuer}->{readings}->{presence}->{link} = "wz_ms_sensor:motion15m"; # PIR als Presence-Sensor verwenden
   #<<<
   
-  $devices->{virtual_ku_fenster}->{alias}    = "Kueche Fenster";
-  $devices->{virtual_ku_fenster}->{type}     = "virtual";
-  $devices->{virtual_ku_fenster}->{location} = "kueche";
-  $devices->{virtual_ku_fenster}->{comment}  = "Kueche: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: KU
+  $devices->{virtual_ku_fenster}->{alias}     = "Kueche Fenster";
+  $devices->{virtual_ku_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_ku_fenster}->{location}  = "kueche";
+  $devices->{virtual_ku_fenster}->{comment}   = "Kueche: Fenster: Zustand und Sonne";
   $devices->{virtual_ku_fenster}->{composite} =["eg_ku_fk01:state","eg_ku_rl01:level","twilight_sensor:azimuth,elevation"
   																							#,"virtual_umwelt_sensor"
-  																							];
-  
-  $devices->{virtual_ku_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_ku_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_ku_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
+  																							];  
   $devices->{virtual_ku_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_top}->{unit} = "m";
   $devices->{virtual_ku_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_ku_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{ValueFn} = "{0.55}";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{alias}   = "Korrekturfaktor Wanddicke";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{comment} = "Korrektur fuer die Wand/Rolladenkasten-Dicke";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_wall_thickness}->{unit} = "m";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{ValueFn} = "{0.85}";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{alias}   = "Korrekturfaktor";
-  #$devices->{virtual_ku_fenster}->{readings}->{cf_sun_room_range}->{comment} = "Korrektur Anpassung";
-  $devices->{virtual_ku_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{secure}->{FnParams} = ['eg_ku_fk01:state'];
-  $devices->{virtual_ku_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_ku_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_ku_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   #<<<
   
-  $devices->{virtual_sz_fenster}->{alias}    = "Schlafzimmer Fenster";
-  $devices->{virtual_sz_fenster}->{type}     = "virtual";
-  $devices->{virtual_sz_fenster}->{location} = "schlafzimmer";
-  $devices->{virtual_sz_fenster}->{comment}  = "Schlafzimmer: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: SZ
+  $devices->{virtual_sz_fenster}->{alias}     = "Schlafzimmer Fenster";
+  $devices->{virtual_sz_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_sz_fenster}->{location}  = "schlafzimmer";
+  $devices->{virtual_sz_fenster}->{comment}   = "Schlafzimmer: Fenster: Zustand und Sonne";
   $devices->{virtual_sz_fenster}->{composite} =["og_sz_fk01:state","og_sz_rl01:level","twilight_sensor:azimuth,elevation"
   																							#,"virtual_umwelt_sensor"
   																							];
-
-  $devices->{virtual_sz_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_sz_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_sz_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
   $devices->{virtual_sz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_top}->{unit} = "m";
   $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_sz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{secure}->{FnParams} = ['og_sz_fk01:state'];
-  $devices->{virtual_sz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_sz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{FnParams} = [215,315];
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.10, 0.57, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_sz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   #<<<
   
-  $devices->{virtual_bz_fenster}->{alias}    = "Badezimmer Fenster";
-  $devices->{virtual_bz_fenster}->{type}     = "virtual";
-  $devices->{virtual_bz_fenster}->{location} = "badezimmer";
-  $devices->{virtual_bz_fenster}->{comment}  = "Badezimmer: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: BZ
+  $devices->{virtual_bz_fenster}->{alias}     = "Badezimmer Fenster";
+  $devices->{virtual_bz_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_bz_fenster}->{location}  = "badezimmer";
+  $devices->{virtual_bz_fenster}->{comment}   = "Badezimmer: Fenster: Zustand und Sonne";
   $devices->{virtual_bz_fenster}->{composite} =["og_bz_fk01:state","og_bz_rl01:level","twilight_sensor:azimuth,elevation"
   																							#,"virtual_umwelt_sensor"
-  																							];
-  $devices->{virtual_bz_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_bz_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_bz_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
+  																							];  
   $devices->{virtual_bz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_top}->{unit} = "m";
   $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_bz_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{secure}->{FnParams} = ['og_bz_fk01:state'];
-  $devices->{virtual_bz_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_bz_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_bz_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   #<<<
   
-  $devices->{virtual_ka_fenster}->{alias}    = "Kinderzimmer1 Fenster";
-  $devices->{virtual_ka_fenster}->{type}     = "virtual";
-  $devices->{virtual_ka_fenster}->{location} = "paula";
-  $devices->{virtual_ka_fenster}->{comment}  = "Kinderzimmer1: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: KA
+  $devices->{virtual_ka_fenster}->{alias}     = "Kinderzimmer1 Fenster";
+  $devices->{virtual_ka_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_ka_fenster}->{location}  = "paula";
+  $devices->{virtual_ka_fenster}->{comment}   = "Kinderzimmer1: Fenster: Zustand und Sonne";
   $devices->{virtual_ka_fenster}->{composite} =["og_ka_fk:state","og_ka_rl01:level","twilight_sensor:azimuth,elevation"
   																							#,"virtual_umwelt_sensor"
   																							];
-  
-  $devices->{virtual_ka_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_ka_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_ka_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
-  $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{unit} = "m";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_ka_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
-  $devices->{virtual_ka_fenster}->{readings}->{secure}->{FnParams} = ['og_ka_fk01:state'];
-  $devices->{virtual_ka_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_ka_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+  $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{ValueFn}     = "{2.12}";
+  $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{ValueFn}  = "{1.28}";
+  $devices->{virtual_ka_fenster}->{readings}->{secure}->{FnParams}     = ['og_ka_fk01:state'];
   $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{FnParams} = [195,315];
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 265]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_ka_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   #<<<
   
-  $devices->{virtual_kb_fenster}->{alias}    = "Kinderzimmer2 Fenster";
-  $devices->{virtual_kb_fenster}->{type}     = "virtual";
-  $devices->{virtual_kb_fenster}->{location} = "hanna";
-  $devices->{virtual_kb_fenster}->{comment}  = "Kinderzimmer2: Fenster: Zustand und Sonne";
+  # >>> virtual_fenster: KB
+  $devices->{virtual_kb_fenster}->{alias}     = "Kinderzimmer2 Fenster";
+  $devices->{virtual_kb_fenster}->{templates} = ['virtual_fenster','virtual'];
+  $devices->{virtual_kb_fenster}->{location}  = "hanna";
+  $devices->{virtual_kb_fenster}->{comment}   = "Kinderzimmer2: Fenster: Zustand und Sonne";
   $devices->{virtual_kb_fenster}->{composite} =["og_kb_fk01:state","og_kb_rl01:level","twilight_sensor:azimuth,elevation"
    																							#,"virtual_umwelt_sensor"
-   																							];
-  
-  $devices->{virtual_kb_fenster}->{readings}->{outdoor_luminosity}  ->{link} = "virtual_umwelt_sensor:luminosity";
-  $devices->{virtual_kb_fenster}->{readings}->{outdoor_temperature} ->{link} = "virtual_umwelt_sensor:temperature";
-  $devices->{virtual_kb_fenster}->{readings}->{outdoor_humidity}    ->{link} = "virtual_umwelt_sensor:humidity";
-  
-  $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{alias}   = "Hoehe";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{unit} = "m";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{alias}   = "Hoehe";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{comment} = "Hoehe ueber den Boden";
-  $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{unit} = "m";
-  $devices->{virtual_kb_fenster}->{readings}->{secure}->{ValueFn} = 'HAL_WinSecureStateValueFn';
-  $devices->{virtual_kb_fenster}->{readings}->{secure}->{FnParams} = ['og_kb_fk01:state'];
-  $devices->{virtual_kb_fenster}->{readings}->{secure}->{alias}   = "gesichert";
-  $devices->{virtual_kb_fenster}->{readings}->{secure}->{comment} = "Nicht offen oder gekippt";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{ValueFn} = 'HAL_WinSunnySideValueFn';
+   																							];  
+  $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{ValueFn}     = "{2.12}";
+  $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{ValueFn}  = "{1.28}";
+  $devices->{virtual_kb_fenster}->{readings}->{secure}->{FnParams}     = ['og_kb_fk01:state'];
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{alias}   = "Sonnenseite";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{comment} = "Sonne strahlt ins Fenster (Sonnenseite (und nicht Nacht))";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{ValueFn} = 'HAL_WinSunRoomRangeValueFn';
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
-  $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   #<<<
-  
+
   $devices->{hg_sensor}->{alias}     ="Garten-Sensor";
   $devices->{hg_sensor}->{fhem_name} ="GSD_1.4";
   $devices->{hg_sensor}->{type}      ="GSD";
@@ -2247,11 +2081,7 @@ sub CommandMGet($$$) {
 		my $rooms = HAL_getRoomNames();
 		foreach my $roomname (@$rooms) {
 			if(!$devname || $devname eq 'all' || $roomname=~m/^$devname/) {
-				#if($roomname=~m/^$devname/) {
 					$ret->{$roomname}=$roomname;
-				#}
-			#} else {
-        #$ret->{$roomname}=$roomname;
       }
 		}
 		if(keys($ret)==0) {return 'no rooms found';}
@@ -2261,6 +2091,7 @@ sub CommandMGet($$$) {
       $sensors = HAL_getSensorNames();
     } else {
     	$sensors = HAL_getRoomSensorNames($devname);
+    	if(scalar($sensors) == 0) {return "no room '$devname' or no sensors in room"; }
     }
 		foreach my $sensorname (@$sensors) {
   			if(defined($rname)) {
@@ -2270,7 +2101,6 @@ sub CommandMGet($$$) {
             }
 				  } else {
 				  	if($sensorname=~m/^$rname/) {
-			      #return 'unknown modifier: '.$rname;
 			        $ret->{$sensorname}=$sensorname;
 			      }
 			    }
@@ -2301,7 +2131,7 @@ sub CommandMGet($$$) {
 	
 	my $str='';
 	if(ref $ret eq 'HASH') {
-		@retOrder = sort(keys($ret)) unless defined(@retOrder) && $#retOrder>0;
+		@retOrder = sort(keys($ret)) unless @retOrder && $#retOrder>0;
 		foreach my $key (@retOrder) {
 		  #if($showmod ne 'full') {
       #  $str.="$key";
@@ -2354,8 +2184,8 @@ sub CommandMGet_format($$$) {
 	
 	my $prefix = '';
 	$mod2 = '' unless defined $mod2;
-	$prefix .= sprintf("%-12s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
-	$prefix .= sprintf("%-12s : ", $record->{name}) if($mod2 eq 'reading' || $mod2 eq 'r');
+	$prefix .= sprintf("%-19s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
+	$prefix .= sprintf("%-19s : ", $record->{reading}) if($mod2 eq 'reading' || $mod2 eq 'r');
 	
 	if(!$mod || $mod eq 'plain' || $mod eq 'p') {
 		return $prefix.$record->{value};
@@ -2375,7 +2205,8 @@ sub CommandMGet_format($$$) {
 	
 	if($mod eq 'full' || $mod eq 'f') {
 		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{name}.' = '.$record->{value}.' '.$record->{unit};
-		return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{name});
+		#return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
+		return $prefix.sprintf("%-11s [%s] %s",$record->{value}.' '.(defined($record->{unit})?$record->{unit}:''),$record->{time},$record->{origin});
 	}
 	
 	if($mod eq 'dump' || $mod eq 'd') {
@@ -2943,14 +2774,19 @@ sub HAL_getReadingsValueRecord($$) {
 			
 			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
 			return undef unless $readingName;
-			return HAL_getSensorValueRecord($sensorName,$readingName);
+			$ret = HAL_getSensorValueRecord($sensorName,$readingName);
+			# ggf. neue Sensor und Reading Namen (er)setzen
+			$ret->{sensor}  =$device->{name};
+      $ret->{reading} =$record->{name}; #XXX?
+			return $ret;
 		} 
-		
+
 		my $valueFn =  $record->{ValueFn};
 		if($valueFn) {
 	    if($valueFn=~m/\{.*\}/) {
 	    	# Klammern: direkt evaluieren
 	      $val= eval $valueFn;	
+	      $time=TimeNow(); # Aktuelle Zeit
 	    } else {
 	    	no strict "refs";
         my $r = &{$valueFn}($device,$record);
@@ -2958,9 +2794,11 @@ sub HAL_getReadingsValueRecord($$) {
         if(ref $r eq ref {}) {
         	# wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
         	$ret = $r;
+        	$time=TimeNow() unless defined $ret->{time}; # Aktuelle Zeit, es sei denn, time wurde definiert
         } else {
         	# Scalar-Wert annehmen
         	$val=$r;
+        	$time=TimeNow(); # Aktuelle Zeit
         }
 	    }
 			#TODO
@@ -3040,7 +2878,7 @@ sub HAL_getReadingsValueRecord($$) {
     $ret->{fhem_name} =$device->{fhem_name} if defined($device->{fhem_name});
     $ret->{sensor}    =$device->{name};
     $ret->{reading}   =$record->{name}; #XXX?
-    $ret->{record}    =$device->{name}.':'.$record->{name};
+    $ret->{origin}    =$device->{name}.':'.$record->{name}; # Ursprung
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
     return $ret;
