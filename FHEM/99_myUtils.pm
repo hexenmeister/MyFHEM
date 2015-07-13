@@ -1651,5 +1651,17 @@ sub IstGewitter($)
   }
 }
 
+sub plan($$) {
+      my ($p, $n)= @_;
+      my $departure= ReadingsVal($p,"plan_departure_$n","");
+      my $arrival= ReadingsVal($p,"plan_arrival_$n","");
+      my $ddelay_= ReadingsVal($p,"plan_departure_delay_$n","none");
+      my $ddelay= ($ddelay_ eq "none" ? "" : "( $ddelay_)");
+      my $adelay_= ReadingsVal($p,"plan_arrival_delay_$n","none");
+      my $adelay= ($adelay_ eq "none" ? "" : "( $adelay_)");
+      my $conn= ReadingsVal($p,"plan_connection_$n","");
+      my $change= ReadingsVal($p,"plan_travel_change_$n",0);
+      return sprintf("%s%s - %s%s   %s %sx", $departure, $ddelay, $arrival, $adelay, $conn, $change);
+}
 
 1;
