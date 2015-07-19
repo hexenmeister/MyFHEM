@@ -501,37 +501,38 @@ my $actornames;
   
   
   
-  
+  # >>>
   $devices->{virtual_umwelt_sensor}->{alias}       ="Virtuelle Umweltsensoren";
-  $devices->{virtual_umwelt_sensor}->{type}        ="virtual";
+  #$devices->{virtual_umwelt_sensor}->{type}        ="virtual";
   $devices->{virtual_umwelt_sensor}->{location}    ="umwelt";
   $devices->{virtual_umwelt_sensor}->{comment}     ="Virtueller Sensor: Berechnet Max. Helligkeit mehreren Sensoren, Durchschnittstemperatur etc.";
+  $devices->{virtual_umwelt_sensor}->{templates}   =['readings_th','readings_lux','readings_dewpoint','virtual'];
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
-  $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{unit} = "Lx";
-  $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{unit} = "Lx";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{alias} = "Kombiniertes Lichtsensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{unit} = "°C";
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{unit} = "°C";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{alias} = "Kombiniertes Temperatursensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{FnParams} = ["um_hh_licht_th:humidity"];#["um_hh_licht_th:humidity", "hg_sensor:humidity"];
-  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{unit} = "% rH";
-  $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{unit} = "% rH";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{alias} = "Kombiniertes Feuchtesensor";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
-  $devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{ValueFn} = "HAL_TaupunktValueFn";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{ValueFn} = "HAL_TaupunktValueFn";
   #$devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{unit} = "°C";
   #$devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{FnParams} = ["temperature", "humidity"];
-  $devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{alias}   = "Taupunkt";
-  $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{ValueFn} = "HAL_AbsFeuchteValueFn";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{dewpoint}->{alias}   = "Taupunkt";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{ValueFn} = "HAL_AbsFeuchteValueFn";
   #$devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{unit} = "g/m3";
-  $devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
   #<<<
-    
+
 	# >>> Virtuelle Raumsensoren  
   $devices->{virtual_raum_sensor_wz}->{alias}       ="Virtueller Raumsensor: WZ";
   $devices->{virtual_raum_sensor_wz}->{location}    ="wohnzimmer";
@@ -577,10 +578,7 @@ my $actornames;
   $devices->{virtual_wz_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_wz_fenster}->{location}  = "wohnzimmer";
   $devices->{virtual_wz_fenster}->{comment}   = "Wohnzimmer: Fenster: Zustand und Sonne";
-  $devices->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state",
-                                                "eg_wz_rl01:level",
-                                                "twilight_sensor:azimuth,elevation",
-                                                #"virtual_umwelt_sensor",
+  $devices->{virtual_wz_fenster}->{composite} =["eg_wz_fk01:state","eg_wz_rl01:level","twilight_sensor:azimuth,elevation",
                                                 "wz_ms_sensor:motiontime,motion15m,motion1h"];
   $devices->{virtual_wz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.10}";
   $devices->{virtual_wz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{0.92}";
@@ -595,10 +593,7 @@ my $actornames;
   $devices->{virtual_wz_terrassentuer}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_wz_terrassentuer}->{location}  = "wohnzimmer";
   $devices->{virtual_wz_terrassentuer}->{comment}   = "Wohnzimmer: Terrassentuer: Zustand und Sonne";
-  $devices->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk:state",
-                                                      "eg_wz_rl02:level",
-                                                      "twilight_sensor:azimuth,elevation",
-                                                      #"virtual_umwelt_sensor",
+  $devices->{virtual_wz_terrassentuer}->{composite} =["eg_wz_tk:state","eg_wz_rl02:level","twilight_sensor:azimuth,elevation",
                                                       "wz_ms_sensor:motiontime,motion15m,motion1h"]; # TODO: Kombiniertes 2-KontaktSensor
   $devices->{virtual_wz_terrassentuer}->{readings}->{dim_top}->{ValueFn} = "{2.07}";
   $devices->{virtual_wz_terrassentuer}->{readings}->{dim_bottom}->{ValueFn} = "{0.12}";
@@ -613,9 +608,7 @@ my $actornames;
   $devices->{virtual_ku_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_ku_fenster}->{location}  = "kueche";
   $devices->{virtual_ku_fenster}->{comment}   = "Kueche: Fenster: Zustand und Sonne";
-  $devices->{virtual_ku_fenster}->{composite} =["eg_ku_fk01:state","eg_ku_rl01:level","twilight_sensor:azimuth,elevation"
-  																							#,"virtual_umwelt_sensor"
-  																							];  
+  $devices->{virtual_ku_fenster}->{composite} =["eg_ku_fk01:state","eg_ku_rl01:level","twilight_sensor:azimuth,elevation"];  
   $devices->{virtual_ku_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
   $devices->{virtual_ku_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
   $devices->{virtual_ku_fenster}->{readings}->{secure}->{FnParams} = ['eg_ku_fk01:state'];
@@ -628,9 +621,7 @@ my $actornames;
   $devices->{virtual_sz_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_sz_fenster}->{location}  = "schlafzimmer";
   $devices->{virtual_sz_fenster}->{comment}   = "Schlafzimmer: Fenster: Zustand und Sonne";
-  $devices->{virtual_sz_fenster}->{composite} =["og_sz_fk01:state","og_sz_rl01:level","twilight_sensor:azimuth,elevation"
-  																							#,"virtual_umwelt_sensor"
-  																							];
+  $devices->{virtual_sz_fenster}->{composite} =["og_sz_fk01:state","og_sz_rl01:level","twilight_sensor:azimuth,elevation"];
   $devices->{virtual_sz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
   $devices->{virtual_sz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
   $devices->{virtual_sz_fenster}->{readings}->{secure}->{FnParams} = ['og_sz_fk01:state'];
@@ -643,9 +634,7 @@ my $actornames;
   $devices->{virtual_bz_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_bz_fenster}->{location}  = "badezimmer";
   $devices->{virtual_bz_fenster}->{comment}   = "Badezimmer: Fenster: Zustand und Sonne";
-  $devices->{virtual_bz_fenster}->{composite} =["og_bz_fk01:state","og_bz_rl01:level","twilight_sensor:azimuth,elevation"
-  																							#,"virtual_umwelt_sensor"
-  																							];  
+  $devices->{virtual_bz_fenster}->{composite} =["og_bz_fk01:state","og_bz_rl01:level","twilight_sensor:azimuth,elevation"];  
   $devices->{virtual_bz_fenster}->{readings}->{dim_top}->{ValueFn} = "{2.12}";
   $devices->{virtual_bz_fenster}->{readings}->{dim_bottom}->{ValueFn} = "{1.28}";
   $devices->{virtual_bz_fenster}->{readings}->{secure}->{FnParams} = ['og_bz_fk01:state'];
@@ -658,9 +647,7 @@ my $actornames;
   $devices->{virtual_ka_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_ka_fenster}->{location}  = "paula";
   $devices->{virtual_ka_fenster}->{comment}   = "Kinderzimmer1: Fenster: Zustand und Sonne";
-  $devices->{virtual_ka_fenster}->{composite} =["og_ka_fk:state","og_ka_rl01:level","twilight_sensor:azimuth,elevation"
-  																							#,"virtual_umwelt_sensor"
-  																							];
+  $devices->{virtual_ka_fenster}->{composite} =["og_ka_fk:state","og_ka_rl01:level","twilight_sensor:azimuth,elevation"];
   $devices->{virtual_ka_fenster}->{readings}->{dim_top}->{ValueFn}     = "{2.12}";
   $devices->{virtual_ka_fenster}->{readings}->{dim_bottom}->{ValueFn}  = "{1.28}";
   $devices->{virtual_ka_fenster}->{readings}->{secure}->{FnParams}     = ['og_ka_fk01:state'];
@@ -673,15 +660,14 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{templates} = ['virtual_fenster','virtual'];
   $devices->{virtual_kb_fenster}->{location}  = "hanna";
   $devices->{virtual_kb_fenster}->{comment}   = "Kinderzimmer2: Fenster: Zustand und Sonne";
-  $devices->{virtual_kb_fenster}->{composite} =["og_kb_fk01:state","og_kb_rl01:level","twilight_sensor:azimuth,elevation"
-   																							#,"virtual_umwelt_sensor"
-   																							];  
+  $devices->{virtual_kb_fenster}->{composite} =["og_kb_fk01:state","og_kb_rl01:level","twilight_sensor:azimuth,elevation"];  
   $devices->{virtual_kb_fenster}->{readings}->{dim_top}->{ValueFn}     = "{2.12}";
   $devices->{virtual_kb_fenster}->{readings}->{dim_bottom}->{ValueFn}  = "{1.28}";
   $devices->{virtual_kb_fenster}->{readings}->{secure}->{FnParams}     = ['og_kb_fk01:state'];
   $devices->{virtual_kb_fenster}->{readings}->{sunny_side}->{FnParams} = [43,144];
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   #<<<
+
 
   $devices->{hg_sensor}->{alias}     ="Garten-Sensor";
   $devices->{hg_sensor}->{fhem_name} ="GSD_1.4";
