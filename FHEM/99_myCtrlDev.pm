@@ -121,8 +121,8 @@ my $actornames;
  # > EG 
   $rooms->{wohnzimmer}->{alias}     = "Wohnzimmer";
   $rooms->{wohnzimmer}->{fhem_name} = "Wohnzimmer";
-  $rooms->{wohnzimmer}->{sensors}   = ["wz_raumsensor","wz_wandthermostat",
-                                       "tt_sensor","wz_ms_sensor",
+  $rooms->{wohnzimmer}->{sensors}   = ["wz_ms_sensor","wz_raumsensor","wz_wandthermostat",
+                                       "tt_sensor",
                                        "eg_wz_fk01","eg_wz_tk",
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
@@ -156,7 +156,7 @@ my $actornames;
  # > OG
   $rooms->{og_flur}->{alias}="Flur OG";
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
-  $rooms->{og_flur}->{sensors}=["og_fl_raumsensor", "fl_og_ms_sensor",'virtual_raum_sensor_of'];
+  $rooms->{og_flur}->{sensors}=["fl_og_ms_sensor", "og_fl_raumsensor", 'virtual_raum_sensor_of'];
   $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
@@ -1927,7 +1927,7 @@ sub HAL_WinCombiStateValueFn($$) {
     			$retVal = $state;
     		  $retTime = $time;
     	  } else { # gleiche
-    	  	$retTime = $time if($retTime lt $time);
+    	  	$retTime = $time if(!defined($retTime)||$retTime lt $time);
     	  }
     	} elsif ($state eq 'tilted') {
       	if($retVal eq 'closed') {
@@ -1936,11 +1936,11 @@ sub HAL_WinCombiStateValueFn($$) {
     	  } elsif ($retVal eq 'open') {
     	  	# NOP
       	} else { # gleiche
-    	  	$retTime = $time if($retTime lt $time);
+    	  	$retTime = $time if(!defined($retTime)||$retTime lt $time);
     	  }
     	} else { # closed
     		if($retVal eq 'closed') {
-    		  $retTime = $time if($retTime lt $time);
+    		  $retTime = $time if(!defined($retTime)||$retTime lt $time);
     	  }
     	}
     }    	
@@ -2780,6 +2780,8 @@ sub HAL_getReadingsValueRecord($$) {
         if(ref $r eq ref {}) {
         	# wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
         	$ret = $r;
+        	#Log 3,"+++++++++++++++++> D: ".Dumper($ret);
+        	$time=$ret->{time};
         	$time=TimeNow() unless defined $ret->{time}; # Aktuelle Zeit, es sei denn, time wurde definiert
         } else {
         	# Scalar-Wert annehmen
@@ -2789,7 +2791,7 @@ sub HAL_getReadingsValueRecord($$) {
 	    }
 			#TODO
 			#$val="not implemented";
-			
+			#Log 3,"+++++++++++++++++> D: ".Dumper($time);
 		}
 		else
 		{
@@ -2803,7 +2805,7 @@ sub HAL_getReadingsValueRecord($$) {
     
     $ret->{value}     =$val if(defined $val);
     $val = $ret->{value};
-    
+    #Log 3,"+++++++++++++++++> D: ".Dumper($ret);
     # ValueFilterFn
     my $valueFilterFn =  $record->{ValueFilterFn};
     if($valueFilterFn) {
