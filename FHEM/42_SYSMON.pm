@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 8856 2015-06-28 19:34:09Z hexenmeister $
+# $Id: 42_SYSMON.pm 8890 2015-07-05 10:16:19Z hexenmeister $
 
 package main;
 
@@ -1163,7 +1163,7 @@ SYSMON_obtainParameters_intern($$)
     # nur lokal abfragen (macht remote keinen Sinn)
     if ($mode eq 'local') {
       # Perl version
-      $map->{+PERL_VERSION} = "$]";
+      $map->{+PERL_VERSION} = "$^V";
     }
     
     if(SYSMON_isProcFS($hash)) {
