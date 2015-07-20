@@ -319,6 +319,9 @@ my $actornames;
   $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   
+  $templates->{gsd}->{type}      ='GSD';
+  $templates->{gsd}->{templates} = ['readings_th','readings_dewpoint','readings_bat_level'];
+
   
   # >>> Devices
   #$devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
@@ -668,62 +671,64 @@ my $actornames;
   $devices->{virtual_kb_fenster}->{readings}->{sunny_room_range}->{FnParams} = [2.12, 0.55, 85]; # Hoehe zum Berechnen des Sonneneinstrahlung, Wanddicke, SonnenWinkel: Elevation bei 90° Winkel zu Fenster (fuer Berechnungen: Wanddicke)
   #<<<
 
-
   $devices->{hg_sensor}->{alias}     ="Garten-Sensor";
   $devices->{hg_sensor}->{fhem_name} ="GSD_1.4";
-  $devices->{hg_sensor}->{type}      ="GSD";
+  $devices->{hg_sensor}->{templates} =['gsd'];
+  #$devices->{hg_sensor}->{type}     ="GSD";
   $devices->{hg_sensor}->{location}  ="garten";
-  $devices->{hg_sensor}->{act_cycle} ="600"; 
-  $devices->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{hg_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{hg_sensor}->{act_cycle} ="600"; 
+  #$devices->{hg_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$devices->{hg_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$devices->{hg_sensor}->{readings}->{temperature} ->{unit}     ="°C";
   #$devices->{hg_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{hg_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{hg_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
   #$devices->{hg_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{hg_sensor}->{readings}->{bat_voltage} ->{reading}  ="batteryLevel";
-  $devices->{hg_sensor}->{readings}->{bat_voltage} ->{unit}     ="V";
+  #$devices->{hg_sensor}->{readings}->{bat_voltage} ->{reading}  ="batteryLevel";
+  #$devices->{hg_sensor}->{readings}->{bat_voltage} ->{unit}     ="V";
   #$devices->{hg_sensor}->{readings}->{bat_voltage} ->{act_cycle} ="600"; 
-  $devices->{hg_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{hg_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{hg_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$devices->{hg_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{hg_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{hg_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   #$devices->{hg_sensor}->{readings}->{dewpoint}    ->{act_cycle} ="600"; 
   #<<<
   
   $devices->{tt_sensor}->{alias}     ="Test-Sensor";
   $devices->{tt_sensor}->{fhem_name} ="GSD_1.1";
-  $devices->{tt_sensor}->{type}      ="GSD";
+  $devices->{tt_sensor}->{templates} =['gsd'];
+  #$devices->{tt_sensor}->{type}      ="GSD";
   $devices->{tt_sensor}->{location}  ="wohnzimmer";
-  $devices->{tt_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{tt_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{tt_sensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{tt_sensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $devices->{tt_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{tt_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{tt_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{tt_sensor}->{readings}->{bat_voltage}  ->{reading} ="batteryLevel";
-  $devices->{tt_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
-  $devices->{tt_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{tt_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{tt_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$devices->{tt_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$devices->{tt_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$devices->{tt_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{tt_sensor}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  #$devices->{tt_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{tt_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{tt_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$devices->{tt_sensor}->{readings}->{bat_voltage}  ->{reading} ="batteryLevel";
+  #$devices->{tt_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
+  #$devices->{tt_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{tt_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{tt_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   #<<<
   
   $devices->{of_sensor}->{alias}     ="OG AR Sensor";
   $devices->{of_sensor}->{fhem_name} ="GSD_1.3";
-  $devices->{of_sensor}->{type}      ="GSD";
+  $devices->{of_sensor}->{templates} =['gsd'];
+  #$devices->{of_sensor}->{type}      ="GSD";
   $devices->{of_sensor}->{location}  ="OG_AR";
-  $devices->{of_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{of_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{of_sensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{of_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{of_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{of_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{of_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{of_sensor}->{readings}->{bat_voltage}  ->{reading} ="batteryLevel";
-  $devices->{of_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
-  $devices->{of_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{of_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{of_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
+  #$devices->{of_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$devices->{of_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$devices->{of_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{of_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  #$devices->{of_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{of_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{of_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$devices->{of_sensor}->{readings}->{bat_voltage}  ->{reading} ="batteryLevel";
+  #$devices->{of_sensor}->{readings}->{bat_voltage}  ->{unit}    ="V";
+  #$devices->{of_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{of_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{of_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
   #<<<
   
   $devices->{ga_sensor}->{alias}     ="Garage Kombisensor";
