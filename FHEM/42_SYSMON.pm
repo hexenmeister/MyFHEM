@@ -38,7 +38,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.4";
+my $VERSION = "2.2.5";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -1488,8 +1488,10 @@ SYSMON_getUserDefined($$$$)
   
   my $out_str = "";
   foreach my $k (@out_arr) {
-    chomp($k);
-    $out_str.=$k." ";
+  	if(defined($k)) {
+      chomp($k);
+      $out_str.=$k." ";
+    }
   }
   #my $out_str = join(" ",@out_arr);
   ##my $out_str = SYSMON_execute($hash, $uCmd);
