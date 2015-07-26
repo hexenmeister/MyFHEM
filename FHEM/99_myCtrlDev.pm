@@ -319,9 +319,53 @@ my $actornames;
   $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{alias}   = "Sonnenreichweite";
   $templates->{virtual_fenster}->{readings}->{sunny_room_range}->{comment} = "Wie weit die Sonne ins Zimmer hineinragt (auf dem Boden)";
   
+  #>>> GSD (Eigenbau, depricated)
   $templates->{gsd}->{type}      ='GSD';
   $templates->{gsd}->{templates} = ['readings_th','readings_dewpoint','readings_bat_level'];
 
+  #>>> Readings: Motion (Basis)
+  $templates->{readings_motion}->{readings}->{motion}         ->{reading}   ="motion";
+  $templates->{readings_motion}->{readings}->{motion}         ->{alias}     ="Bewegungsmelder";
+  $templates->{readings_motion}->{readings}->{motion}         ->{unit_type} ="ENUM: on";
+  $templates->{readings_motion}->{readings}->{motiontime_str} ->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $templates->{readings_motion}->{readings}->{motiontime}     ->{ValueFn}   = "HAL_MotionTimeValueFn";
+  #$templates->{readings_motion}->{readings}->{motiontime}     ->{FnParams}  = "motion";
+  $templates->{readings_motion}->{readings}->{motiontime}     ->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  $templates->{readings_motion}->{readings}->{motiontime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
+  #>>> Readings: Motion (letzte Minute)
+  $templates->{readings_motion_1m}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  $templates->{readings_motion_1m}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  $templates->{readings_motion_1m}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  $templates->{readings_motion_1m}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  #>>> Readings: Motion (letzten 15 Minuten)
+  $templates->{readings_motion_15m}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  $templates->{readings_motion_15m}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  $templates->{readings_motion_15m}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  $templates->{readings_motion_15m}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  #>>> Readings: Motion (letzte Stunde)
+  $templates->{readings_motion_1h}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  $templates->{readings_motion_1h}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  $templates->{readings_motion_1h}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  $templates->{readings_motion_1h}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  #>>> Readings: Motion (letzten 12 Stunden)
+  $templates->{readings_motion_12h}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  $templates->{readings_motion_12h}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  $templates->{readings_motion_12h}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  $templates->{readings_motion_12h}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  #>>> Readings: Motion (letzten 24 Stunden)
+  $templates->{readings_motion_24h}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  $templates->{readings_motion_24h}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  $templates->{readings_motion_24h}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  $templates->{readings_motion_24h}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+
+  #>>> MySensors (Eigenbau)  
+  $templates->{ms_base}->{type}              ="MySensors";
+  $templates->{ms_combi_th}->{templates}     =['ms_base','readings_th','readings_dewpoint'];
+  $templates->{ms_combi_lux}->{templates}    =['ms_base','readings_lux'];
+  $templates->{ms_combi_lux}->{readings}->{luminosity}->{reading}="brightness";
+  $templates->{ms_combi_motion}->{templates} =['ms_base','readings_motion','readings_motion_1m','readings_motion_15m','readings_motion_1h','readings_motion_12h','readings_motion_24h'];
+  $templates->{ms_combi_lmth}->{templates} =['ms_combi_th','ms_combi_lux','ms_combi_motion'];
+  #<<<
   
   # >>> Devices
   #$devices->{vr_luftdruck}->{alias}     ="Luftdrucksensor";
@@ -689,56 +733,59 @@ my $actornames;
   $devices->{of_sensor}->{location}  ="OG_AR";
   #<<<
   
+
+  
   $devices->{ga_sensor}->{alias}     ="Garage Kombisensor";
   $devices->{ga_sensor}->{fhem_name} ="EG_GA_MS01";
-  $devices->{ga_sensor}->{type}      ="MySensors";
+  $devices->{ga_sensor}->{templates} =['ms_combi_lmth'];
+  #$devices->{ga_sensor}->{type}      ="MySensors";
   $devices->{ga_sensor}->{location}  ="garage";
-  $devices->{ga_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
-  $devices->{ga_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $devices->{ga_sensor}->{readings}->{temperature} ->{unit}     ="°C";
-  $devices->{ga_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
-  $devices->{ga_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
-  $devices->{ga_sensor}->{readings}->{humidity}    ->{alias}    ="rel. Feuchte";
-  $devices->{ga_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
-  $devices->{ga_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
-  $devices->{ga_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
-  $devices->{ga_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
-  $devices->{ga_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt"; 
-  $devices->{ga_sensor}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
-  $devices->{ga_sensor}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
-  $devices->{ga_sensor}->{readings}->{absFeuchte}  ->{alias}    ="Abs. Feuchte";
-  $devices->{ga_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
-  $devices->{ga_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
-  $devices->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
-  $devices->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
-  $devices->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
-  $devices->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
-  $devices->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  $devices->{ga_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
-  $devices->{ga_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
-  #$devices->{ga_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
-  $devices->{ga_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
-  $devices->{ga_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
-  $devices->{ga_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
-  $devices->{ga_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
-  $devices->{ga_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
-  $devices->{ga_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
-  $devices->{ga_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
-  $devices->{ga_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
-  $devices->{ga_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
-  $devices->{ga_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
-  $devices->{ga_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
-  $devices->{ga_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
-  $devices->{ga_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
-  $devices->{ga_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  $devices->{ga_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
-  $devices->{ga_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
-  $devices->{ga_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
-  $devices->{ga_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$devices->{ga_sensor}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$devices->{ga_sensor}->{readings}->{temperature} ->{unit}     ="°C";
+  #$devices->{ga_sensor}->{readings}->{temperature} ->{act_cycle} ="600";
+  #$devices->{ga_sensor}->{readings}->{humidity}    ->{reading}  ="humidity";
+  #$devices->{ga_sensor}->{readings}->{humidity}    ->{alias}    ="rel. Feuchte";
+  #$devices->{ga_sensor}->{readings}->{humidity}    ->{unit}     ="% rH";
+  #$devices->{ga_sensor}->{readings}->{humidity}    ->{act_cycle} ="600"; 
+  #$devices->{ga_sensor}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
+  #$devices->{ga_sensor}->{readings}->{dewpoint}    ->{unit}     ="°C";
+  #$devices->{ga_sensor}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt"; 
+  #$devices->{ga_sensor}->{readings}->{absFeuchte}  ->{reading}  ="absFeuchte";
+  #$devices->{ga_sensor}->{readings}->{absFeuchte}  ->{unit}     ="g/m3";
+  #$devices->{ga_sensor}->{readings}->{absFeuchte}  ->{alias}    ="Abs. Feuchte";
+  #$devices->{ga_sensor}->{readings}->{luminosity}  ->{reading}  ="brightness";
+  #$devices->{ga_sensor}->{readings}->{luminosity}  ->{alias}    ="Lichtintesität";
+  #$devices->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="RANGE: 0-120000";  
+  #$devices->{ga_sensor}->{readings}->{luminosity}  ->{unit}     ="Lx (*)";
+  #$devices->{ga_sensor}->{readings}->{motion}      ->{reading}   ="motion";
+  #$devices->{ga_sensor}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
+  #$devices->{ga_sensor}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
+  #$devices->{ga_sensor}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  #$devices->{ga_sensor}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
+  ##$devices->{ga_sensor}->{readings}->{motiontime}->{FnParams}  = "motion";
+  #$devices->{ga_sensor}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
+  #$devices->{ga_sensor}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
+  #$devices->{ga_sensor}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
+  #$devices->{ga_sensor}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
+  #$devices->{ga_sensor}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
+  #$devices->{ga_sensor}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
+  #$devices->{ga_sensor}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
+  #$devices->{ga_sensor}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
+  #$devices->{ga_sensor}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
+  #$devices->{ga_sensor}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
+  #$devices->{ga_sensor}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
+  #$devices->{ga_sensor}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
+  #$devices->{ga_sensor}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
+  #$devices->{ga_sensor}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  #$devices->{ga_sensor}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
+  #$devices->{ga_sensor}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
+  #$devices->{ga_sensor}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
+  #$devices->{ga_sensor}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
   #<<<
   
   $devices->{wz_ms_sensor}->{alias}     ="WZ MS Kombisensor";
