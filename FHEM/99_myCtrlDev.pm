@@ -281,12 +281,18 @@ my $actornames;
   $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{level}   = '3';
 
   # >>> ... mit Temp/Hum
-  $templates->{readings_th}->{templates}=['readings_dewpoint'];
-  $templates->{readings_th}->{readings}->{temperature} ->{reading}  ="temperature";
-  $templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
-  $templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
-  $templates->{readings_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
-  $templates->{readings_th}->{readings}->{temperature} ->{level}    ='1';
+  $templates->{readings_temperature}->{readings}->{temperature} ->{reading}  ="temperature";
+  $templates->{readings_temperature}->{readings}->{temperature} ->{unit}     ="°C";
+  $templates->{readings_temperature}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  $templates->{readings_temperature}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  $templates->{readings_temperature}->{readings}->{temperature} ->{level}    ='1';
+  
+  $templates->{readings_th}->{templates}=['readings_temperature','readings_dewpoint'];
+  #$templates->{readings_th}->{readings}->{temperature} ->{reading}  ="temperature";
+  #$templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
+  #$templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
+  #$templates->{readings_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  #$templates->{readings_th}->{readings}->{temperature} ->{level}    ='1';
   $templates->{readings_th}->{readings}->{humidity}    ->{reading}  ="humidity";
   $templates->{readings_th}->{readings}->{humidity}    ->{unit}     ="% rH";
   $templates->{readings_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
@@ -393,6 +399,12 @@ my $actornames;
   $templates->{ms_combi_motion}->{templates} =['ms_base','readings_motion_set'];
   $templates->{ms_combi_lm}->{templates}   =['ms_combi_lux','ms_combi_motion'];
   $templates->{ms_combi_lmth}->{templates} =['ms_combi_th','ms_combi_lux','ms_combi_motion'];
+  #<<<
+  
+  #>>> OneWire
+  $templates->{owx_base}->{type}      ="OneWire";
+  $templates->{owx_temp}->{templates} =['readings_temperature','owx_base'];
+  $templates->{owx_temp}->{readings}->{temperature}->{ValueFilterFn} ='HAL_round1';
   #<<<
   
   # >>> Devices
@@ -788,102 +800,79 @@ my $actornames;
   
   $devices->{um_vh_bw_licht}->{alias}     ="Bewegungsmelder (Vorgarten)";
   $devices->{um_vh_bw_licht}->{fhem_name} ="UM_VH_HMBL01.Eingang";
-  $devices->{um_vh_bw_licht}->{type}      ="HomeMatic";
+  $devices->{um_vh_bw_licht}->{templates} =['hm'];
+  #$devices->{um_vh_bw_licht}->{type}      ="HomeMatic";
   $devices->{um_vh_bw_licht}->{location}  ="umwelt";
   $devices->{um_vh_bw_licht}->{readings}->{brightness}  ->{reading}   ="brightness";
   $devices->{um_vh_bw_licht}->{readings}->{brightness}  ->{alias}     ="Helligkeit";
   $devices->{um_vh_bw_licht}->{readings}->{brightness}  ->{unit}      ="RANGE: 0-250";
   $devices->{um_vh_bw_licht}->{readings}->{brightness}  ->{act_cycle} ="600";
+  $devices->{um_vh_bw_licht}->{readings}->{brightness}  ->{level} ='2';
   #<<<
   
   $devices->{um_vh_bw_motion}->{alias}     ="Bewegungsmelder (Vorgarten)";
   $devices->{um_vh_bw_motion}->{fhem_name} ="UM_VH_HMBL01.Eingang";
   $devices->{um_vh_bw_motion}->{templates} =['hm','readings_bat_status','readings_motion_set'];
-  #$devices->{um_vh_bw_motion}->{type}      ="HomeMatic";
   $devices->{um_vh_bw_motion}->{location}  ="vorgarten";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion}      ->{reading}   ="motion";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion}      ->{alias}     ="Bewegungsmelder";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion}      ->{unit_type} ="ENUM: on";
-  #$devices->{um_vh_bw_motion}->{readings}->{motiontime_str}->{ValueFn}   = "HAL_MotionTimeStrValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motiontime}->{ValueFn}   = "HAL_MotionTimeValueFn";
-  ##$devices->{um_vh_bw_motion}->{readings}->{motiontime}->{FnParams}  = "motion";
-  #$devices->{um_vh_bw_motion}->{readings}->{motiontime}->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
-  #$devices->{um_vh_bw_motion}->{readings}->{motiontime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
-  #$devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{reading}   ="battery";
-  #$devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{alias}     ="Batteriezustand";
-  #$devices->{um_vh_bw_motion}->{readings}->{bat_status}  ->{unit_type} ="ENUM: ok,low";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
-  #$devices->{um_vh_bw_motion}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
-  #$devices->{um_vh_bw_motion}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
-  #$devices->{um_vh_bw_motion}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
-  #$devices->{um_vh_bw_motion}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
   #<<<
   
+  #>>> OneWire
   $devices->{um_vh_owts01}->{alias}     ="OWX Aussentemperatur";
   $devices->{um_vh_owts01}->{fhem_name} ="UM_VH_OWTS01.Luft";
-  $devices->{um_vh_owts01}->{type}      ="OneWire";
+  $devices->{um_vh_owts01}->{templates} =['owx_temp'];
+  #$devices->{um_vh_owts01}->{type}      ="OneWire";
   $devices->{um_vh_owts01}->{location}  ="umwelt";
-  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  $devices->{um_vh_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
+  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_ga_owts01}->{alias}     ="OWX Garage";
   $devices->{eg_ga_owts01}->{fhem_name} ="EG_GA_OWTS01.Raum";
-  $devices->{eg_ga_owts01}->{type}      ="OneWire";
+  $devices->{eg_ga_owts01}->{templates} =['owx_temp'];
+  #$devices->{eg_ga_owts01}->{type}      ="OneWire";
   $devices->{eg_ga_owts01}->{location}  ="garage";
-  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  $devices->{eg_ga_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
+  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_fl_owts01}->{alias}     ="OWX Flur";
   $devices->{eg_fl_owts01}->{fhem_name} ="EG_FL_OWTS01.Raum";
-  $devices->{eg_fl_owts01}->{type}      ="OneWire";
+  $devices->{eg_fl_owts01}->{templates} =['owx_temp'];
+  #$devices->{eg_fl_owts01}->{type}      ="OneWire";
   $devices->{eg_fl_owts01}->{location}  ="eg_flur";
-  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  $devices->{eg_fl_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
+  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_wc_owts01}->{alias}     ="OWX Gäste WC";
   $devices->{eg_wc_owts01}->{fhem_name} ="EG_WC_OWTS01.Raum";
-  $devices->{eg_wc_owts01}->{type}      ="OneWire";
+  $devices->{eg_wc_owts01}->{templates} =['owx_temp'];
+  #$devices->{eg_wc_owts01}->{type}      ="OneWire";
   $devices->{eg_wc_owts01}->{location}  ="wc";
-  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  $devices->{eg_wc_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
+  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_ha_owts01}->{alias}     ="OWX HWR";
   $devices->{eg_ha_owts01}->{fhem_name} ="EG_HA_OWTS01.Raum_Oben";
-  $devices->{eg_ha_owts01}->{type}      ="OneWire";
+  $devices->{eg_ha_owts01}->{templates} =['owx_temp'];
+  #$devices->{eg_ha_owts01}->{type}      ="OneWire";
   $devices->{eg_ha_owts01}->{location}  ="hwr";
-  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  $devices->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
+  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
+  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
+  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
+  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
+  #TODO: template
   $devices->{eg_ku_rl01}->{alias}     ="Rollo";
   $devices->{eg_ku_rl01}->{fhem_name} ="ku_rollo";
   $devices->{eg_ku_rl01}->{type}      ="HomeMatic";
