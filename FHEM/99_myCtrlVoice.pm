@@ -241,8 +241,10 @@ sub speakWetterDaten(;$) {
   my($art)=@_;
   if(!defined($art)){$art=1;}
   # TODO: Sauber / Abstraktionslayer erstellen
-  my $temp = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
-  my $humi = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
+  #my $temp = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","temperature","unbekannt")));
+  #my $humi = myCtrlVoice_prepareNumToSpeak(rundeZahl0(ReadingsVal("GSD_1.4","humidity","unbekannt")));
+  my $temp = myCtrlVoice_prepareNumToSpeak(rundeZahl0(HAL_getRoomReadingValue('umwelt','temperature')));
+  my $humi = myCtrlVoice_prepareNumToSpeak(rundeZahl0(HAL_getRoomReadingValue('umwelt','humidity')));
   if($art==0) {
     #speak("Aussentemperatur ".$temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
     speak($temp." Grad. Feuchtigkeit ".$humi." Prozent.",0);
