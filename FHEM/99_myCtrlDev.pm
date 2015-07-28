@@ -231,18 +231,29 @@ my $actornames;
   $templates->{hm_raumsensor_general}->{type}='HomeMatic compatible';
   $templates->{hm_raumsensor_general}->{templates}=['hm'];
   # >>> mit Bat-Messung
+  $templates->{readings_bat_voltage_base}->{readings}->{bat_voltage} ->{reading} =undef;
+  $templates->{readings_bat_voltage_base}->{readings}->{bat_voltage} ->{unit}    ="V";
+  $templates->{readings_bat_voltage_base}->{readings}->{bat_voltage} ->{alias}   ="Batterie-Spannung";
+  # 0 (reserved / unknown), 1 (Hauptwerte. Temp,Hum,..), 2 (primär, wichtig. Licht,..), 3 (sekunder, wichtig. Taupunkt, AbsFeuchte,..), 4 (info, weniger wichtig. BatLevel,..) 5 (technik, weniger wichtig. BatLowLimit,..) 6 (technik / debug)
+  $templates->{readings_bat_voltage_base}->{readings}->{bat_voltage} ->{level}   ='4'; 
+  
+  $templates->{readings_bat_voltage}->{templates} =['readings_bat_voltage_base'];
   $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{reading} ="batVoltage";
-  $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{unit}    ="V";
-  $templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{alias}   ="Batterie-Spannung";
+  #$templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{unit}    ="V";
+  #$templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{alias}   ="Batterie-Spannung";
+  #$templates->{readings_bat_voltage}->{readings}->{bat_voltage} ->{level}   ='4'; 
   # >>>
+  $templates->{readings_bat_level}->{templates} =['readings_bat_voltage_base'];
   $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{reading}   ="batteryLevel";
-  $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{unit}      ="V";
-  $templates->{readings_bat_level}->{readings}->{bat_voltage} ->{alias}     ="Batterie-Spannung";
+  #$templates->{readings_bat_level}->{readings}->{bat_voltage} ->{unit}      ="V";
+  #$templates->{readings_bat_level}->{readings}->{bat_voltage} ->{alias}     ="Batterie-Spannung";
+  #$templates->{readings_bat_level}->{readings}->{bat_voltage} ->{level}     ='5';
   # >>> LowBatLimit-Template
   $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{reading}       =undef;
   $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{ValueFilterFn} ='{(split(/\s/,$VAL))[0]}';
   $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{unit}          ="V";
   $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{alias}         ="Spannungsrenze für schwache Batterie";
+  $templates->{readings_low_bat_limit}->{readings}->{low_bat_limit} ->{level}         ='5';
   # >>> LowBatLimit-RT
   $templates->{readings_low_bat_limit_rt}->{readings}->{low_bat_limit} ->{reading}       ="R-lowBatLimitRT";
   $templates->{readings_low_bat_limit_rt}->{templates}=['readings_low_bat_limit'];
@@ -252,18 +263,22 @@ my $actornames;
   # >>> 
   $templates->{readings_bat_status}->{readings}->{bat_status}  ->{reading}  ="battery";
   $templates->{readings_bat_status}->{readings}->{bat_status}  ->{alias}    ="Batterie-Status";
+  $templates->{readings_bat_status}->{readings}->{bat_status}  ->{level}    ='4';
 
   # >>> ... mit Lux-Messung
   $templates->{readings_lux}->{readings}->{luminosity}->{reading}  ="luminosity";
   $templates->{readings_lux}->{readings}->{luminosity}->{alias}    ="Lichtintesität";
   $templates->{readings_lux}->{readings}->{luminosity}->{unit}     ="Lx (*)";
   $templates->{readings_lux}->{readings}->{luminosity}->{act_cycle} ="600"; 
+  $templates->{readings_lux}->{readings}->{luminosity}->{level}    ='2';
   
   # >>> ... Erweiterung fuer TH-Readings um Taupunkt und ABs.Feuchte
   $templates->{readings_dewpoint}->{readings}->{dewpoint}->{ValueFn}   = "HAL_TaupunktValueFn";
   $templates->{readings_dewpoint}->{readings}->{dewpoint}->{alias}     = "Taupunkt";
+  $templates->{readings_dewpoint}->{readings}->{dewpoint}->{level}     = '3';
   $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{ValueFn} = "HAL_AbsFeuchteValueFn";
   $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
+  $templates->{readings_dewpoint}->{readings}->{absFeuchte}->{level}   = '3';
 
   # >>> ... mit Temp/Hum
   $templates->{readings_th}->{templates}=['readings_dewpoint'];
@@ -271,10 +286,12 @@ my $actornames;
   $templates->{readings_th}->{readings}->{temperature} ->{unit}     ="°C";
   $templates->{readings_th}->{readings}->{temperature} ->{alias}    ="Temperatur";
   $templates->{readings_th}->{readings}->{temperature} ->{act_cycle} ="600"; # Zeit in Sekunden ohne Rückmeldung, dann wird Device als 'dead' erklaert.
+  $templates->{readings_th}->{readings}->{temperature} ->{level}    ='1';
   $templates->{readings_th}->{readings}->{humidity}    ->{reading}  ="humidity";
   $templates->{readings_th}->{readings}->{humidity}    ->{unit}     ="% rH";
   $templates->{readings_th}->{readings}->{humidity}    ->{alias}    ="Luftfeuchtigkeit";
   $templates->{readings_th}->{readings}->{humidity}    ->{act_cycle} ="600";
+  $templates->{readings_th}->{readings}->{humidity}    ->{level}    ='1';
   #$templates->{readings_th}->{readings}->{dewpoint}    ->{reading}  ="dewpoint";
   #$templates->{readings_th}->{readings}->{dewpoint}    ->{unit}     ="°C";
   #$templates->{readings_th}->{readings}->{dewpoint}    ->{alias}    ="Taupunkt";
@@ -327,36 +344,44 @@ my $actornames;
   $templates->{readings_motion}->{readings}->{motion}         ->{reading}   ="motion";
   $templates->{readings_motion}->{readings}->{motion}         ->{alias}     ="Bewegungsmelder";
   $templates->{readings_motion}->{readings}->{motion}         ->{unit_type} ="ENUM: on";
+  $templates->{readings_motion}->{readings}->{motion}         ->{level}     ='6';
   $templates->{readings_motion}->{readings}->{motiontime_str} ->{ValueFn}   = "HAL_MotionTimeStrValueFn";
+  $templates->{readings_motion}->{readings}->{motiontime_str} ->{level}     = '2';
   $templates->{readings_motion}->{readings}->{motiontime}     ->{ValueFn}   = "HAL_MotionTimeValueFn";
   #$templates->{readings_motion}->{readings}->{motiontime}     ->{FnParams}  = "motion";
   $templates->{readings_motion}->{readings}->{motiontime}     ->{alias}     = "Zeit in Sekunden seit der letzten Bewegung";
   $templates->{readings_motion}->{readings}->{motiontime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Bewegung erkannt wurde";
+  $templates->{readings_motion}->{readings}->{motiontime}     ->{level}     = '2';
   #>>> Readings: Motion (letzte Minute)
   $templates->{readings_motion_1m}->{readings}->{motion1m}->{ValueFn}   = "HAL_MotionValueFn";
   $templates->{readings_motion_1m}->{readings}->{motion1m}->{FnParams}  = [60, "motion"];
   $templates->{readings_motion_1m}->{readings}->{motion1m}->{alias}     = "Bewegung in der letzten Minute";
   $templates->{readings_motion_1m}->{readings}->{motion1m}->{comment}   = "gibt an, ob in der letzten Minute eine Bewegung erkannt wurde";
+  $templates->{readings_motion_1m}->{readings}->{motion1m}->{level}     = '3';
   #>>> Readings: Motion (letzten 15 Minuten)
   $templates->{readings_motion_15m}->{readings}->{motion15m}->{ValueFn}  = "HAL_MotionValueFn";
   $templates->{readings_motion_15m}->{readings}->{motion15m}->{FnParams} = [900, "motion"];
   $templates->{readings_motion_15m}->{readings}->{motion15m}->{alias}    = "Bewegung in den letzten 15 Minuten";
   $templates->{readings_motion_15m}->{readings}->{motion15m}->{comment}  = "gibt an, ob in den letzten 15 Minuten eine Bewegung erkannt wurde";
+  $templates->{readings_motion_15m}->{readings}->{motion15m}->{level}     = '3';
   #>>> Readings: Motion (letzte Stunde)
   $templates->{readings_motion_1h}->{readings}->{motion1h}->{ValueFn}   = "HAL_MotionValueFn";
   $templates->{readings_motion_1h}->{readings}->{motion1h}->{FnParams}  = [3600, "motion"];
   $templates->{readings_motion_1h}->{readings}->{motion1h}->{alias}     = "Bewegung in der letzten Stunde";
   $templates->{readings_motion_1h}->{readings}->{motion1h}->{comment}   = "gibt an, ob in der letzten Stunde eine Bewegung erkannt wurde";
+  $templates->{readings_motion_1h}->{readings}->{motion1h}->{level}     = '3';
   #>>> Readings: Motion (letzten 12 Stunden)
   $templates->{readings_motion_12h}->{readings}->{motion12h}->{ValueFn}  = "HAL_MotionValueFn";
   $templates->{readings_motion_12h}->{readings}->{motion12h}->{FnParams} = [43200, "motion"];
   $templates->{readings_motion_12h}->{readings}->{motion12h}->{alias}    = "Bewegung in den letzten 12 Stunden";
   $templates->{readings_motion_12h}->{readings}->{motion12h}->{comment}  = "gibt an, ob in den letzten 12 Stunden eine Bewegung erkannt wurde";
+  $templates->{readings_motion_12h}->{readings}->{motion12h}->{level}    = '3';
   #>>> Readings: Motion (letzten 24 Stunden)
   $templates->{readings_motion_24h}->{readings}->{motion24h}->{ValueFn}  = "HAL_MotionValueFn";
   $templates->{readings_motion_24h}->{readings}->{motion24h}->{FnParams} = [86400, "motion"];
   $templates->{readings_motion_24h}->{readings}->{motion24h}->{alias}    = "Bewegung in den letzten 24 Stunden";
   $templates->{readings_motion_24h}->{readings}->{motion24h}->{comment}  = "gibt an, ob in den letzten 24 Stunden eine Bewegung erkannt wurde";
+  $templates->{readings_motion_24h}->{readings}->{motion24h}->{level}    = '3';
 
   #>>> MySensors (Eigenbau)  
   $templates->{ms_base}->{type}              ="MySensors";
@@ -1819,8 +1844,8 @@ sub HAL_WinCombiStateValueFn($$) {
 #--- Methods: Base ------------------------------------------------------------
   
  # >>> Commands
-my @usage = ("[room] (roomname) all*|(readingname) [plain*|full|value|time|brief|dump]",
-            "sensor (sensorname) all*|(readingname) [plain*|full|value|time|brief|dump]",
+my @usage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
+            "sensor (sensorname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
             "rooms [rexExp|all*]",
             "sensors [(roomname)|all*] [regExp|dead]",
             "dump (roomname|sensorname)");
@@ -1881,22 +1906,24 @@ sub CommandMGet($$$) {
 	  	# all als Default
 			$rname = 'all';
 		}
-	  if($rname eq 'all') {
+	  #if($rname eq 'all') {
+	  if($rname=~m/all(:\d+)*$/) {
+	  	my(undef,$level)=split(/:/,$rname);
 			my @readings = HAL_getRoomSensorReadingsList($devname);
-			$showmod2 = 'r' unless defined $showmod2;
+			$showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
 			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_room($devname,$rname,$showmod,$showmod2);
+				$ret->{$rname}=CommandMGet_room($devname,$rname,int($level),$showmod,$showmod2);
 			}
 		} else {
 			my @readings = split(/,/,$rname);
 			if(@readings && $#readings>0) {
 				@retOrder = @readings;
-				$showmod2 = 'r' unless defined $showmod2;
+				$showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
 				foreach $rname (@readings) {
-				  $ret->{$rname}=CommandMGet_room($devname,$rname,$showmod,$showmod2);
+				  $ret->{$rname}=CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
 			  }
 		  } else {
-			  return CommandMGet_room($devname,$rname,$showmod,$showmod2);
+			  return CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
 			}
 		}
 		if(keys($ret)==0) {return 'no rooms found';}
@@ -1908,11 +1935,13 @@ sub CommandMGet($$$) {
 			# all als Default
 			$rname = 'all';
 		}
-		if($rname eq 'all') {
+		#if($rname eq 'all') {
+		if($rname=~m/all(:\d+)*$/) {
+			my(undef,$level)=split(/:/,$rname);
 			my @readings = HAL_getSensorReadingsList($devname);
 			$showmod2 = 'r' unless defined $showmod2;
 			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
+				$ret->{$rname}=CommandMGet_sensor($devname,$rname,int($level),$showmod,$showmod2);
 			}
 		} else {
 			my @readings = split(/,/,$rname);
@@ -1920,10 +1949,10 @@ sub CommandMGet($$$) {
 				@retOrder = @readings;
 				$showmod2 = 'r' unless defined $showmod2;
 				foreach $rname (@readings) {
-				  $ret->{$rname}=CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
+				  $ret->{$rname}=CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
 			  } 
 		  } else {
-		  	return CommandMGet_sensor($devname,$rname,$showmod,$showmod2);
+		  	return CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
 		  }
 		}
 		if(keys($ret)==0) {return 'no sensors found';}
@@ -2002,27 +2031,43 @@ sub CommandMGet($$$) {
 	return $str;
 }
 
-sub CommandMGet_room($$$$) {
-	my($name, $readingname, $mod, $mod2) = @_;
+sub CommandMGet_room($$$$$) {
+	my($name, $readingname, $level, $mod, $mod2) = @_;
 
 	my $record = HAL_getRoomReadingRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown room or reading: $name:$readingname";
 	}
-	
+	# ggf. nach Level filtern
+	if($level) { # 0 oder nichts (letzteres sollte nicht sein)
+		my $rlevel = $record->{level};
+		if(defined($rlevel)) {
+			if(int($rlevel)>$level) {
+				return undef;
+			}
+		}
+	}
 	return CommandMGet_format($record,$mod,$mod2);
 	
 	#return HAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
 }
 
-sub CommandMGet_sensor($$$$) {
-	my($name, $readingname, $mod, $mod2) = @_;
+sub CommandMGet_sensor($$$$$) {
+	my($name, $readingname, $level, $mod, $mod2) = @_;
 
 	my $record = HAL_getSensorValueRecord($name, $readingname);
 	if(!defined($record)) {
 		return "unknown sensor or reading: $name:$readingname";
 	}
-	
+	# ggf. nach Level filtern
+	if($level) { # 0 oder nichts (letzteres sollte nicht sein)
+		my $rlevel = $record->{level};
+		if(defined($rlevel)) {
+			if(int($rlevel)>$level) {
+				return undef;
+			}
+		}
+	}
 	return CommandMGet_format($record,$mod,$mod2);
 	
 	#return HAL_getSensorReadingValue($name, $readingname);
@@ -2647,6 +2692,8 @@ sub HAL_getReadingsValueRecord($$) {
         	#Log 3,"+++++++++++++++++> D: ".Dumper($ret);
         	$time=$ret->{time};
         	$time=TimeNow() unless defined $ret->{time}; # Aktuelle Zeit, es sei denn, time wurde definiert
+        	$ret->{level} = $record->{level} unless defined($ret->{level});
+        	#Log 3,"+++++++++++++++++> D: ".Dumper($record);
         } else {
         	# Scalar-Wert annehmen
         	$val=$r;
@@ -2726,7 +2773,8 @@ sub HAL_getReadingsValueRecord($$) {
     }
     
     $ret->{unit}      =$record->{unit} if defined($record->{unit});
-    $ret->{alias}     =$record->{alias}  if defined($record->{alias});
+    $ret->{alias}     =$record->{alias} if defined($record->{alias});
+    $ret->{level}     =defined($record->{level})?$record->{level}:'0' unless defined($ret->{level});#$record->{level} if defined($record->{level});
     $ret->{fhem_name} =$device->{fhem_name} if defined($device->{fhem_name});
     $ret->{sensor}    =$device->{name};
     $ret->{reading}   =$record->{name}; #XXX?
