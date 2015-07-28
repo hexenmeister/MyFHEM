@@ -820,56 +820,31 @@ my $actornames;
   $devices->{um_vh_owts01}->{alias}     ="OWX Aussentemperatur";
   $devices->{um_vh_owts01}->{fhem_name} ="UM_VH_OWTS01.Luft";
   $devices->{um_vh_owts01}->{templates} =['owx_temp'];
-  #$devices->{um_vh_owts01}->{type}      ="OneWire";
   $devices->{um_vh_owts01}->{location}  ="umwelt";
-  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  #$devices->{um_vh_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_ga_owts01}->{alias}     ="OWX Garage";
   $devices->{eg_ga_owts01}->{fhem_name} ="EG_GA_OWTS01.Raum";
   $devices->{eg_ga_owts01}->{templates} =['owx_temp'];
-  #$devices->{eg_ga_owts01}->{type}      ="OneWire";
   $devices->{eg_ga_owts01}->{location}  ="garage";
-  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  #$devices->{eg_ga_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_fl_owts01}->{alias}     ="OWX Flur";
   $devices->{eg_fl_owts01}->{fhem_name} ="EG_FL_OWTS01.Raum";
   $devices->{eg_fl_owts01}->{templates} =['owx_temp'];
-  #$devices->{eg_fl_owts01}->{type}      ="OneWire";
   $devices->{eg_fl_owts01}->{location}  ="eg_flur";
-  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  #$devices->{eg_fl_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_wc_owts01}->{alias}     ="OWX Gäste WC";
   $devices->{eg_wc_owts01}->{fhem_name} ="EG_WC_OWTS01.Raum";
   $devices->{eg_wc_owts01}->{templates} =['owx_temp'];
-  #$devices->{eg_wc_owts01}->{type}      ="OneWire";
   $devices->{eg_wc_owts01}->{location}  ="wc";
-  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  #$devices->{eg_wc_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   $devices->{eg_ha_owts01}->{alias}     ="OWX HWR";
   $devices->{eg_ha_owts01}->{fhem_name} ="EG_HA_OWTS01.Raum_Oben";
   $devices->{eg_ha_owts01}->{templates} =['owx_temp'];
-  #$devices->{eg_ha_owts01}->{type}      ="OneWire";
   $devices->{eg_ha_owts01}->{location}  ="hwr";
-  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{reading}  ="temperature";
-  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{unit}     ="°C";
-  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{ValueFilterFn} ='HAL_round1';
-  #$devices->{eg_ha_owts01}->{readings}->{temperature}  ->{alias}    ="Temperatur";
   #<<<
   
   #TODO: template
