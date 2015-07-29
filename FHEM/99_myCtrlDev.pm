@@ -20,6 +20,7 @@ sub HAL_getRoomNames();
 #sub HAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
 #sub HAL_getActions(;$); # <DevName>
 
+sub HAL_getRoomActorNames($);
 sub HAL_getRoomSensorNames($);
 sub HAL_getRoomOutdoorSensorNames($);
 sub HAL_getRoomSensorReadingsList($;$);
@@ -31,9 +32,11 @@ sub HAL_getRoomReadingValue($$;$$);
 
 # Device
 sub HAL_getDeviceTab();
+sub HAL_getDeviceRecord($);
 
 # Actors
 sub HAL_getActorNames();
+sub HAL_getActorRecord($);
 
 # Sensoren
 #sub HAL_getSensors();
@@ -127,6 +130,7 @@ my $actornames;
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
+  $rooms->{wohnzimmer}->{actors}=['wz_rollo_r'];
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
@@ -200,20 +204,50 @@ my $actornames;
   #$devices->{wz_rollo_r}->{class}="rollo"; # optional zum gruppieren #TODO?
   $devices->{wz_rollo_r}->{alias}="WZ Rolladen";
   $devices->{wz_rollo_r}->{fhem_name}="wz_rollo_r";
-  $devices->{wz_rollo_r}->{type}="HomeMatic compatible";
+  $devices->{wz_rollo_r}->{type}="HomeMatic";
   $devices->{wz_rollo_r}->{location}="wohnzimmer";
   #$devices->{wz_rollo_r}->{readings}->{level}="level";
   #$devices->{wz_rollo_r}->{actions}->{xxx}->{valueFn}="{...}";
-  $devices->{wz_rollo_r}->{actions}->{level}->{set}="pct";
+  $devices->{wz_rollo_r}->{actions}->{level}->{setting}="pct";
   $devices->{wz_rollo_r}->{actions}->{level}->{type}="int"; #?
   $devices->{wz_rollo_r}->{actions}->{level}->{min}="0";    #?
   $devices->{wz_rollo_r}->{actions}->{level}->{max}="100";  #?
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{hoch}->{value}="100";
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{runter}->{value}="0";
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{halb}->{value}="60";
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{nacht}->{value}="0";
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{schatten}->{valueFn}="TODO";
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias}->{schatten}->{fnParams}="TODO";
+  $devices->{wz_rollo_r}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
+
+#TODO: Verlagern
+# Sendet neuen Wert an den Aktor
+# Params:
+#   name:  Name des Aktors
+#   value: Neuer Wert
+sub HAL_setActorValue($$$) {
+	my($actorname, $actionname, $value) = @_;
+	my $actor_record = HAL_getActorRecord($actorname);
+	
+	if(!defined($actorname)) {return "no actor specified";}
+	if(!defined($actionname)) {return "no action specified";}
+	if(!defined($value)) {return "no value specified";}
+	if(!$actor_record) {return "no actor $actorname found";}
+	if(!$actor_record->{actions}) {return "no actions found in $actorname";}
+	my $action_record = $actor_record->{actions}->{$actionname};
+	if(!$action_record) {return "no action $actorname:$actionname found";}
+	# TODO: Pruefen type
+	# TODO: Pruefen Grenzen
+	# TODO: Pruefen predefined
+	# TODO: Pruefen interna
+	# 
+	#TODO :  set wz_rollo_r pct X
+	
+	my $fhem_actor_name = $actor_record->{fhem_name};
+	my $setting = $action_record->{setting};
+	return fhem("set $fhem_actor_name $setting $value");
+	#return undef;
+}
 
 
 # >>> Sensoren
@@ -1961,7 +1995,10 @@ sub CommandMGet($$$) {
     if($rec=HAL_getRoomRecord($devname)) {
       $type='ROOM';
     } elsif($rec=HAL_getSensorRecord($devname)) {
-      $type='SENSOR';
+    	if($rec->{readings} && $rec->{actions}) {$type='ACTOR+SENSOR';}
+      elsif($rec->{readings}) {$type='SENSOR';}
+      elsif($rec->{actions}) {$type='ACTOR';}
+      else {$type='UNKNOWN';}
     #} elsif($rec=HAL_getActorRecord($devname)) {
     #  #TODO: Actor
     #  $type='ACTOR';
@@ -2196,7 +2233,7 @@ sub HAL_getRoomReadingRecord_($$$) {
 	my ($roomName, $readingName, $listNameSuffix) = @_;
 	my $listName.="sensors".$listNameSuffix;
 		
-	my $sensorList = HAL_getRoomSensorNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
+	my $sensorList = HAL_getRoomDeviceNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
 	return undef unless $sensorList;
 	
 	# Wenn Reading mit Sensorname ubergeben wurde
@@ -2302,7 +2339,7 @@ sub HAL_getRoomReadingValue($$;$$) {
 }
 
 #------------------------------------------------------------------------------
-# returns Sensor-Record by name
+# returns Device-Record by name
 # Parameter: name 
 # record:
 #  X->{name}->{alias}     ="Text zur Anzeige etc.";
@@ -2312,7 +2349,7 @@ sub HAL_getRoomReadingValue($$;$$) {
 #  X->{name}->{readings}->{<readings_name>} ->{reading}  ="temperature";
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
-sub HAL_getSensorRecord($)
+sub HAL_getDeviceRecord($)
 {
 	my ($name) = @_;
 	return undef unless $name;
@@ -2321,6 +2358,18 @@ sub HAL_getSensorRecord($)
   	$ret->{name} = $name; # Name hinzufuegen
   }
 	return $ret;
+}
+
+# s. HAL_getDeviceRecord
+sub HAL_getActorRecord($) {
+	my ($name) = @_;
+	return HAL_getDeviceRecord($name);
+}
+
+# s. HAL_getDeviceRecord
+sub HAL_getSensorRecord($) {
+	my ($name) = @_;
+	return HAL_getDeviceRecord($name);
 }
 
 # Liefert HASH mit Sensor-Definitionen
@@ -2383,13 +2432,22 @@ sub HAL_getRoomNames() {
 	return \@ret;
 }
 
+# liefert Liste (Referenz) der Actoren in einem Raum (Liste der Namen)
+# Param: Raumname
+#  Beispiel:   {HAL_getRoomActorNames("wohnzimmer")->[0]}
+sub HAL_getRoomActorNames($)
+{
+	my ($roomName) = @_;
+  return HAL_getRoomDeviceNames_($roomName,"actors");	
+}
+
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
 # Param: Raumname
 #  Beispiel:   {HAL_getRoomSensorNames("wohnzimmer")->[0]}
 sub HAL_getRoomSensorNames($)
 {
 	my ($roomName) = @_;
-  return HAL_getRoomSensorNames_($roomName,"sensors");	
+  return HAL_getRoomDeviceNames_($roomName,"sensors");	
 }
 
 # liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
@@ -2398,12 +2456,12 @@ sub HAL_getRoomSensorNames($)
 sub HAL_getRoomOutdoorSensorNames($)
 {
 	my ($roomName) = @_;
-  return HAL_getRoomSensorNames_($roomName,"sensors_outdoor");	
+  return HAL_getRoomDeviceNames_($roomName,"sensors_outdoor");	
 }
 
-# liefert Referenz der Liste der Sensors in einem Raum (List der Namen)
+# liefert Referenz der Liste der Geraete in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
-sub HAL_getRoomSensorNames_($$)
+sub HAL_getRoomDeviceNames_($$)
 {
 	my ($roomName, $listName) = @_;
 	my $roomRec=HAL_getRoomRecord($roomName);
@@ -2440,7 +2498,7 @@ sub HAL_getRoomOutdoorSensorReadingsList($;$) {
 sub HAL_getRoomSensorReadingsList_($$;$) {
 	my ($roomName,$listName,$withSensorNames) = @_;
 	
-	my $snames = HAL_getRoomSensorNames_($roomName,$listName);
+	my $snames = HAL_getRoomDeviceNames_($roomName,$listName);
 	my @rnames = ();
 	#Log 3,"+++++++++++++++++> SNames: ".Dumper($snames);
 	foreach my $sname (@{$snames}) {
