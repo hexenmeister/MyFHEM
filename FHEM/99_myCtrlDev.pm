@@ -33,10 +33,14 @@ sub HAL_getRoomReadingValue($$;$$);
 # Device
 sub HAL_getDeviceTab();
 sub HAL_getDeviceRecord($);
+sub HAL_isDeviceExist($);
+sub HAL_isDeviceLowBat($);
+sub HAL_getDeviceBatStatus($);
 
 # Actors
 sub HAL_getActorNames();
 sub HAL_getActorRecord($);
+sub HAL_setActionValue($$$);
 
 # Sensoren
 #sub HAL_getSensors();
@@ -219,13 +223,14 @@ my $actornames;
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
-
+  #TODO: Coposite,Link
+  
 #TODO: Verlagern
 # Sendet neuen Wert an den Aktor
 # Params:
 #   name:  Name des Aktors
 #   value: Neuer Wert
-sub HAL_setActorValue($$$) {
+sub HAL_setActionValue($$$) {
 	my($actorname, $actionname, $value) = @_;
 	my $actor_record = HAL_getActorRecord($actorname);
 	
@@ -249,6 +254,7 @@ sub HAL_setActorValue($$$) {
 	#return undef;
 }
 
+# TODO: setRoomActionValue
 
 # >>> Sensoren
   #$templates->{global};
@@ -1203,7 +1209,7 @@ sub HAL_setActorValue($$$) {
   #<<<
 
 # >>> Actions/Scenarios
-
+# : Conditions
 
 #--- Methods: Utils ------------------------------------------------------------
 
@@ -1848,9 +1854,11 @@ sub HAL_WinCombiStateValueFn($$) {
 my @usage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
             "sensor (sensorname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
             "rooms [rexExp|all*]",
-            "sensors [(roomname)|all*] [regExp|dead]",
-            "dump (roomname|sensorname)");
-my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1};
+            "sensors [(roomname)|all*] [regExp|dead|lowbat[ info]]",
+            "dump (roomname|sensorname)",
+            "dead",
+            "lowbat");
+my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1,dead=>1,lowbat=>1};
 sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
@@ -1977,7 +1985,17 @@ sub CommandMGet($$$) {
   			if(defined($rname)) {
 	  			if($rname eq 'dead') {
 		  			if(!HAL_isSensorAlive($sensorname)) {
+		  			  # TODO: info: dead since
               $ret->{$sensorname}=$sensorname;
+            }
+				  } elsif($rname eq 'lowbat') {
+		  			if(HAL_isDeviceLowBat($sensorname)) {
+		  			  if($showmod eq 'info') {
+		  			    my $info = HAL_getDeviceBatStatus($sensorname);
+                $ret->{$sensorname}=$sensorname.' => '.$info; 
+		  			  } else {
+                $ret->{$sensorname}=$sensorname;
+              }
             }
 				  } else {
 				  	if($sensorname=~m/^$rname/) {
@@ -2008,6 +2026,21 @@ sub CommandMGet($$$) {
       return 'unknown device' unless $rec;
     }
     return $type."\n".Dumper($rec);
+  } elsif($modifier eq 'dead') {
+    my $sensors = HAL_getSensorNames();
+    foreach my $sensorname (@$sensors) {
+      if(!HAL_isSensorAlive($sensorname)) {
+        $ret->{$sensorname}=$sensorname;
+      }
+    }
+  } elsif($modifier eq 'lowbat') {
+    my $sensors = HAL_getSensorNames();
+    foreach my $sensorname (@$sensors) {
+      if(HAL_isDeviceLowBat($sensorname)) {
+        my $info = HAL_getDeviceBatStatus($sensorname);
+        $ret->{$sensorname}=$sensorname.' => '.$info;
+      }
+    }
   } else {
 		return 'unknown command';
 	}
@@ -2883,6 +2916,14 @@ sub HAL_getReadingTime($) {
 	return HAL_getSensorReadingTime($sNamem,$rName);
 }
 
+# Prueft, ob Device vorhanden ist
+#  Param: Sensorname
+sub HAL_isDeviceExist($) {
+  my($name) = @_;
+  my $record = HAL_getDeviceRecord($name);
+  return (defined($record))?1:0;
+}
+
 # Prueft, ob der Sensor alive ist (s. actCycle)
 #  Param: Sensorname
 sub HAL_isSensorAlive($) {
@@ -2894,6 +2935,60 @@ sub HAL_isSensorAlive($) {
 		}
 	}
 	return 1;
+}
+
+# Prueft, ob ein (Batterie-betriebener) Device schwache Batterie hat
+#  Param: Sensorname
+#  Return: (Status, Zusatzinfo)
+sub HAL_isDeviceLowBat($) {
+  my($name) = @_;
+  my ($stat,undef) = HAL_getDeviceBatStatus($name);
+  return ($stat eq 'low')?1:0;
+}
+
+# Liefert Batteriestatus eines (Batterie-betriebenen) Devices.
+#  Param: Sensorname
+#  Return: ok, low, non bat, unknown status: STAT, unknown limit: VOLT
+sub HAL_getDeviceBatStatus($) {
+  my($name) = @_;
+  
+  # Pruefen, ob Device existiert
+  if(!HAL_isDeviceExist($name)) {
+    return 'device not found'; 
+  }
+	
+	my $bStat = HAL_getSensorReadingValue($name,'bat_status');
+	my $bLimit = HAL_getSensorReadingValue($name,'low_bat_limit');
+	my $bVolt = HAL_getSensorReadingValue($name,'bat_voltage');
+	my $zInfo = '';
+	if(defined($bVolt)) {$zInfo = $bVolt;}
+	if(defined($bLimit)) {$zInfo .= ' / '.$bLimit;}
+	
+	if($bStat) {
+    if($bStat eq 'ok') {
+      return ('ok',$zInfo); 
+    }
+    if($bStat eq 'low') {
+      return ('low',$zInfo); 
+    }
+    
+    return 'unknown status: '.$bStat;
+	}
+	
+	if(defined($bLimit) && defined($bVolt)) {
+	  # wenn beides bekannt, kann man ausrechnen
+	  if((0+$bVolt)<=(0+$bLimit)) {
+	    return ('low',$zInfo); 
+	  } else {
+	    return ('ok',$zInfo); 
+	  }
+	} elsif(defined($bVolt)) {
+	  # wenn Voltage bekannt aber kein Limit
+	  return ('unknown',$zInfo);
+	}
+	
+	# vermutlich kein Batterie-Device
+	return ('non bat',undef);
 }
 
 # Prueft, ob Reading eines Sensors alive ist (s. actCycle)
