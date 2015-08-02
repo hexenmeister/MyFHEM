@@ -1858,7 +1858,7 @@ my @usage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|ti
             "dump (roomname|sensorname)",
             "dead",
             "lowbat");
-my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1,dead=>1,lowbat=>1};
+my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1,dead=>1,lowbat=>1,low=>1};
 sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
@@ -1986,13 +1986,15 @@ sub CommandMGet($$$) {
 	  			if($rname eq 'dead') {
 		  			if(!HAL_isSensorAlive($sensorname)) {
 		  			  # TODO: info: dead since
+		  			  
               $ret->{$sensorname}=$sensorname;
             }
-				  } elsif($rname eq 'lowbat') {
+				  } elsif($rname eq 'lowbat' || $rname eq 'low') {
 		  			if(HAL_isDeviceLowBat($sensorname)) {
 		  			  if($showmod eq 'info') {
 		  			    my $info = HAL_getDeviceBatStatus($sensorname);
-                $ret->{$sensorname}=$sensorname.' => '.$info; 
+                my $deadSt = HAL_isSensorAlive($sensorname)?'(alive)':'(dead)';
+                $ret->{$sensorname}=$sensorname.' : '.$info.' '.$deadSt;
 		  			  } else {
                 $ret->{$sensorname}=$sensorname;
               }
@@ -2033,12 +2035,13 @@ sub CommandMGet($$$) {
         $ret->{$sensorname}=$sensorname;
       }
     }
-  } elsif($modifier eq 'lowbat') {
+  } elsif($modifier eq 'low') {
     my $sensors = HAL_getSensorNames();
     foreach my $sensorname (@$sensors) {
       if(HAL_isDeviceLowBat($sensorname)) {
         my $info = HAL_getDeviceBatStatus($sensorname);
-        $ret->{$sensorname}=$sensorname.' => '.$info;
+        my $deadSt = HAL_isSensorAlive($sensorname)?'(alive)':'(dead)';
+        $ret->{$sensorname}=$sensorname.' : '.$info.' '.$deadSt;
       }
     }
   } else {
@@ -2961,8 +2964,8 @@ sub HAL_getDeviceBatStatus($) {
 	my $bLimit = HAL_getSensorReadingValue($name,'low_bat_limit');
 	my $bVolt = HAL_getSensorReadingValue($name,'bat_voltage');
 	my $zInfo = '';
-	if(defined($bVolt)) {$zInfo = $bVolt;}
-	if(defined($bLimit)) {$zInfo .= ' / '.$bLimit;}
+	if(defined($bVolt)) {$zInfo = $bVolt.' V';}
+	if(defined($bLimit)) {$zInfo .= ' / '.$bLimit.' V';}
 	
 	if($bStat) {
     if($bStat eq 'ok') {
