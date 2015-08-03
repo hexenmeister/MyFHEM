@@ -52,8 +52,12 @@ sub HAL_getSensorValueRecord($$);
 sub HAL_getSensorReadingValue($$);
 sub HAL_getSensorReadingUnit($$);
 sub HAL_getSensorReadingTime($$);
+sub HAL_getSensorReadingTimeDurationStr($$);
+sub HAL_getSensorReadingTimeDuration($$);
 sub HAL_isSensorAlive($);
 sub HAL_isReadingAlive($$);
+sub HAL_gerSensorDeadTimeDuration($);
+sub HAL_gerSensorDeadTimeDurationStr($);
 
 #TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
@@ -1985,9 +1989,13 @@ sub CommandMGet($$$) {
   			if(defined($rname)) {
 	  			if($rname eq 'dead') {
 		  			if(!HAL_isSensorAlive($sensorname)) {
-		  			  # TODO: info: dead since
-		  			  
-              $ret->{$sensorname}=$sensorname;
+		  			  # info: dead seit
+		  			  my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
+		  			  if($dauer) {
+		  			    $ret->{$sensorname}=$sensorname.' : '.$dauer;
+		  			  } else {
+                $ret->{$sensorname}=$sensorname;
+              }
             }
 				  } elsif($rname eq 'lowbat' || $rname eq 'low') {
 		  			if(HAL_isDeviceLowBat($sensorname)) {
@@ -2008,7 +2016,7 @@ sub CommandMGet($$$) {
 			  $ret->{$sensorname}=$sensorname;
 			}
 		}
-		if(keys($ret)==0) {return 'no sensors found';}
+		if(keys($ret)==0) {return 'no devices found';}
   } elsif($modifier eq 'dump') {
   	my $rec;
   	my $type;
@@ -2032,9 +2040,16 @@ sub CommandMGet($$$) {
     my $sensors = HAL_getSensorNames();
     foreach my $sensorname (@$sensors) {
       if(!HAL_isSensorAlive($sensorname)) {
-        $ret->{$sensorname}=$sensorname;
+        # info: dead seit
+			  my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
+			  if($dauer) {
+			    $ret->{$sensorname}=$sensorname.' : '.$dauer;
+			  } else {
+          $ret->{$sensorname}=$sensorname;
+        }
       }
     }
+    if(keys($ret)==0) { return 'no dead devices'; }
   } elsif($modifier eq 'low') {
     my $sensors = HAL_getSensorNames();
     foreach my $sensorname (@$sensors) {
@@ -2044,6 +2059,7 @@ sub CommandMGet($$$) {
         $ret->{$sensorname}=$sensorname.' : '.$info.' '.$deadSt;
       }
     }
+    if(keys($ret)==0) { return 'no low batteries'; }
   } else {
 		return 'unknown command';
 	}
@@ -2879,13 +2895,46 @@ sub HAL_getSensorReadingUnit($$)
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus
 # parameters: name, reading name
 # returns current readings time
-sub HAL_getSensorReadingTime($$)
-{
+sub HAL_getSensorReadingTime($$) {
 	my ($name, $reading) = @_;
 	my $h = HAL_getSensorValueRecord($name, $reading);
 	return undef unless $h;
 	return $h->{time};
 }
+
+# Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus.
+# Zurückgegeben wird die Dauer seit dem Zeitpunkt der Reading als lesbarer Text
+# parameters: name, reading name
+# returns current readings time duration
+sub HAL_getSensorReadingTimeDurationStr($$) {
+  my ($name, $reading) = @_;
+  
+  my $mTime = HAL_getSensorReadingTimeDuration($name, $reading);
+  if($mTime) {
+    my $dauerTxt = sec2Dauer($mTime);
+    return $dauerTxt;
+  }
+  
+  return undef;
+}
+
+# Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus.
+# Zurückgegeben wird die Dauer seit dem Zeitpunkt der Reading (in Sekunden).
+# parameters: name, reading name
+# returns current readings time duration
+sub HAL_getSensorReadingTimeDuration($$) {
+  my ($name, $reading) = @_;
+  
+  my $mTime = HAL_getSensorReadingTime($name, $reading);
+  if($mTime) {
+  	my $dTime = dateTime2dec($mTime);
+  	my $diffTime = time() - $dTime;
+  	return $diffTime;
+  }
+  
+  return undef;
+}
+
 
 # Liefert Record fuer eine Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
@@ -2940,6 +2989,34 @@ sub HAL_isSensorAlive($) {
 	return 1;
 }
 
+# Prueft, ob der Sensor alive ist (s. actCycle)
+# Wenn nicht, liefert Dauer seit der letzten Meldung (in Sekunden)
+#  Param: Sensorname
+sub HAL_gerSensorDeadTimeDuration($) {
+  my($name) = @_;
+	my @list = HAL_getSensorReadingsList($name);
+	foreach my $reading (@list) {
+		if(!HAL_isReadingAlive($name, $reading)) {
+			return HAL_getSensorReadingTimeDuration($name, $reading);
+		}
+	}
+	return undef;
+}
+
+# Prueft, ob der Sensor alive ist (s. actCycle)
+# Wenn nicht, liefert Dauer seit der letzten Meldung (in Sekunden)
+#  Param: Sensorname
+sub HAL_gerSensorDeadTimeDurationStr($) {
+  my($name) = @_;
+	my @list = HAL_getSensorReadingsList($name);
+	foreach my $reading (@list) {
+		if(!HAL_isReadingAlive($name, $reading)) {
+			return HAL_getSensorReadingTimeDurationStr($name, $reading);
+		}
+	}
+	return undef;
+}
+
 # Prueft, ob ein (Batterie-betriebener) Device schwache Batterie hat
 #  Param: Sensorname
 #  Return: (Status, Zusatzinfo)
@@ -2951,7 +3028,9 @@ sub HAL_isDeviceLowBat($) {
 
 # Liefert Batteriestatus eines (Batterie-betriebenen) Devices.
 #  Param: Sensorname
-#  Return: ok, low, non bat, unknown status: STAT, unknown limit: VOLT
+#  Return: Array 
+#        0: ok, low, non bat, unknown
+#        1: Info-String
 sub HAL_getDeviceBatStatus($) {
   my($name) = @_;
   
