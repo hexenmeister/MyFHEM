@@ -59,6 +59,11 @@ sub HAL_isReadingAlive($$);
 sub HAL_gerSensorDeadTimeDuration($);
 sub HAL_gerSensorDeadTimeDurationStr($);
 
+# Aliases
+sub HAL_getAliasTab();
+sub HAL_getRoomAliasTab();
+sub HAL_getDeviceAliasTab();
+
 #TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
 # 
@@ -89,9 +94,10 @@ my $rooms     = {};
 my $devices   = {};
 #my $actors    = {};
 #my $sensors   = {};
-my $actions   = {};
+my $actions   = {}; # ? Was ist der Zweck ?
 my $scenarios = {};
 my $templates = {};
+my $aliases = {};
 
 $HAL_defs->{rooms}     = $rooms;
 $HAL_defs->{devices}   = $devices;
@@ -99,7 +105,8 @@ $HAL_defs->{devices}   = $devices;
 #$HAL_defs->{sensors}   = $sensors;
 $HAL_defs->{actions}   = $actions;
 $HAL_defs->{scenarios} = $scenarios;
-$HAL_defs->{templates}   = $templates;
+$HAL_defs->{templates} = $templates;
+$HAL_defs->{aliases}   = $aliases;
 
 my $sensornames;
 my $actornames;
@@ -1215,6 +1222,15 @@ sub HAL_setActionValue($$$) {
 # >>> Actions/Scenarios
 # : Conditions
 
+# aliases
+# $aliases->{rooms}->{alias_name}="device_name";
+# $aliases->{devices}->{alias_name}="device_name";
+$aliases->{rooms}->{wz}="wohnzimmer";
+
+$aliases->{devices}->{umweltsensor}="virtual_umwelt_sensor";
+#TODO: Aliases definieren
+
+
 #--- Methods: Utils ------------------------------------------------------------
 
 sub HAL_round0($) {
@@ -1922,6 +1938,7 @@ sub CommandMGet($$$) {
 	  #if($rname eq 'all') {
 	  if($rname=~m/all(:\d+)*$/) {
 	  	my(undef,$level)=split(/:/,$rname);
+	  	$level = 3 unless defined $level;
 			my @readings = HAL_getRoomSensorReadingsList($devname);
 			$showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
 			foreach $rname (@readings) {
@@ -1951,6 +1968,7 @@ sub CommandMGet($$$) {
 		#if($rname eq 'all') {
 		if($rname=~m/all(:\d+)*$/) {
 			my(undef,$level)=split(/:/,$rname);
+			$level = 3 unless defined $level;
 			my @readings = HAL_getSensorReadingsList($devname);
 			$showmod2 = 'r' unless defined $showmod2;
 			foreach $rname (@readings) {
@@ -2089,6 +2107,8 @@ sub CommandMGet($$$) {
 
 sub CommandMGet_room($$$$$) {
 	my($name, $readingname, $level, $mod, $mod2) = @_;
+
+Log3 "TEST", 3, '>>>>>>>>>> '.$level ;
 
 	my $record = HAL_getRoomReadingRecord($name, $readingname);
 	if(!defined($record)) {
@@ -2401,14 +2421,26 @@ sub HAL_getRoomReadingValue($$;$$) {
 #  X->{name}->{readings}->{<readings_name>} ->{reading}  ="temperature";
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
-sub HAL_getDeviceRecord($)
-{
+sub HAL_getDeviceRecord($) {
 	my ($name) = @_;
 	return undef unless $name;
 	my $ret = HAL_getDeviceTab()->{$name};
 	if($ret) {
   	$ret->{name} = $name; # Name hinzufuegen
   }
+	# AliasTab-Suche
+	if(!defined($ret)) {
+	  my $alias = HAL_getDeviceAliasTab()->{$name};
+	  if(defined($alias)) {
+	    $ret =  HAL_getDeviceTab()->{$alias};
+	    if($ret) {
+	      $ret->{name} = $alias; # Echten Namen hinzufuegen
+	      $ret->{name_alias} = $name; # Alias hinzufuegen
+	    }
+	  }
+	}
+	
+	
 	return $ret;
 }
 
@@ -2427,6 +2459,21 @@ sub HAL_getSensorRecord($) {
 # Liefert HASH mit Sensor-Definitionen
 sub HAL_getDeviceTab() {
   return $devices;
+}
+
+# Liefert HASH mit Aliases
+sub HAL_getAliasTab() {
+  return $aliases;
+}
+
+# Liefert HASH mit Aliases fuer Rooms
+sub HAL_getRoomAliasTab() {
+  return HAL_getAliasTab()->{rooms};
+}
+
+# Liefert HASH mit Aliases fuer Devices
+sub HAL_getDeviceAliasTab() {
+  return HAL_getAliasTab()->{devices};
 }
 
 # Liefert Liste der Sensornamen.
@@ -2468,6 +2515,18 @@ sub HAL_getRoomRecord($) {
 	if($ret) {
   	$ret->{name} = $name; # Name hinzufuegen
   }
+  # AliasTab-Suche
+	if(!defined($ret)) {
+	  my $alias = HAL_getRoomAliasTab()->{$name};
+	  if(defined($alias)) {
+	    $ret =  HAL_getRooms()->{$alias};
+	    if($ret) {
+	      $ret->{name} = $alias; # Echten Namen hinzufuegen
+	      $ret->{name_alias} = $name; # Alias hinzufuegen
+	    }
+	  }
+	}
+  
 	return $ret;
 }
 
