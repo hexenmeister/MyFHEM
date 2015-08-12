@@ -234,6 +234,27 @@ my $actornames;
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
   $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
+  
+  $devices->{wz_licht_r}->{alias}="WZ Licht (Dimmer)";
+  $devices->{wz_licht_r}->{fhem_name}="EG_WZ_DA01_Licht_Rechts_Sw";
+  $devices->{wz_licht_r}->{type}="HomeMatic";
+  $devices->{wz_licht_r}->{location}="wohnzimmer";
+  $devices->{wz_licht_r}->{readings}->{level}->{reading} ="level";
+  $devices->{wz_licht_r}->{readings}->{level}->{alias}   ="Dimmwert";
+  $devices->{wz_licht_r}->{readings}->{level}->{unit}    ="%";
+  #$devices->{wz_licht_r}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{wz_licht_r}->{actions}->{level}->{setting}="pct";
+  $devices->{wz_licht_r}->{actions}->{level}->{type}="int"; #?
+  $devices->{wz_licht_r}->{actions}->{level}->{min}="0";    #?
+  $devices->{wz_licht_r}->{actions}->{level}->{max}="100";  #?
+  $devices->{wz_licht_r}->{actions}->{level}->{alias} = "Licht Dimmer";
+  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{an}->{value}="100";
+  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{aus}->{value}="0";
+  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{on}->{value}="100";
+  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{off}->{value}="0";
+  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
+  #$devices->{wz_licht_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  #$devices->{wz_licht_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #TODO: Coposite,Link
   
 #TODO: Verlagern
@@ -242,27 +263,43 @@ my $actornames;
 #   name:  Name des Aktors
 #   value: Neuer Wert
 sub HAL_setActionValue($$$) {
-	my($actorname, $actionname, $value) = @_;
-	my $actor_record = HAL_getActorRecord($actorname);
-	
-	if(!defined($actorname)) {return "no actor specified";}
-	if(!defined($actionname)) {return "no action specified";}
-	if(!defined($value)) {return "no value specified";}
-	if(!$actor_record) {return "no actor $actorname found";}
-	if(!$actor_record->{actions}) {return "no actions found in $actorname";}
-	my $action_record = $actor_record->{actions}->{$actionname};
-	if(!$action_record) {return "no action $actorname:$actionname found";}
-	# TODO: Pruefen type
-	# TODO: Pruefen Grenzen
-	# TODO: Pruefen predefined
-	# TODO: Pruefen interna
-	# 
-	#TODO :  set wz_rollo_r pct X
-	
-	my $fhem_actor_name = $actor_record->{fhem_name};
-	my $setting = $action_record->{setting};
-	return fhem("set $fhem_actor_name $setting $value");
-	#return undef;
+  my($actorname, $actionname, $value) = @_;
+  my $actor_record = HAL_getActorRecord($actorname);
+  
+  if(!defined($actorname)) {return "no actor specified";}
+  if(!defined($actionname)) {return "no action specified";}
+  if(!defined($value)) {return "no value specified";}
+  if(!$actor_record) {return "no actor $actorname found";}
+  if(!$actor_record->{actions}) {return "no actions found in $actorname";}
+  my $action_record = $actor_record->{actions}->{$actionname};
+  if(!$action_record) {return "no action $actorname:$actionname found";}
+  
+  my $fhem_actor_name = $actor_record->{fhem_name};
+  my $setting = $action_record->{setting};
+  
+  # wenn es eine predefined-Tabelle gibt...
+  my $predefined_record = $action_record->{predefined};
+  if(defined($predefined_record)) {
+    my $predefined_value_record = $predefined_record->{$value};
+    # ... wenn dort ein entsprechender Eintrag vorhanen ist...
+    if(defined($predefined_value_record)) { 
+      #TODO: ValueFn
+      my $predefined_value = $predefined_value_record->{value};
+      # ... dann ggf. als Wert aufnehmen.
+      if(defined($predefined_value)) { 
+        $value = $predefined_value;
+      }
+    }
+  }
+  
+  # TODO: Pruefen type
+  # TODO: Pruefen Grenzen
+  # TODO: Pruefen interna
+  # 
+  
+  
+  return fhem("set $fhem_actor_name $setting $value");
+  #return undef;
 }
 
 # TODO: setRoomActionValue
@@ -671,7 +708,7 @@ sub HAL_setActionValue($$$) {
   #$devices->{virtual_umwelt_sensor}->{readings}->{absFeuchte}->{alias}   = "Absolute Feuchte";
   #<<<
 
-	# >>> Virtuelle Raumsensoren  
+  # >>> Virtuelle Raumsensoren  
   $devices->{virtual_raum_sensor_wz}->{alias}       ="Virtueller Raumsensor: WZ";
   $devices->{virtual_raum_sensor_wz}->{location}    ="wohnzimmer";
   $devices->{virtual_raum_sensor_wz}->{templates}   =['virtual_raum_sensor'];
@@ -1234,18 +1271,18 @@ $aliases->{devices}->{umweltsensor}="virtual_umwelt_sensor";
 #--- Methods: Utils ------------------------------------------------------------
 
 sub HAL_round0($) {
-	my($val)=@_;
-	return rundeZahl0($val);
+  my($val)=@_;
+  return rundeZahl0($val);
 }
   
 sub HAL_round1($) {
-	my($val)=@_;
-	return rundeZahl1($val);
+  my($val)=@_;
+  return rundeZahl1($val);
 }
 
 sub HAL_round2($) {
-	my($val)=@_;
-	return rundeZahl2($val);
+  my($val)=@_;
+  return rundeZahl2($val);
 }
 
 # Taupunkt-MEthoden entnommen aus dewpoint-Modul
@@ -1275,21 +1312,21 @@ sub HAL_dewpoint($$) {
 }
 
 sub HAL_absFeuchte ($$) {
-	# Formeln von http://kellerlueftung.blogspot.de/p/blog-page_9.html
-	#             http://www.wettermail.de/wetter/feuchte.html
+  # Formeln von http://kellerlueftung.blogspot.de/p/blog-page_9.html
+  #             http://www.wettermail.de/wetter/feuchte.html
   my ($T, $rh) = @_;
   if (($rh < 0) || ($rh > 110)){
     Log 1, "Error dewpoint: humidity invalid: $rh";
     return "";
-	}
-	# a = 7.5, b = 237.3 für T >= 0
-	# a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  }
+  # a = 7.5, b = 237.3 für T >= 0
+  # a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
   my $a = ($T > 0) ? 7.5 : 7.6;
   my $b = ($T > 0) ? 237.3 : 240.7;
-	my $SDD = 6.1078 * 10**(($a*$T)/($b+$T));
-	my $DD  = $rh/100 * $SDD;
-	my $AF  = (10**5) * (18.016 / 8314.3) * ($DD / (273.15 + $T));
-	my $af  = sprintf( "%.1f",$AF);
+  my $SDD = 6.1078 * 10**(($a*$T)/($b+$T));
+  my $DD  = $rh/100 * $SDD;
+  my $AF  = (10**5) * (18.016 / 8314.3) * ($DD / (273.15 + $T));
+  my $af  = sprintf( "%.1f",$AF);
   return $af; # $aF = absolute Feuchte in g Wasserdampf pro m3 Luft
 }
 
@@ -1297,13 +1334,13 @@ sub HAL_absFeuchte ($$) {
 # ValueFn: Berechnet Taupunkt aus Temperatur und Feuchte
 # FnParams: Namen der Readings fuer Temperatur und Feuchte (default: 'temperature' und 'humidity')
 sub HAL_TaupunktValueFn($$) {
-	my ($device, $record) = @_;
-	my $params = $record->{FnParams};
+  my ($device, $record) = @_;
+  my $params = $record->{FnParams};
   my $tempReading = "temperature";
   my $humReading = "humidity";
   if($params) {
-  	$tempReading = @{$params}[0];
-  	$humReading = @{$params}[1];
+    $tempReading = @{$params}[0];
+    $humReading = @{$params}[1];
   }
   
   my $tRec = HAL_getSensorValueRecord($device->{name},$tempReading);
@@ -1314,16 +1351,16 @@ sub HAL_TaupunktValueFn($$) {
     my $time = $tRec->{time};
 
     if($temp && $hum) {
-		  my $val = HAL_dewpoint($temp, $hum);
-		  my $ret;
-			$ret->{value} = HAL_round0($val);
-			#Log 3,'>------------>: '.$val.', ROUND: '.$ret->{value};
-			$ret->{time} = $time;#TimeNow();
-			#$ret->{time} = TimeNow();
-			#$ret->{reading_name} = $record->{name};
-			$ret->{unit} = '°C';
-			return $ret;
-	  }
+      my $val = HAL_dewpoint($temp, $hum);
+      my $ret;
+      $ret->{value} = HAL_round0($val);
+      #Log 3,'>------------>: '.$val.', ROUND: '.$ret->{value};
+      $ret->{time} = $time;#TimeNow();
+      #$ret->{time} = TimeNow();
+      #$ret->{reading_name} = $record->{name};
+      $ret->{unit} = '°C';
+      return $ret;
+    }
   }
 
   return undef;
@@ -1332,13 +1369,13 @@ sub HAL_TaupunktValueFn($$) {
 # ValueFn: Berechnet Abs.Feuchte Taupunkt aus Temperatur und Feuchte
 # FnParams: Namen der Readings fuer Temperatur und Feuchte (default: 'temperature' und 'humidity')
 sub HAL_AbsFeuchteValueFn($$) {
-	my ($device, $record) = @_;
-	my $params = $record->{FnParams};
+  my ($device, $record) = @_;
+  my $params = $record->{FnParams};
   my $tempReading = "temperature";
   my $humReading = "humidity";
   if($params) {
-  	$tempReading = @{$params}[0];
-  	$humReading = @{$params}[1];
+    $tempReading = @{$params}[0];
+    $humReading = @{$params}[1];
   }
   
   my $tRec = HAL_getSensorValueRecord($device->{name},$tempReading);
@@ -1349,218 +1386,218 @@ sub HAL_AbsFeuchteValueFn($$) {
     my $time = $tRec->{time};
 
     if($temp && $hum) {
-		  my $val = HAL_absFeuchte($temp, $hum);
-		  my $ret;
-			$ret->{value} = HAL_round0($val);
-			$ret->{time} = $time;#TimeNow();
-			#$ret->{reading_name} = $record->{name};
-			$ret->{unit} = 'g/m3';
-			return $ret;
-	  }
+      my $val = HAL_absFeuchte($temp, $hum);
+      my $ret;
+      $ret->{value} = HAL_round0($val);
+      $ret->{time} = $time;#TimeNow();
+      #$ret->{reading_name} = $record->{name};
+      $ret->{unit} = 'g/m3';
+      return $ret;
+    }
   }
-		      
+          
   return undef;
 }
 
 # ValueFn: Berechnet, wieweit die Sonne aktuell ins Zimmer hineinstrahlt (am Boden). Beruecksichtigt nur Azimuth/Elevation, nicht die aktuelle Intensitaet.
 # FnParams: Fensterhoehe (Oberkante)
 sub HAL_WinSunRoomRangeValueFn($$) {
-	my ($device, $record) = @_;
-	my $params = $record->{FnParams};
-	
-	my $val = 0;
-	my $msg = undef;
-	
-	my $sRec = HAL_getSensorValueRecord($device->{name},'sunny_side');
-	if($sRec) {
-		my $sside = $sRec->{value};
-		if($sside==0) {
-			$val = 0;
-		  $msg = $sRec->{message};
-		} else {
-			$sRec = HAL_getSensorValueRecord($device->{name},'elevation');
-			if($sRec) {
+  my ($device, $record) = @_;
+  my $params = $record->{FnParams};
+  
+  my $val = 0;
+  my $msg = undef;
+  
+  my $sRec = HAL_getSensorValueRecord($device->{name},'sunny_side');
+  if($sRec) {
+    my $sside = $sRec->{value};
+    if($sside==0) {
+      $val = 0;
+      $msg = $sRec->{message};
+    } else {
+      $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+      if($sRec) {
       my $elevation = $sRec->{value};
-  		  my $height = @{$params}[0];
-	      $val = $height/tan(deg2rad($elevation));
-	      
-	      # Korrekturfaktor Wanddicke
-	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_wall_thickness');
-	      my $cf = @{$params}[1];
-	      #if($cf) {
-	      #	$val-=$cf;
-	      #	$val = 0 unless $val>0;
-	      #}
-	      
-	      # Winkel: Elevation bei 90° Winkel zu Fenster
-	      my $cfW = @{$params}[2];
-	      if($cfW) {
-	      	my $aRec = HAL_getSensorValueRecord($device->{name},'azimuth');
-	      	if($aRec) {
-	      		my $azimuth = $aRec->{value};
-		      	my $winkel = abs($azimuth-$cfW);
-		      	# Aus dem Winkel die neue Dicke der Wand berechen (entlang der Strahlen)
-		      	my $wdc = $cf/cos(deg2rad($winkel));
-		      	$wdc=$cf if ($wdc<$cf);
-		      	# Bei großen Winkel wird auch sehr groß. Max Fensterbreite ist aber der Begrenzender Faktor (praktisch nicht wirklich relevant).
-		      	$wdc=2 if ($wdc>2); # 2 meter annehmen
-		      	
-		      	#Log 3,'>------------>WD: '.$cf.', W: '.$winkel.', WDC: '.$wdc;
-		      	
-		      	$val-=$wdc;
-		        $val = 0 unless $val>0;
-		      }
-	      }
+        my $height = @{$params}[0];
+        $val = $height/tan(deg2rad($elevation));
+        
+        # Korrekturfaktor Wanddicke
+        #my $cf = HAL_getSensorReadingValue($device->{name},'cf_wall_thickness');
+        my $cf = @{$params}[1];
+        #if($cf) {
+        # $val-=$cf;
+        # $val = 0 unless $val>0;
+        #}
+        
+        # Winkel: Elevation bei 90° Winkel zu Fenster
+        my $cfW = @{$params}[2];
+        if($cfW) {
+          my $aRec = HAL_getSensorValueRecord($device->{name},'azimuth');
+          if($aRec) {
+            my $azimuth = $aRec->{value};
+            my $winkel = abs($azimuth-$cfW);
+            # Aus dem Winkel die neue Dicke der Wand berechen (entlang der Strahlen)
+            my $wdc = $cf/cos(deg2rad($winkel));
+            $wdc=$cf if ($wdc<$cf);
+            # Bei großen Winkel wird auch sehr groß. Max Fensterbreite ist aber der Begrenzender Faktor (praktisch nicht wirklich relevant).
+            $wdc=2 if ($wdc>2); # 2 meter annehmen
+            
+            #Log 3,'>------------>WD: '.$cf.', W: '.$winkel.', WDC: '.$wdc;
+            
+            $val-=$wdc;
+            $val = 0 unless $val>0;
+          }
+        }
 
-	      # Korrekturfaktor Anpassung
-	      #my $cf = HAL_getSensorReadingValue($device->{name},'cf_sun_room_range');
-	      #if($cf) {
-	      #	$val*=$cf;
-	      #}
-	      
-	      #Log 3,'>------------>Val: '.$val;
-	  	  $val=HAL_round2($val);
-	  	  #Log 3,'>------------>Val: '.$val;
-	  	  
-		    $msg = "elevation: $elevation, height: $height";
-		  } else {
-		  	$val = 0;
-		    $msg = 'error: elevation';
-		  }
-		}
-	} else {
-		$val = 0;
-		$msg = 'error: elevation';
-	}
-	
-	my $ret;
-	$ret->{value} = $val;
-	$ret->{time} = TimeNow();
-	#$ret->{reading_name} = $record->{name};
-	$ret->{message} = $msg;
-	return $ret;
-	
+        # Korrekturfaktor Anpassung
+        #my $cf = HAL_getSensorReadingValue($device->{name},'cf_sun_room_range');
+        #if($cf) {
+        # $val*=$cf;
+        #}
+        
+        #Log 3,'>------------>Val: '.$val;
+        $val=HAL_round2($val);
+        #Log 3,'>------------>Val: '.$val;
+        
+        $msg = "elevation: $elevation, height: $height";
+      } else {
+        $val = 0;
+        $msg = 'error: elevation';
+      }
+    }
+  } else {
+    $val = 0;
+    $msg = 'error: elevation';
+  }
+  
+  my $ret;
+  $ret->{value} = $val;
+  $ret->{time} = TimeNow();
+  #$ret->{reading_name} = $record->{name};
+  $ret->{message} = $msg;
+  return $ret;
+  
 }
 
 # ValueFn: Prueft, ob das Fenster auf der Sonnenseite ist (Sonne ist zum Fenster zugewandt: Azimut) und nicht Nacht ist (Elevation).
 # FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
 sub HAL_WinSunnySideValueFn($$) {
-	my ($device, $record) = @_;
-	my $params = $record->{FnParams};
-	
-	my $val = 0;
-	my $msg = undef;
-	
-	my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
-	if($sRec) {
-		if($sRec->{value} < 10) { # XXX fester Wert für Sonnenwinkel. 10 OK?
-			$val = 0;
-	    $msg = 'dark: elevation';
-		} else {
-			$sRec = HAL_getSensorValueRecord($device->{name},'azimuth');
-			if($sRec) {
-				my $t = $sRec->{value};
-				if($t > @{$params}[0] && $t < @{$params}[1]) {
-				  $val = 1;
-		      $msg = 'sunny';	
-				} else {
-					$val = 0;
-		      $msg = 'shady: azimuth (now: '.$t.', Limits: ['.@{$params}[0].', '.@{$params}[1].'])';
-				}
-			} else {
-				$val = 0;
-		    $msg = 'error: azimuth';
-			}
-		}
-	} else {
-		$val = 0;
-		    $msg = 'error: elevation';
-	}
-	
-	my $ret;
-	$ret->{value} = $val;
-	$ret->{time} = TimeNow();
-	#$ret->{reading_name} = $record->{name};
-	$ret->{message} = $msg;
-	return $ret;
+  my ($device, $record) = @_;
+  my $params = $record->{FnParams};
+  
+  my $val = 0;
+  my $msg = undef;
+  
+  my $sRec = HAL_getSensorValueRecord($device->{name},'elevation');
+  if($sRec) {
+    if($sRec->{value} < 10) { # XXX fester Wert für Sonnenwinkel. 10 OK?
+      $val = 0;
+      $msg = 'dark: elevation';
+    } else {
+      $sRec = HAL_getSensorValueRecord($device->{name},'azimuth');
+      if($sRec) {
+        my $t = $sRec->{value};
+        if($t > @{$params}[0] && $t < @{$params}[1]) {
+          $val = 1;
+          $msg = 'sunny'; 
+        } else {
+          $val = 0;
+          $msg = 'shady: azimuth (now: '.$t.', Limits: ['.@{$params}[0].', '.@{$params}[1].'])';
+        }
+      } else {
+        $val = 0;
+        $msg = 'error: azimuth';
+      }
+    }
+  } else {
+    $val = 0;
+        $msg = 'error: elevation';
+  }
+  
+  my $ret;
+  $ret->{value} = $val;
+  $ret->{time} = TimeNow();
+  #$ret->{reading_name} = $record->{name};
+  $ret->{message} = $msg;
+  return $ret;
 }
 
   
 # ValueFn: Fragt angegebene (Fenster)Sensoren ab un liefert den Sicherheitsstand (ob alles geschlossen ist).
 # FnParams: Liste der zu betrachtenden Fenster/Tueren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
 sub HAL_WinSecureStateValueFn($$) {
-	my ($device, $record) = @_;
-	my $senList = $record->{FnParams};
-	
-	my $secure = 1;
-	my $msg = undef;
-	
-	foreach my $a (@{$senList}) {
-  	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-  	if(!defined($sRec)) {
-  		$secure=0;
-  		$msg = 'error: undefined sensor';
-  		last;
-  	} elsif(!$sRec->{alive}) {
-  		$secure=0;
-  		$msg = 'dead sensor';
-  		last;
-  	} else {
-  	  if($sRec->{value} ne 'closed') {
-  	  	$secure=0;
-  		  $msg = 'insecure state: '.$sRec->{value};
-  		  last;
-  	  }
-  	}
+  my ($device, $record) = @_;
+  my $senList = $record->{FnParams};
+  
+  my $secure = 1;
+  my $msg = undef;
+  
+  foreach my $a (@{$senList}) {
+    my($sensorName,$readingName) = split(/:/, $a);
+    my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+    if(!defined($sRec)) {
+      $secure=0;
+      $msg = 'error: undefined sensor';
+      last;
+    } elsif(!$sRec->{alive}) {
+      $secure=0;
+      $msg = 'dead sensor';
+      last;
+    } else {
+      if($sRec->{value} ne 'closed') {
+        $secure=0;
+        $msg = 'insecure state: '.$sRec->{value};
+        last;
+      }
+    }
   }
   
   my $ret;
-	$ret->{value} = $secure;
-	$ret->{time} = TimeNow();
-	#$ret->{reading_name} = $record->{name};
-	$ret->{message} = $msg;
-	return $ret;
+  $ret->{value} = $secure;
+  $ret->{time} = TimeNow();
+  #$ret->{reading_name} = $record->{name};
+  $ret->{message} = $msg;
+  return $ret;
 }  
   
   
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Durchschnittswert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
 sub HAL_AvgReadingValueFn($$) {
-	my ($device, $record) = @_;
-	my $senList = $record->{FnParams};
-	# keine 'dead' Sensoren verwenden. 
-	my $time;
-	my $unit;
-	my $rname;
+  my ($device, $record) = @_;
+  my $senList = $record->{FnParams};
+  # keine 'dead' Sensoren verwenden. 
+  my $time;
+  my $unit;
+  my $rname;
   my $aVal = 0;
   my $aCnt = 0;
   foreach my $a (@{$senList}) {
-  	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-  	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', val: '. $sRec->{value}.', alive: '.$sRec->{alive};
-  	if($sRec->{alive}) {
-  		$aCnt += 1;
-  		my $sVal = $sRec->{value};
-  		$aVal += $sVal;
-  		if(!defined($unit)) { $unit = $sRec->{unit}; }
-  		if(!defined($rname)) { $rname = $sRec->{name}; }
-  		if($time && $sRec->{time}) {
-    		if($time lt $sRec->{time}) { $time = $sRec->{time}; }
-    	} else {
-    		$time = $sRec->{time};
-    	}
-  	}
-  	#Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
+    my($sensorName,$readingName) = split(/:/, $a);
+    my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+    #Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', val: '. $sRec->{value}.', alive: '.$sRec->{alive};
+    if($sRec->{alive}) {
+      $aCnt += 1;
+      my $sVal = $sRec->{value};
+      $aVal += $sVal;
+      if(!defined($unit)) { $unit = $sRec->{unit}; }
+      if(!defined($rname)) { $rname = $sRec->{name}; }
+      if($time && $sRec->{time}) {
+        if($time lt $sRec->{time}) { $time = $sRec->{time}; }
+      } else {
+        $time = $sRec->{time};
+      }
+    }
+    #Log 3,'>------------>aVal: '.$aVal.', aCnt: '.$aCnt;
   }
   if($aCnt>0) {
-  	my $retVal = $aVal / $aCnt;
-  	my $ret;
-  	$ret->{value} = $retVal;
-  	$ret->{unit} = $unit;
-  	$ret->{time} = $time;
-  	#$ret->{name} = $rname;
-  	return $ret;
+    my $retVal = $aVal / $aCnt;
+    my $ret;
+    $ret->{value} = $retVal;
+    $ret->{unit} = $unit;
+    $ret->{time} = $time;
+    #$ret->{name} = $rname;
+    return $ret;
   }
   return undef;
 }
@@ -1568,63 +1605,63 @@ sub HAL_AvgReadingValueFn($$) {
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Min. Wert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
 sub HAL_MinReadingValueFn($$) {
-	my ($device, $record) = @_;
-	my $senList = $record->{FnParams};
-	# keine 'dead' Sensoren verwenden. 
-	my $time;
-	my $unit;
-	my $rname;
+  my ($device, $record) = @_;
+  my $senList = $record->{FnParams};
+  # keine 'dead' Sensoren verwenden. 
+  my $time;
+  my $unit;
+  my $rname;
   my $mVal = undef;
   foreach my $a (@{$senList}) {
-  	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-  	if($sRec->{alive}) {
-  		my $sVal = $sRec->{value};
-  		if(!defined($mVal) || $sVal<$mVal) {
-  		  $mVal = $sVal;
-  		  $unit = $sRec->{unit};
-  		  $time = $sRec->{time};
-  		  $rname = $sRec->{name};
-  		}
-  	}
+    my($sensorName,$readingName) = split(/:/, $a);
+    my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+    if($sRec->{alive}) {
+      my $sVal = $sRec->{value};
+      if(!defined($mVal) || $sVal<$mVal) {
+        $mVal = $sVal;
+        $unit = $sRec->{unit};
+        $time = $sRec->{time};
+        $rname = $sRec->{name};
+      }
+    }
   }
   my $ret;
-	$ret->{value} = $mVal;
-	$ret->{unit} = $unit;
-	$ret->{time} = $time;
-	#$ret->{name} = $rname;
-	return $ret;
+  $ret->{value} = $mVal;
+  $ret->{unit} = $unit;
+  $ret->{time} = $time;
+  #$ret->{name} = $rname;
+  return $ret;
 }
 
 # ValueFn: Fragt angegebene Sensoren ab un liefert den Max. Wert aller Readings.
 # FnParams: Liste der zu betrachtenden Sensoren. Jeder Eintrag muss in Form DevName:ReadingName angegeben sein.
 sub HAL_MaxReadingValueFn($$) {
-	my ($device, $record) = @_;
-	my $senList = $record->{FnParams};
-	# keine 'dead' Sensoren verwenden.
-	my $time;
-	my $unit;
-	my $rname;
+  my ($device, $record) = @_;
+  my $senList = $record->{FnParams};
+  # keine 'dead' Sensoren verwenden.
+  my $time;
+  my $unit;
+  my $rname;
   my $mVal = undef;
   foreach my $a (@{$senList}) {
-  	my($sensorName,$readingName) = split(/:/, $a);
-  	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-  	if($sRec->{alive}) {
-  		my $sVal = $sRec->{value};
-  		if(!defined($mVal) || $sVal>$mVal) {
-  		  $mVal = $sVal;
-  		  $unit = $sRec->{unit};
-  		  $time = $sRec->{time};
-  		  $rname = $sRec->{name};
-  		}
-  	}
+    my($sensorName,$readingName) = split(/:/, $a);
+    my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+    if($sRec->{alive}) {
+      my $sVal = $sRec->{value};
+      if(!defined($mVal) || $sVal>$mVal) {
+        $mVal = $sVal;
+        $unit = $sRec->{unit};
+        $time = $sRec->{time};
+        $rname = $sRec->{name};
+      }
+    }
   }
   my $ret;
-	$ret->{value} = $mVal;
-	$ret->{unit} = $unit;
-	$ret->{time} = $time;
-	#$ret->{name} = $rname;
-	return $ret;
+  $ret->{value} = $mVal;
+  $ret->{unit} = $unit;
+  $ret->{time} = $time;
+  #$ret->{name} = $rname;
+  return $ret;
 }
 
 # ValueFn: Benutzt Time der angegebenen Reading 
@@ -1633,22 +1670,22 @@ sub HAL_MaxReadingValueFn($$) {
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
 sub HAL_ReadingTimeStrValueFn($$;$) {
-	my ($device, $record, $default) = @_;
-	my $rName = $record->{FnParams};
+  my ($device, $record, $default) = @_;
+  my $rName = $record->{FnParams};
   $rName = $default unless $rName;
   if(!defined($rName)){
-  	return undef;
+    return undef;
   }
   my $t = HAL_ReadingTimeValueFn($device, $record,$rName);
   
   if($t) {
-  	if(ref $t eq ref {}) {
-		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
-    	$t->{value} = sec2Dauer($t->{value});
-    	return $t;
+    if(ref $t eq ref {}) {
+      # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
+      $t->{value} = sec2Dauer($t->{value});
+      return $t;
     } else {
-    	# Scalar-Wert annehmen
-    	return sec2Dauer($t);
+      # Scalar-Wert annehmen
+      return sec2Dauer($t);
     }
   }
   return undef;
@@ -1659,16 +1696,16 @@ sub HAL_ReadingTimeStrValueFn($$;$) {
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
 sub HAL_MotionTimeStrValueFn($$) {
-	my ($device, $record) = @_;
+  my ($device, $record) = @_;
   my $t = HAL_MotionTimeValueFn($device, $record);
   if($t) {
-  	if(ref $t eq ref {}) {
-		  # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
-    	$t->{value} = sec2Dauer($t->{value});
-    	return $t;
+    if(ref $t eq ref {}) {
+      # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
+      $t->{value} = sec2Dauer($t->{value});
+      return $t;
     } else {
-    	# Scalar-Wert annehmen
-    	return sec2Dauer($t);
+      # Scalar-Wert annehmen
+      return sec2Dauer($t);
     }
   }
   return undef;
@@ -1689,23 +1726,23 @@ sub HAL_MotionTimeValueFn($$) {
 # FnParams: Readingname 
 # Params: Dev-Hash, Record-HASH
 sub HAL_ReadingTimeValueFn($$;$) {
-	my ($device, $record, $default) = @_;
-	my $rName = $record->{FnParams};
+  my ($device, $record, $default) = @_;
+  my $rName = $record->{FnParams};
   my $devName = $device->{name};
   $rName = $default unless $rName;
   if(!defined($rName)){
-  	return undef;
+    return undef;
   }
   my $mTime = HAL_getSensorReadingTime($devName, $rName);    
   
   if($mTime) {
-  	my $dTime = dateTime2dec($mTime);
-  	my $diffTime = time() - $dTime;
-  	
-  	my $ret;
-  	$ret->{value} = int($diffTime);
-  	$ret->{time} = TimeNow();
-  	return $ret;
+    my $dTime = dateTime2dec($mTime);
+    my $diffTime = time() - $dTime;
+    
+    my $ret;
+    $ret->{value} = int($diffTime);
+    $ret->{time} = TimeNow();
+    return $ret;
   }
   
   return undef;
@@ -1717,22 +1754,22 @@ sub HAL_ReadingTimeValueFn($$;$) {
 # FnParams: Zeit in Sekunden [, Readingname] 
 # Params: Dev-Hash, Record-HASH
 sub HAL_MotionValueFn($$) {
-	my ($device, $record) = @_;
-	my ($pTime,$rName) = @{$record->{FnParams}};
+  my ($device, $record) = @_;
+  my ($pTime,$rName) = @{$record->{FnParams}};
   my $devName = $device->{name};
   $rName = "motion" unless $rName;
   my $mTime = HAL_getSensorReadingTime($devName, $rName);    
   #Log 3,'>------------>Name: '.$devName.', Reading: '.$rName.', time: '.$mTime;
 
   if($mTime) {
-  	my $dTime = dateTime2dec($mTime);
-  	my $diffTime = time() - $dTime;
-  	
-  	#return $diffTime < $pTime?1:0;
-  	my $ret;
-  	$ret->{value} = $diffTime < $pTime?1:0;
-  	$ret->{time} = TimeNow();
-  	return $ret;
+    my $dTime = dateTime2dec($mTime);
+    my $diffTime = time() - $dTime;
+    
+    #return $diffTime < $pTime?1:0;
+    my $ret;
+    $ret->{value} = $diffTime < $pTime?1:0;
+    $ret->{time} = TimeNow();
+    return $ret;
   }
   
   return 0;
@@ -1741,11 +1778,11 @@ sub HAL_MotionValueFn($$) {
 # ValueFn: Berechnet Temperaturdifferenz zw. Innen und Außen 
 # (wenn draußen kaelter ist, dann ist der Wert negativ)
 sub HAL_TempDiffOutdoorValueFn($$) {
-	my ($device, $record) = @_;
-	
-	my $room = $device->{location};
-	
-	my $tIn = HAL_getRoomReadingRecord($room, 'temperature');
+  my ($device, $record) = @_;
+  
+  my $room = $device->{location};
+  
+  my $tIn = HAL_getRoomReadingRecord($room, 'temperature');
   my $tOut = HAL_getRoomOutdoorReadingRecord($room,'temperature');
   if($tIn && $tOut) {
     my $tempIn = $tIn->{value};
@@ -1753,14 +1790,14 @@ sub HAL_TempDiffOutdoorValueFn($$) {
     my $time = $tIn->{time};
 
     if($tempIn && $tempOut) {
-		  my $val = $tempOut - $tempIn;
-		  my $ret;
-			$ret->{value} = HAL_round0($val);
-			$ret->{time} = $time;#TimeNow();
-			#$ret->{reading_name} = $record->{name};
-			$ret->{unit} = '°C';
-			return $ret;
-	  }
+      my $val = $tempOut - $tempIn;
+      my $ret;
+      $ret->{value} = HAL_round0($val);
+      $ret->{time} = $time;#TimeNow();
+      #$ret->{reading_name} = $record->{name};
+      $ret->{unit} = '°C';
+      return $ret;
+    }
   }
   
   return undef;
@@ -1768,45 +1805,45 @@ sub HAL_TempDiffOutdoorValueFn($$) {
 
   #TODO:
   sub HAL_SunValueFn($$) {
-  	my ($device, $record) = @_;
-  	#my $oRecord=$_[1];
-  	my $senList = $record->{FnParams};
-  	# keine 'dead' Sensoren verwenden. Wenn verschiedene Ergebnisse => Mehrheit entscheidet. Bei Gleichstand => on, alle 'dead' => on
-  	# oldVal (letzter ermittelter Wert) speichern. Je nach oldVal obere oder untere Grenze verwenden
-  	my $oldVal = $record->{oldVal};
-  	$oldVal='on' unless defined $oldVal;
+    my ($device, $record) = @_;
+    #my $oRecord=$_[1];
+    my $senList = $record->{FnParams};
+    # keine 'dead' Sensoren verwenden. Wenn verschiedene Ergebnisse => Mehrheit entscheidet. Bei Gleichstand => on, alle 'dead' => on
+    # oldVal (letzter ermittelter Wert) speichern. Je nach oldVal obere oder untere Grenze verwenden
+    my $oldVal = $record->{oldVal};
+    $oldVal='on' unless defined $oldVal;
     my $cnt_on = 0;
     my $cnt_off = 0;
     foreach my $a (@{$senList}) {
-    	my $senSpec = $a->[0];
-    	my($sensorName,$readingName) = split(/:/, $senSpec);
-    	my $senLim1 = $a->[1];
-    	my $senLim2 = $a->[2];
-    	#Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', Lim1/2: '.$senLim1.'/'.$senLim2;
-    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-    	if($sRec->{alive}) {
-    		my $sVal = $sRec->{value};
-    		#Log 3,'>------------>sVal: '.$sVal;
-    		if($oldVal eq 'on') {
-    			#Log 3,">------------>XXX: $sVal / $senLim1";
-    			if($sVal < $senLim1) {
-    				$cnt_off+=1;
-    				# Log 3,'>------------>1.1 oldVal: '.$oldVal." => new: off";
-    			} else {
-    				$cnt_on+=1;
-    				# Log 3,'>------------>1.2 oldVal: '.$oldVal." => new: on";
-    			}
-    		} else {
-    			# oldVal war off
-    			if($sVal > $senLim2) {
-    				$cnt_on+=1;
-    				# Log 3,'>------------>2.1 oldVal: '.$oldVal." => new: on";
-    			} else {
-    				$cnt_off+=1;
-    				# Log 3,'>------------>2.2 oldVal: '.$oldVal." => new: off";
-    			}
-    		}
-    	}
+      my $senSpec = $a->[0];
+      my($sensorName,$readingName) = split(/:/, $senSpec);
+      my $senLim1 = $a->[1];
+      my $senLim2 = $a->[2];
+      #Log 3,'>------------>Name: '.$sensorName.', Reading: '.$readingName.', Lim1/2: '.$senLim1.'/'.$senLim2;
+      my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+      if($sRec->{alive}) {
+        my $sVal = $sRec->{value};
+        #Log 3,'>------------>sVal: '.$sVal;
+        if($oldVal eq 'on') {
+          #Log 3,">------------>XXX: $sVal / $senLim1";
+          if($sVal < $senLim1) {
+            $cnt_off+=1;
+            # Log 3,'>------------>1.1 oldVal: '.$oldVal." => new: off";
+          } else {
+            $cnt_on+=1;
+            # Log 3,'>------------>1.2 oldVal: '.$oldVal." => new: on";
+          }
+        } else {
+          # oldVal war off
+          if($sVal > $senLim2) {
+            $cnt_on+=1;
+            # Log 3,'>------------>2.1 oldVal: '.$oldVal." => new: on";
+          } else {
+            $cnt_off+=1;
+            # Log 3,'>------------>2.2 oldVal: '.$oldVal." => new: off";
+          }
+        }
+      }
     }
     my $newVal = 'on';
     if($cnt_off>$cnt_on) {$newVal = 'off';}
@@ -1818,8 +1855,8 @@ sub HAL_TempDiffOutdoorValueFn($$) {
     #return $newVal;
     my $ret;
     $ret->{value} = $newVal;
-  	$ret->{time} = TimeNow();
-  	return $ret;
+    $ret->{time} = TimeNow();
+    return $ret;
   }
 
 # ValueFn: Kombiniert State-Readings zweier (oder auch mhr) Fenstersensoren.
@@ -1828,43 +1865,43 @@ sub HAL_TempDiffOutdoorValueFn($$) {
 # FnParams: Liste der Sensoren mit Readings: sensorName:readingName
 # Params: Dev-Hash, Record-HASH  
 sub HAL_WinCombiStateValueFn($$) {
-	  my ($device, $record) = @_;
-  	
-  	my $senList = $record->{FnParams};
-  	my $retVal = 'closed';
-  	my $retTime = undef;
+    my ($device, $record) = @_;
+    
+    my $senList = $record->{FnParams};
+    my $retVal = 'closed';
+    my $retTime = undef;
     foreach my $senSpec (@{$senList}) {
-    	my($sensorName,$readingName) = split(/:/, $senSpec);
-    	my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
-    	my $state = $sRec->{value};
-    	my $time = $sRec->{time};
-    	if($state eq 'open') {
-    		if($retVal eq 'closed' || $retVal eq 'tilted') {
-    			$retVal = $state;
-    		  $retTime = $time;
-    	  } else { # gleiche
-    	  	$retTime = $time if(!defined($retTime)||$retTime lt $time);
-    	  }
-    	} elsif ($state eq 'tilted') {
-      	if($retVal eq 'closed') {
-    			$retVal = $state;
-    		  $retTime = $time;
-    	  } elsif ($retVal eq 'open') {
-    	  	# NOP
-      	} else { # gleiche
-    	  	$retTime = $time if(!defined($retTime)||$retTime lt $time);
-    	  }
-    	} else { # closed
-    		if($retVal eq 'closed') {
-    		  $retTime = $time if(!defined($retTime)||$retTime lt $time);
-    	  }
-    	}
-    }    	
+      my($sensorName,$readingName) = split(/:/, $senSpec);
+      my $sRec = HAL_getSensorValueRecord($sensorName,$readingName);
+      my $state = $sRec->{value};
+      my $time = $sRec->{time};
+      if($state eq 'open') {
+        if($retVal eq 'closed' || $retVal eq 'tilted') {
+          $retVal = $state;
+          $retTime = $time;
+        } else { # gleiche
+          $retTime = $time if(!defined($retTime)||$retTime lt $time);
+        }
+      } elsif ($state eq 'tilted') {
+        if($retVal eq 'closed') {
+          $retVal = $state;
+          $retTime = $time;
+        } elsif ($retVal eq 'open') {
+          # NOP
+        } else { # gleiche
+          $retTime = $time if(!defined($retTime)||$retTime lt $time);
+        }
+      } else { # closed
+        if($retVal eq 'closed') {
+          $retTime = $time if(!defined($retTime)||$retTime lt $time);
+        }
+      }
+    }     
     
     my $ret;
     $ret->{value} = $retVal;
-  	$ret->{time} = $retTime;
-  	return $ret;
+    $ret->{time} = $retTime;
+    return $ret;
 }
 
 
@@ -1896,152 +1933,152 @@ sub myCtrlDev_Initialize($$)
 
 # Verarbeitungsroutine für mger Befehl
 sub CommandMGet($$$) {
-	my($hash, $param, $cmd) = @_;
-	my @line = split(/\s+/,$param);
-	
-	if(scalar(@line)==0) {
-		return "Usage: $cmd ".join("\n",@usage);
-	}
-	
-	my $modifier = $line[0];
-	my $devname;
-	#if($modifier ne 'room' && $modifier ne 'sensor' && $modifier ne 'rooms' && $modifier ne 'sensors') {
-	if(!$mget_mods->{$modifier}) {
-		# Default is room
-		$modifier = 'room';
-	} else {
-		# modifier entfernen
-	  shift(@line);
-	}
-	# Device/Room name
-	$devname = shift(@line);
-	
-	my $rname = shift(@line);
-	
-	my $showmod = shift(@line);
-	$showmod = '' unless defined $showmod;
-	
-	my $showmod2 = shift(@line);
-	#$showmod2 = '' unless defined $showmod2;
-	
-	my $ret={};
-	my @retOrder=();
-	
-	if($modifier eq 'room') {
-		if(!defined($devname)) {
-		  return 'no room name provided';
-	  }
-	  if(!defined($rname)) { 
-	  	# all als Default
-			$rname = 'all';
-		}
-	  #if($rname eq 'all') {
-	  if($rname=~m/all(:\d+)*$/) {
-	  	my(undef,$level)=split(/:/,$rname);
-	  	$level = 3 unless defined $level;
-			my @readings = HAL_getRoomSensorReadingsList($devname);
-			$showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
-			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_room($devname,$rname,int($level),$showmod,$showmod2);
-			}
-		} else {
-			my @readings = split(/,/,$rname);
-			if(@readings && $#readings>0) {
-				@retOrder = @readings;
-				$showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
-				foreach $rname (@readings) {
-				  $ret->{$rname}=CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
-			  }
-		  } else {
-			  return CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
-			}
-		}
-		if(keys($ret)==0) {return 'no rooms found';}
-	} elsif($modifier eq 'sensor') {
-		if(!defined($devname)) {
-			return 'no sensor name provided';
-		}
-		if(!defined($rname)) { 
-			# all als Default
-			$rname = 'all';
-		}
-		#if($rname eq 'all') {
-		if($rname=~m/all(:\d+)*$/) {
-			my(undef,$level)=split(/:/,$rname);
-			$level = 3 unless defined $level;
-			my @readings = HAL_getSensorReadingsList($devname);
-			$showmod2 = 'r' unless defined $showmod2;
-			foreach $rname (@readings) {
-				$ret->{$rname}=CommandMGet_sensor($devname,$rname,int($level),$showmod,$showmod2);
-			}
-		} else {
-			my @readings = split(/,/,$rname);
-			if(@readings && $#readings>0) {
-				@retOrder = @readings;
-				$showmod2 = 'r' unless defined $showmod2;
-				foreach $rname (@readings) {
-				  $ret->{$rname}=CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
-			  } 
-		  } else {
-		  	return CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
-		  }
-		}
-		if(keys($ret)==0) {return 'no sensors found';}
-	} elsif($modifier eq 'rooms') {
-		my $rooms = HAL_getRoomNames();
-		foreach my $roomname (@$rooms) {
-			if(!$devname || $devname eq 'all' || $roomname=~m/^$devname/) {
-					$ret->{$roomname}=$roomname;
+  my($hash, $param, $cmd) = @_;
+  my @line = split(/\s+/,$param);
+  
+  if(scalar(@line)==0) {
+    return "Usage: $cmd ".join("\n",@usage);
+  }
+  
+  my $modifier = $line[0];
+  my $devname;
+  #if($modifier ne 'room' && $modifier ne 'sensor' && $modifier ne 'rooms' && $modifier ne 'sensors') {
+  if(!$mget_mods->{$modifier}) {
+    # Default is room
+    $modifier = 'room';
+  } else {
+    # modifier entfernen
+    shift(@line);
+  }
+  # Device/Room name
+  $devname = shift(@line);
+  
+  my $rname = shift(@line);
+  
+  my $showmod = shift(@line);
+  $showmod = '' unless defined $showmod;
+  
+  my $showmod2 = shift(@line);
+  #$showmod2 = '' unless defined $showmod2;
+  
+  my $ret={};
+  my @retOrder=();
+  
+  if($modifier eq 'room') {
+    if(!defined($devname)) {
+      return 'no room name provided';
+    }
+    if(!defined($rname)) { 
+      # all als Default
+      $rname = 'all';
+    }
+    #if($rname eq 'all') {
+    if($rname=~m/all(:\d+)*$/) {
+      my(undef,$level)=split(/:/,$rname);
+      $level = 3 unless defined $level;
+      my @readings = HAL_getRoomSensorReadingsList($devname);
+      $showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
+      foreach $rname (@readings) {
+        $ret->{$rname}=CommandMGet_room($devname,$rname,int($level),$showmod,$showmod2);
       }
-		}
-		if(keys($ret)==0) {return 'no rooms found';}
+    } else {
+      my @readings = split(/,/,$rname);
+      if(@readings && $#readings>0) {
+        @retOrder = @readings;
+        $showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
+        foreach $rname (@readings) {
+          $ret->{$rname}=CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
+        }
+      } else {
+        return CommandMGet_room($devname,$rname,0,$showmod,$showmod2);
+      }
+    }
+    if(keys($ret)==0) {return 'no rooms found';}
+  } elsif($modifier eq 'sensor') {
+    if(!defined($devname)) {
+      return 'no sensor name provided';
+    }
+    if(!defined($rname)) { 
+      # all als Default
+      $rname = 'all';
+    }
+    #if($rname eq 'all') {
+    if($rname=~m/all(:\d+)*$/) {
+      my(undef,$level)=split(/:/,$rname);
+      $level = 3 unless defined $level;
+      my @readings = HAL_getSensorReadingsList($devname);
+      $showmod2 = 'r' unless defined $showmod2;
+      foreach $rname (@readings) {
+        $ret->{$rname}=CommandMGet_sensor($devname,$rname,int($level),$showmod,$showmod2);
+      }
+    } else {
+      my @readings = split(/,/,$rname);
+      if(@readings && $#readings>0) {
+        @retOrder = @readings;
+        $showmod2 = 'r' unless defined $showmod2;
+        foreach $rname (@readings) {
+          $ret->{$rname}=CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
+        } 
+      } else {
+        return CommandMGet_sensor($devname,$rname,0,$showmod,$showmod2);
+      }
+    }
+    if(keys($ret)==0) {return 'no sensors found';}
+  } elsif($modifier eq 'rooms') {
+    my $rooms = HAL_getRoomNames();
+    foreach my $roomname (@$rooms) {
+      if(!$devname || $devname eq 'all' || $roomname=~m/^$devname/) {
+          $ret->{$roomname}=$roomname;
+      }
+    }
+    if(keys($ret)==0) {return 'no rooms found';}
   } elsif($modifier eq 'sensors') {
-  	my $sensors;
-  	if(!defined($devname) || $devname eq 'all') {
+    my $sensors;
+    if(!defined($devname) || $devname eq 'all') {
       $sensors = HAL_getSensorNames();
     } else {
-    	$sensors = HAL_getRoomSensorNames($devname);
-    	if(scalar($sensors) == 0) {return "no room '$devname' or no sensors in room"; }
+      $sensors = HAL_getRoomSensorNames($devname);
+      if(scalar($sensors) == 0) {return "no room '$devname' or no sensors in room"; }
     }
-		foreach my $sensorname (@$sensors) {
-  			if(defined($rname)) {
-	  			if($rname eq 'dead') {
-		  			if(!HAL_isSensorAlive($sensorname)) {
-		  			  # info: dead seit
-		  			  my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
-		  			  if($dauer) {
-		  			    $ret->{$sensorname}=$sensorname.' : '.$dauer;
-		  			  } else {
+    foreach my $sensorname (@$sensors) {
+        if(defined($rname)) {
+          if($rname eq 'dead') {
+            if(!HAL_isSensorAlive($sensorname)) {
+              # info: dead seit
+              my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
+              if($dauer) {
+                $ret->{$sensorname}=$sensorname.' : '.$dauer;
+              } else {
                 $ret->{$sensorname}=$sensorname;
               }
             }
-				  } elsif($rname eq 'lowbat' || $rname eq 'low') {
-		  			if(HAL_isDeviceLowBat($sensorname)) {
-		  			  if($showmod eq 'info') {
-		  			    my $info = HAL_getDeviceBatStatus($sensorname);
+          } elsif($rname eq 'lowbat' || $rname eq 'low') {
+            if(HAL_isDeviceLowBat($sensorname)) {
+              if($showmod eq 'info') {
+                my $info = HAL_getDeviceBatStatus($sensorname);
                 my $deadSt = HAL_isSensorAlive($sensorname)?'(alive)':'(dead)';
                 $ret->{$sensorname}=$sensorname.' : '.$info.' '.$deadSt;
-		  			  } else {
+              } else {
                 $ret->{$sensorname}=$sensorname;
               }
             }
-				  } else {
-				  	if($sensorname=~m/^$rname/) {
-			        $ret->{$sensorname}=$sensorname;
-			      }
-			    }
-			} else {
-			  $ret->{$sensorname}=$sensorname;
-			}
-		}
-		if(keys($ret)==0) {return 'no devices found';}
+          } else {
+            if($sensorname=~m/^$rname/) {
+              $ret->{$sensorname}=$sensorname;
+            }
+          }
+      } else {
+        $ret->{$sensorname}=$sensorname;
+      }
+    }
+    if(keys($ret)==0) {return 'no devices found';}
   } elsif($modifier eq 'dump') {
-  	my $rec;
-  	my $type;
+    my $rec;
+    my $type;
     if($rec=HAL_getRoomRecord($devname)) {
       $type='ROOM';
     } elsif($rec=HAL_getSensorRecord($devname)) {
-    	if($rec->{readings} && $rec->{actions}) {$type='ACTOR+SENSOR';}
+      if($rec->{readings} && $rec->{actions}) {$type='ACTOR+SENSOR';}
       elsif($rec->{readings}) {$type='SENSOR';}
       elsif($rec->{actions}) {$type='ACTOR';}
       else {$type='UNKNOWN';}
@@ -2059,10 +2096,10 @@ sub CommandMGet($$$) {
     foreach my $sensorname (@$sensors) {
       if(!HAL_isSensorAlive($sensorname)) {
         # info: dead seit
-			  my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
-			  if($dauer) {
-			    $ret->{$sensorname}=$sensorname.' : '.$dauer;
-			  } else {
+        my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
+        if($dauer) {
+          $ret->{$sensorname}=$sensorname.' : '.$dauer;
+        } else {
           $ret->{$sensorname}=$sensorname;
         }
       }
@@ -2079,110 +2116,110 @@ sub CommandMGet($$$) {
     }
     if(keys($ret)==0) { return 'no low batteries'; }
   } else {
-		return 'unknown command';
-	}
-	
-	my $str='';
-	if(ref $ret eq 'HASH') {
-		@retOrder = sort(keys($ret)) unless @retOrder && $#retOrder>0;
-		foreach my $key (@retOrder) {
-		  #if($showmod ne 'full') {
+    return 'unknown command';
+  }
+  
+  my $str='';
+  if(ref $ret eq 'HASH') {
+    @retOrder = sort(keys($ret)) unless @retOrder && $#retOrder>0;
+    foreach my $key (@retOrder) {
+      #if($showmod ne 'full') {
       #  $str.="$key";
       #}
       #$str.=sprintf("%-12s", $key);
-	  	my $val = $ret->{$key};
-		  if(defined($val)) {
-			  #if($showmod ne 'full') {
+      my $val = $ret->{$key};
+      if(defined($val)) {
+        #if($showmod ne 'full') {
         #  $str.=' : ';
         #}
         $str.=$val;
         $str.="\n";
       }
-	  }
+    }
   } else {
-  	return "internal error";
+    return "internal error";
   }
-	return $str;
+  return $str;
 }
 
 sub CommandMGet_room($$$$$) {
-	my($name, $readingname, $level, $mod, $mod2) = @_;
+  my($name, $readingname, $level, $mod, $mod2) = @_;
 
 Log3 "TEST", 3, '>>>>>>>>>> '.$level ;
 
-	my $record = HAL_getRoomReadingRecord($name, $readingname);
-	if(!defined($record)) {
-		return "unknown room or reading: $name:$readingname";
-	}
-	# ggf. nach Level filtern
-	if($level) { # 0 oder nichts (letzteres sollte nicht sein)
-		my $rlevel = $record->{level};
-		if(defined($rlevel)) {
-			if(int($rlevel)>$level) {
-				return undef;
-			}
-		}
-	}
-	return CommandMGet_format($record,$mod,$mod2);
-	
-	#return HAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
+  my $record = HAL_getRoomReadingRecord($name, $readingname);
+  if(!defined($record)) {
+    return "unknown room or reading: $name:$readingname";
+  }
+  # ggf. nach Level filtern
+  if($level) { # 0 oder nichts (letzteres sollte nicht sein)
+    my $rlevel = $record->{level};
+    if(defined($rlevel)) {
+      if(int($rlevel)>$level) {
+        return undef;
+      }
+    }
+  }
+  return CommandMGet_format($record,$mod,$mod2);
+  
+  #return HAL_getRoomReadingValue($name, $readingname,'unknown reading '.$readingname,'unknown room '.$name);
 }
 
 sub CommandMGet_sensor($$$$$) {
-	my($name, $readingname, $level, $mod, $mod2) = @_;
+  my($name, $readingname, $level, $mod, $mod2) = @_;
 
-	my $record = HAL_getSensorValueRecord($name, $readingname);
-	if(!defined($record)) {
-		return "unknown sensor or reading: $name:$readingname";
-	}
-	# ggf. nach Level filtern
-	if($level) { # 0 oder nichts (letzteres sollte nicht sein)
-		my $rlevel = $record->{level};
-		if(defined($rlevel)) {
-			if(int($rlevel)>$level) {
-				return undef;
-			}
-		}
-	}
-	return CommandMGet_format($record,$mod,$mod2);
-	
-	#return HAL_getSensorReadingValue($name, $readingname);
+  my $record = HAL_getSensorValueRecord($name, $readingname);
+  if(!defined($record)) {
+    return "unknown sensor or reading: $name:$readingname";
+  }
+  # ggf. nach Level filtern
+  if($level) { # 0 oder nichts (letzteres sollte nicht sein)
+    my $rlevel = $record->{level};
+    if(defined($rlevel)) {
+      if(int($rlevel)>$level) {
+        return undef;
+      }
+    }
+  }
+  return CommandMGet_format($record,$mod,$mod2);
+  
+  #return HAL_getSensorReadingValue($name, $readingname);
 }
 
 #[plain*|full|value|time|dump]
 sub CommandMGet_format($$$) {
-	my($record, $mod, $mod2) = @_;
-	
-	my $prefix = '';
-	$mod2 = '' unless defined $mod2;
-	$prefix .= sprintf("%-19s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
-	$prefix .= sprintf("%-19s : ", $record->{reading}) if($mod2 eq 'reading' || $mod2 eq 'r');
-	
-	if(!$mod || $mod eq 'plain' || $mod eq 'p') {
-		return $prefix.$record->{value};
-	}
-	
-	if($mod eq 'time' || $mod eq 't') {
-		return $prefix.$record->{time};
-	}
-	
-	if($mod eq 'value' || $mod eq 'v') {
-		return $prefix.$record->{value}.' '.$record->{unit};
-	}
-	
-	if($mod eq 'brief' || $mod eq 'b') {
-		return $prefix.$record->{value}.' '.$record->{unit};
-	}
-	
-	if($mod eq 'full' || $mod eq 'f') {
-		#return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{name}.' = '.$record->{value}.' '.$record->{unit};
-		#return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
-		return $prefix.sprintf("%-11s [%s] %s",$record->{value}.' '.(defined($record->{unit})?$record->{unit}:''),$record->{time},$record->{origin});
-	}
-	
-	if($mod eq 'dump' || $mod eq 'd') {
-	  return Dumper($record);
-	}
+  my($record, $mod, $mod2) = @_;
+  
+  my $prefix = '';
+  $mod2 = '' unless defined $mod2;
+  $prefix .= sprintf("%-19s : ", $record->{alias}) if($mod2 eq 'alias' || $mod2 eq 'a');
+  $prefix .= sprintf("%-19s : ", $record->{reading}) if($mod2 eq 'reading' || $mod2 eq 'r');
+  
+  if(!$mod || $mod eq 'plain' || $mod eq 'p') {
+    return $prefix.$record->{value};
+  }
+  
+  if($mod eq 'time' || $mod eq 't') {
+    return $prefix.$record->{time};
+  }
+  
+  if($mod eq 'value' || $mod eq 'v') {
+    return $prefix.$record->{value}.' '.$record->{unit};
+  }
+  
+  if($mod eq 'brief' || $mod eq 'b') {
+    return $prefix.$record->{value}.' '.$record->{unit};
+  }
+  
+  if($mod eq 'full' || $mod eq 'f') {
+    #return '['.$record->{time}.'] '.$record->{sensor}.':'.$record->{name}.' = '.$record->{value}.' '.$record->{unit};
+    #return $prefix.sprintf("%-8s [%s] %s:%s",$record->{value}.' '.$record->{unit},$record->{time},$record->{sensor},$record->{reading});
+    return $prefix.sprintf("%-11s [%s] %s",$record->{value}.' '.(defined($record->{unit})?$record->{unit}:''),$record->{time},$record->{origin});
+  }
+  
+  if($mod eq 'dump' || $mod eq 'd') {
+    return Dumper($record);
+  }
 }
 
 
@@ -2191,93 +2228,93 @@ sub CommandMGet_format($$$) {
 # Füght einem Hash Zweige/werte aus dem anderen zu, aber nur, wenn Werte (Blaetter) noch nicht vorhanden waren.
 # Params: Zu aendernder Hash, Template-Hash
 sub merge_hash_recursive($$) {
-	my($hash, $template) = @_;
+  my($hash, $template) = @_;
   #Log3 "TEST", 3, 'ENTER';
   if(!defined($hash) || !defined($template)) { return };
   
-	foreach my $key (keys($template)) {
-		my $t = $template->{$key};
-		#Log3 "TEST", 3, 'Key: '.$key;
-		if(defined($t)) {
-			if(defined($hash->{$key}) && (ref $hash->{$key} ne ref $t)) {
-				#Log3 "TEST", 3, 'Verschiedenen Typen -> ignore';
-				# Verschiedenen Typen -> ignore
-			} elsif(ref $t eq "HASH") {
-				#Log3 "TEST", 3, 'HASH';
-				if(!defined($hash->{$key})) {
-					#Log3 "TEST", 3, 'create empty hash';
-					$hash->{$key}={};
-				}
-  			merge_hash_recursive($hash->{$key},$template->{$key});
-  		} elsif(ref $t eq "ARRAY") {
-  			#Log3 "TEST", 3, 'ARRAY';
-  			if(!defined($hash->{$key})) {
-  				#Log3 "TEST", 3, 'copy array';
-  				my @a = @$t;
-					$hash->{$key}=\@a;
-				} else {
-					# Nicht leere Arrays ignorieren
-					#Log3 "TEST", 3, 'ignore';
-				}
-  		} else {
-  			#Log3 "TEST", 3, 'SCALAR';
-  			# Scalar
-  			if(!defined($hash->{$key})) {
-  				#Log3 "TEST", 3, 'copy value';
-  				$hash->{$key}=$t;
-  			} else {
-  			  # sonst ignorieren
-  			  #Log3 "TEST", 3, 'ignore';
-  		  }
-  		}
-		}
-	}
+  foreach my $key (keys($template)) {
+    my $t = $template->{$key};
+    #Log3 "TEST", 3, 'Key: '.$key;
+    if(defined($t)) {
+      if(defined($hash->{$key}) && (ref $hash->{$key} ne ref $t)) {
+        #Log3 "TEST", 3, 'Verschiedenen Typen -> ignore';
+        # Verschiedenen Typen -> ignore
+      } elsif(ref $t eq "HASH") {
+        #Log3 "TEST", 3, 'HASH';
+        if(!defined($hash->{$key})) {
+          #Log3 "TEST", 3, 'create empty hash';
+          $hash->{$key}={};
+        }
+        merge_hash_recursive($hash->{$key},$template->{$key});
+      } elsif(ref $t eq "ARRAY") {
+        #Log3 "TEST", 3, 'ARRAY';
+        if(!defined($hash->{$key})) {
+          #Log3 "TEST", 3, 'copy array';
+          my @a = @$t;
+          $hash->{$key}=\@a;
+        } else {
+          # Nicht leere Arrays ignorieren
+          #Log3 "TEST", 3, 'ignore';
+        }
+      } else {
+        #Log3 "TEST", 3, 'SCALAR';
+        # Scalar
+        if(!defined($hash->{$key})) {
+          #Log3 "TEST", 3, 'copy value';
+          $hash->{$key}=$t;
+        } else {
+          # sonst ignorieren
+          #Log3 "TEST", 3, 'ignore';
+        }
+      }
+    }
+  }
 }
 
 # Template-Tab rekursiv erweitern (Templates mit Templates)
 # Param: Template-Tab-Hash
 sub HAL_expandTemplates($) {
-	my($templates) = @_;
-	foreach my $key (keys($templates)) {
-		my $subTab = $templates->{$key};
-		HAL_expandTemplates_intern($templates, $subTab);
-	}
+  my($templates) = @_;
+  foreach my $key (keys($templates)) {
+    my $subTab = $templates->{$key};
+    HAL_expandTemplates_intern($templates, $subTab);
+  }
 }
 # Interne Routine fuer expandTemplates (ein Zweig verarbeiten (rekursiv))
 sub HAL_expandTemplates_intern($$) {
-	my($templates, $tab) = @_;
-	#Log3 "TEST", 3, 'expand_intern'.Dumper($templates);
-	#Log3 "TEST", 3, 'expand_intern: --->';
-	return unless defined $tab;
-	my $desiredTemplates = $tab->{templates};
-	if(defined($desiredTemplates) && ref($desiredTemplates) eq 'ARRAY') {
+  my($templates, $tab) = @_;
+  #Log3 "TEST", 3, 'expand_intern'.Dumper($templates);
+  #Log3 "TEST", 3, 'expand_intern: --->';
+  return unless defined $tab;
+  my $desiredTemplates = $tab->{templates};
+  if(defined($desiredTemplates) && ref($desiredTemplates) eq 'ARRAY') {
     foreach my $tName (@$desiredTemplates) {
-    	#Log3 "TEST", 3, 'expand_intern: apply '.$tName;
-    	my $node = $templates->{$tName};
-    	HAL_expandTemplates_intern($templates, $node);
-    	#Log3 "TEST", 3, 'expand_intern'.Dumper($templates)."\n\n".Dumper($node);
-		  merge_hash_recursive($tab, $node);
-	  }
-	  delete($tab->{templates});
-	}
+      #Log3 "TEST", 3, 'expand_intern: apply '.$tName;
+      my $node = $templates->{$tName};
+      HAL_expandTemplates_intern($templates, $node);
+      #Log3 "TEST", 3, 'expand_intern'.Dumper($templates)."\n\n".Dumper($node);
+      merge_hash_recursive($tab, $node);
+    }
+    delete($tab->{templates});
+  }
 }
 
 # Geht die Liste der Devices durch und wendet angegebenen Tempates an (Zweige ergaenzen/einfuegen)
 # Params: Dev-Hash, Templates-Hash
 sub HAL_applyTemplates($$) {
-	my($tab,$templates) = @_;
-	
-	foreach my $key (keys($tab)) {
-		#Log3 "myCtrlDev", 3, ">>>ExpandTemplates: $key";
-		my $subTab = $tab->{$key};
-		my $desiredTemplates = $subTab->{templates};
-		if(defined($desiredTemplates)) {
+  my($tab,$templates) = @_;
+  
+  foreach my $key (keys($tab)) {
+    #Log3 "myCtrlDev", 3, ">>>ExpandTemplates: $key";
+    my $subTab = $tab->{$key};
+    my $desiredTemplates = $subTab->{templates};
+    if(defined($desiredTemplates)) {
       foreach my $tName (@$desiredTemplates) {
-      	my $tNode = $templates->{$tName};
-			  merge_hash_recursive($subTab, $tNode);
-		  }
-		}
-	}
+        my $tNode = $templates->{$tName};
+        merge_hash_recursive($subTab, $tNode);
+      }
+    }
+  }
 }
 
  #>>> Data
@@ -2286,105 +2323,105 @@ sub HAL_applyTemplates($$) {
 # Param Room-Name, Reading-Name
 # return ReadingsRecord
 sub HAL_getRoomReadingRecord($$) {
-	my ($roomName, $readingName) = @_;
-	return HAL_getRoomReadingRecord_($roomName, $readingName, "");
+  my ($roomName, $readingName) = @_;
+  return HAL_getRoomReadingRecord_($roomName, $readingName, "");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte
 # Param Room-Name, Reading-Name
 # return ReadingsRecord
 sub HAL_getRoomOutdoorReadingRecord($$) {
-	my ($roomName, $readingName) = @_;
-	return HAL_getRoomReadingRecord_($roomName, $readingName, "_outdoor");
+  my ($roomName, $readingName) = @_;
+  return HAL_getRoomReadingRecord_($roomName, $readingName, "_outdoor");
 }
 
 # Liefert Record zu der Reading für die angeforderte Messwerte und Sensorliste (Internal)
 # Param Room-Name, Reading-Name, Name der Liste (sensors, sensors_outdoor)
 # return ReadingsRecord
 sub HAL_getRoomReadingRecord_($$$) {
-	my ($roomName, $readingName, $listNameSuffix) = @_;
-	my $listName.="sensors".$listNameSuffix;
-		
-	my $sensorList = HAL_getRoomDeviceNames_($roomName, $listName);	#HAL_getRoomSensorNames($roomName);
-	return undef unless $sensorList;
-	
-	# Wenn Reading mit Sensorname ubergeben wurde
-	my($tsname,$trname) = split(/:/,$readingName);
-	#Log 3,"+++++++++++++++++> ::::: ".$tsname." > :: ".$trname;
-	if($trname) {
-		# Pruefen, ob dieser Sensor in der aktuellen Raum-Liste bekannt ist
-		my $found=0;
-		foreach my $tsn (@{$sensorList}) {
-			#Log 3,"+++++++++++++++++> 1: ".$tsn." > 2: ".$tsname;
-			my($tsnSN,$tsnRest) = split(/:/,$tsn);
-			if($tsnSN eq $tsname) {
-				if($tsnRest) {
-					#Log 3,"+++++++++++++++++> XXX ".$tsnSN." > :: ".$tsnRest;
-					# ggf. auch (kommaseparierte) Liste der ReadingsNamen pruefen
-					my @aRN = split(/,\s*/,$tsnRest);
-					foreach my $tRN (@aRN) {
-						if($tRN eq $trname) {
-							$found=1;
-	  			    last;
-						}
-					}
-				  if($found) {last;}
-				} else {
-  				$found=1;
-	  			last;
-	  		}
-			}
-		}
-		if(!$found) { return undef };
-		#Log 3,"+++++++++++++++++> >>> ".$tsname." > :: ".$trname;
-		my $rec = HAL_getSensorValueRecord($tsname, $trname);
-		if(defined $rec) {
-			my $roomRec=HAL_getRoomRecord($roomName);
-			$rec->{room_alias}=$roomRec->{alias};
-			$rec->{room_fhem_name}=$roomRec->{fhem_name};
-			# XXX: ggf. weitere Room Eigenschaften
-			return $rec;
-		}
-	}
-	
-	foreach my $sName (@$sensorList) {
-		if(!defined($sName)) {next;} 
-		#Log 3,"+++++++++++++++++> >>> ".$sName." > :: ".$readingName;
-		# Pruefen, ob in den sName auch Reading(s) angegeben sind (in Raumdefinition)
-		my($tsname,$trname) = split(/:/,$sName);
-		if($trname) {
-		  #Pruefung, ob in trname readingName enthalten ist
-		  my @aRN = split(/,\s*/,$trname);
-		  my $found=0;
-		  foreach my $tRN (@aRN) {
-				if($tRN eq $readingName) {
-					$found=1;
-			    last;
-				}
-			}
-			if(!$found) { next; }
-		  
-		  my $rec = HAL_getSensorValueRecord($tsname, $readingName);
-	  	if(defined $rec) {
-		  	my $roomRec=HAL_getRoomRecord($roomName);
-			  $rec->{room_alias}=$roomRec->{alias};
-			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
-			  # XXX: ggf. weitere Room Eigenschaften
-			  return $rec;
-		  }
-		} else {
-  		my $rec = HAL_getSensorValueRecord($sName, $readingName);
-	  	if(defined $rec) {
-		  	my $roomRec=HAL_getRoomRecord($roomName);
-			  $rec->{room_alias}=$roomRec->{alias};
-			  $rec->{room_fhem_name}=$roomRec->{fhem_name};
-			  # XXX: ggf. weitere Room Eigenschaften
-			  return $rec;
-		  }
-		}
-	}
-	
-	return undef;
+  my ($roomName, $readingName, $listNameSuffix) = @_;
+  my $listName.="sensors".$listNameSuffix;
+    
+  my $sensorList = HAL_getRoomDeviceNames_($roomName, $listName); #HAL_getRoomSensorNames($roomName);
+  return undef unless $sensorList;
+  
+  # Wenn Reading mit Sensorname ubergeben wurde
+  my($tsname,$trname) = split(/:/,$readingName);
+  #Log 3,"+++++++++++++++++> ::::: ".$tsname." > :: ".$trname;
+  if($trname) {
+    # Pruefen, ob dieser Sensor in der aktuellen Raum-Liste bekannt ist
+    my $found=0;
+    foreach my $tsn (@{$sensorList}) {
+      #Log 3,"+++++++++++++++++> 1: ".$tsn." > 2: ".$tsname;
+      my($tsnSN,$tsnRest) = split(/:/,$tsn);
+      if($tsnSN eq $tsname) {
+        if($tsnRest) {
+          #Log 3,"+++++++++++++++++> XXX ".$tsnSN." > :: ".$tsnRest;
+          # ggf. auch (kommaseparierte) Liste der ReadingsNamen pruefen
+          my @aRN = split(/,\s*/,$tsnRest);
+          foreach my $tRN (@aRN) {
+            if($tRN eq $trname) {
+              $found=1;
+              last;
+            }
+          }
+          if($found) {last;}
+        } else {
+          $found=1;
+          last;
+        }
+      }
+    }
+    if(!$found) { return undef };
+    #Log 3,"+++++++++++++++++> >>> ".$tsname." > :: ".$trname;
+    my $rec = HAL_getSensorValueRecord($tsname, $trname);
+    if(defined $rec) {
+      my $roomRec=HAL_getRoomRecord($roomName);
+      $rec->{room_alias}=$roomRec->{alias};
+      $rec->{room_fhem_name}=$roomRec->{fhem_name};
+      # XXX: ggf. weitere Room Eigenschaften
+      return $rec;
+    }
+  }
+  
+  foreach my $sName (@$sensorList) {
+    if(!defined($sName)) {next;} 
+    #Log 3,"+++++++++++++++++> >>> ".$sName." > :: ".$readingName;
+    # Pruefen, ob in den sName auch Reading(s) angegeben sind (in Raumdefinition)
+    my($tsname,$trname) = split(/:/,$sName);
+    if($trname) {
+      #Pruefung, ob in trname readingName enthalten ist
+      my @aRN = split(/,\s*/,$trname);
+      my $found=0;
+      foreach my $tRN (@aRN) {
+        if($tRN eq $readingName) {
+          $found=1;
+          last;
+        }
+      }
+      if(!$found) { next; }
+      
+      my $rec = HAL_getSensorValueRecord($tsname, $readingName);
+      if(defined $rec) {
+        my $roomRec=HAL_getRoomRecord($roomName);
+        $rec->{room_alias}=$roomRec->{alias};
+        $rec->{room_fhem_name}=$roomRec->{fhem_name};
+        # XXX: ggf. weitere Room Eigenschaften
+        return $rec;
+      }
+    } else {
+      my $rec = HAL_getSensorValueRecord($sName, $readingName);
+      if(defined $rec) {
+        my $roomRec=HAL_getRoomRecord($roomName);
+        $rec->{room_alias}=$roomRec->{alias};
+        $rec->{room_fhem_name}=$roomRec->{fhem_name};
+        # XXX: ggf. weitere Room Eigenschaften
+        return $rec;
+      }
+    }
+  }
+  
+  return undef;
 }
 
 
@@ -2394,20 +2431,20 @@ sub HAL_getRoomReadingRecord_($$$) {
 # Wenn kein Wert gefunden werden kann, wird Default1 zurückgageben (wenn angegeben, ansonsten undef)
 # Wenn Default2 angegeben, dann wird dieser zurückgegeben, falls Raum nicht bekannt ist, ansonsten Default1 (wenn nicht angegeben - undef)
 sub HAL_getRoomReadingValue($$;$$) {
-	my ($roomName, $readingName, $def1, $def2) = @_;
-	
-	$def2 = $def1 unless defined($def2); 
-	
-	my $sensorList = HAL_getRoomSensorNames($roomName);
-	return $def2 unless $sensorList;
-	
-	foreach my $sName (@$sensorList) {
-		if(!defined($sName)) {next;} 
-		my $val = HAL_getSensorReadingValue($sName, $readingName);
-		if(defined $val) {return $val;}
-	}
-	
-	return $def1;
+  my ($roomName, $readingName, $def1, $def2) = @_;
+  
+  $def2 = $def1 unless defined($def2); 
+  
+  my $sensorList = HAL_getRoomSensorNames($roomName);
+  return $def2 unless $sensorList;
+  
+  foreach my $sName (@$sensorList) {
+    if(!defined($sName)) {next;} 
+    my $val = HAL_getSensorReadingValue($sName, $readingName);
+    if(defined $val) {return $val;}
+  }
+  
+  return $def1;
 }
 
 #------------------------------------------------------------------------------
@@ -2422,38 +2459,38 @@ sub HAL_getRoomReadingValue($$;$$) {
 #  X->{name}->{readings}->{<readings_name>} ->{unit}     ="°C";
 #  ...
 sub HAL_getDeviceRecord($) {
-	my ($name) = @_;
-	return undef unless $name;
-	my $ret = HAL_getDeviceTab()->{$name};
-	if($ret) {
-  	$ret->{name} = $name; # Name hinzufuegen
+  my ($name) = @_;
+  return undef unless $name;
+  my $ret = HAL_getDeviceTab()->{$name};
+  if($ret) {
+    $ret->{name} = $name; # Name hinzufuegen
   }
-	# AliasTab-Suche
-	if(!defined($ret)) {
-	  my $alias = HAL_getDeviceAliasTab()->{$name};
-	  if(defined($alias)) {
-	    $ret =  HAL_getDeviceTab()->{$alias};
-	    if($ret) {
-	      $ret->{name} = $alias; # Echten Namen hinzufuegen
-	      $ret->{name_alias} = $name; # Alias hinzufuegen
-	    }
-	  }
-	}
-	
-	
-	return $ret;
+  # AliasTab-Suche
+  if(!defined($ret)) {
+    my $alias = HAL_getDeviceAliasTab()->{$name};
+    if(defined($alias)) {
+      $ret =  HAL_getDeviceTab()->{$alias};
+      if($ret) {
+        $ret->{name} = $alias; # Echten Namen hinzufuegen
+        $ret->{name_alias} = $name; # Alias hinzufuegen
+      }
+    }
+  }
+  
+  
+  return $ret;
 }
 
 # s. HAL_getDeviceRecord
 sub HAL_getActorRecord($) {
-	my ($name) = @_;
-	return HAL_getDeviceRecord($name);
+  my ($name) = @_;
+  return HAL_getDeviceRecord($name);
 }
 
 # s. HAL_getDeviceRecord
 sub HAL_getSensorRecord($) {
-	my ($name) = @_;
-	return HAL_getDeviceRecord($name);
+  my ($name) = @_;
+  return HAL_getDeviceRecord($name);
 }
 
 # Liefert HASH mit Sensor-Definitionen
@@ -2478,26 +2515,26 @@ sub HAL_getDeviceAliasTab() {
 
 # Liefert Liste der Sensornamen.
 sub HAL_getSensorNames() {
-	HAL_initDeviceNames_() unless defined($sensornames);
-	return $sensornames;
+  HAL_initDeviceNames_() unless defined($sensornames);
+  return $sensornames;
 }
 
 # Liefert Liste der Actornamen.
 sub HAL_getActorNames() {
-	HAL_initDeviceNames_() unless defined($actornames);
-	return $actornames;
+  HAL_initDeviceNames_() unless defined($actornames);
+  return $actornames;
 }
 
 # Initialisiert Listen der Sensor/Actor-Names
 sub HAL_initDeviceNames_() {
-	my $r = HAL_getDeviceTab();
-	foreach my $name (keys %{$r}) {
-	  if(defined($r->{$name}->{readings})) {
-	  	push(@$sensornames,$name);
-	  }
-	  if(defined($r->{$name}->{actions})) {
-	  	push(@$actornames,$name);
-	  }
+  my $r = HAL_getDeviceTab();
+  foreach my $name (keys %{$r}) {
+    if(defined($r->{$name}->{readings})) {
+      push(@$sensornames,$name);
+    }
+    if(defined($r->{$name}->{actions})) {
+      push(@$actornames,$name);
+    }
   }
 }
 
@@ -2510,24 +2547,24 @@ sub HAL_initDeviceNames_() {
 #  X->{name}->{sensors}   =(<Liste der Namen>);
 #  X->{name}->{sensors_outdor} =(<Liste der SensorenNamen 'vor dem Fenster'>);
 sub HAL_getRoomRecord($) {
-	my ($name) = @_;
-	my $ret = HAL_getRooms()->{$name};
-	if($ret) {
-  	$ret->{name} = $name; # Name hinzufuegen
+  my ($name) = @_;
+  my $ret = HAL_getRooms()->{$name};
+  if($ret) {
+    $ret->{name} = $name; # Name hinzufuegen
   }
   # AliasTab-Suche
-	if(!defined($ret)) {
-	  my $alias = HAL_getRoomAliasTab()->{$name};
-	  if(defined($alias)) {
-	    $ret =  HAL_getRooms()->{$alias};
-	    if($ret) {
-	      $ret->{name} = $alias; # Echten Namen hinzufuegen
-	      $ret->{name_alias} = $name; # Alias hinzufuegen
-	    }
-	  }
-	}
+  if(!defined($ret)) {
+    my $alias = HAL_getRoomAliasTab()->{$name};
+    if(defined($alias)) {
+      $ret =  HAL_getRooms()->{$alias};
+      if($ret) {
+        $ret->{name} = $alias; # Echten Namen hinzufuegen
+        $ret->{name_alias} = $name; # Alias hinzufuegen
+      }
+    }
+  }
   
-	return $ret;
+  return $ret;
 }
 
 # Liefert HASH mit Raum-Definitionen
@@ -2537,10 +2574,10 @@ sub HAL_getRooms() {
 
 # Liefert Liste der Raumnamen.
 sub HAL_getRoomNames() {
-	my $r = HAL_getRooms();
-	my @ret = keys($r);
-	
-	return \@ret;
+  my $r = HAL_getRooms();
+  my @ret = keys($r);
+  
+  return \@ret;
 }
 
 # liefert Liste (Referenz) der Actoren in einem Raum (Liste der Namen)
@@ -2548,8 +2585,8 @@ sub HAL_getRoomNames() {
 #  Beispiel:   {HAL_getRoomActorNames("wohnzimmer")->[0]}
 sub HAL_getRoomActorNames($)
 {
-	my ($roomName) = @_;
-  return HAL_getRoomDeviceNames_($roomName,"actors");	
+  my ($roomName) = @_;
+  return HAL_getRoomDeviceNames_($roomName,"actors"); 
 }
 
 # liefert Liste (Referenz) der Sensors in einem Raum (Liste der Namen)
@@ -2557,8 +2594,8 @@ sub HAL_getRoomActorNames($)
 #  Beispiel:   {HAL_getRoomSensorNames("wohnzimmer")->[0]}
 sub HAL_getRoomSensorNames($)
 {
-	my ($roomName) = @_;
-  return HAL_getRoomDeviceNames_($roomName,"sensors");	
+  my ($roomName) = @_;
+  return HAL_getRoomDeviceNames_($roomName,"sensors");  
 }
 
 # liefert Liste (Referenz) der Sensors für einen Raum draussen (Liste der Namen)
@@ -2566,21 +2603,21 @@ sub HAL_getRoomSensorNames($)
 #  Beispiel:  {HAL_getRoomSensorNames("wohnzimmer")->[0]}
 sub HAL_getRoomOutdoorSensorNames($)
 {
-	my ($roomName) = @_;
-  return HAL_getRoomDeviceNames_($roomName,"sensors_outdoor");	
+  my ($roomName) = @_;
+  return HAL_getRoomDeviceNames_($roomName,"sensors_outdoor");  
 }
 
 # liefert Referenz der Liste der Geraete in einem Raum (List der Namen)
 # Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
 sub HAL_getRoomDeviceNames_($$)
 {
-	my ($roomName, $listName) = @_;
-	my $roomRec=HAL_getRoomRecord($roomName);
-	return undef unless $roomRec;
-	my $sensorList=$roomRec->{$listName};
-	return undef unless $sensorList;
-	
-	return $sensorList;
+  my ($roomName, $listName) = @_;
+  my $roomRec=HAL_getRoomRecord($roomName);
+  return undef unless $roomRec;
+  my $sensorList=$roomRec->{$listName};
+  return undef unless $sensorList;
+  
+  return $sensorList;
 }
 
 # liefert liste aller veruegbaren Readings in einem Raum
@@ -2588,7 +2625,7 @@ sub HAL_getRoomDeviceNames_($$)
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
 sub HAL_getRoomSensorReadingsList($;$) {
-	my ($roomName,$withSensorNames) = @_;
+  my ($roomName,$withSensorNames) = @_;
   return HAL_getRoomSensorReadingsList_($roomName,'sensors',$withSensorNames);
 }
 
@@ -2597,7 +2634,7 @@ sub HAL_getRoomSensorReadingsList($;$) {
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
 sub HAL_getRoomOutdoorSensorReadingsList($;$) {
-	my ($roomName,$withSensorNames) = @_;
+  my ($roomName,$withSensorNames) = @_;
   return HAL_getRoomSensorReadingsList_($roomName,'sensors_outdoor',$withSensorNames);
 }
 
@@ -2607,26 +2644,26 @@ sub HAL_getRoomOutdoorSensorReadingsList($;$) {
 #        Flag, gibt an, ob die Sensor-Namen mit ausgegeben werden sollen (als sensorname:readingname).
 #              Falls nicht, werden doppelte Eintraege aus der Liste entfernt.
 sub HAL_getRoomSensorReadingsList_($$;$) {
-	my ($roomName,$listName,$withSensorNames) = @_;
-	
-	my $snames = HAL_getRoomDeviceNames_($roomName,$listName);
-	my @rnames = ();
-	#Log 3,"+++++++++++++++++> SNames: ".Dumper($snames);
-	foreach my $sname (@{$snames}) {
-		#Log 3,"+++++++++++++++++> Name:".$sname." | ".Dumper($sname);
-		my @tnames = HAL_getSensorReadingsList($sname);
-		if($withSensorNames) {
-			@tnames = map {$sname.':'.$_} @tnames;
-		}
-		@rnames = (@rnames, @tnames);
-	}
-	
-	if(!$withSensorNames) {
-	  #distinct
-		@rnames = keys { map { $_ => 1 } @rnames };
-	}
-	
-	return @rnames;
+  my ($roomName,$listName,$withSensorNames) = @_;
+  
+  my $snames = HAL_getRoomDeviceNames_($roomName,$listName);
+  my @rnames = ();
+  #Log 3,"+++++++++++++++++> SNames: ".Dumper($snames);
+  foreach my $sname (@{$snames}) {
+    #Log 3,"+++++++++++++++++> Name:".$sname." | ".Dumper($sname);
+    my @tnames = HAL_getSensorReadingsList($sname);
+    if($withSensorNames) {
+      @tnames = map {$sname.':'.$_} @tnames;
+    }
+    @rnames = (@rnames, @tnames);
+  }
+  
+  if(!$withSensorNames) {
+    #distinct
+    @rnames = keys { map { $_ => 1 } @rnames };
+  }
+  
+  return @rnames;
 }
 
 
@@ -2636,8 +2673,8 @@ sub HAL_getRoomSensorReadingsList_($$;$) {
 ##  Beispiel:  {(HAL_getRoomSensors("wohnzimmer"))[0]->{alias}}
 #sub HAL_getRoomSensors($)
 #{
-#	my ($roomName) = @_;
-#  return HAL_getRoomSensors_($roomName,"sensors");	
+# my ($roomName) = @_;
+#  return HAL_getRoomSensors_($roomName,"sensors"); 
 #}
 #
 ## liefert Liste der Sensors für einen Raum draussen (Array of Hashes)
@@ -2645,109 +2682,111 @@ sub HAL_getRoomSensorReadingsList_($$;$) {
 ##  Beispiel:  {(HAL_getRoomOutdoorSensors("wohnzimmer"))[0]->{alias}}
 #sub HAL_getRoomOutdoorSensors($)
 #{
-#	my ($roomName) = @_;
-#  return HAL_getRoomSensors_($roomName,"sensors_outdoor");	
+# my ($roomName) = @_;
+#  return HAL_getRoomSensors_($roomName,"sensors_outdoor"); 
 #}
 #
 ## liefert Liste der Sensors in einem Raum (Array of Hashes)
 ## Param: Raumname, SensorListName (z.B. sensors, sensors_outdoor)
 #sub HAL_getRoomSensors_($$)
 #{
-#	my ($roomName, $listName) = @_;
-#	my $roomRec=HAL_getRoomRecord($roomName);
-#	return undef unless $roomRec;
-#	my $sensorList=$roomRec->{$listName};
-#	return undef unless $sensorList;
-#	
-#	my @ret;
-#	foreach my $sName (@{$sensorList}) {
-#		my $sRec = HAL_getSensorRecord($sName);
-#		push(@ret, \%{$sRec}) if $sRec ;
-#	}
-#	
-#	return @ret;
+# my ($roomName, $listName) = @_;
+# my $roomRec=HAL_getRoomRecord($roomName);
+# return undef unless $roomRec;
+# my $sensorList=$roomRec->{$listName};
+# return undef unless $sensorList;
+# 
+# my @ret;
+# foreach my $sName (@{$sensorList}) {
+#   my $sRec = HAL_getSensorRecord($sName);
+#   push(@ret, \%{$sRec}) if $sRec ;
+# }
+# 
+# return @ret;
 #}
 ## <---------------
 
 # parameters: name
 # liefert Array : Liste aller Readings eines Sensor-Device (auch composite)
 sub HAL_getSensorReadingsList($) {
-	my ($name) = @_;
-	
-	my $record = HAL_getSensorRecord($name);
-	
-	if(defined($record)) {
-		# Eigene Readings
-		my @areadings = keys($record->{readings});
-		
-		# Composite-Devices
-		my $composites = $record->{composite};
+  my ($name) = @_;
+  
+  my $record = HAL_getSensorRecord($name);
+  
+  if(defined($record)) {
+    # Eigene Readings
+    my @areadings = keys($record->{readings});
+    
+    # Composite-Devices
+    my $composites = $record->{composite};
 
-	  foreach my $composite_rec (@{$composites}) {
-		  my($composite_name,$composite_readings_names)= split(/:/,$composite_rec);
-		  if($composite_name) {
-		  	my @composite_readings = HAL_getSensorReadingsList($composite_name);
-  		  if(defined($composite_readings_names)) {
-  		  	my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
-	  	  	@composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
-		    }
-		    
-		    @areadings = (@areadings,@composite_readings);
-		  }
-	  }
-	  
+    foreach my $composite_rec (@{$composites}) {
+      my($composite_name,$composite_readings_names)= split(/:/,$composite_rec);
+      if($composite_name) {
+        my @composite_readings = HAL_getSensorReadingsList($composite_name);
+        if(defined($composite_readings_names)) {
+          my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
+          @composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
+        }
+        
+        @areadings = (@areadings,@composite_readings);
+      }
+    }
+    
     return @areadings;
   }
-	return undef;
+  return undef;
 }
 
 # sucht gewünschtes reading zu dem angegebenen device, folgt den in {composite} definierten (Unter)-Devices.
 # liefert Device und Reading Recors als Array 
 sub HAL_getSensorReadingCompositeRecord_intern($$)
 {
-	my ($device_record,$reading) = @_;
-	return (undef, undef) unless $device_record;
-	return (undef, undef) unless $reading;
-	
-	my $readings_record = $device_record->{readings};
-	my $single_reading_record = $readings_record->{$reading};
-	
-	if(defined($single_reading_record) && ref($single_reading_record ne 'HASH')) {
-		#Log 3,"+++++++++++++++++> R:".$reading." SR: ".Dumper($single_reading_record);
-		return (undef, undef);
-	}
-	
-	if ($single_reading_record) {
-		#$single_reading_record->{reading_name} = $reading; Nicht noetig
-		$single_reading_record->{name}=$reading; #XXX? So nicht! doch?
-	  return ($device_record, $single_reading_record);
-	}
-	
-	# composites verarbeiten
-	# e.g.  $devices->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); 
-	my $composites = $device_record->{composite};
+  my ($device_record,$reading) = @_;
+  return (undef, undef) unless $device_record;
+  return (undef, undef) unless $reading;
+  
+  my $readings_record = $device_record->{readings};
+  my $single_reading_record = $readings_record->{$reading};
+  
+  #Log 3,"+++++++++++++++++> R:".$reading." SR: ".Dumper($single_reading_record);
+  
+  if(defined($single_reading_record) && (ref($single_reading_record) ne 'HASH')) {
+    #Log 3,"+++++++++++++++++> R:".$reading." SR: ".Dumper($single_reading_record);
+    return (undef, undef);
+  }
+  
+  if ($single_reading_record) {
+    #$single_reading_record->{reading_name} = $reading; Nicht noetig
+    $single_reading_record->{name}=$reading; #XXX? So nicht! doch?
+    return ($device_record, $single_reading_record);
+  }
+  
+  # composites verarbeiten
+  # e.g.  $devices->{wz_wandthermostat}->{composite} =("wz_wandthermostat_climate"); 
+  my $composites = $device_record->{composite};
 
-	foreach my $composite_rec (@{$composites}) {
-		my($composite_name,$composite_readings)= split(/:/,$composite_rec);
-		if(defined($composite_readings)) {
-			my @a_composite_readings = split(/,\s*/,$composite_readings);
-			#Log 3,"+++++++++++++++++> R:".$reading." A: ".Dumper(@a_composite_readings);
-			my $found=0;
-			for my $aval (@a_composite_readings) { if($aval eq $reading) {$found=1;last;} }
-			if ( !$found ) {
-			  next;
-		  }
-		}
-		my $new_device_record = HAL_getSensorRecord($composite_name);
-		my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
-		if(defined($new_single_reading_record )) {
-			#$new_single_reading_record->{reading_name} = $reading; #Nicht noetig
-			$new_single_reading_record->{name}=$reading; #XXX? So nicht! doch?
-			return ($new_device_record2, $new_single_reading_record);
-		}
-	}
-	
-	return (undef, undef);
+  foreach my $composite_rec (@{$composites}) {
+    my($composite_name,$composite_readings)= split(/:/,$composite_rec);
+    if(defined($composite_readings)) {
+      my @a_composite_readings = split(/,\s*/,$composite_readings);
+      #Log 3,"+++++++++++++++++> R:".$reading." A: ".Dumper(@a_composite_readings);
+      my $found=0;
+      for my $aval (@a_composite_readings) { if($aval eq $reading) {$found=1;last;} }
+      if ( !$found ) {
+        next;
+      }
+    }
+    my $new_device_record = HAL_getSensorRecord($composite_name);
+    my ($new_device_record2, $new_single_reading_record) = HAL_getSensorReadingCompositeRecord_intern($new_device_record,$reading);
+    if(defined($new_single_reading_record )) {
+      #$new_single_reading_record->{reading_name} = $reading; #Nicht noetig
+      $new_single_reading_record->{name}=$reading; #XXX? So nicht! doch?
+      return ($new_device_record2, $new_single_reading_record);
+    }
+  }
+  
+  return (undef, undef);
 }
 
 # parameters: name, reading name
@@ -2757,13 +2796,13 @@ sub HAL_getSensorReadingCompositeRecord_intern($$)
 #  X->{unit} = "";
 sub HAL_getSensorReadingRecord($$)
 {
-	my ($name, $reading) = @_;
-	my $record = HAL_getSensorRecord($name);
-	
-	if(defined($record)) {
+  my ($name, $reading) = @_;
+  my $record = HAL_getSensorRecord($name);
+  
+  if(defined($record)) {
     return HAL_getSensorReadingCompositeRecord_intern($record,$reading);
   }
-	return (undef, undef);
+  return (undef, undef);
 }
 
 # Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
@@ -2778,7 +2817,7 @@ sub HAL_getSensorReadingRecord($$)
 # X->...
 sub HAL_getSensorValueRecord($$)
 {
-	my ($name, $reading) = @_;
+  my ($name, $reading) = @_;
   # Sensor/Reading-Record suchen
   my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
   
@@ -2789,60 +2828,62 @@ sub HAL_getSensorValueRecord($$)
 # Param: Device-Hash, Reading-Hash
 # Return: Value-Hash
 sub HAL_getReadingsValueRecord($$) {
-	my ($device, $record) = @_;
-	
-	#Log 3,"+++++++++++++++++> ".Dumper($device);
-	#Log 3,"+++++++++++++++++> ".Dumper($record);
-	
-	if (defined($record)) {
-		my $val=undef;
-		my $time=undef;
-		my $ret;
-	
-		my $link = $record->{link};
-		if($link) {
-			my($sensorName,$readingName) = split(/:/, $link);
-			
-			$sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
-			return undef unless $readingName;
-			$ret = HAL_getSensorValueRecord($sensorName,$readingName);
-			# ggf. neue Sensor und Reading Namen (er)setzen
-			$ret->{sensor}  =$device->{name};
+  my ($device, $record) = @_;
+  
+  #Log 3,"+++++++++++++++++> ".Dumper($device);
+  #Log 3,"+++++++++++++++++> ".Dumper($record);
+  
+  if (defined($record)) {
+    my $val=undef;
+    my $time=undef;
+    my $ret;
+  
+    my $link = $record->{link};
+    if($link) {
+      my($sensorName,$readingName) = split(/:/, $link);
+      
+      $sensorName = $device->{name} unless $sensorName; # wenn nichts angegeben (vor dem :) dann den Sensor selbst verwenden (Kopie eigenes Readings)
+      return undef unless $readingName;
+      $ret = HAL_getSensorValueRecord($sensorName,$readingName);
+      # ggf. neue Sensor und Reading Namen (er)setzen
+      $ret->{sensor}  =$device->{name};
       $ret->{reading} =$record->{name}; #XXX?
-			return $ret;
-		} 
+      return $ret;
+    }
 
-		my $valueFn =  $record->{ValueFn};
-		if($valueFn) {
-	    if($valueFn=~m/\{.*\}/) {
-	    	# Klammern: direkt evaluieren
-	      $val= eval $valueFn;	
-	      $time=TimeNow(); # Aktuelle Zeit
-	    } else {
-	    	no strict "refs";
+    my $valueFn =  $record->{ValueFn};
+    if($valueFn) {
+      if($valueFn=~m/\{.*\}/) {
+        # Klammern: direkt evaluieren
+        no warnings;
+        $val= eval $valueFn;
+        use warnings; 
+        $time=TimeNow(); # Aktuelle Zeit
+      } else {
+        no strict "refs";
         my $r = &{$valueFn}($device,$record);
         use strict "refs";
         if(ref $r eq ref {}) {
-        	# wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
-        	$ret = $r;
-        	#Log 3,"+++++++++++++++++> D: ".Dumper($ret);
-        	$time=$ret->{time};
-        	$time=TimeNow() unless defined $ret->{time}; # Aktuelle Zeit, es sei denn, time wurde definiert
-        	$ret->{level} = $record->{level} unless defined($ret->{level});
-        	#Log 3,"+++++++++++++++++> D: ".Dumper($record);
+          # wenn Hash (also kompletter Hash zurückgegeben, mit value, time etc.)
+          $ret = $r;
+          #Log 3,"+++++++++++++++++> D: ".Dumper($ret);
+          $time=$ret->{time};
+          $time=TimeNow() unless defined $ret->{time}; # Aktuelle Zeit, es sei denn, time wurde definiert
+          $ret->{level} = $record->{level} unless defined($ret->{level});
+          #Log 3,"+++++++++++++++++> D: ".Dumper($record);
         } else {
-        	# Scalar-Wert annehmen
-        	$val=$r;
-        	$time=TimeNow(); # Aktuelle Zeit
+          # Scalar-Wert annehmen
+          $val=$r;
+          $time=TimeNow(); # Aktuelle Zeit
         }
-	    }
-			#TODO
-			#$val="not implemented";
-			#Log 3,"+++++++++++++++++> D: ".Dumper($time);
-		}
-		else
-		{
-	    my $fhem_name = $device->{fhem_name};
+      }
+      #TODO
+      #$val="not implemented";
+      #Log 3,"+++++++++++++++++> D: ".Dumper($time);
+    }
+    else
+    {
+      my $fhem_name = $device->{fhem_name};
       my $reading_fhem_name = $record->{reading};
       #Log 3,"+++++++++++++++++> ".Dumper($record);
       $val = ReadingsVal($fhem_name,$reading_fhem_name,undef);
@@ -2856,23 +2897,26 @@ sub HAL_getReadingsValueRecord($$) {
     # ValueFilterFn
     my $valueFilterFn =  $record->{ValueFilterFn};
     if($valueFilterFn) {
-    	#Log 3,"+++++++++++++++++> D: ".$val;
-			if($valueFilterFn=~m/\{.*\}/) {
-	    	# Klammern: direkt evaluieren
-	    	my $VAL = $val;
-	      $val= eval $valueFilterFn;
-	    } else {
-	    	no strict "refs";
+      #Log 3,"+++++++++++++++++> D: ".$val;
+      if($valueFilterFn=~m/\{.*\}/) {
+        # Klammern: direkt evaluieren
+        my $VAL = $val;
+        #Log 3,"+++++++++++++++++> V: ".Dumper($valueFilterFn);
+        no warnings;
+        $val= eval $valueFilterFn;
+        use warnings;
+      } else {
+        no strict "refs";
         my $r = &{$valueFilterFn}($val,$device,$record);
         use strict "refs";
         if(defined($r)) {
-        	$val=$r;
+          $val=$r;
         }
-	    #Log 3,"+++++++++++++++++> R: ".$val;
-	    }
-	    
-	    $ret->{value}     =$val if(defined $val);
-		}
+      #Log 3,"+++++++++++++++++> R: ".$val;
+      }
+      
+      $ret->{value}     =$val if(defined $val);
+    }
     
     # dead or alive?
     $ret->{status} = 'unknown';
@@ -2889,12 +2933,12 @@ sub HAL_getReadingsValueRecord($$) {
       if($actCycle && $iactCycle > 0) {
         my $ttime = dateTime2dec($time);
         if($ttime && $ttime>0) {
-      	  my $delta = time()-$ttime;
-      	  if($delta>$iactCycle) {
-      	  	$ret->{status} = 'dead';
-      	  } else {
-      	  	$ret->{status} = 'alive';
-      	  }
+          my $delta = time()-$ttime;
+          if($delta>$iactCycle) {
+            $ret->{status} = 'dead';
+          } else {
+            $ret->{status} = 'alive';
+          }
         }
       }
     }
@@ -2905,7 +2949,7 @@ sub HAL_getReadingsValueRecord($$) {
     if ($ret->{alive}) {
       $ret->{value_alive} = $ret->{value};
     } else {
-    	$ret->{value_alive} = undef;
+      $ret->{value_alive} = undef;
     }
     
     $ret->{unit}      =$record->{unit} if defined($record->{unit});
@@ -2918,8 +2962,8 @@ sub HAL_getReadingsValueRecord($$) {
     #$ret->{sensor_alias} =$
     $ret->{device_alias} =$device->{alias};
     return $ret;
-	}
-	return undef;
+  }
+  return undef;
 }
 
 # Sucht den Gewuenschten SensorDevice und liest den gesuchten Reading aus
@@ -2927,10 +2971,10 @@ sub HAL_getReadingsValueRecord($$) {
 # returns current readings value
 sub HAL_getSensorReadingValue($$)
 {
-	my ($name, $reading) = @_;
-	my $h = HAL_getSensorValueRecord($name, $reading);
-	return undef unless $h;
-	return $h->{value};
+  my ($name, $reading) = @_;
+  my $h = HAL_getSensorValueRecord($name, $reading);
+  return undef unless $h;
+  return $h->{value};
 }
 
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading das Unit-String aus
@@ -2938,27 +2982,27 @@ sub HAL_getSensorReadingValue($$)
 # returns readings unit
 sub HAL_getSensorReadingUnit($$)
 {
-	my ($name, $reading) = @_;
-	my $h = HAL_getSensorValueRecord($name, $reading);
-	return undef unless $h;
-	return $h->{unit};
-	
-	# Sensor/Reading-Record suchen
-	my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
-	if (defined($record)) {
-	  return $record->{unit};
-	}
-	return undef;
+  my ($name, $reading) = @_;
+  my $h = HAL_getSensorValueRecord($name, $reading);
+  return undef unless $h;
+  return $h->{unit};
+  
+  # Sensor/Reading-Record suchen
+  my ($device, $record) = HAL_getSensorReadingRecord($name,$reading);
+  if (defined($record)) {
+    return $record->{unit};
+  }
+  return undef;
 }
 
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus
 # parameters: name, reading name
 # returns current readings time
 sub HAL_getSensorReadingTime($$) {
-	my ($name, $reading) = @_;
-	my $h = HAL_getSensorValueRecord($name, $reading);
-	return undef unless $h;
-	return $h->{time};
+  my ($name, $reading) = @_;
+  my $h = HAL_getSensorValueRecord($name, $reading);
+  return undef unless $h;
+  return $h->{time};
 }
 
 # Sucht den Gewuenschten SensorDevice und liest zu dem gesuchten Reading die Zeitangabe aus.
@@ -2986,9 +3030,9 @@ sub HAL_getSensorReadingTimeDuration($$) {
   
   my $mTime = HAL_getSensorReadingTime($name, $reading);
   if($mTime) {
-  	my $dTime = dateTime2dec($mTime);
-  	my $diffTime = time() - $dTime;
-  	return $diffTime;
+    my $dTime = dateTime2dec($mTime);
+    my $diffTime = time() - $dTime;
+    return $diffTime;
   }
   
   return undef;
@@ -2998,33 +3042,33 @@ sub HAL_getSensorReadingTimeDuration($$) {
 # Liefert Record fuer eine Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
 sub HAL_getReadingRecord($) {
-	my($readingSpec) = @_;
-	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return HAL_getSensorValueRecord($sNamem,$rName);
+  my($readingSpec) = @_;
+  my($sNamem,$rName) = split(/:/,$readingSpec);
+  return HAL_getSensorValueRecord($sNamem,$rName);
 }
 
 # Liefert Value einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
 sub HAL_getReadingValue($) {
-	my($readingSpec) = @_;
-	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return HAL_getSensorReadingValue($sNamem,$rName);
+  my($readingSpec) = @_;
+  my($sNamem,$rName) = split(/:/,$readingSpec);
+  return HAL_getSensorReadingValue($sNamem,$rName);
 }
 
 # Liefert Unit einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
 sub HAL_getReadingUnit($) {
-	my($readingSpec) = @_;
-	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return HAL_getSensorReadingUnit($sNamem,$rName);
+  my($readingSpec) = @_;
+  my($sNamem,$rName) = split(/:/,$readingSpec);
+  return HAL_getSensorReadingUnit($sNamem,$rName);
 }
 
 # Liefert Time einer Reading eines Sensors
 # Param: Spec in Form SensorName:ReadingName
 sub HAL_getReadingTime($) {
-	my($readingSpec) = @_;
-	my($sNamem,$rName) = split(/:/,$readingSpec);
-	return HAL_getSensorReadingTime($sNamem,$rName);
+  my($readingSpec) = @_;
+  my($sNamem,$rName) = split(/:/,$readingSpec);
+  return HAL_getSensorReadingTime($sNamem,$rName);
 }
 
 # Prueft, ob Device vorhanden ist
@@ -3038,14 +3082,14 @@ sub HAL_isDeviceExist($) {
 # Prueft, ob der Sensor alive ist (s. actCycle)
 #  Param: Sensorname
 sub HAL_isSensorAlive($) {
-	my($name) = @_;
-	my @list = HAL_getSensorReadingsList($name);
-	foreach my $reading (@list) {
-		if(!HAL_isReadingAlive($name, $reading)) {
-			return 0;
-		}
-	}
-	return 1;
+  my($name) = @_;
+  my @list = HAL_getSensorReadingsList($name);
+  foreach my $reading (@list) {
+    if(!HAL_isReadingAlive($name, $reading)) {
+      return 0;
+    }
+  }
+  return 1;
 }
 
 # Prueft, ob der Sensor alive ist (s. actCycle)
@@ -3053,13 +3097,13 @@ sub HAL_isSensorAlive($) {
 #  Param: Sensorname
 sub HAL_gerSensorDeadTimeDuration($) {
   my($name) = @_;
-	my @list = HAL_getSensorReadingsList($name);
-	foreach my $reading (@list) {
-		if(!HAL_isReadingAlive($name, $reading)) {
-			return HAL_getSensorReadingTimeDuration($name, $reading);
-		}
-	}
-	return undef;
+  my @list = HAL_getSensorReadingsList($name);
+  foreach my $reading (@list) {
+    if(!HAL_isReadingAlive($name, $reading)) {
+      return HAL_getSensorReadingTimeDuration($name, $reading);
+    }
+  }
+  return undef;
 }
 
 # Prueft, ob der Sensor alive ist (s. actCycle)
@@ -3067,13 +3111,13 @@ sub HAL_gerSensorDeadTimeDuration($) {
 #  Param: Sensorname
 sub HAL_gerSensorDeadTimeDurationStr($) {
   my($name) = @_;
-	my @list = HAL_getSensorReadingsList($name);
-	foreach my $reading (@list) {
-		if(!HAL_isReadingAlive($name, $reading)) {
-			return HAL_getSensorReadingTimeDurationStr($name, $reading);
-		}
-	}
-	return undef;
+  my @list = HAL_getSensorReadingsList($name);
+  foreach my $reading (@list) {
+    if(!HAL_isReadingAlive($name, $reading)) {
+      return HAL_getSensorReadingTimeDurationStr($name, $reading);
+    }
+  }
+  return undef;
 }
 
 # Prueft, ob ein (Batterie-betriebener) Device schwache Batterie hat
@@ -3097,15 +3141,15 @@ sub HAL_getDeviceBatStatus($) {
   if(!HAL_isDeviceExist($name)) {
     return 'device not found'; 
   }
-	
-	my $bStat = HAL_getSensorReadingValue($name,'bat_status');
-	my $bLimit = HAL_getSensorReadingValue($name,'low_bat_limit');
-	my $bVolt = HAL_getSensorReadingValue($name,'bat_voltage');
-	my $zInfo = '';
-	if(defined($bVolt)) {$zInfo = $bVolt.' V';}
-	if(defined($bLimit)) {$zInfo .= ' / '.$bLimit.' V';}
-	
-	if($bStat) {
+  
+  my $bStat = HAL_getSensorReadingValue($name,'bat_status');
+  my $bLimit = HAL_getSensorReadingValue($name,'low_bat_limit');
+  my $bVolt = HAL_getSensorReadingValue($name,'bat_voltage');
+  my $zInfo = '';
+  if(defined($bVolt)) {$zInfo = $bVolt.' V';}
+  if(defined($bLimit)) {$zInfo .= ' / '.$bLimit.' V';}
+  
+  if($bStat) {
     if($bStat eq 'ok') {
       return ('ok',$zInfo); 
     }
@@ -3114,34 +3158,34 @@ sub HAL_getDeviceBatStatus($) {
     }
     
     return 'unknown status: '.$bStat;
-	}
-	
-	if(defined($bLimit) && defined($bVolt)) {
-	  # wenn beides bekannt, kann man ausrechnen
-	  if((0+$bVolt)<=(0+$bLimit)) {
-	    return ('low',$zInfo); 
-	  } else {
-	    return ('ok',$zInfo); 
-	  }
-	} elsif(defined($bVolt)) {
-	  # wenn Voltage bekannt aber kein Limit
-	  return ('unknown',$zInfo);
-	}
-	
-	# vermutlich kein Batterie-Device
-	return ('non bat',undef);
+  }
+  
+  if(defined($bLimit) && defined($bVolt)) {
+    # wenn beides bekannt, kann man ausrechnen
+    if((0+$bVolt)<=(0+$bLimit)) {
+      return ('low',$zInfo); 
+    } else {
+      return ('ok',$zInfo); 
+    }
+  } elsif(defined($bVolt)) {
+    # wenn Voltage bekannt aber kein Limit
+    return ('unknown',$zInfo);
+  }
+  
+  # vermutlich kein Batterie-Device
+  return ('non bat',undef);
 }
 
 # Prueft, ob Reading eines Sensors alive ist (s. actCycle)
 #  Param: Sensorname, Readingname
 sub HAL_isReadingAlive($$) {
-	my($sensor,$reading) = @_;
+  my($sensor,$reading) = @_;
 
-	my $record = HAL_getSensorValueRecord($sensor,$reading);
-	if($record) {
-		return $record->{alive};
-	}
-	return 0;
+  my $record = HAL_getSensorValueRecord($sensor,$reading);
+  if($record) {
+    return $record->{alive};
+  }
+  return 0;
 }
 
 #------------------------------------------------------------------------------
@@ -3153,11 +3197,11 @@ sub HAL_isReadingAlive($$) {
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
 #sub HAL_doAllActions() {
-#	Main:Log 3, "PROXY_CTRL:--------> do all ";
-#	foreach my $act (keys %{$actTab}) {
-#		my $cTab = $actTab->{$act};
-#		HAL_doAction($cTab, $act);
-#	}
+# Main:Log 3, "PROXY_CTRL:--------> do all ";
+# foreach my $act (keys %{$actTab}) {
+#   my $cTab = $actTab->{$act};
+#   HAL_doAction($cTab, $act);
+# }
 #}
 
 ###############################################################################
@@ -3165,37 +3209,37 @@ sub HAL_isReadingAlive($$) {
 # (für alle Devices, solange nicht anders definiert) 
 ###############################################################################
 #sub HAL_doAction($$) {
-#	my ($cTab, $actName) = @_;
-#	
-#	Log 3, "PROXY_CTRL:--------> do ".$actName;
-#	
-#	my $disabled = $cTab->{disabled}; # undef => enabled
-#	Log 3, "PROXY_CTRL:--------> act ".$actName." disabled:".$disabled;
-#	if(defined($disabled) && $disabled eq '1') { return }; # wenn disabled => raus
-#	
-#	my $checkFn = $cTab->{checkFn}; # undef => ausführen
-#	Log 3, "PROXY_CTRL:--------> act ".$actName." checkFn:".$checkFn;
-#	if(defined($checkFn)) {
-#		my $valueFn = eval $checkFn;
-#		if(!defined($valueFn)) { return }; # wenn undef => raus
+# my ($cTab, $actName) = @_;
+# 
+# Log 3, "PROXY_CTRL:--------> do ".$actName;
+# 
+# my $disabled = $cTab->{disabled}; # undef => enabled
+# Log 3, "PROXY_CTRL:--------> act ".$actName." disabled:".$disabled;
+# if(defined($disabled) && $disabled eq '1') { return }; # wenn disabled => raus
+# 
+# my $checkFn = $cTab->{checkFn}; # undef => ausführen
+# Log 3, "PROXY_CTRL:--------> act ".$actName." checkFn:".$checkFn;
+# if(defined($checkFn)) {
+#   my $valueFn = eval $checkFn;
+#   if(!defined($valueFn)) { return }; # wenn undef => raus
 #    if( !$valueFn ) { return }; # wenn false => raus
-#	}
-#	
-#	my @devList = $cTab->{deviceList}; # undef => für alle ausführen
-#	Log 3, "PROXY_CTRL:--------> act ".$actName." deviceList: ".@devList;
-#	if(@devList) {
-#	 	foreach my $dev (@devList) {
-#	 		Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
-#		  HAL_DeviceSetFn($dev, $actName);
-#	  }
-#	} else {
-#	  foreach my $dev (keys %{$devTab}) {     
-#	  	Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
-#  	  if($dev ne 'DEFAULT') {
-#  	  	HAL_DeviceSetFn($dev, $actName, "www"); #?
-#  	  }
+# }
+# 
+# my @devList = $cTab->{deviceList}; # undef => für alle ausführen
+# Log 3, "PROXY_CTRL:--------> act ".$actName." deviceList: ".@devList;
+# if(@devList) {
+#   foreach my $dev (@devList) {
+#     Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
+#     HAL_DeviceSetFn($dev, $actName);
+#   }
+# } else {
+#   foreach my $dev (keys %{$devTab}) {     
+#     Log 3, "PROXY_CTRL:--------> act ".$actName." device:".$dev;
+#     if($dev ne 'DEFAULT') {
+#       HAL_DeviceSetFn($dev, $actName, "www"); #?
+#     }
 #    }
-#	}
+# }
 #}
 
 #- Steuerung aus ReadingProxy -------------------------------------------------
@@ -3210,15 +3254,15 @@ sub HAL_isReadingAlive($$) {
 # und auch wie stark (wie weit soll Rollo heruntergefahren werden).
 ###############################################################################
 #sub HAL_DeviceSetFn($@) {
-#	my ($DEVICE,@a) = @_;
-#	my $CMD = $a[0];
+# my ($DEVICE,@a) = @_;
+# my $CMD = $a[0];
 #  my $ARGS = join(" ", @a[1..$#a]);
 #  
 #  #TODO
 #  Log 3, "PROXY_CTRL:--------> set ".$DEVICE." - ".$CMD." - ".$ARGS;
 #  my $cmdFn = $devTab->{$DEVICE}->{valueFns}->{$CMD}; #TODO
 #  if(defined($cmdFn)) {
-#  	# TODO
+#   # TODO
 #  } else {
 #    return;
 #  }
@@ -3227,15 +3271,15 @@ sub HAL_isReadingAlive($$) {
 # Zur Verwendung in ReadingProxy. Prüft (transparent) ob und wie ein Befehl ausgeführt werden soll.
 # TODO
 #sub HAL_SetProxyFn($@) {
-#	my ($DEVICE,@a) = @_;
-#	my $CMD = $a[0];
+# my ($DEVICE,@a) = @_;
+# my $CMD = $a[0];
 #  my $ARGS = join(" ", @a[1..$#a]);
 #  
 #  #TODO
 #  Log 3, "PROXY_CTRL:--------> set ".$DEVICE." - ".$CMD." - ".$ARGS;
 #  my $cmdFn = $devTab->{$DEVICE}->{valueFns}->{$CMD};
 #  if(defined($cmdFn)) {
-#  	# TODO
+#   # TODO
 #  } else {
 #    return ""; # pass through cmd to device
 #  }
@@ -3271,12 +3315,12 @@ sub HAL_isReadingAlive($$) {
  # $test->{sname2}->{readings}->{humidity}->{asd}  = "DSF2";
  
 sub sTest() {
-	#merge_hash_recursive($test->{sname}, $template->{t1});
-	#merge_hash_recursive($test->{sname2}, $template->{t1});
-	
-	HAL_expandTemplates($templates);
-	return Dumper($templates);
-	#return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
+  #merge_hash_recursive($test->{sname}, $template->{t1});
+  #merge_hash_recursive($test->{sname2}, $template->{t1});
+  
+  HAL_expandTemplates($templates);
+  return Dumper($templates);
+  #return Dumper($test->{sname}) ."\n------------------\n". Dumper($test->{sname2});
 }
 
 
