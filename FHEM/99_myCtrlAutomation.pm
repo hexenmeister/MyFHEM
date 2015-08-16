@@ -578,7 +578,12 @@ sub checkFensterZustand($) {
   my $wcb = previewGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
 	my $msgzeit = $wcb ->{SINCE_LAST_SEC};
 	my $msgcnt = $wcb ->{EQ_ACT_CNT};
+	
 	my $msgMaxCnt;
+	my $delayTirstWarningTilted = 1800;
+	my $delayBetweenWarningsTilted = 900;
+	my $delayTirstWarningOpen = 1200;
+	my $delayBetweenWarningsOpen = 900;
 	
 	Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName.", Zustand: ".$zustand.", Dauer: ".$dauer.", LastMsgTime: ".$msgzeit.", MsgCnt: ".$msgcnt;
 	
@@ -589,9 +594,9 @@ sub checkFensterZustand($) {
 			# Wenn gekippt
 			$msgMaxCnt = 1;
 			if($msgcnt<$msgMaxCnt) { # wenn max Anzahl Meldungen noch nicht erreicht ist
-			  if($msgcnt==0 || $msgzeit>600) { # wenn seit ueber 10 Min keine Meldung
+			  if($msgcnt==0 || $msgzeit>$delayBetweenWarningsTilted) { # wenn seit ueber 10 Min keine Meldung
       		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
-          if($dauer>1800) { # einmalig nach 30 Minuten warnen
+          if($dauer>$delayTirstWarningTilted) { # einmalig nach 30 Minuten warnen
     	      # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
       	    # Alarm wenn kalt im Zimmer?
     	      #TODO
@@ -604,19 +609,19 @@ sub checkFensterZustand($) {
     	      }
           }
         } else {
-          Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt."Warnung in ".(600-$msgzeit).". (Max: ".$msgMaxCnt." Meldungen)";
+          Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt."Warnung in ".($delayBetweenWarningsTilted-$msgzeit).". (Max: ".$msgMaxCnt." Meldungen)";
         }
       } else {
         Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." Max. Anzahl Warnungen erreicht. (Max: ".$msgMaxCnt." Meldungen)";
       }
-		} else {
-		  $msgMaxCnt = 4;
+		} else { # wenn offen
+		  $msgMaxCnt = 3;
 		  $msgMaxCnt = 2 if($hour>22); # Nach 22:00 nur zweimal warnen
 		  $msgMaxCnt = 1 if($hour>23); # Nach 23:00 nur einmal warnen
     	if($msgcnt<$msgMaxCnt) { # sein min. 10 Min keine Meldung, oder gar keine Meldung, aber nicht mehr als N Mal
-    	  if($msgcnt==0 || $msgzeit>600) { # wenn seit ueber 10 Min keine Meldung
+    	  if($msgcnt==0 || $msgzeit>$delayBetweenWarningsOpen) { # wenn seit ueber 10 Min keine Meldung
       		# TODO je nach Aussentemperatur unterschiedliche Zeiten fuer die Warnung
-          if($dauer>1200) { # 20 Min
+          if($dauer>$delayTirstWarningOpen) { # 20 Min
     	      # Meldung nur einmal augeben (bis zu 3 mal? bei 20,30, 60?)
       	    # Alarm wenn kalt im Zimmer?
     	      #TODO
@@ -626,7 +631,7 @@ sub checkFensterZustand($) {
     	      speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",100);
           }
         } else {
-          Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt."Warnung in ".(600-$msgzeit).". (Max: ".$msgMaxCnt." Meldungen)";
+          Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt."Warnung in ".($delayBetweenWarningsOpen-$msgzeit).". (Max: ".$msgMaxCnt." Meldungen)";
         }
       } else {
         Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." Max. Anzahl Warnungen erreicht. (Max: ".$msgMaxCnt." Meldungen)";
