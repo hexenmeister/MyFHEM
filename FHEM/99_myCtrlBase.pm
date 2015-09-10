@@ -679,6 +679,18 @@ sub previewGenericCtrlBlock($;$$$$) {
 	return getGenericCtrlBlock($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt,1)
 }
 
+# Gleich wie previewGenericCtrlBlock, der Satz wird jedoch erzeugt, falls nicht vorhanden
+sub previewGenericCtrlBlockAutocreate($;$$$$) {
+	my($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt)=@_;
+	my $ret = getGenericCtrlBlock($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt,1);
+	if(!defined($ret->{LAST_STATE})) {
+	  $ret = getGenericCtrlBlock($group, $new_state, $last_time_diff, $sequenceKey, $sequenceCnt,0);
+	  $ret->{SINCE_LAST_SEC}=99999;
+	  $ret->{BETWEEN_2_LAST_SEC}=99999;
+	}
+	return $ret;
+}
+
 sub test_getGenericCtrlBlock() {
 	my $d;
 	$d = getGenericCtrlBlock("TESTX");
