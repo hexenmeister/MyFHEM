@@ -930,7 +930,7 @@ my $debounce_map;
 # Es wird geprüft, ob der Schluessel in der angegebenen Zeit bereits 
 # angefragt wurde. Dann wird liefert 1 (true), sonst 0 (false).
 # Damit kann z.B. sichergestellt werden, dass nur ein Befehl 
-# in der angegebenen Zeit ausgefuehrt. Nuetzlich bei notify-Befehlen.
+# in der angegebenen Zeit ausgefuehrt wird. Nuetzlich bei notify-Befehlen.
 #
 # Parameter: Key - Schluessel; time - Zeit in Sekunden
 ###############################################################################
@@ -938,7 +938,7 @@ sub
 debounce($$)
 {
 	my($key, $dtime) = @_;
-  
+
   my $ctime = time();
   my $otime = $debounce_map->{$key};
   
