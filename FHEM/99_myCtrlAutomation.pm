@@ -444,7 +444,7 @@ sub checkFensterBeschattung($$$) {
 	  }
 	}
 	
-	my $wstruct = previewGenericCtrlBlock("ctrl_last_window_beschattung_".$sensorName);
+	my $wstruct = previewGenericCtrlBlockAutocreate("ctrl_last_window_beschattung_".$sensorName);
 	
 	my $dauer = $wstruct ->{SINCE_LAST_SEC};
   my $zustand = $wstruct ->{LAST_STATE};
@@ -568,14 +568,14 @@ sub checkFensterBeschattung($$$) {
 # Prueft, ob Fenster geoeffnet sind und ob diesbezueglich Warnungen ausgegeben werden sollen
 sub checkFensterZustand($) {
 	my($deviceName) = @_;
-	my $wstruct = previewGenericCtrlBlock("ctrl_last_window_state_".$deviceName);
+	my $wstruct = previewGenericCtrlBlockAutocreate("ctrl_last_window_state_".$deviceName);
 	
 	my $dauer = $wstruct ->{SINCE_LAST_SEC};
   my $zustand = $wstruct ->{LAST_STATE};
   
   # TODO
   # Wenn Offen und laenger als X? und kalt draussen, dann Warnung
-  my $wcb = previewGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
+  my $wcb = previewGenericCtrlBlockAutocreate("ctrl_last_window_state_".$deviceName."_msg","on");
 	my $msgzeit = $wcb ->{SINCE_LAST_SEC};
 	my $msgcnt = $wcb ->{EQ_ACT_CNT};
 	
