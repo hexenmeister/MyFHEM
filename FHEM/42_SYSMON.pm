@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 8890 2015-07-05 10:16:19Z hexenmeister $
+# $Id: 42_SYSMON.pm 9182 2015-08-30 20:37:47Z hexenmeister $
 
 package main;
 
@@ -173,18 +173,20 @@ SYSMON_Define($$)
         delete($hash->{HOST});
         delete($hash->{USER});
         # erkennen, wenn User angegeben ist
-        my($user,$th) = split(/@/,$host);
-        if(defined($th)) {
-          $hash->{USER} = lc($user);
-          $host = $th;
+        if($host) {
+          my($user,$th) = split(/@/,$host);
+          if(defined($th)) {
+            $hash->{USER} = lc($user);
+            $host = $th;
+          }
+          $hash->{HOST} = lc($host) if(defined($host));
+          # DefaultPort je nach Protokol
+          if(!defined($port)) {
+            $port = '23' if($mode eq 'telnet');
+            $port = '22' if($mode eq 'ssh');
+          }
+          $hash->{PORT} = lc($port);
         }
-        $hash->{HOST} = lc($host) if(defined($host));
-        # DefaultPort je nach Protokol
-        if(!defined($port)) {
-          $port = '23' if($mode eq 'telnet');
-          $port = '22' if($mode eq 'ssh');
-        }
-        $hash->{PORT} = lc($port);
       } else {
         return "unexpected mode. use local or telnet only."; # TODO: SSH
       }
@@ -2187,14 +2189,28 @@ SYSMON_getCPUProcStat_intern($$$)
     # Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
     my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
     
-    my $CPUuser    = $neuCPUuser    - $altCPUuser;
-    my $CPUnice    = $neuCPUnice    - $altCPUnice;
-    my $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
-    my $CPUidle    = $neuCPUidle    - $altCPUidle;
-    my $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
-    my $CPUirq     = $neuCPUirq     - $altCPUirq;
-    my $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
-    $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
+    my ($CPUuser, $CPUnice, $CPUsystem, $CPUidle, $CPUiowait, $CPUirq, $CPUsoftirq);
+
+  	if($neuCPUuser < $altCPUuser) {
+        $CPUuser    = $neuCPUuser;
+        $CPUnice    = $neuCPUnice;
+        $CPUsystem  = $neuCPUsystem;
+        $CPUidle    = $neuCPUidle;
+        $CPUiowait  = $neuCPUiowait;
+        $CPUirq     = $neuCPUirq;
+        $CPUsoftirq = $neuCPUsoftirq;
+  	}
+  	else {
+        $CPUuser    = $neuCPUuser    - $altCPUuser;
+        $CPUnice    = $neuCPUnice    - $altCPUnice;
+        $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
+        $CPUidle    = $neuCPUidle    - $altCPUidle;
+        $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
+        $CPUirq     = $neuCPUirq     - $altCPUirq;
+        $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
+  	}
+    
+    #$map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
     
     my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
     my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
@@ -3028,7 +3044,8 @@ sub SYSMON_FBVersionInfo($$) {
   
   if($hash->{helper}->{excludes}{'fbversion'}) {return $map;}
   
-  my $data = SYSMON_execute($hash, "/etc/version --version --date");
+  my @ar = SYSMON_execute($hash, "/etc/version --version --date");
+  my $data = $ar[0];
   
   my($v, $d, $t) = split(/\s+/, $data);
   
