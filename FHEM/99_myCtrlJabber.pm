@@ -71,7 +71,41 @@ sendMeStatusMsg()
 	#$msg=$msg."T: ".ReadingsVal("GSD_1.4", "temperature", "---")." C,"; 
 	#$msg=$msg." H: ".ReadingsVal("GSD_1.4", "humidity", "---")." %,";  
 	#$msg=$msg." Bat: ".ReadingsVal("GSD_1.4", "batteryLevel", "---")." V";
+
+  my $msgDead='';	
+	my $sensors = HAL_getSensorNames();
+  foreach my $sensorname (@$sensors) {
+    if(!HAL_isSensorAlive($sensorname)) {
+      # info: dead seit
+      my $dauer = HAL_gerSensorDeadTimeDurationStr($sensorname);
+      if($dauer) {
+        $msgDead.="\n".$sensorname.' seit '.$dauer;
+      } else {
+        $msgDead.="\n".$sensorname;
+      }
+    }
+  }
+  if($msgDead) {
+   $msg.="\nDead devices:".$msgDead;
+  } else {
+   $msg.="\nno dead devices"; 
+  }
 	
+  my $msgBat='';
+	my $sensors = HAL_getSensorNames();
+  foreach my $sensorname (@$sensors) {
+    if(HAL_isDeviceLowBat($sensorname)) {
+      my $info = HAL_getDeviceBatStatus($sensorname);
+      my $deadSt = HAL_isSensorAlive($sensorname)?'(alive)':'(dead)';
+      $msgBat.="\n".$sensorname.' : '.$info.' '.$deadSt;
+    }
+  }
+  if($msgBat) {
+   $msg.="\nlow batteries:".$msgBat;
+  } else {
+   $msg.="\nno low batteries"; 
+  }
+
 	sendMeJabberMessage($msg);
 }
 
