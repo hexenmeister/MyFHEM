@@ -599,9 +599,9 @@ sub voiceBewegungVorgarten() {
 	#	speak(":sonar-ping0.mp3:",10);
 	#}
 	
-	my $ret = previewGenericCtrlBlock("voice_pir_vorgarten", 'x', 300);
+	my $ret = previewGenericCtrlBlockAutocreate("voice_pir_vorgarten", 'x', 300);
 	my $since_last = $ret->{SINCE_LAST_SEC};
-	if($since_last > 30) { # Events unter 30 Sekunden ausfiltern.
+	if($since_last > 30 || !defined($ret->{LAST_STATE})) { # Events unter 30 Sekunden ausfiltern. Oder die erste Abfrage (lastState=undef)
 	
 	  $ret = getGenericCtrlBlock("voice_pir_vorgarten", 'x', 300); # Letzte 5 Min betrachten.
     $since_last = $ret->{SINCE_LAST_SEC};
@@ -636,7 +636,7 @@ sub voiceMorningGreeting() {
   # nur morgens zw. 5 und 10 Uhr
   if($hour>=5 && $hour<10) {
   	# nur, wenn seit 4:30 Uhr keine Bewegung festgestellt wurde und mindest dauer zw. 
-  	my $ret = previewGenericCtrlBlock("ctrl_last_pir_eg_fl");
+  	my $ret = previewGenericCtrlBlockAutocreate("ctrl_last_pir_eg_fl");
     # Zeit (jetzt), wenn das Ereignis kam (duerfte sehr klein sein < 2 Sec.)
     my $zeit_x = $ret->{SINCE_LAST_SEC}; 
     # nur, wenn das letzte Ereigniss nicht zu lange her liegt (macht ja irgendwann keinen Sinn mehr)
