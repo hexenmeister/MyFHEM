@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 9182 2015-08-30 20:37:47Z hexenmeister $
+# $Id: 42_SYSMON.pm 9239 2015-09-13 07:48:24Z hexenmeister $
 
 package main;
 
@@ -2210,7 +2210,7 @@ SYSMON_getCPUProcStat_intern($$$)
         $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
   	}
     
-    #$map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
+    $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
     
     my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
     my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
@@ -3084,7 +3084,7 @@ sub SYSMON_getFBStreamRate($$) {
   my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
   
   if($ds_rate ne "" && $us_rate ne "") {
-    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." kBit/s, up: ".int($us_rate)." kBit/s";
   }
   
   return $map;
@@ -3102,7 +3102,7 @@ sub SYSMON_getFBStreamRate2($$) {
   if(defined($ds_rate) && defined($us_rate) && $ds_rate ne "" && $us_rate ne "") {
     $ds_rate = $ds_rate/1000;
     $us_rate = $us_rate/1000;
-    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." kBit/s, up: ".int($us_rate)." kBit/s";
   }
   
   return $map;
