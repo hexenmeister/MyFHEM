@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 9239 2015-09-13 07:48:24Z hexenmeister $
+# $Id: 42_SYSMON.pm 9269 2015-09-17 19:39:41Z hexenmeister $
 
 package main;
 
@@ -4319,7 +4319,7 @@ sub SYSMON_ShowBarChartHtml($;$) {
   my $sysmon = {};
   my $html='';
   if(defined($main::defs{$dev}{READINGS})) {
-    foreach my $r (keys($main::defs{$dev}{READINGS})){
+    foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
       $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
     }
   } else {
@@ -4597,7 +4597,7 @@ sub SYSMON_ShowBarChartHtml_alt($;$$){
   # access sysmon data..
   #my $sysmon = SYSMON_getValues($dev);
   my $sysmon = {};  
-  foreach my $r (keys($main::defs{$dev}{READINGS})){
+  foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
     $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
   }
   
