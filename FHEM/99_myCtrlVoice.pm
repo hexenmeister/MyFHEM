@@ -724,6 +724,12 @@ sub voiceHalloween($) {
       speak(":halloween/klopfen.wav:",100);
       return 1;
     }
+    
+    # Tuerknarren
+    if($mode eq "4") {
+      speak(":halloween/tuer_zu.wav:",100);
+      return 1;
+    }
   }
   
   return 0;
