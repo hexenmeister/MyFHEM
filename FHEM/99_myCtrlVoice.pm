@@ -14,6 +14,7 @@ require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 use constant {
  NOTIFICATION_CONFIRM1 => ":sonic-ring.mp3:",
  NOTIFICATION_CONFIRM2 => ":cm/notifications/Argon.ogg:",
+ NOTIFICATION_CONFIRM3 => ":ding.mp3:",
  NOTIFICATION_FAIL => ":cm/notifications/Doink.ogg:",
  NOTIFICATION_MSG_INFO1 => ":cm/notifications/Merope.ogg:",
  NOTIFICATION_MSG_INFO2 => ":cm/notifications/pixiedust.ogg:",
@@ -150,6 +151,14 @@ sub voiceNotificationConfirm2(;$) {
   my($volume)=@_;
 	$volume=0 unless defined ($volume);
   speak(NOTIFICATION_CONFIRM2,$volume);
+}
+###############################################################################
+# Bestaetigungston 3
+###############################################################################
+sub voiceNotificationConfirm3(;$) {
+  my($volume)=@_;
+	$volume=0 unless defined ($volume);
+  speak(NOTIFICATION_CONFIRM3,$volume);
 }
 ###############################################################################
 # Ton: Fehlgeschlagen
@@ -320,7 +329,7 @@ sub voiceActGenericUserEvent() {
   #TODO: Alle Ausgaben umbauen / auslagern / sauber implmentieren
   #TODO: Spezielle Ansage Texte wenn Zustand geaendert ist: 'Nach Hause mommen'
   
-  voiceNotificationConfirm1();
+  voiceNotificationConfirm3();
   
   # Nachtansage
   if($hour>=23||$hour<3) {
@@ -481,9 +490,6 @@ sub voiceActLeaveHome() {
   
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   
-  voiceNotificationConfirm2(); #TODO ? Anderer Sound als beim 'On'?
-  
-  
   my @wndOpen = getWindowDoorList(+STATE_NAME_WIN_OPENED);
   my @wndTilted = getWindowDoorList(+STATE_NAME_WIN_TILTED);
   my @wndNotClosed = getWindowDoorList(+STATE_NAME_WIN_CLOSED,1);
@@ -549,14 +555,21 @@ sub voiceActLeaveHome() {
     $flag=1;
   }
   
-  speak($text);
+  if($flag) {
+    voiceNotificationMsgWarn();
+    speak($text);  
+  } else {
+    voiceNotificationConfirm2(); #TODO ? Anderer Sound als beim 'On'?    
+  }
+  
+  
   # TODO: bessere Sprache/Saetze
 
   if(!$flag) {
   # Nachtansage
   if($hour>=23||$hour<3) {
     if($cnt_1min==0) {
-    # Begrueßung nur, wenn laenger als 10 Min.
+    # Begrueßung nur, wenn laenger als X Min.
       if($since_last>=300) {
         speakWetterDaten(0);
         #speak("Bis dann!",0);
@@ -568,7 +581,7 @@ sub voiceActLeaveHome() {
   # Morgensansage
   if($hour>=3&&$hour<10) {
     if($cnt_1min==0) {
-    # Begrueßung nur, wenn laenger als 10 Min.
+    # Begrueßung nur, wenn laenger als X Min.
       if($since_last>=300) {
         speakWetterDaten();
         #speak("angenehmen Tag!",0);
@@ -580,7 +593,7 @@ sub voiceActLeaveHome() {
   # Tagesansage
     if($hour>=10&&$hour<23) {
       if($cnt_1min==0) {
-      # Begrueßung nur, wenn laenger als 10 Min.
+      # Begrueßung nur, wenn laenger als X Min.
         if($since_last>=300) {
         speakWetterDaten();
           #speak("Bis spaeter!",0);
