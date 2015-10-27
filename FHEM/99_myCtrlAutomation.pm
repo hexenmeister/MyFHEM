@@ -65,6 +65,70 @@ sub actPIR_EGFlur() {
 	voiceMorningGreeting();
 }
 
+# Benachrichtigungen von Tuerkontakten (open/closed)
+# Params:
+#   Device: Name des Ausloesers
+#   Event: open/closed/tilted
+# Moegliche Werte (HM): 
+#   battery: ok / battery: low
+#   open / closed
+#   contact: open (to ccu) / .. closed (to XXX)
+#   alive: yes
+#   cover: open / cover: closed
+#   
+sub actTuer($$) {
+  my ($deviceName, $event) = @_;
+  my $le = lc($event);
+	if($le=~/^(open|closed)$/) {
+		# Doppelte Meldungen innerhalb kurzer Zeit (1s) unterdruecken.
+		if(debounce("state-".$deviceName."-".$le,1)) {
+		  actTuerStatus($deviceName, $le);
+	  }
+	} elsif($le=~/cover:\s+(\S+)/) {
+		if(debounce("sabotage-".$deviceName."-".$le,1)) {
+  		actTuerSabotageKontakt($deviceName, $1);
+  	}
+	}
+}
+
+# Benachrichtigung ueber die Aenderung des Status einer Tuer
+# Params:
+#   Device: Name des Ausloesers
+#   Event:  open/closed
+#
+sub actTuerStatus($$) {
+	my ($deviceName, $event) = @_;
+	Log 3, ">Tuer: $deviceName => $event";
+	
+	my $ctrl = getGenericCtrlBlock("ctrl_last_door_state_".$deviceName, $event, 86400, $event, 10);
+	my $last = $ctrl->{LAST_STATE};
+	
+	# Fuer alle Faelle: nur wenn nicht die gleiche Ereignisse mehrfach kommen.
+	if($event ne $last) {
+	  # Sound für 'Oeffnen'
+  	if($event eq 'open') {
+  	  voiceHalloween(2); 
+    }
+    # Sound fuer 'Schliessen'
+    if($event eq 'closed') {
+  	  voiceHalloween(4); 
+    }
+  }
+}
+
+# Benachrichtigung Sabotagekontakt einer Tuer 
+# (Oeffnung/Schliessung des Batteriefaches)
+# Params:
+#   Device: Name des Ausloesers
+#   Event:  open/closed
+#
+sub actTuerSabotageKontakt($$) {
+	my ($deviceName, $event) = @_;
+	Log 3, ">Tuer Sabotagekontakt: $deviceName => $event";
+	# TODO
+
+}
+
 # Benachrichtigungen von Fensterkontakten (open/closed/tilted)
 # Params:
 #   Device: Name des Ausloesers
@@ -72,7 +136,7 @@ sub actPIR_EGFlur() {
 # Moegliche Werte (HM): 
 #   battery: ok / battery: low
 #   open / closed /  tilted
-#   contact: open (to ccu) / .. closed, tlted (to XXX)
+#   contact: open (to ccu) / .. closed, tilted (to XXX)
 #   alive: yes
 #   cover: open / cover: closed
 #   
@@ -202,13 +266,13 @@ sub actHomePresenceLong() {
 	setHomePresence_Absent();
 	
 	#Halloween TEMP
-	if(!voiceHalloween(2)) {
+	#if(!voiceHalloween(2)) {
 	  #wenn die Halloween-Schaltung inaktiv
 	  # andere Aktionen
 	  
 	  # Hier (Sprach)Meldungen
 	  voiceActLeaveHome();
-	}
+	#}
 }
 
 
