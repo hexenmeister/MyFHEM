@@ -1285,18 +1285,18 @@ sub arraysIntersec2($$) {
   return \@intersec;
 }
 
-sub arraysIntesecTest() {
+sub arraysIntersecTest() {
   my @a = ('a','b','c');
   my @b = ('b','c','d');
   
-  my @c = arraysIntesec(\@a,\@b);
+  my @c = arraysIntersec(\@a,\@b);
   
   Log 3,"+++++++++++++++++> a:".Dumper(@a);
   Log 3,"+++++++++++++++++> b:".Dumper(@b);
   Log 3,"+++++++++++++++++> c:".Dumper(@c);  
 }
 
-sub arraysIntesec($$) {
+sub arraysIntersec($$) {
 	my ($a1,$a2) = @_;
 	
 	my @array1 = @$a1; # erstes Array
