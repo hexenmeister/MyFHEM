@@ -145,7 +145,7 @@ my $actornames;
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
-  $rooms->{wohnzimmer}->{actors}=['wz_rollo_r'];
+  $rooms->{wohnzimmer}->{actors}=['eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
@@ -216,46 +216,48 @@ my $actornames;
 # >>> Aktoren
 
 # TODO
-  #$devices->{wz_rollo_r}->{class}="rollo"; # optional zum gruppieren #TODO?
-  $devices->{wz_rollo_r}->{alias}="WZ Rolladen";
-  $devices->{wz_rollo_r}->{fhem_name}="wz_rollo_r";
-  $devices->{wz_rollo_r}->{type}="HomeMatic";
-  $devices->{wz_rollo_r}->{location}="wohnzimmer";
-  #$devices->{wz_rollo_r}->{readings}->{level}="level";
-  #$devices->{wz_rollo_r}->{actions}->{xxx}->{valueFn}="{...}";
-  $devices->{wz_rollo_r}->{actions}->{level}->{setting}="pct";
-  $devices->{wz_rollo_r}->{actions}->{level}->{type}="int"; #?
-  $devices->{wz_rollo_r}->{actions}->{level}->{min}="0";    #?
-  $devices->{wz_rollo_r}->{actions}->{level}->{max}="100";  #?
-  $devices->{wz_rollo_r}->{actions}->{level}->{alias} = "Rolladenstellung";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{runter}->{value}="0";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{halb}->{value}="60";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
-  $devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   
-  $devices->{wz_licht_r}->{alias}="WZ Licht (Dimmer)";
-  $devices->{wz_licht_r}->{fhem_name}="EG_WZ_DA01_Licht_Rechts_Sw";
-  $devices->{wz_licht_r}->{type}="HomeMatic";
-  $devices->{wz_licht_r}->{location}="wohnzimmer";
-  $devices->{wz_licht_r}->{readings}->{level}->{reading} ="level";
-  $devices->{wz_licht_r}->{readings}->{level}->{alias}   ="Dimmwert";
-  $devices->{wz_licht_r}->{readings}->{level}->{unit}    ="%";
-  #$devices->{wz_licht_r}->{actions}->{xxx}->{valueFn}="{...}";
-  $devices->{wz_licht_r}->{actions}->{level}->{setting}="pct";
-  $devices->{wz_licht_r}->{actions}->{level}->{type}="int"; #?
-  $devices->{wz_licht_r}->{actions}->{level}->{min}="0";    #?
-  $devices->{wz_licht_r}->{actions}->{level}->{max}="100";  #?
-  $devices->{wz_licht_r}->{actions}->{level}->{alias} = "Licht Dimmer";
-  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{an}->{value}="100";
-  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{aus}->{value}="0";
-  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{on}->{value}="100";
-  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{off}->{value}="0";
-  $devices->{wz_licht_r}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
-  #$devices->{wz_licht_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
-  #$devices->{wz_licht_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
+  
+  $devices->{eg_wz_li_r}->{alias}="WZ Licht (Dimmer)";
+  $devices->{eg_wz_li_r}->{fhem_name}="EG_WZ_DA01_Licht_Rechts_Sw";
+  $devices->{eg_wz_li_r}->{type}="HomeMatic";
+  $devices->{eg_wz_li_r}->{location}="wohnzimmer";
+  $devices->{eg_wz_li_r}->{readings}->{level}->{reading} ="level";
+  $devices->{eg_wz_li_r}->{readings}->{level}->{alias}   ="Dimmwert";
+  $devices->{eg_wz_li_r}->{readings}->{level}->{unit}    ="%";
+  #$devices->{eg_wz_li_r}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{setting}="pct";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{type}="int"; #?
+  $devices->{eg_wz_li_r}->{actions}->{level}->{min}="0";    #?
+  $devices->{eg_wz_li_r}->{actions}->{level}->{max}="100";  #?
+  $devices->{eg_wz_li_r}->{actions}->{level}->{alias} = "Licht Dimmer";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{an}->{value}="100";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{aus}->{value}="0";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{on}->{value}="100";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{off}->{value}="0";
+  $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
+  #$devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  #$devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #TODO: Coposite,Link
+  
+  ##$devices->{wz_rollo_r}->{class}="rollo"; # optional zum gruppieren #TODO?
+  #$devices->{wz_rollo_r}->{alias}="WZ Rolladen";
+  #$devices->{wz_rollo_r}->{fhem_name}="wz_rollo_r";
+  #$devices->{wz_rollo_r}->{type}="HomeMatic";
+  #$devices->{wz_rollo_r}->{location}="wohnzimmer";
+  ##$devices->{wz_rollo_r}->{readings}->{level}="level";
+  ##$devices->{wz_rollo_r}->{actions}->{xxx}->{valueFn}="{...}";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{setting}="pct";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{type}="int"; #?
+  #$devices->{wz_rollo_r}->{actions}->{level}->{min}="0";    #?
+  #$devices->{wz_rollo_r}->{actions}->{level}->{max}="100";  #?
+  #$devices->{wz_rollo_r}->{actions}->{level}->{alias} = "Rolladenstellung";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   
 #TODO: Verlagern
 # Sendet neuen Wert an den Aktor
@@ -270,8 +272,36 @@ sub HAL_setActionValue($$$) {
   if(!defined($actionname)) {return "no action specified";}
   if(!defined($value)) {return "no value specified";}
   if(!$actor_record) {return "no actor $actorname found";}
-  if(!$actor_record->{actions}) {return "no actions found in $actorname";}
-  my $action_record = $actor_record->{actions}->{$actionname};
+  my $actions_record = $actor_record->{actions};
+  if(!$actions_record) {return "no actions found in $actorname";}
+  
+  # composite, link
+  my $link = $actions_record->{link};
+  my $composites = $actions_record->{composite};
+  if($composites) {
+    my $ret=undef;
+    foreach my $composite_rec (@{$composites}) {
+      my($actornameN,$actionnameN)= split(/:/,$composite_rec);
+      $actionnameN = $actionname unless $actionnameN;
+      my $r=HAL_setActionValue($actornameN, $actionnameN, $value);
+      if(defined($r)) {
+        if(!defined($ret)) {
+          $ret=$r;
+        } else {
+          $ret.=','.$r; 
+        }
+      }
+    }
+    return $ret;
+  } elsif($link) {
+    my($actornameN, $actionnameN) = split(/:/, $a);
+    $actionnameN = $actionname unless $actionnameN;
+    return HAL_setActionValue($actornameN, $actionnameN, $value);
+    #return undef;
+  }
+  
+  # direkt setzen
+  my $action_record = $actions_record->{$actionname};
   if(!$action_record) {return "no action $actorname:$actionname found";}
   
   my $fhem_actor_name = $actor_record->{fhem_name};
@@ -297,8 +327,8 @@ sub HAL_setActionValue($$$) {
   # TODO: Pruefen interna
   # 
   
-  
   return fhem("set $fhem_actor_name $setting $value");
+  
   #return undef;
 }
 
@@ -984,6 +1014,7 @@ sub HAL_setActionValue($$$) {
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{FnParams}  = "level";
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
   $devices->{eg_wz_rl}->{readings}->{leveltime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  $devices->{eg_wz_rl}->{actions} ->{composite}     = ['eg_wz_rl01','eg_wz_rl02'];
   #<<<
   
   $devices->{eg_wz_rl01}->{alias}     ="Rollo";
@@ -994,16 +1025,39 @@ sub HAL_setActionValue($$$) {
   $devices->{eg_wz_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{eg_wz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{eg_wz_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{eg_wz_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{eg_wz_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{eg_wz_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{eg_wz_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{eg_wz_rl02}->{alias}     ="Rollo";
   $devices->{eg_wz_rl02}->{fhem_name} ="wz_rollo_r";
   $devices->{eg_wz_rl02}->{type}      ="HomeMatic";
   $devices->{eg_wz_rl02}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_rl02}->{comment}   ="Rollostand";
+  $devices->{eg_wz_rl02}->{comment}   ="Rollo-Actor";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{reading}   ="level";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{unit} ="%";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{setting}="pct";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{type}="int"; #?
+  $devices->{eg_wz_rl02}->{actions}->{level}->{min}="0";    #?
+  $devices->{eg_wz_rl02}->{actions}->{level}->{max}="100";  #?
+  $devices->{eg_wz_rl02}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{eg_wz_rl02}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
+
   #<<<
   
   $devices->{eg_wz_fk01}->{alias}     ="Fensterkontakt";
@@ -2726,7 +2780,7 @@ sub HAL_getSensorReadingsList($) {
         my @composite_readings = HAL_getSensorReadingsList($composite_name);
         if(defined($composite_readings_names)) {
           my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
-          @composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
+          @composite_readings = arraysIntersec(\@composite_readings,\@a_composite_readings_names);
         }
         
         @areadings = (@areadings,@composite_readings);
