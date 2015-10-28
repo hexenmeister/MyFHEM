@@ -1959,11 +1959,11 @@ use POSIX;
 #
 ##------------------------------------------------------------------------------
 #
-#sub
-#myCtrlProxies_Initialize($$)
-#{
-#  my ($hash) = @_;
-#}
+sub
+myCtrlProxies_Initialize($$)
+{
+  my ($hash) = @_;
+}
 #
 ## Liefert Record zu der Reading für die angeforderte Messwerte
 ## Param Room-Name, Reading-Name
@@ -2288,7 +2288,7 @@ use POSIX;
 #		  	my @composite_readings = HAL_getSensorReadingsList($composite_name);
 #  		  if(defined($composite_readings_names)) {
 #  		  	my @a_composite_readings_names = split(/,\s*/,$composite_readings_names);
-#	  	  	@composite_readings = arraysIntesec(\@composite_readings,\@a_composite_readings_names);
+#	  	  	@composite_readings = arraysIntersec(\@composite_readings,\@a_composite_readings_names);
 #		    }
 #		    
 #		    @areadings = (@areadings,@composite_readings);
