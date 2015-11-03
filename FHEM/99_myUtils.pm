@@ -631,7 +631,12 @@ sub
 _getRolloLevel($)
 {
 	my ($name) = @_;
-	return int(ReadingsVal($name, "level", "100"));
+	# Situation abfangen, wenn gerade ein Wert geschrieben wird (dann sieht es so in etwa aus: 'set_0').
+	my $ll = ReadingsVal($name, "level", "100");
+  if($ll=~/set_(.*)/) {
+    $ll=$1; 
+  }
+	return int($ll);
 }
 
 ###############################################################################
