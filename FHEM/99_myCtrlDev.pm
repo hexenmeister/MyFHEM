@@ -41,6 +41,7 @@ sub HAL_getDeviceBatStatus($);
 sub HAL_getActorNames();
 sub HAL_getActorRecord($);
 sub HAL_setActionValue($$$);
+sub HAL_setRoomActionValue($$$);
 
 # Sensoren
 #sub HAL_getSensors();
@@ -145,7 +146,7 @@ my $actornames;
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
-  $rooms->{wohnzimmer}->{actors}=['eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
+  $rooms->{wohnzimmer}->{actors}=['licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
@@ -330,6 +331,44 @@ sub HAL_setActionValue($$$) {
   return fhem("set $fhem_actor_name $setting $value");
   
   #return undef;
+}
+
+# Setzt Aktoren auf den gewuenschten Wert
+# Param: Spec in Form: actorName (hier wird action im actor gesucht) oder actionName=actorName[:nActionName][,actorName[:nActionName]] (Actions unter anderen Namen ansprechen)
+sub HAL_setRoomActionValue($$$) {
+  my($roomName, $actionName, $value) = @_;
+  my $actorList = HAL_getRoomActorNames($roomName);
+  return "no room $roomName found" unless $actorList;
+  foreach my $taname (@{$actorList}) {
+    my($tactionName,$rest) = split(/=/, $taname);
+    if(defined($rest)) {
+      # Erweiterter Syntax
+      if($tactionName eq $actionName) {
+        my @a= split(/,/ , $rest);
+        foreach my $aspec (@a) {
+          my($tsactorName,$tsactionName) = split(/:/, $aspec);
+          $tsactionName = $actionName unless $tsactionName;
+          if(defined($tsactorName)) {
+            return HAL_setActionValue($tsactorName,$tsactionName,$value);
+          }
+        }
+      }
+    } else {
+      # Nur Actorname
+      my $actorRecord = HAL_getActorRecord($taname);
+      if($actorRecord) {
+        my $actionsRecord = $actorRecord->{actions};
+        if($actionsRecord) {
+          my $actionRecord = $actionsRecord->{$actionName};
+          if($actionRecord) {
+            return HAL_setActionValue($taname,$actionName,$value);
+          }
+        }
+      }
+    }
+  }
+  
+  return "no action $actionName for room $roomName found";
 }
 
 # TODO: setRoomActionValue
