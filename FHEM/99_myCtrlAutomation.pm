@@ -577,12 +577,18 @@ sub checkFensterBeschattung($$$) {
   Log 3, "Automation: checkFensterBeschattung: Sensor: $sensorName, SunRange: $sr, Lum: $lum, Temp: $tem, Level: $level";
 	
 	# Grenzwerte: TODO: Ggf. ins SensorRecord packen
+	my $limMinLumDisable = 120; 
 	my $limMaxLum = 20000; 
 	my $limMinLum = $limMaxLum*0.7;
-	my $limMaxTem = 24;
+	my $limMaxTem = 26;
 	my $limMinTem = $limMaxTem - 1;
 	my $limMaxSR = 1;
 	my $limMinSR = $limMaxSR - 0.1;
+	
+	if($lum<$limMinLumDisable) {
+	  Log 3, "Automation: checkFensterBeschattung: Sensor: ".$sensorName." => luminosity very low => disabled";
+		return -6;
+	}
 	
 	my $doClose=0;
 	# Pruefen: schliessen?
