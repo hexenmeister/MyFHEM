@@ -217,7 +217,31 @@ my $actornames;
 # >>> Aktoren
 
 # TODO
-
+  $devices->{eg_wz_li}->{alias}="WZ Licht (kombiniert)";
+  $devices->{eg_wz_li}->{type}="virtual";
+  $devices->{eg_wz_li}->{location}="wohnzimmer";
+  $devices->{eg_wz_li}->{readings}->{level}         ->{ValueFn}   ="HAL_AvgReadingValueFn";
+  $devices->{eg_wz_li}->{readings}->{level}         ->{FnParams}  =["eg_wz_li_l:level","eg_wz_li_r:level"];
+  $devices->{eg_wz_li}->{readings}->{level}         ->{ValueFilterFn} = "HAL_round0";
+  $devices->{eg_wz_li}->{readings}->{level}         ->{alias}     ="Wert Durchschnitt";
+  $devices->{eg_wz_li}->{readings}->{level}         ->{unit}      ="%";
+  $devices->{eg_wz_li}->{readings}->{level1}        ->{link}      = "eg_wz_li_l:level";
+  $devices->{eg_wz_li}->{readings}->{level2}        ->{link}      = "eg_wz_li_r:level";
+  $devices->{eg_wz_li}->{readings}->{leveltime_str} ->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
+  $devices->{eg_wz_li}->{readings}->{leveltime_str} ->{FnParams}  = "level";
+  $devices->{eg_wz_li}->{readings}->{leveltime}     ->{ValueFn}   = "HAL_ReadingTimeValueFn";
+  $devices->{eg_wz_li}->{readings}->{leveltime}     ->{FnParams}  = "level";
+  $devices->{eg_wz_li}->{readings}->{leveltime}     ->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
+  $devices->{eg_wz_li}->{readings}->{leveltime}     ->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  #$devices->{eg_wz_li}->{actions} ->{composite}     = ['eg_wz_li_l','eg_wz_li_r'];
+  $devices->{eg_wz_li}->{default_action} = 'level';
+  $devices->{eg_wz_li}->{actions}->{level}->{predefinedFn} = '{my $r; $r->{link}=($value eq "none")?"$ACTOR:all=0":($value eq "all")?"$ACTOR:all=100":"$ACTOR:level2=$value,$ACTOR:level1=off"; $r}';
+  $devices->{eg_wz_li}->{actions}->{level}->{type}="enum:on,off,%,all"; #?
+  $devices->{eg_wz_li}->{actions}->{level}->{alias} = "Licht Switch";
+  $devices->{eg_wz_li}->{actions}->{all}->{composite}=['eg_wz_li_l:level','eg_wz_li_r:level'];
+  $devices->{eg_wz_li}->{actions}->{level1}->{link}='eg_wz_li_l:level';
+  $devices->{eg_wz_li}->{actions}->{level2}->{link}='eg_wz_li_r:level';
+  
   $devices->{eg_wz_li_l}->{alias}="WZ Licht (Switch)";
   $devices->{eg_wz_li_l}->{fhem_name}="EG_WZ_SA01_Licht_Links_Sw";
   $devices->{eg_wz_li_l}->{type}="HomeMatic";
@@ -296,9 +320,16 @@ sub HAL_setActionValue($$$) {
   my $actions_record = $actor_record->{actions};
   if(!$actions_record) {return "no actions found in $actorname";}
   
+  my $action_record = $actions_record->{$actionname};
+  
   # composite, link
   my $link = $actions_record->{link};
   my $composites = $actions_record->{composite};
+  if($action_record) {
+    $link = $action_record->{link} if($action_record->{link});
+    $composites = $action_record->{composite} if($action_record->{composite});
+  }
+  #return Dumper($composites);
   if($composites) {
     my $ret=undef;
     foreach my $composite_rec (@{$composites}) {
@@ -315,35 +346,65 @@ sub HAL_setActionValue($$$) {
     }
     return $ret;
   } elsif($link) {
-    my($actornameN, $actionnameN) = split(/:/, $a);
+    my($actornameN, $actionnameN) = split(/:/, $link);
     $actionnameN = $actionname unless $actionnameN;
+    #return $actornameN.":".$actionnameN."=".$value;
     return HAL_setActionValue($actornameN, $actionnameN, $value);
     #return undef;
   }
   
   # direkt setzen
-  my $action_record = $actions_record->{$actionname};
   if(!$action_record) {return "no action $actorname:$actionname found";}
   
   my $fhem_actor_name = $actor_record->{fhem_name};
+  #return Dumper($actor_record) ;
   my $setting = $action_record->{setting};
   
    # vorrangig predefined FN prüfen
    my $predefinedFn = $action_record->{predefinedFn};
    if($predefinedFn) {
+    my $r;
     if($predefinedFn=~m/\{.*\}/) {
       # Klammern: direkt evaluieren
       no warnings;
-      my $VAL = $value; # ggf. Wert auch unter diesem namen bereitstellen
-      $value = eval $predefinedFn;
+      my $ACTION = $actionname;
+      my $ACTOR = $actorname;
+      my $VALUE = $value; # ggf. Wert auch unter diesem namen bereitstellen
+      #$value = eval $predefinedFn;
+      $r = eval $predefinedFn;
       use warnings;
+      #return Dumper($r);
     } else {
       no strict "refs";
-      my $r = &{$predefinedFn}($value,$actor_record,$action_record);
+      $r = &{$predefinedFn}($actionname,$value,$actor_record,$action_record);
       use strict "refs";
+    }
+    if(defined($r)) {
+      #return Dumper($r);
       if(ref $r eq ref {}) {
         # wenn Hash (also kompletter Hash zurückgegeben -> for future use)
+        #$value = $r->{value} if $r->{value};
         $value = $r->{value};
+        if($r->{link}) {
+          # delegieren: Format: actor1[:action1]=value1[,actor2[:action2]=value2]...
+          my @a= split(/,/ , $r->{link});
+          #return Dumper(@a);
+          my $ret=undef;
+          my $found=0;
+          #return Dumper(@a);
+          foreach my $act (@a) {
+            my($tactorSpec,$tvalue) = split(/=/, $act);
+            my($tactorName,$tactionName) = split(/:/, $tactorSpec);
+            #return $tactorName.":".$tactionName."=".$tvalue;
+            my $tret = HAL_setActionValue($tactorName,$tactionName,$tvalue);
+            #return $tret;
+            $found=1;
+            if(defined($tret)) {
+              if(defined($ret)) {$ret.=", ".$tret;} else {$ret=$tret;}
+            }
+          }
+          if($found) { return $ret; }
+        }
       } else {
         # Scalar-Wert annehmen
         $value=$r;
@@ -364,13 +425,15 @@ sub HAL_setActionValue($$$) {
         $value = $predefined_value;
       }
     }
-  }  
+  }
   
   # TODO: Pruefen type
   # TODO: Pruefen Grenzen
   # TODO: Pruefen interna
   # 
   
+  if(!defined($value)) { return undef; }
+  #return "set $fhem_actor_name $setting $value";
   return fhem("set $fhem_actor_name $setting $value");
   
   #return undef;
