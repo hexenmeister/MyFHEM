@@ -225,16 +225,17 @@ my $actornames;
   $devices->{eg_wz_li_l}->{readings}->{level}->{reading} ="state";
   $devices->{eg_wz_li_l}->{readings}->{level}->{alias}   ="on/off";
   $devices->{eg_wz_li_l}->{readings}->{level}->{unit}    ="%";
+  $devices->{eg_wz_li_l}->{default_action} = 'level';
   #$devices->{eg_wz_li_l}->{actions}->{xxx}->{valueFn}="{...}";
   $devices->{eg_wz_li_l}->{actions}->{level}->{setting}="";
   $devices->{eg_wz_li_l}->{actions}->{level}->{type}="enum:on,off"; #?
   $devices->{eg_wz_li_l}->{actions}->{level}->{alias} = "Licht Switch";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefinedFn} = '{$value>=50?"on":"off"}';
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{an}->{value}="on";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{aus}->{value}="off";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{dunkel}->{value}="off";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{100}->{value}="on";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{0}->{value}="off";
-  #TODO: Predefined FN: auf einer freien Zahl on/off wert berechnen (> 50 vs. < 50)
   
   $devices->{eg_wz_li_r}->{alias}="WZ Licht (Dimmer)";
   $devices->{eg_wz_li_r}->{fhem_name}="EG_WZ_DA01_Licht_Rechts_Sw";
@@ -327,6 +328,29 @@ sub HAL_setActionValue($$$) {
   my $fhem_actor_name = $actor_record->{fhem_name};
   my $setting = $action_record->{setting};
   
+   # vorrangig predefined FN prüfen
+   my $predefinedFn = $action_record->{predefinedFn};
+   if($predefinedFn) {
+    if($predefinedFn=~m/\{.*\}/) {
+      # Klammern: direkt evaluieren
+      no warnings;
+      my $VAL = $value; # ggf. Wert auch unter diesem namen bereitstellen
+      $value = eval $predefinedFn;
+      use warnings;
+    } else {
+      no strict "refs";
+      my $r = &{$predefinedFn}($value,$actor_record,$action_record);
+      use strict "refs";
+      if(ref $r eq ref {}) {
+        # wenn Hash (also kompletter Hash zurückgegeben -> for future use)
+        $value = $r->{value};
+      } else {
+        # Scalar-Wert annehmen
+        $value=$r;
+      }
+    }
+  }
+
   # wenn es eine predefined-Tabelle gibt...
   my $predefined_record = $action_record->{predefined};
   if(defined($predefined_record)) {
@@ -340,7 +364,7 @@ sub HAL_setActionValue($$$) {
         $value = $predefined_value;
       }
     }
-  }
+  }  
   
   # TODO: Pruefen type
   # TODO: Pruefen Grenzen
