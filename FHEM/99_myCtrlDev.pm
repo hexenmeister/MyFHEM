@@ -146,7 +146,7 @@ my $actornames;
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
-  $rooms->{wohnzimmer}->{actors}=['licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
+  $rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li_l:level,eg_wz_li_r:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
@@ -217,7 +217,24 @@ my $actornames;
 # >>> Aktoren
 
 # TODO
-  
+
+  $devices->{eg_wz_li_l}->{alias}="WZ Licht (Switch)";
+  $devices->{eg_wz_li_l}->{fhem_name}="EG_WZ_SA01_Licht_Links_Sw";
+  $devices->{eg_wz_li_l}->{type}="HomeMatic";
+  $devices->{eg_wz_li_l}->{location}="wohnzimmer";
+  $devices->{eg_wz_li_l}->{readings}->{level}->{reading} ="state";
+  $devices->{eg_wz_li_l}->{readings}->{level}->{alias}   ="on/off";
+  $devices->{eg_wz_li_l}->{readings}->{level}->{unit}    ="%";
+  #$devices->{eg_wz_li_l}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{setting}="";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{type}="enum:on,off"; #?
+  $devices->{eg_wz_li_l}->{actions}->{level}->{alias} = "Licht Switch";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{an}->{value}="on";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{aus}->{value}="off";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{dunkel}->{value}="off";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{100}->{value}="on";
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{0}->{value}="off";
+  #TODO: Predefined FN: auf einer freien Zahl on/off wert berechnen (> 50 vs. < 50)
   
   $devices->{eg_wz_li_r}->{alias}="WZ Licht (Dimmer)";
   $devices->{eg_wz_li_r}->{fhem_name}="EG_WZ_DA01_Licht_Rechts_Sw";
@@ -226,6 +243,7 @@ my $actornames;
   $devices->{eg_wz_li_r}->{readings}->{level}->{reading} ="level";
   $devices->{eg_wz_li_r}->{readings}->{level}->{alias}   ="Dimmwert";
   $devices->{eg_wz_li_r}->{readings}->{level}->{unit}    ="%";
+  $devices->{eg_wz_li_r}->{default_action} = 'level';
   #$devices->{eg_wz_li_r}->{actions}->{xxx}->{valueFn}="{...}";
   $devices->{eg_wz_li_r}->{actions}->{level}->{setting}="pct";
   $devices->{eg_wz_li_r}->{actions}->{level}->{type}="int"; #?
@@ -270,9 +288,10 @@ sub HAL_setActionValue($$$) {
   my $actor_record = HAL_getActorRecord($actorname);
   
   if(!defined($actorname)) {return "no actor specified";}
-  if(!defined($actionname)) {return "no action specified";}
   if(!defined($value)) {return "no value specified";}
   if(!$actor_record) {return "no actor $actorname found";}
+  $actionname = $actor_record->{default_action} unless defined($actionname);
+  if(!defined($actionname)) {return "no action specified";}
   my $actions_record = $actor_record->{actions};
   if(!$actions_record) {return "no actions found in $actorname";}
   
@@ -345,13 +364,20 @@ sub HAL_setRoomActionValue($$$) {
       # Erweiterter Syntax
       if($tactionName eq $actionName) {
         my @a= split(/,/ , $rest);
+        my $ret=undef;
+        my $found=0;
         foreach my $aspec (@a) {
           my($tsactorName,$tsactionName) = split(/:/, $aspec);
           $tsactionName = $actionName unless $tsactionName;
           if(defined($tsactorName)) {
-            return HAL_setActionValue($tsactorName,$tsactionName,$value);
+            my $tret = HAL_setActionValue($tsactorName,$tsactionName,$value);
+            $found=1;
+            if(defined($tret)) {
+              if(defined($ret)) {$ret.=", ".$tret;} else {$ret=$tret;}
+            }
           }
         }
+        if($found) { return $ret; }
       }
     } else {
       # Nur Actorname
