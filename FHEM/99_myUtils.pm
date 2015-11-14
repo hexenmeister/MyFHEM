@@ -1103,6 +1103,17 @@ sub dateTime2dec($){
   return ($z)
 }
 
+# Liefert Wochentag (0 (So) - 6 (Sa)).
+# Param: Datum ('24.12.2015')
+sub getDayOfWeek($){  
+ my $datum_str = shift || return -1;  
+ my($day, $month, $year) = split /\./, $datum_str;  
+ return -1 if $day < 1 or $day > 31;  
+ return -1 if $month < 1 or $month > 12;  
+ my $time = timelocal(0, 0, 0, $day, $month - 1, $year);  
+ return (localtime($time))[6];  
+}
+
 sub checkOWTHERMTimeOut() {
 	my @a = devspec2array("TYPE=OWTHERM");
 	my $readingsName = "temperature";
