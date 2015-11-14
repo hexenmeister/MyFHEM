@@ -57,6 +57,8 @@ sub actPIRVorgarten() {
 	  # anderen SOund abspielen
 	  voiceBewegungVorgarten();
 	}
+	
+	sonderSchaltungWeihnachtslicht('pir');
 }
 
 # Benachrichtigungen von PIR im EG Flur.
@@ -220,10 +222,13 @@ sub actHomeAutomaticOn() {
 	# Bestaetigungston
 	voiceActAutomatik(1);
 	
-	# Derzeit keine globale Automatik, daher delegieren
-	setBeschattungAutomatic();
-	# Tag/Nacht-Steuerung moechte ich hier nicht haben...
+	if(!sonderSchaltungWeihnachtslicht('toggle')) {
+	  # Derzeit keine globale Automatik, daher delegieren
+	  setBeschattungAutomatic();
+	  # Tag/Nacht-Steuerung moechte ich hier nicht haben...
 	
+  }
+
 	#TODO: Weiteres
 
 }
@@ -236,8 +241,10 @@ sub actHomeAutomaticOff() {
 	# Bestaetigungston
 	voiceActAutomatik(2);
 	
-	# Derzeit keine globale Automatik, daher delegieren
-	setBeschattungAutomaticOff(); # ?
+	if(!sonderSchaltungWeihnachtslicht('auto')) {
+	  # Derzeit keine globale Automatik, daher delegieren
+	  setBeschattungAutomaticOff(); # ?
+	}
 	
 	#TODO: Weiteres
 	
@@ -278,6 +285,102 @@ sub actHomePresenceLong() {
 
 
 # --- User Service Utils ------------------------------------------------------
+
+# Sonderschaltung f. Weihnachtslicht.
+sub sonderSchaltungWeihnachtslicht($) {
+  my ($e) = @_;
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  # nur am Halloween-Abend ab 16:00
+  if($month==12 || ($month==11 || $mday>=14) || ($month==1 || $mday<=3)) {
+    # innerhalb von Zeitraum
+                                        
+    my $dev = 'CUL_HM_HM_ES_PMSw1_Pl_286734_Sw';
+    
+    my $ctrlm = previewGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode");
+    my $lastm = $ctrlm->{LAST_STATE};
+    $lastm = 'auto' unless defined $lastm;
+    my $lastState = ReadingsVal($dev,'state','none');
+    
+    if($e eq 'auto') {
+      getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+      sonderSchaltungWeihnachtslicht('timer');
+      return 1;
+    } elsif($e eq 'toggle') {
+      getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'manu');
+      fhem("set $dev toggle");
+      Log 3, ">sonderSchaltungWeihnachtslicht ($e) => manuell toggle (vorher: $lastState)";
+    } elsif ($e eq 'on') {
+      getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'manu');
+      fhem("set $dev on");
+      Log 3, ">sonderSchaltungWeihnachtslicht ($e) => manuell ein";
+    } elsif ($e eq 'off') {
+      getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'manu');
+      fhem("set $dev off");
+      Log 3, ">sonderSchaltungWeihnachtslicht ($e) => manuell aus";
+    } elsif($e eq 'pir') {
+      if($lastm eq 'auto') {
+        # Einschalten bei Bewegung (für eine begrenzte Zeit)
+        getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+        fhem("set $dev on-for-timer 60");
+        Log 3, ">sonderSchaltungWeihnachtslicht ($e) => ein bei Bewegung fuer eine Minute";
+      }
+    } elsif ($e eq 'timer') {
+      if($hour>07 && $hour<16) {
+        # Tag -> aus 
+        getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+        if($lastState ne 'off') {
+          fhem("set $dev off");
+          Log 3, ">sonderSchaltungWeihnachtslicht ($e) => aus(Tagmodus)";    
+        }
+        return 0;
+      }
+      if($lastm eq 'auto'){
+        # TODO: Niht automatisch einschalten vor dem 'Totensonntag'
+        my $wwday = getDayOfWeek("24.12.".$year); # Wochentag Weihnachten
+        my $dayshift = 35; # Totensonntag ist eine Woche vor 1. Advent, also 5 Wochen vor Weihnachten (mit einer Ausnahme)
+        $dayshift = 28 if($wwday==0); # Wenn Weihnachten am Sonntag, dann ist der 4.Advent am Weihnachstag
+        my $decd = timelocal(0,0,0,24,11,$year);
+        $decd-=86400*$dayshift;
+        if(time()<$decd) {
+          # vor dem Totensonntag
+          if($lastState ne 'off') {
+            fhem("set $dev off");
+            Log 3, ">sonderSchaltungWeihnachtslicht ($e) => aus (vor dem Totensonntag - keine Automatik)";    
+          }
+          return 0; 
+        }
+
+        my $bright = HAL_getRoomReadingValue('umwelt','brightness');
+        if($hour>=1 && $hour<8) {
+          # Nachts ausschalten
+          getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+          if($lastState ne 'off') {
+            fhem("set $dev off");
+            Log 3, ">sonderSchaltungWeihnachtslicht ($e) => auto aus (Nachtmodus)";
+          }
+        } elsif($bright < 100) {
+          # dunkel ->  ein
+          getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+          if($lastState ne 'on') {
+            fhem("set $dev on");
+            Log 3, ">sonderSchaltungWeihnachtslicht ($e) => auto ein (brigthness)";
+          }
+        }
+      } else {
+        Log 3, ">sonderSchaltungWeihnachtslicht ($e) => Steuerung aus (manueller Modus)";     
+      }
+    
+    } else {
+      # unknown
+      return 0; 
+    }
+    
+    return 1;
+  }
+  
+  return 0;
+}
 
 # Diese Methode setzt nachts die SteuerungsControlls (Dummies) auf 
 # Defaultwerte (AUTOMATIC). Sie soll jede Nacht zu einem Definierten Zeitpunkt
@@ -470,6 +573,7 @@ sub automationHeartbeat() {
 	 checkFensterBeschattung("virtual_kb_fenster", "kb_rollo",$bMode);
 	# TODO
 
+  sonderSchaltungWeihnachtslicht('timer');
 }
 
 # --- User Methods ------------------------------------------------------------
