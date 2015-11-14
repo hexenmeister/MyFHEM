@@ -2114,7 +2114,7 @@ sub HAL_WinCombiStateValueFn($$) {
 #--- Methods: Base ------------------------------------------------------------
   
  # >>> Commands
-my @usage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
+my @mgusage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
             "sensor (sensorname) all[:level]*|(readingname) [plain*|full|value|time|brief|dump]",
             "rooms [rexExp|all*]",
             "sensors [(roomname)|all*] [regExp|dead|lowbat[ info]]",
@@ -2133,7 +2133,7 @@ sub myCtrlDev_Initialize($$)
   
   # Console-Commandos registrieren
   my %lhash = ( Fn=>"CommandMGet",
-                Hlp=>join(",",@usage).",request sensor values"); 
+                Hlp=>join(",",@mgusage).",request sensor values"); 
   $cmds{mget} = \%lhash;
 }
 
@@ -2143,7 +2143,7 @@ sub CommandMGet($$$) {
   my @line = split(/\s+/,$param);
   
   if(scalar(@line)==0) {
-    return "Usage: $cmd ".join("\n",@usage);
+    return "Usage: $cmd ".join("\n",@mgusage);
   }
   
   my $modifier = $line[0];
