@@ -302,6 +302,8 @@ sub sonderSchaltungWeihnachtslicht($) {
     $lastm = 'auto' unless defined $lastm;
     my $lastState = ReadingsVal($dev,'state','none');
     
+    my $lightLim = 100;
+    
     if($e eq 'auto') {
       getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
       sonderSchaltungWeihnachtslicht('timer');
@@ -321,9 +323,15 @@ sub sonderSchaltungWeihnachtslicht($) {
     } elsif($e eq 'pir') {
       if($lastm eq 'auto') {
         # Einschalten bei Bewegung (für eine begrenzte Zeit)
-        getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
-        fhem("set $dev on-for-timer 60");
-        Log 3, ">sonderSchaltungWeihnachtslicht ($e) => ein bei Bewegung fuer eine Minute";
+        my $bright = HAL_getRoomReadingValue('umwelt','brightness');
+        if($bright < $lightLim) {
+          # dunkel ->  ein
+          getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
+          if($lastState ne 'on') {
+            fhem("set $dev on-for-timer 60");
+            Log 3, ">sonderSchaltungWeihnachtslicht ($e) => ein bei Bewegung fuer eine Minute";
+          }
+        }
       }
     } elsif ($e eq 'timer') {
       if($hour>07 && $hour<16) {
@@ -359,7 +367,7 @@ sub sonderSchaltungWeihnachtslicht($) {
             fhem("set $dev off");
             Log 3, ">sonderSchaltungWeihnachtslicht ($e) => auto aus (Nachtmodus)";
           }
-        } elsif($bright < 100) {
+        } elsif($bright < $lightLim) {
           # dunkel ->  ein
           getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
           if($lastState ne 'on') {
