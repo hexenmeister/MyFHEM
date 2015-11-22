@@ -17,6 +17,7 @@ sub myCtrlDev_Initialize($$);
 sub HAL_getRooms();
 sub HAL_getRoomRecord($);
 sub HAL_getRoomNames();
+sub HAL_isRoomExist($);
 #sub HAL_getRooms(;$); # Räume  nach verschiedenen Kriterien?
 #sub HAL_getActions(;$); # <DevName>
 
@@ -64,6 +65,10 @@ sub HAL_gerSensorDeadTimeDurationStr($);
 sub HAL_getAliasTab();
 sub HAL_getRoomAliasTab();
 sub HAL_getDeviceAliasTab();
+
+# internal 
+sub HAL_getRoomDeviceNames_($$);
+
 
 #TODO sub HAL_getSensors(;$$$$); # <SenName/undef> [<type>][<DevName>][<location>]
 
@@ -146,7 +151,8 @@ my $actornames;
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
                                        "eg_wz_rl",'virtual_raum_sensor_wz'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
-  $rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li_l:level,eg_wz_li_r:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
+  #$rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li_l:level,eg_wz_li_r:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
+  $rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','rollo=eg_wz_rl:level','rollo1=eg_wz_rl01:level','rollo2=eg_wz_rl02:level'];
   
   $rooms->{kueche}->{alias}     = "Küche";
   $rooms->{kueche}->{fhem_name} = "Kueche";
@@ -444,7 +450,7 @@ sub HAL_setActionValue($$$) {
 sub HAL_setRoomActionValue($$$) {
   my($roomName, $actionName, $value) = @_;
   my $actorList = HAL_getRoomActorNames($roomName);
-  return "no room $roomName found" unless $actorList;
+  return "no room $roomName found or no actors known in room" unless $actorList;
   foreach my $taname (@{$actorList}) {
     my($tactionName,$rest) = split(/=/, $taname);
     if(defined($rest)) {
@@ -457,6 +463,7 @@ sub HAL_setRoomActionValue($$$) {
           my($tsactorName,$tsactionName) = split(/:/, $aspec);
           $tsactionName = $actionName unless $tsactionName;
           if(defined($tsactorName)) {
+            Log3 "TEST", 3, "> HAL_setRoomActionValue: $tsactorName, $tsactionName, $value";
             my $tret = HAL_setActionValue($tsactorName,$tsactionName,$value);
             $found=1;
             if(defined($tret)) {
@@ -1172,30 +1179,6 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_ku_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{eg_ku_fk01}->{fhem_name} ="EG_KU_FK01.Fenster";
   $devices->{eg_ku_fk01}->{location}  ="kueche";
-  #$devices->{eg_ku_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{eg_ku_fk01}->{fhem_name} ="EG_KU_FK01.Fenster";
-  #$devices->{eg_ku_fk01}->{type}      ="HomeMatic";
-  #$devices->{eg_ku_fk01}->{location}  ="kueche";
-  #$devices->{eg_ku_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{eg_ku_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{eg_ku_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{eg_ku_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{eg_ku_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{eg_ku_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_ku_fk01}->{readings}->{cover}        ->{level}   ='6';
-  #$devices->{eg_ku_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{eg_ku_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{eg_ku_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{eg_ku_fk01}->{readings}->{state}        ->{level}   ='6';
-  #$devices->{eg_ku_fk01}->{readings}->{window}       ->{link}   =':state';
-  #$devices->{eg_ku_fk01}->{readings}->{window}       ->{level}   ='2';
-  #$devices->{eg_ku_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{eg_ku_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{eg_ku_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{eg_ku_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{eg_ku_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{eg_ku_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
-  #TODO: Mapping f. Zustaende: closed => geschlossen?
   #<<<
   
   $devices->{eg_wz_rl}->{alias}     ="Rollos Kombiniert";
@@ -1262,67 +1245,49 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_wz_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{eg_wz_fk01}->{fhem_name} ="EG_WZ_FK01.Fenster";
   $devices->{eg_wz_fk01}->{location}  ="wohnzimmer";
-  #$devices->{eg_wz_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{eg_wz_fk01}->{fhem_name} ="EG_WZ_FK01.Fenster";
-  #$devices->{eg_wz_fk01}->{type}      ="HomeMatic";
-  #$devices->{eg_wz_fk01}->{location}  ="wohnzimmer";
-  #$devices->{eg_wz_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{eg_wz_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{eg_wz_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{eg_wz_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{eg_wz_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{eg_wz_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_wz_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{eg_wz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{eg_wz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{eg_wz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
-  $devices->{eg_wz_tk01}->{alias}     ="Terrassentürkontakt Links";
+  $devices->{eg_wz_tk01}->{templates} =['hm_fensterkontakt'];
   $devices->{eg_wz_tk01}->{fhem_name} ="wz_fenster_l";
-  $devices->{eg_wz_tk01}->{type}      ="HomeMatic";
   $devices->{eg_wz_tk01}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  $devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  $devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  $devices->{eg_wz_tk01}->{readings}->{cover}        ->{reading}   ="cover";
-  $devices->{eg_wz_tk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  $devices->{eg_wz_tk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk01}->{readings}->{state}        ->{reading}   ="state";
-  $devices->{eg_wz_tk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
+  $devices->{eg_wz_tk01}->{alias}     ="Terrassentürkontakt Links";
+  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{reading}   ="battery";
+  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
+  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
+  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{reading}   ="cover";
+  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
+  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
+  #$devices->{eg_wz_tk01}->{readings}->{state}        ->{reading}   ="state";
+  #$devices->{eg_wz_tk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  $devices->{eg_wz_tk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_wz_tk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  $devices->{eg_wz_tk01}->{readings}->{statetime}->{FnParams}  = "state";
-  $devices->{eg_wz_tk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  $devices->{eg_wz_tk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime_str}->{FnParams}  = "state";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{FnParams}  = "state";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
+  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
+  $devices->{eg_wz_tk02}->{templates} =['hm_fensterkontakt'];
   $devices->{eg_wz_tk02}->{alias}     ="Terrassentürkontakt Recht";
   $devices->{eg_wz_tk02}->{fhem_name} ="wz_fenster_r";
   $devices->{eg_wz_tk02}->{type}      ="HomeMatic";
   $devices->{eg_wz_tk02}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{reading}   ="battery";
-  $devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  $devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  $devices->{eg_wz_tk02}->{readings}->{cover}        ->{reading}   ="cover";
-  $devices->{eg_wz_tk02}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  $devices->{eg_wz_tk02}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk02}->{readings}->{state}        ->{reading}   ="state";
-  $devices->{eg_wz_tk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
+  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{reading}   ="battery";
+  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
+  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
+  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{reading}   ="cover";
+  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{alias}     ="Coverzustand";
+  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
+  #$devices->{eg_wz_tk02}->{readings}->{state}        ->{reading}   ="state";
+  #$devices->{eg_wz_tk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  $devices->{eg_wz_tk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  $devices->{eg_wz_tk02}->{readings}->{statetime_str}->{FnParams}  = "state";
-  $devices->{eg_wz_tk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  $devices->{eg_wz_tk02}->{readings}->{statetime}->{FnParams}  = "state";
-  $devices->{eg_wz_tk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  $devices->{eg_wz_tk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime_str}->{FnParams}  = "state";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{FnParams}  = "state";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
+  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{eg_wz_tk}->{alias}     ="Terrassentürkontakt Kombiniert";
@@ -1554,6 +1519,16 @@ $aliases->{rooms}->{bz}="badezimmer";
 $aliases->{rooms}->{ku}="kueche";
 $aliases->{rooms}->{ka}="paula";
 $aliases->{rooms}->{kb}="hanna";
+$aliases->{rooms}->{ga}="garage";
+$aliases->{rooms}->{ef}="eg_flur";
+$aliases->{rooms}->{of}="og_flur";
+$aliases->{rooms}->{dz}="duschbad";
+
+# umwelt
+# vorgarten
+# garten
+# haus?
+
 
 $aliases->{devices}->{umweltsensor}="virtual_umwelt_sensor";
 #TODO: Aliases definieren
@@ -2207,6 +2182,10 @@ my @mgusage = ("[room] (roomname) all[:level]*|(readingname) [plain*|full|value|
             "dead",
             "lowbat");
 my $mget_mods = {room=>1,sensor=>1,rooms=>1,sensors=>1,dump=>1,dead=>1,lowbat=>1,low=>1};
+
+my @msusage = ("[room] (roomname) (settingname) (value)",
+            "actor (actorname) (settingname) (value)");
+my $mset_mods = {room=>1,actor=>1};
 sub myCtrlDev_Initialize($$)
 {
   my ($hash) = @_;
@@ -2217,12 +2196,64 @@ sub myCtrlDev_Initialize($$)
   HAL_applyTemplates($devices, $templates);
   
   # Console-Commandos registrieren
-  my %lhash = ( Fn=>"CommandMGet",
-                Hlp=>join(",",@mgusage).",request sensor values"); 
-  $cmds{mget} = \%lhash;
+  my %glhash = ( Fn=>"CommandMGet",
+                Hlp=>join(",",@mgusage).", request sensor values"); 
+  $cmds{mget} = \%glhash;
+  my %slhash = ( Fn=>"CommandMSet",
+                Hlp=>join(",",@msusage).", set actor value"); 
+  $cmds{mset} = \%slhash;
 }
 
-# Verarbeitungsroutine für mger Befehl
+# Verarbeitungsroutine für mset Befehl
+sub CommandMSet($$$) {
+  my($hash, $param, $cmd) = @_;
+  my @line = split(/\s+/,$param);
+  
+  if(scalar(@line)==0) {
+    return "Usage: $cmd ".join("\n",@msusage);
+  }
+  
+  my $modifier = $line[0];
+  my $devname;
+  if(!$mset_mods->{$modifier}) {
+    # Default is room
+    $modifier = 'room';
+  } else {
+    # modifier entfernen
+    shift(@line);
+  }
+  # Device/Room name
+  $devname = shift(@line);
+  
+  my $aname = shift(@line);
+  
+  my $val = shift(@line);
+  
+  if($modifier eq 'room') {
+    if(!defined($devname)) {
+      return 'no room name provided';
+    }
+    if(!defined($aname)) { 
+      return 'no actor name provided';
+    }
+    if(!defined($val)) { 
+      return 'no value provided';
+    }
+    return HAL_setRoomActionValue($devname, $aname, $val);
+  } elsif($modifier eq 'actor') {
+    if(!defined($devname)) {
+      return 'no actor name provided';
+    }
+    if(!defined($val)) { 
+      return 'no value provided';
+    }
+    return HAL_setActionValue($devname, $aname, $val);
+  }
+  
+  return "sorry, action is not implemented. [$modifier, $devname, $aname, $val]";
+}
+
+# Verarbeitungsroutine für mget Befehl
 sub CommandMGet($$$) {
   my($hash, $param, $cmd) = @_;
   my @line = split(/\s+/,$param);
@@ -2896,6 +2927,15 @@ sub HAL_getRoomOutdoorSensorNames($)
 {
   my ($roomName) = @_;
   return HAL_getRoomDeviceNames_($roomName,"sensors_outdoor");  
+}
+
+# Prueft, ob das angegebene Raum bekannt ist (aliase werden berücksichtigt).
+# Param: roomname
+sub HAL_isRoomExist($) {
+  my ($roomName) = @_;
+  my $roomRec=HAL_getRoomRecord($roomName);
+  return undef unless $roomRec;
+  return 1;
 }
 
 # liefert Referenz der Liste der Geraete in einem Raum (List der Namen)
