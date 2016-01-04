@@ -1196,9 +1196,20 @@ sub setValue($$) {
 
 sub setReading($$$) {
   my($devName, $rName, $val) = @_;
-  fhem("setreading ".$devName." ".$rName." ".$val);
+  fhem("setreading ".$devName." ".$rName." ".replace($val,';',';;'));
 }
 
+sub replace($$$) {
+  my($s, $f, $r) = @_;
+  my $pos = index($s, $f);
+  my $lf=length( $f );
+  my $lr=length( $r );
+  while ( $pos > -1 ) {
+    substr( $s, $pos, $lf, $r );
+    $pos = index( $s, $f, $pos + $lr );
+  }
+  return $s;
+}
 
 # Rundet eine Zahl ohne Nachkommastellen
 sub rundeZahl0($) {
