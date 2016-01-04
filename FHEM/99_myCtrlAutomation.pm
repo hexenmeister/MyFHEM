@@ -344,7 +344,7 @@ sub sonderSchaltungWeihnachtslicht($) {
         return 0;
       }
       if($lastm eq 'auto'){
-        # TODO: Niht automatisch einschalten vor dem 'Totensonntag'
+        # TODO: Niht automatisch einschalten vor dem 'Totensonntag' => TODO: Berechnung irgendwo falsch
         my $wwday = getDayOfWeek("24.12.".$year); # Wochentag Weihnachten
         my $dayshift = 35; # Totensonntag ist eine Woche vor 1. Advent, also 5 Wochen vor Weihnachten (mit einer Ausnahme)
         $dayshift = 28 if($wwday==0); # Wenn Weihnachten am Sonntag, dann ist der 4.Advent am Weihnachstag
@@ -360,7 +360,7 @@ sub sonderSchaltungWeihnachtslicht($) {
         }
 
         my $bright = HAL_getRoomReadingValue('umwelt','brightness');
-        if($hour>=1 && $hour<8) {
+        if($hour>=0 && $hour<8) {
           # Nachts ausschalten
           getGenericCtrlBlock("ctrl_sonderSchaltungWeihnachtslicht_mode",'auto');
           if($lastState ne 'off') {
