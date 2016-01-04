@@ -365,15 +365,21 @@ myCtrlBase_Undef($$)
 # liefert gewuenschte Reading zu dem gegebenen Element
 sub myCtrlBase_setReading($$$) {
   my($devName, $rName, $val) = @_;
-  #fhem("setreading ".$devName." ".$rName." ".$val);
-  CommandSetReading("setreading", $devName." ".$rName." ".$val);
+  #Log 3, "AutomationControlBase.myCtrlBase_setReading DEBUG: $devName, $rName, $val";
+  #fhem("setreading ".$devName." ".$rName." ".replace($val,';',';;'));
+  #CommandSetReading("setreading", $devName." ".$rName." ".$val);
+  #CommandSetReading({}, $devName." ".$rName." ".$val);
+  CommandSetReading(undef, $devName." ".$rName." ".$val);
 }
 
 # liefert angegenen Reading zu dem gegebenen Element
 sub myCtrlBase_deleteReading($$) {
   my($devName, $rName) = @_;
+  #Log 3, "AutomationControlBase.myCtrlBase_deleteReading DEBUG: $devName, $rName";
   #fhem("deletereading ".$devName." ".$rName);
-  CommandDeleteReading("deletereading", $devName." ".$rName);
+  #CommandDeleteReading("deletereading", $devName." ".$rName);
+  #CommandDeleteReading({}, $devName." ".$rName);
+  CommandDeleteReading(undef, $devName." ".$rName);
 }
 
 # speichert (Restart-sicher) ein Key/Value-Paar (fuer Steuerungszwecke)
