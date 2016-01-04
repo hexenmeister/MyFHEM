@@ -286,28 +286,7 @@ my $actornames;
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{on}->{value}="100";
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{off}->{value}="0";
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
-  #$devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
-  #$devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
-  #TODO: Coposite,Link
-  
-  ##$devices->{wz_rollo_r}->{class}="rollo"; # optional zum gruppieren #TODO?
-  #$devices->{wz_rollo_r}->{alias}="WZ Rolladen";
-  #$devices->{wz_rollo_r}->{fhem_name}="wz_rollo_r";
-  #$devices->{wz_rollo_r}->{type}="HomeMatic";
-  #$devices->{wz_rollo_r}->{location}="wohnzimmer";
-  ##$devices->{wz_rollo_r}->{readings}->{level}="level";
-  ##$devices->{wz_rollo_r}->{actions}->{xxx}->{valueFn}="{...}";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{setting}="pct";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{type}="int"; #?
-  #$devices->{wz_rollo_r}->{actions}->{level}->{min}="0";    #?
-  #$devices->{wz_rollo_r}->{actions}->{level}->{max}="100";  #?
-  #$devices->{wz_rollo_r}->{actions}->{level}->{alias} = "Rolladenstellung";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{runter}->{value}="0";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{halb}->{value}="60";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
-  #$devices->{wz_rollo_r}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
+    
   
 #TODO: Verlagern
 # Sendet neuen Wert an den Aktor
@@ -1204,7 +1183,7 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_wz_rl01}->{fhem_name} ="wz_rollo_l";
   $devices->{eg_wz_rl01}->{type}      ="HomeMatic";
   $devices->{eg_wz_rl01}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_rl01}->{comment}   ="Rollostand";
+  $devices->{eg_wz_rl01}->{comment}   ="Rollaeden";
   $devices->{eg_wz_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{eg_wz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{eg_wz_rl01}->{readings}->{level} ->{unit} ="%";
@@ -1225,7 +1204,7 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_wz_rl02}->{fhem_name} ="wz_rollo_r";
   $devices->{eg_wz_rl02}->{type}      ="HomeMatic";
   $devices->{eg_wz_rl02}->{location}  ="wohnzimmer";
-  $devices->{eg_wz_rl02}->{comment}   ="Rollo-Actor";
+  $devices->{eg_wz_rl02}->{comment}   ="Rollaeden";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{reading}   ="level";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{eg_wz_rl02}->{readings}->{level} ->{unit} ="%";
@@ -1251,21 +1230,7 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_wz_tk01}->{fhem_name} ="wz_fenster_l";
   $devices->{eg_wz_tk01}->{location}  ="wohnzimmer";
   $devices->{eg_wz_tk01}->{alias}     ="Terrassentürkontakt Links";
-  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{eg_wz_tk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{eg_wz_tk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_wz_tk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{eg_wz_tk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{eg_wz_tk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{eg_wz_tk02}->{templates} =['hm_fensterkontakt'];
@@ -1273,21 +1238,7 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_wz_tk02}->{fhem_name} ="wz_fenster_r";
   $devices->{eg_wz_tk02}->{type}      ="HomeMatic";
   $devices->{eg_wz_tk02}->{location}  ="wohnzimmer";
-  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{eg_wz_tk02}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{eg_wz_tk02}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_wz_tk02}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{eg_wz_tk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
   $devices->{eg_wz_tk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{eg_wz_tk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{eg_wz_tk}->{alias}     ="Terrassentürkontakt Kombiniert";
@@ -1324,25 +1275,6 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_bz_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{og_bz_fk01}->{fhem_name} ="OG_BZ_FK01.Fenster";
   $devices->{og_bz_fk01}->{location}  ="badezimmer";
-  #$devices->{og_bz_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{og_bz_fk01}->{fhem_name} ="OG_BZ_FK01.Fenster";
-  #$devices->{og_bz_fk01}->{type}      ="HomeMatic";
-  #$devices->{og_bz_fk01}->{location}  ="badezimmer";
-  #$devices->{og_bz_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{og_bz_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{og_bz_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{og_bz_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{og_bz_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{og_bz_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{og_bz_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{og_bz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{og_bz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{og_bz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{og_bz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{og_bz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{og_bz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{og_bz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{og_bz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{og_sz_rl01}->{alias}     ="Rollo";
@@ -1358,25 +1290,6 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_sz_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{og_sz_fk01}->{fhem_name} ="OG_SZ_FK01.Fenster";
   $devices->{og_sz_fk01}->{location}  ="schlafzimmer";
-  #$devices->{og_sz_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{og_sz_fk01}->{fhem_name} ="OG_SZ_FK01.Fenster";
-  #$devices->{og_sz_fk01}->{type}      ="HomeMatic";
-  #$devices->{og_sz_fk01}->{location}  ="schlafzimmer";
-  #$devices->{og_sz_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{og_sz_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{og_sz_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{og_sz_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{og_sz_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{og_sz_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{og_sz_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{og_sz_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{og_sz_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{og_sz_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{og_sz_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{og_sz_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{og_sz_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{og_sz_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{og_sz_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{og_ka_rl01}->{alias}     ="Rollo";
@@ -1428,49 +1341,11 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_ka_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{og_ka_fk01}->{fhem_name} ="OG_KA_FK01.Fenster";
   $devices->{og_ka_fk01}->{location}  ="paula";
-  #$devices->{og_ka_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{og_ka_fk01}->{fhem_name} ="OG_KA_FK01.Fenster";
-  #$devices->{og_ka_fk01}->{type}      ="HomeMatic";
-  #$devices->{og_ka_fk01}->{location}  ="paula";
-  #$devices->{og_ka_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{og_ka_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{og_ka_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{og_ka_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{og_ka_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{og_ka_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{og_ka_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{og_ka_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{og_ka_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{og_ka_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{og_ka_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{og_ka_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{og_ka_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{og_ka_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{og_ka_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
   
   $devices->{og_ka_fk02}->{templates} =['hm_fensterkontakt'];
   $devices->{og_ka_fk02}->{fhem_name} ="OG_KA_FK02.Fenster";
   $devices->{og_ka_fk02}->{location}  ="paula";
-  #$devices->{og_ka_fk02}->{alias}     ="Fensterkontakt";
-  #$devices->{og_ka_fk02}->{fhem_name} ="OG_KA_FK02.Fenster";
-  #$devices->{og_ka_fk02}->{type}      ="HomeMatic";
-  #$devices->{og_ka_fk02}->{location}  ="paula";
-  #$devices->{og_ka_fk02}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{og_ka_fk02}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{og_ka_fk02}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{og_ka_fk02}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{og_ka_fk02}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{og_ka_fk02}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{og_ka_fk02}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{og_ka_fk02}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{og_ka_fk02}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{og_ka_fk02}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{og_ka_fk02}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{og_ka_fk02}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{og_ka_fk02}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{og_ka_fk02}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{og_ka_fk02}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
     
   $devices->{og_kb_rl01}->{alias}     ="Rollo";
@@ -1486,25 +1361,6 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_kb_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{og_kb_fk01}->{fhem_name} ="OG_KB_FK01.Fenster";
   $devices->{og_kb_fk01}->{location}  ="hanna";
-  #$devices->{og_kb_fk01}->{alias}     ="Fensterkontakt";
-  #$devices->{og_kb_fk01}->{fhem_name} ="OG_KB_FK01.Fenster";
-  #$devices->{og_kb_fk01}->{type}      ="HomeMatic";
-  #$devices->{og_kb_fk01}->{location}  ="hanna";
-  #$devices->{og_kb_fk01}->{readings}->{bat_status}   ->{reading}   ="battery";
-  #$devices->{og_kb_fk01}->{readings}->{bat_status}   ->{alias}     ="Batteriezustand";
-  #$devices->{og_kb_fk01}->{readings}->{bat_status}   ->{unit_type} ="ENUM: ok,low";
-  #$devices->{og_kb_fk01}->{readings}->{cover}        ->{reading}   ="cover";
-  #$devices->{og_kb_fk01}->{readings}->{cover}        ->{alias}     ="Coverzustand";
-  #$devices->{og_kb_fk01}->{readings}->{cover}        ->{unit_type} ="ENUM: closed,open";
-  #$devices->{og_kb_fk01}->{readings}->{state}        ->{reading}   ="state";
-  #$devices->{og_kb_fk01}->{readings}->{state}        ->{alias}     ="Fensterzustand";
-  #$devices->{og_kb_fk01}->{readings}->{state}        ->{unit_type} ="ENUM: closed,open,tilted";
-  #$devices->{og_kb_fk01}->{readings}->{statetime_str}->{ValueFn}   = "HAL_ReadingTimeStrValueFn";
-  #$devices->{og_kb_fk01}->{readings}->{statetime_str}->{FnParams}  = "state";
-  #$devices->{og_kb_fk01}->{readings}->{statetime}->{ValueFn}   = "HAL_ReadingTimeValueFn";
-  #$devices->{og_kb_fk01}->{readings}->{statetime}->{FnParams}  = "state";
-  #$devices->{og_kb_fk01}->{readings}->{statetime}->{alias}     = "Zeit in Sekunden seit der letzten Statusaenderung";
-  #$devices->{og_kb_fk01}->{readings}->{statetime}->{comment}   = "gibt an, wie viel zeit in Sekunden vergangen ist seit die letzte Aenderung stattgefunden hat";
   #<<<
 
 # >>> Actions/Scenarios
