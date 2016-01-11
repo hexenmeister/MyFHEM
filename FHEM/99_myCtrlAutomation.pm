@@ -67,6 +67,27 @@ sub actPIR_EGFlur() {
 	voiceMorningGreeting();
 }
 
+# Benachrichtigungen von PIR im OG Flur.
+sub actPIR_OGFlur() {
+	getGenericCtrlBlock("ctrl_last_pir_og_fl");
+	welcomeHome_Light();
+	# TODO
+}
+
+sub welcomeHome_Light() {
+  #TODO: 
+  # wenn jemand nach Hause kommt und es dunkel ist, soll Licht im Flur angehen.
+  # (aber nicht nach einer bestimmten Uhrzeit (Ruhestunden))
+  #
+  # wenn PIR im Flur und davor Türkontakt (< 1 Min?) ggf. nach PIR-Vorgarten einbeziehen
+  # wenn Licht < ? und nicht Ruhestunden
+  # dann Licht anmachen => wie ist die Bedingung zum Ausmachen? Max.Dauer? per Timer max. Zeit ohne Bewegung?
+  
+  # TODO
+  
+  
+}
+
 # Benachrichtigungen von Tuerkontakten (open/closed)
 # Params:
 #   Device: Name des Ausloesers
