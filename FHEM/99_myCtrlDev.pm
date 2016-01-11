@@ -173,6 +173,7 @@ my $actornames;
   $rooms->{eg_flur}->{fhem_name} = "EG_Flur";
   $rooms->{eg_flur}->{sensors}   = ["eg_fl_raumsensor","fl_eg_ms_sensor",'virtual_raum_sensor_ef'];
   $rooms->{eg_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
+  $rooms->{eg_flur}->{actors}=['licht=eg_fl_li:level'];
     
   $rooms->{garage}->{alias}     = "Garage";
   $rooms->{garage}->{fhem_name} = "Garage";
@@ -184,6 +185,7 @@ my $actornames;
   $rooms->{og_flur}->{fhem_name}="OG_Flur";
   $rooms->{og_flur}->{sensors}=["fl_og_ms_sensor", "og_fl_raumsensor", 'virtual_raum_sensor_of'];
   $rooms->{og_flur}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
+  $rooms->{og_flur}->{actors}=['licht=og_fl_li:level'];
   
   $rooms->{schlafzimmer}->{alias}="Schlafzimmer";
   $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
@@ -260,7 +262,7 @@ my $actornames;
   $devices->{eg_wz_li_l}->{actions}->{level}->{setting}="";
   $devices->{eg_wz_li_l}->{actions}->{level}->{type}="enum:on,off"; #?
   $devices->{eg_wz_li_l}->{actions}->{level}->{alias} = "Licht Switch";
-  $devices->{eg_wz_li_l}->{actions}->{level}->{predefinedFn} = '{$value>=50?"on":"off"}';
+  $devices->{eg_wz_li_l}->{actions}->{level}->{predefinedFn} = '{looks_like_number($value)?$value>=50?"on":"off":undef}';
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{an}->{value}="on";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{aus}->{value}="off";
   $devices->{eg_wz_li_l}->{actions}->{level}->{predefined}->{dunkel}->{value}="off";
@@ -286,7 +288,44 @@ my $actornames;
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{on}->{value}="100";
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{off}->{value}="0";
   $devices->{eg_wz_li_r}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
+  
+  $devices->{eg_fl_li}->{alias}="EG_FL Licht (Switch)";
+  $devices->{eg_fl_li}->{fhem_name}="EG_FL_SA01_Licht";
+  $devices->{eg_fl_li}->{type}="HomeMatic";
+  $devices->{eg_fl_li}->{location}="eg_flur";
+  $devices->{eg_fl_li}->{readings}->{level}->{reading} ="state";
+  $devices->{eg_fl_li}->{readings}->{level}->{alias}   ="on/off";
+  $devices->{eg_fl_li}->{readings}->{level}->{unit}    ="%";
+  $devices->{eg_fl_li}->{default_action} = 'level';
+  #$devices->{eg_fl_li}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{eg_fl_li}->{actions}->{level}->{setting}="";
+  $devices->{eg_fl_li}->{actions}->{level}->{type}="enum:on,off"; #?
+  $devices->{eg_fl_li}->{actions}->{level}->{alias} = "Licht Switch";
+  $devices->{eg_fl_li}->{actions}->{level}->{predefinedFn} = '{looks_like_number($value)?$value>=50?"on":"off":undef}';
+  $devices->{eg_fl_li}->{actions}->{level}->{predefined}->{an}->{value}="on";
+  $devices->{eg_fl_li}->{actions}->{level}->{predefined}->{aus}->{value}="off";
+  $devices->{eg_fl_li}->{actions}->{level}->{predefined}->{dunkel}->{value}="off";
+  $devices->{eg_fl_li}->{actions}->{level}->{predefined}->{100}->{value}="on";
+  $devices->{eg_fl_li}->{actions}->{level}->{predefined}->{0}->{value}="off";
     
+  $devices->{og_fl_li}->{alias}="OG_FL Licht (Switch)";
+  $devices->{og_fl_li}->{fhem_name}="OG_FL_SA01_Licht";
+  $devices->{og_fl_li}->{type}="HomeMatic";
+  $devices->{og_fl_li}->{location}="og_flur";
+  $devices->{og_fl_li}->{readings}->{level}->{reading} ="state";
+  $devices->{og_fl_li}->{readings}->{level}->{alias}   ="on/off";
+  $devices->{og_fl_li}->{readings}->{level}->{unit}    ="%";
+  $devices->{og_fl_li}->{default_action} = 'level';
+  #$devices->{og_fl_li}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{og_fl_li}->{actions}->{level}->{setting}="";
+  $devices->{og_fl_li}->{actions}->{level}->{type}="enum:on,off"; #?
+  $devices->{og_fl_li}->{actions}->{level}->{alias} = "Licht Switch";
+  $devices->{og_fl_li}->{actions}->{level}->{predefinedFn} = '{looks_like_number($value)?$value>=50?"on":"off":undef}';
+  $devices->{og_fl_li}->{actions}->{level}->{predefined}->{an}->{value}="on";
+  $devices->{og_fl_li}->{actions}->{level}->{predefined}->{aus}->{value}="off";
+  $devices->{og_fl_li}->{actions}->{level}->{predefined}->{dunkel}->{value}="off";
+  $devices->{og_fl_li}->{actions}->{level}->{predefined}->{100}->{value}="on";
+  $devices->{og_fl_li}->{actions}->{level}->{predefined}->{0}->{value}="off";
   
 #TODO: Verlagern
 # Sendet neuen Wert an den Aktor
@@ -1377,7 +1416,9 @@ $aliases->{rooms}->{ka}="paula";
 $aliases->{rooms}->{kb}="hanna";
 $aliases->{rooms}->{ga}="garage";
 $aliases->{rooms}->{ef}="eg_flur";
+$aliases->{rooms}->{eg_fl}="eg_flur";
 $aliases->{rooms}->{of}="og_flur";
+$aliases->{rooms}->{og_fl}="og_flur";
 $aliases->{rooms}->{dz}="duschbad";
 
 # umwelt
