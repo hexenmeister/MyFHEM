@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 9437 2015-10-11 17:46:08Z hexenmeister $
+# $Id: 42_SYSMON.pm 10360 2016-01-04 21:21:02Z hexenmeister $
 
 package main;
 
@@ -273,7 +273,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $rMap->{"cpu".$li."_freq_stat"}        = "CPU frequency (core $li) stat";
     }
   }
-  if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
+  if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash) || SYSMON_isCPUTempBBB2($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
@@ -1199,7 +1199,7 @@ SYSMON_obtainParameters_intern($$)
       if(SYSMON_isCPUTempRPi($hash)) { # Rasp
          $map = SYSMON_getCPUTemp_RPi($hash, $map);
       } 
-      if (SYSMON_isCPUTempBBB($hash)) {
+      if (SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempBBB2($hash)) {
         $map = SYSMON_getCPUTemp_BBB($hash, $map);
       }
       foreach my $li (0..7) {
@@ -1765,7 +1765,12 @@ SYSMON_getCPUTemp_BBB($$) {
   if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
   
   my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
-  if(!looks_like_number($val)) {return $map;}
+  if(!looks_like_number($val)) {
+    $val = SYSMON_execute($hash, "cat /sys/devices/platform/sunxi-i2c.0/i2c-0/0-0034/temp1_input 2>&1");
+    if(!looks_like_number($val)) {
+      return $map;
+    }
+  }
   
   $val = int($val);
   my $val_txt = sprintf("%.2f", $val/1000);
@@ -3461,6 +3466,16 @@ SYSMON_isCPUTempBBB($) {
   }
 
   return $hash->{helper}{sys_cpu_temp_bbb};
+}
+
+sub
+SYSMON_isCPUTempBBB2($) {
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu_temp_bbb2}) {
+    $hash->{helper}{sys_cpu_temp_bbb2} = int(SYSMON_execute($hash, "[ -f /sys/devices/platform/sunxi-i2c.0/i2c-0/0-0034/temp1_input ] && echo 1 || echo 0"));
+  }
+  
+  return $hash->{helper}{sys_cpu_temp_bbb2};
 }
 
 #my $sys_cpu_freq_rpi_bbb = undef;
