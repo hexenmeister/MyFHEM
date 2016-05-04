@@ -158,6 +158,7 @@ my $actornames;
   $rooms->{kueche}->{fhem_name} = "Kueche";
   $rooms->{kueche}->{sensors}   = ["ku_raumsensor","eg_ku_fk01","virtual_ku_fenster","eg_ku_rl01",'virtual_raum_sensor_ku'];
   $rooms->{kueche}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_vh_owts01","um_hh_licht_th","hg_sensor"]; 
+  $rooms->{kueche}->{actors}=['rollo=eg_ku_rl01:level'];
 
   $rooms->{wc}->{alias}     = "Gäste WC";
   $rooms->{wc}->{fhem_name} = "WC";
@@ -191,11 +192,13 @@ my $actornames;
   $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
   $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor","sz_wandthermostat","og_sz_fk01","og_sz_rl01","virtual_sz_fenster",'virtual_raum_sensor_sz'];
   $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{schlafzimmer}->{actors}=['licht=eg_wz_li:level','rollo=og_sz_rl01:level'];
   
   $rooms->{badezimmer}->{alias}="Badezimmer";
   $rooms->{badezimmer}->{fhem_name}="Badezimmer";
   $rooms->{badezimmer}->{sensors}=["bz_raumsensor","bz_wandthermostat","og_bz_fk01","og_bz_rl01","virtual_bz_fenster",'virtual_raum_sensor_bz'];
   $rooms->{badezimmer}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
+  $rooms->{badezimmer}->{actors}=['rollo=og_bz_rl01:level'];
   
   $rooms->{duschbad}->{alias}="Duschbad";
   $rooms->{duschbad}->{fhem_name}="Duschbad";
@@ -206,11 +209,13 @@ my $actornames;
   $rooms->{paula}->{fhem_name} = "Paula";
   $rooms->{paula}->{sensors}   = ["ka_raumsensor","ka_wandthermostat","og_ka_fk","og_ka_rl01","virtual_ka_fenster",'virtual_raum_sensor_ka'];#,"og_ka_fk01","og_ka_fk02"
   $rooms->{paula}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
+  $rooms->{paula}->{actors}=['rollo=og_ka_rl01:level'];
   
   $rooms->{hanna}->{alias}     = "Hannas Zimmer";
   $rooms->{hanna}->{fhem_name} = "Hanna";
   $rooms->{hanna}->{sensors}   = ["kb_raumsensor","kb_wandthermostat","og_kb_fk01","og_kb_rl01","virtual_kb_fenster",'virtual_raum_sensor_kb'];
   $rooms->{hanna}->{sensors_outdoor}=["vr_luftdruck","um_vh_licht","um_hh_licht_th","um_vh_owts01","hg_sensor"];
+  $rooms->{hanna}->{actors}=['rollo=og_kb_rl01:level'];
   
   $rooms->{ar}->{alias}     = "OG Abstellraum";
   $rooms->{ar}->{fhem_name} = "OG_AR";
@@ -940,9 +945,11 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{ValueFn} = "HAL_MaxReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{FnParams} = ["um_vh_licht:luminosity", "um_hh_licht_th:luminosity"];
   $devices->{virtual_umwelt_sensor}->{readings}->{luminosity}->{comment} = "Kombiniert Werte beider Sensoren und nimmt das Maximum. Damit soll der Einfluss von Hausschatten entfernt werden.";
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
+  #$devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_MinReadingValueFn";
+  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFn} = "HAL_AvgReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{ValueFilterFn} = "HAL_round1";
-  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
+  #$devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_vh_owts01:temperature", "um_hh_licht_th:temperature", "hg_sensor:temperature"];
+  $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{FnParams} = ["um_hh_licht_th:temperature", "hg_sensor:temperature"];
   $devices->{virtual_umwelt_sensor}->{readings}->{temperature}->{comment} = "Kombiniert Werte mehrerer Sensoren und bildet einen Durchschnittswert.";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFn} = "HAL_AvgReadingValueFn";
   $devices->{virtual_umwelt_sensor}->{readings}->{humidity}->{ValueFilterFn} = "HAL_round1";
@@ -1192,6 +1199,17 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{eg_ku_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{eg_ku_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{eg_ku_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{eg_ku_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{eg_ku_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{eg_ku_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{eg_ku_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{eg_ku_fk01}->{templates} =['hm_fensterkontakt'];
@@ -1309,6 +1327,17 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_bz_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{og_bz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{og_bz_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{og_bz_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{og_bz_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{og_bz_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{og_bz_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{og_bz_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="0";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{og_bz_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{og_bz_fk01}->{templates} =['hm_fensterkontakt'];
@@ -1324,6 +1353,17 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_sz_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{og_sz_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{og_sz_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{og_sz_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{og_sz_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{og_sz_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{og_sz_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{og_sz_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="35";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{og_sz_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{og_sz_fk01}->{templates} =['hm_fensterkontakt'];
@@ -1339,6 +1379,17 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_ka_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{og_ka_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{og_ka_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{og_ka_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{og_ka_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{og_ka_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{og_ka_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{og_ka_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="35";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{og_ka_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{og_ka_fk}->{alias}     ="Fensterkontakt Kombiniert";
@@ -1386,7 +1437,7 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_ka_fk02}->{fhem_name} ="OG_KA_FK02.Fenster";
   $devices->{og_ka_fk02}->{location}  ="paula";
   #<<<
-    
+  
   $devices->{og_kb_rl01}->{alias}     ="Rollo";
   $devices->{og_kb_rl01}->{fhem_name} ="kb_rollo";
   $devices->{og_kb_rl01}->{type}      ="HomeMatic";
@@ -1395,6 +1446,17 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_kb_rl01}->{readings}->{level} ->{reading}   ="level";
   $devices->{og_kb_rl01}->{readings}->{level} ->{alias}     ="Rollostand";
   $devices->{og_kb_rl01}->{readings}->{level} ->{unit} ="%";
+  $devices->{og_kb_rl01}->{actions}->{level}->{setting}="pct";
+  $devices->{og_kb_rl01}->{actions}->{level}->{type}="int"; #?
+  $devices->{og_kb_rl01}->{actions}->{level}->{min}="0";    #?
+  $devices->{og_kb_rl01}->{actions}->{level}->{max}="100";  #?
+  $devices->{og_kb_rl01}->{actions}->{level}->{alias} = "Rolladenstellung";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{hoch}->{value}="100";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{runter}->{value}="0";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{halb}->{value}="60";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{nacht}->{value}="35";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{schatten}->{valueFn}="TODO";
+  $devices->{og_kb_rl01}->{actions}->{level}->{predefined}->{schatten}->{fnParams}="TODO";
   #<<<
   
   $devices->{og_kb_fk01}->{templates} =['hm_fensterkontakt'];
@@ -1420,8 +1482,8 @@ $aliases->{rooms}->{eg_fl}="eg_flur";
 $aliases->{rooms}->{of}="og_flur";
 $aliases->{rooms}->{og_fl}="og_flur";
 $aliases->{rooms}->{dz}="duschbad";
+$aliases->{rooms}->{um}="umwelt";
 
-# umwelt
 # vorgarten
 # garten
 # haus?
