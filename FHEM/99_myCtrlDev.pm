@@ -192,7 +192,7 @@ my $actornames;
   $rooms->{schlafzimmer}->{fhem_name}="Schlafzimmer";
   $rooms->{schlafzimmer}->{sensors}=["sz_raumsensor","sz_wandthermostat","og_sz_fk01","og_sz_rl01","virtual_sz_fenster",'virtual_raum_sensor_sz'];
   $rooms->{schlafzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"];
-  $rooms->{schlafzimmer}->{actors}=['licht=eg_wz_li:level','rollo=og_sz_rl01:level'];
+  $rooms->{schlafzimmer}->{actors}=['licht=og_sz_li:level','rollo=og_sz_rl01:level'];
   
   $rooms->{badezimmer}->{alias}="Badezimmer";
   $rooms->{badezimmer}->{fhem_name}="Badezimmer";
@@ -1369,6 +1369,27 @@ sub HAL_setRoomActionValue($$$) {
   $devices->{og_sz_fk01}->{templates} =['hm_fensterkontakt'];
   $devices->{og_sz_fk01}->{fhem_name} ="OG_SZ_FK01.Fenster";
   $devices->{og_sz_fk01}->{location}  ="schlafzimmer";
+  #<<<
+  
+  $devices->{og_sz_li}->{alias}="SZ Licht (Dimmer)";
+  $devices->{og_sz_li}->{fhem_name}="OG_SZ_DA01_Licht_Sw";
+  $devices->{og_sz_li}->{type}="HomeMatic";
+  $devices->{og_sz_li}->{location}="schlafzimmer";
+  $devices->{og_sz_li}->{readings}->{level}->{reading} ="level";
+  $devices->{og_sz_li}->{readings}->{level}->{alias}   ="Dimmwert";
+  $devices->{og_sz_li}->{readings}->{level}->{unit}    ="%";
+  $devices->{og_sz_li}->{default_action} = 'level';
+  #$devices->{og_sz_li}->{actions}->{xxx}->{valueFn}="{...}";
+  $devices->{og_sz_li}->{actions}->{level}->{setting}="pct";
+  $devices->{og_sz_li}->{actions}->{level}->{type}="int"; #?
+  $devices->{og_sz_li}->{actions}->{level}->{min}="0";    #?
+  $devices->{og_sz_li}->{actions}->{level}->{max}="100";  #?
+  $devices->{og_sz_li}->{actions}->{level}->{alias} = "Licht Dimmer";
+  $devices->{og_sz_li}->{actions}->{level}->{predefined}->{an}->{value}="100";
+  $devices->{og_sz_li}->{actions}->{level}->{predefined}->{aus}->{value}="0";
+  $devices->{og_sz_li}->{actions}->{level}->{predefined}->{on}->{value}="100";
+  $devices->{og_sz_li}->{actions}->{level}->{predefined}->{off}->{value}="0";
+  $devices->{og_sz_li}->{actions}->{level}->{predefined}->{dunkel}->{value}="10";
   #<<<
   
   $devices->{og_ka_rl01}->{alias}     ="Rollo";
