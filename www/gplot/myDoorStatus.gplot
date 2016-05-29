@@ -1,0 +1,22 @@
+############################
+# Display the power reported by the EM1010
+# Corresponding FileLog definition:
+# define ememlog FileLog /var/log/fhem/emem-%Y.log emem:power.*
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics ("Zu" 0, "/" 0.5, "Auf" 1)
+set y2tics ("Zu" 0, "/" 0.5, "Auf" 1)
+set grid
+set ylabel "Status"
+set y2label "Status"
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+set title '<L1>'
+
+#FileLog 4:open|closed::$fld[3]=~"closed"?0:1
+
+plot "<IN>" using 1:2 axes x1y2 title 'Tuer' ls l1fill lw 1 with steps
