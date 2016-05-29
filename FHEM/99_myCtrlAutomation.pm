@@ -416,7 +416,7 @@ sub sonderSchaltungWeihnachtslicht($) {
 # aufgerufen werden. Damit wird erreicht, dass alle Uebersteuerungen irgendwann 
 # in einen normalen Zustand uebergehen.
 sub resetAutomatikControls() {
-	setBeschattungAutomatic();
+	#setBeschattungAutomatic();
 	setHomePresence_Automatic();
 	#setHomePresence_Present();
 	setDayNightRolloAutomaticOn();
@@ -533,7 +533,7 @@ sub automationHeartbeat() {
 	# es ist egal, an welchen Element man diese Angabe 'anhaengt'... nur ein Container
 	my $lDate = getCtrlData("ctrl_last_automatic_heartbeat_reset");
 	# einmal am Tag zw. 2 und 5 Uhr
-	if($cDate ne $lDate &&  $hms gt "02:00" and $hms lt "05:00") {
+	if($cDate ne $lDate &&  $hms gt "02:00:00" and $hms lt "05:00:00") {
 		if(Value(DEVICE_NAME_CTRL_ANWESENHEIT) ne FAR_AWAY) {
 		  resetAutomatikControls();
     } else {
@@ -567,7 +567,7 @@ sub automationHeartbeat() {
 	#	my $lName="EG_WZ_DA01_Licht_Rechts_Sw";; my $llevel=ReadingsVal($lName,"level","0");; 
 	#	my $lthr=$llevel>20?170:130;; my $self="NN_RL_CTRL_SZ_Dn";; 
 	#	my $li = ReadingsVal("UM_VH_HMBL01.Eingang", "brightness", "180");; 
-	#	if ($li < $lthr &&  $hms gt "17:00" and $hms lt "23:30") {notGreaterThen("sz_rollo", "30");;}
+	#	if ($li < $lthr &&  $hms gt "17:00:00" and $hms lt "23:30:00") {notGreaterThen("sz_rollo", "30");;}
 	# {notGreaterThen("wz_rollo_l", 0);;notGreaterThen("wz_rollo_r", 0, ('wz_fenster_l', 'wz_fenster_r'));;fhem("attr ".$self." my_control ".$dt);;}}
 	#	} 
 	
@@ -805,7 +805,7 @@ sub checkFensterZustand($) {
     	      #TODO
     	      getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
     	      # Aber nicht nachts in Schlafzimmern/Bad : TODO
-    	      if($hms lt "11:00" and $hms gt "06:00") {
+    	      if($hms lt "22:00:00" and $hms gt "06:00:00") {
     	        Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt.". Warnung. (Max: ".$msgMaxCnt." Meldungen)";
     	        voiceNotificationMsgWarn(0);
     	        speak("Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten gekippt!",0);
