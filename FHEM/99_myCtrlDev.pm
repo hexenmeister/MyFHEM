@@ -149,7 +149,7 @@ my $actornames;
                                        "tt_sensor",
                                        "eg_wz_fk01","eg_wz_tk",
                                        "virtual_wz_fenster","virtual_wz_terrassentuer",
-                                       "eg_wz_rl",'virtual_raum_sensor_wz'];
+                                       "eg_wz_rl",'virtual_raum_sensor_wz','eg_wz_li_l','eg_wz_li_r'];
   $rooms->{wohnzimmer}->{sensors_outdoor}=["vr_luftdruck","um_hh_licht_th","um_vh_licht","um_vh_owts01","hg_sensor"]; # Sensoren 'vor dem Fenster'. Wichtig vor allen bei Licht (wg. Sonnenstand)
   #$rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li_l:level,eg_wz_li_r:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','eg_wz_rl','eg_wz_rl01','eg_wz_rl02'];
   $rooms->{wohnzimmer}->{actors}=['licht=eg_wz_li:level','licht1=eg_wz_li_l:level','licht2=eg_wz_li_r:level','rollo=eg_wz_rl:level','rollo1=eg_wz_rl01:level','rollo2=eg_wz_rl02:level'];
@@ -2278,7 +2278,7 @@ sub CommandMGet($$$) {
     if($rname=~m/all(:\d+)*$/) {
       my(undef,$level)=split(/:/,$rname);
       $level = 3 unless defined $level;
-      my @readings = HAL_getRoomSensorReadingsList($devname);
+      my @readings = HAL_getRoomSensorReadingsList($devname,1);
       $showmod2 = 'r' unless defined $showmod2; # reading name anzeigen (a fuer alias)
       foreach $rname (@readings) {
         $ret->{$rname}=CommandMGet_room($devname,$rname,int($level),$showmod,$showmod2);
