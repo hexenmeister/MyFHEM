@@ -23,7 +23,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 11105 2016-03-20 19:37:02Z hexenmeister $
+# $Id: 42_SYSMON.pm 12951 2017-01-04 09:39:43Z hexenmeister $
 
 package main;
 
@@ -867,7 +867,7 @@ SYSMON_Update($;$)
   if( AttrVal($name, "disable", "") eq "1" )
   {
     #SYSMON_Log($hash, 5, "disabled");
-    $hash->{STATE} = "Inactive";
+    #$hash->{STATE} = "Inactive";
   } else {
     # Beim ersten mal alles aktualisieren!
     if(!$hash->{helper}{u_first_mark}) {
@@ -889,7 +889,7 @@ SYSMON_Update($;$)
       }
     
       SYSMON_updateReadings($hash,$map);
-      $hash->{STATE} = "Active";
+      #$hash->{STATE} = "Active";
     } else {
       # blocking call
       if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) ) {
@@ -1048,7 +1048,7 @@ sub SYSMON_blockingFinish($) {
   }
   
   SYSMON_updateReadings($hash,$map);
-  $hash->{STATE} = "Active";
+  #$hash->{STATE} = "Active";
 }
 
 sub SYSMON_updateReadings($$) {
@@ -1556,6 +1556,10 @@ SYSMON_getCPUCoreNum_intern($) {
   my ($hash) = @_;
   
   return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
+  
+  # TODO: Umstellung auf 
+  # cat /sys/devices/system/cpu/present
+  # cat /sys/devices/system/cpu/online
   
   # nur wenn verfuegbar
   if(SYSMON_isSysCpuNum($hash)) {
@@ -4162,6 +4166,9 @@ sub SYSMON_Log($$$) {
 1;
 
 =pod
+=item device
+=item summary    provides some statistics about the system
+=item summary_DE liefert einige Statistiken ueber das Host-System
 =begin html
 
 <!-- ================================ -->
