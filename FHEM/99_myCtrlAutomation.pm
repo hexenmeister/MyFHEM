@@ -311,6 +311,9 @@ sub actHomePresenceLong() {
 sub sonderSchaltungWeihnachtslicht($) {
   my ($e) = @_;
   
+  # Deaktivieren
+  return 0;
+  
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   # nur am Halloween-Abend ab 16:00
   if($month==12 || ($month==11 || $mday>=14) || ($month==1 || $mday<=3)) {
@@ -831,7 +834,7 @@ sub checkFensterZustand($) {
     	      getGenericCtrlBlock("ctrl_last_window_state_".$deviceName."_msg","on");
     	      Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt.". Warnung. (Max: ".$msgMaxCnt." Meldungen)";
     	      voiceNotificationMsgWarn(0);
-    	      speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",100);
+    	      speak("Achtung! Fenster in ".getDeviceLocation($deviceName,"unbekannt")." ist seit ueber ".rundeZahl0($dauer/60)." Minuten offen!",0);
           }
         } else {
           Log 3, "Automation: checkFensterZustand: Dev: ".$deviceName." => ".$msgcnt."Warnung in ".($delayBetweenWarningsOpen-$msgzeit).". (Max: ".$msgMaxCnt." Meldungen)";
