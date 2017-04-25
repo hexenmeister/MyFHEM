@@ -27,7 +27,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 13595 2017-03-04 08:11:19Z hexenmeister $
+# $Id: 42_SYSMON.pm 13933 2017-04-08 12:39:23Z hexenmeister $
 
 package main;
 
@@ -2841,7 +2841,7 @@ sub SYSMON_getNetworkInfo ($$$) {
         }
       }
       elsif (1 eq SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && echo 1 || echo 0")) {
-        $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed");
+        $speed = SYSMON_execute($hash, "cat /sys/class/net/$nName/speed 2>/dev/null");
       }
       else {
         $speed = "not available";
@@ -3623,20 +3623,23 @@ sub SYSMON_PowerAcInfo($$) {
   
   my $type="ac";
   my $base = "cat /sys/class/power_supply/".$type."/";
+   
+  my $d_online_t = SYSMON_execute($hash, $base."online");
+  if($d_online_t) {
+    my $d_online = trim($d_online_t);
+    my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+    my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
+    if(defined $d_current) {$d_current/=1000;} else {return $map;}
+    my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
+    if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
     
-  my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
-  if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
-  if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
-  
-  #$map->{"power_".$type."_online"}=$d_online;
-  #$map->{"power_".$type."_present"}=$d_present;
-  #$map->{"power_".$type."_current"}=$d_current;
-  #$map->{"power_".$type."_voltage"}=$d_voltage;
-  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
+    #$map->{"power_".$type."_online"}=$d_online;
+    #$map->{"power_".$type."_present"}=$d_present;
+    #$map->{"power_".$type."_current"}=$d_current;
+    #$map->{"power_".$type."_voltage"}=$d_voltage;
+    $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
+    $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
+  }
   return $map;
 }
 
@@ -3650,10 +3653,10 @@ sub SYSMON_PowerUsbInfo($$) {
   my $base = "cat /sys/class/power_supply/".$type."/";
     
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
+  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
   if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
   if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
   #$map->{"power_".$type."_online"}=$d_online;
@@ -3676,13 +3679,13 @@ sub SYSMON_PowerBatInfo($$) {
   my $base = "cat /sys/class/power_supply/".$type."/";
     
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
-  my $d_present = trim(SYSMON_execute($hash, $base."present"));
-  my $d_current = SYSMON_execute($hash, $base."current_now");
+  my $d_present = trim(SYSMON_execute($hash, $base."present 2>/dev/null"));
+  my $d_current = SYSMON_execute($hash, $base."current_now 2>/dev/null");
   if(defined $d_current) {$d_current/=1000;} else {return $map;}
-  my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
+  my $d_voltage = SYSMON_execute($hash, $base."voltage_now 2>/dev/null");
   if(defined $d_voltage) {$d_voltage/=1000000;} else {return $map;}
   
-  my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
+  my $d_capacity = trim(SYSMON_execute($hash, $base."capacity 2>/dev/null"));
   if($d_present ne "1") {
     $d_capacity = "0";
   }
@@ -3695,10 +3698,10 @@ sub SYSMON_PowerBatInfo($$) {
   
   if($d_present eq "1") {
     # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
-    my $d_technology = trim(SYSMON_execute($hash, $base."technology"));
-    my $d_status = trim(SYSMON_execute($hash, $base."status"));
-    my $d_health = trim(SYSMON_execute($hash, $base."health"));
-    my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design"));
+    my $d_technology = trim(SYSMON_execute($hash, $base."technology 2>/dev/null"));
+    my $d_status = trim(SYSMON_execute($hash, $base."status 2>/dev/null"));
+    my $d_health = trim(SYSMON_execute($hash, $base."health 2>/dev/null"));
+    my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design 2>/dev/null"));
     
     $map->{"power_".$type."_info"}=$type." info: ".$d_technology." , capacity: ".$d_capacity." %, status: ".$d_status." , health: ".$d_health." , total capacity: ".$d_energy_full_design." mAh";
     
@@ -3791,7 +3794,7 @@ sub SYSMON_readPassword($)
    }
    else
    {
-      SYSMON_Log($hash, 2, "No password in file");
+      SYSMON_Log($hash, 5, "No password in file");
       return undef;
    }
 }
@@ -3976,8 +3979,6 @@ sub SYSMON_Exec($$;$)
    my ($hash, $cmd,$is_arr) = @_;
    my $openedTelnet = 0;
    my $telnet = $hash->{".telnet"};
-   
-   #TODO: SSH
    
    my $name = $hash->{NAME};
    my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
@@ -4184,6 +4185,7 @@ SYSMON_Exec_Ssh($$)
    SYSMON_Log ($hash, 5, "Call: '".$call."'");
    $call = $t_sshpass.$call;
    
+   # $call = $call.' 2>/dev/null';
    
    my @result = qx($call);
    # Arrays als solche zurueckgeben
