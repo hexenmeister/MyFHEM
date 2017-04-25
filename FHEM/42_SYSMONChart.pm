@@ -481,7 +481,13 @@ SYSMONChart_prepareDataFileSystem($$$)
     $factor = 1024;
     $unit = 'GB';
   }
-  $item->{value} = sprintf("%.1f",$used/$total*100);
+  my $v = 0;
+  if($total == 0) {
+      $unit = '';
+  } else {
+    $v=$used/$total*100;
+  }
+  $item->{value} = sprintf("%.1f",$v);
   $item->{text} = sprintf("%.1f / %.1f %s",$used/$factor,$total/$factor,$unit);
   $item->{has} = 1;
 }
