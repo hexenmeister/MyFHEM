@@ -710,7 +710,8 @@ sub voiceHalloween($) {
   
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   # nur am Halloween-Abend ab 16:00
-  if($month==9 && $mday==31 && $hour>=16 && $hour<23) {
+  #if($month==9 && $mday==31 && $hour>=16 && $hour<23) {
+  if($month==9 && $mday==31 && $hour>=17 && $hour<20) {
     
     # Schrei (Tuerklingel)
     if($mode eq "0") {
