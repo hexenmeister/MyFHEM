@@ -341,16 +341,27 @@ sub dev_proxy_Set($@){
       my $cmd = "state";
       ($val, $cmd) = dev_proxy_mapDeviceReadingValueDefultMap($hash, $d, "state", $command,0);
       $cmd = dev_proxy_remap_reading($hash, $d, $cmd);
+      my $cmdstr;
       if($cmd ne "state") {
-        $ret .= CommandSet(undef, join(" ", ($d, $cmd, $val)));
+        $cmdstr = join(" ", ($d, $cmd, $val));
       } else {
-        $ret .= CommandSet(undef, join(" ", ($d, $val)));
+        $cmdstr = join(" ", ($d, $val));
       }
+      #Log3 $hash, 1, "SET: >>> ".$cmdstr;
+      $ret .= CommandSet(undef, $cmdstr);
     } else {
       # benannte readings
-      ($val, $command) = dev_proxy_mapDeviceReadingValueDefultMap($hash, $d, $command, join(" ", @values),0);
-      $command = dev_proxy_remap_reading($hash, $d, $command);
-      $ret .= CommandSet(undef, join(" ", ($d, $command, $val)));
+      my $cmd = $command;
+      ($val, $cmd) = dev_proxy_mapDeviceReadingValueDefultMap($hash, $d, $command, join(" ", @values),0);
+      $cmd = dev_proxy_remap_reading($hash, $d, $cmd);
+      my $cmdstr;
+      if($cmd ne "state") {
+         $cmdstr = join(" ", ($d, $cmd, $val));
+      } else {
+         $cmdstr = join(" ", ($d, $val));
+      }
+      #Log3 $hash, 1, "SET: >>> ".$cmdstr;
+      $ret .= CommandSet(undef, $cmdstr);
     }
   }
   Log3 $hash, 5, "SET: $ret" if($ret);
