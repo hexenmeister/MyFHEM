@@ -177,19 +177,49 @@ sub dev_proxy_updateReadings($$) {
   }
   $hash->{INNTFY} = 1;
   
-  my $nrmap;
+#  my $nrmap;
+#  foreach my $or (keys %{ $hash->{OBSERVED_READINGS}} ) { 
+#    my $map;
+#    foreach my $d (keys %{ $hash->{CONTENT}} ) {
+#      next if(!$defs{$d});
+#      my $or_mapped = dev_proxy_remap_reading($hash, $d, $or);
+#      my $devReadings = ReadingsVal($d,$or_mapped,undef);
+#      if(defined($devReadings)) {
+#        ($devReadings) = dev_proxy_mapDeviceReadingValueDefultMap($hash,$d,$or,$devReadings,1);
+#        $map->{$d}=$devReadings;
+#      }
+#    }
+#    my $newReading = dev_proxy_computeCombReading($or, $map);
+#    if(defined($newReading)) {
+#      $nrmap->{$or}=$newReading;
+#    }
+#  }
+
+  my $map;
   foreach my $or (keys %{ $hash->{OBSERVED_READINGS}} ) { 
-    my $map;
     foreach my $d (keys %{ $hash->{CONTENT}} ) {
       next if(!$defs{$d});
       my $or_mapped = dev_proxy_remap_reading($hash, $d, $or);
       my $devReadings = ReadingsVal($d,$or_mapped,undef);
       if(defined($devReadings)) {
-        ($devReadings) = dev_proxy_mapDeviceReadingValueDefultMap($hash,$d,$or,$devReadings,1);
-        $map->{$d}=$devReadings;
+        my $nReading;
+        ($devReadings, $nReading) = dev_proxy_mapDeviceReadingValueDefultMap($hash,$d,$or,$devReadings,1);
+        # Nur wenn nicht ueberschrieben wurde
+        if(!defined($map->{$or}->{$d})) {
+          $map->{$or}->{$d}=$devReadings;
+        }
+        # falls umgemappt werden soll, den neuen Wert auch aufnehmen (ueberschreibt den eigentlichen Wert für das andere Reading)
+        if($or ne $nReading) {
+          $map->{$nReading}->{$d}=$devReadings;
+        }
       }
     }
-    my $newReading = dev_proxy_computeCombReading($or, $map);
+  }
+  
+  # jetzt gesammelten Werte kombinieren / zusammenrechnen
+  my $nrmap;
+  foreach my $or (keys %{ $map } ) {
+    my $newReading = dev_proxy_computeCombReading($or, $map->{$or});
     if(defined($newReading)) {
       $nrmap->{$or}=$newReading;
     }
@@ -420,10 +450,12 @@ sub dev_proxy_eval_map_readings($$) {
   my ($hash, $attrVal) = @_;
   $hash->{READING_NAME_MAP} = undef unless defined $attrVal;
   my $map;
-  my @list = split("[ \t][ \t]*", $attrVal);
-  foreach (@list) {
-    my($devName, $devReading, $newReading) = split(/:/, $_);
-    $map->{$devName} -> {$newReading} = $devReading;
+  if(defined $attrVal) {
+    my @list = split("[ \t][ \t]*", $attrVal);
+    foreach (@list) {
+      my($devName, $devReading, $newReading) = split(/:/, $_);
+      $map->{$devName} -> {$newReading} = $devReading;
+    }
   }
   $hash->{READING_NAME_MAP} = $map;
 }
@@ -531,7 +563,7 @@ sub dev_proxy_cleanup_readings($) {
       Falls die Definition mit dem Richtungsprefix nicht existiert oder kein Ergebnis liefert, 
       werden Standartdefinitionen (die parallel angegeben werden k&ouml;nnen) verwendet.
       F&uuml;r ausgehende Werte kann die Ziel-Reading auch umdefiniert werden, dieser wird im Zielwert nach dem ':' angegeben.
-      Die Angabe ist auch bei 'in:' m&ouml;glich, wird dort jedoch ignoriert.
+      Die Angabe ist auch bei 'in:' m&ouml;glich, dann wird dieser Wert den Wert der angegebenen Reading (bei dem selben Device) ersetzen.
       Das kann n&uuml;tzlich sein, um spezielle Werte an andere Readings umzuleiten.
       <br>
       Die Werte m&uuml;ssen in als eine Hash-Map angegeben werden. 
