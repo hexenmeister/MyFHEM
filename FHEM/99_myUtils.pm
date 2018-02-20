@@ -42,7 +42,10 @@ myUtils_Initialize($$)
 
 # --- Steuerung ---->
 
-my $_steuerungZirkulationspumpe_lastActorChangeTime = time();
+#my $_steuerungZirkulationspumpe_lastActorChangeTime = time();
+
+
+
 
 sub
 steuerungZirkulationspumpe($$$$$) {
@@ -50,6 +53,12 @@ steuerungZirkulationspumpe($$$$$) {
  my ($nSpeicherTemp, $nEntnahmeTemp, $nRueckflussTemp, $aktor, $msg) = @_;
 
  my $CHECK_MIN_TEMP = 0;
+ 
+ my $_steuerungZirkulationspumpe_lastActorChangeTime = ReadingsVal($msg,'lastChange',undef);
+ if(!looks_like_number($_steuerungZirkulationspumpe_lastActorChangeTime)) {
+  $_steuerungZirkulationspumpe_lastActorChangeTime = time();
+  CommandSetReading(undef,"$msg lastChange $_steuerungZirkulationspumpe_lastActorChangeTime");
+ }
  
  # Grenzwerte
  # - MAX_TEMP_DELTA_SPEICHER_RUECKFLUSS: Max Unnterschied zw. Speicher und Rueckflus. Bei Ueberschreitung -> Pumpe an
@@ -109,7 +118,7 @@ steuerungZirkulationspumpe($$$$$) {
 		my $timeDiffMinutes = $timeDiff/60;
 		# Daten (Name, Zeit, Dauer) fuer die Anzeige
 		my $tabName = $ctrlTab->{name};
-		my $Sekunden = $timeDiff;
+		my $Sekunden = round($timeDiff,0);
 		my $Stunden=int($Sekunden/3600);
 		my $Minuten=int(($Sekunden-$Stunden*3600)/60);
 		$Sekunden=$Sekunden-$Stunden*3600-$Minuten*60;
@@ -136,6 +145,7 @@ steuerungZirkulationspumpe($$$$$) {
 	 			if($timeDiffMinutes > ($ctrlTabPart->{MIN_TIME_BEFORE_CHANGE_MINUTES})) {
 	 				# Zeit der letzten Aenderung speichern
 	 				$_steuerungZirkulationspumpe_lastActorChangeTime = time();
+	 				CommandSetReading(undef,"$msg lastChange $_steuerungZirkulationspumpe_lastActorChangeTime");
 	 				
 		 			Log 3, "steuerungZirkulationspumpe: Aktor-Aenderung (neuer Wert: $actor_desired_value, ".$ctrlTab->{name}.")";
 		 			fhem("set $aktor $actor_desired_value");
