@@ -227,39 +227,39 @@ sub watchdog_client_NotifySystemD($$) {
   <p>
     Systemd erlaubt Ueberwachung von Programmen mittels eines Watchdogs.
     Sendet der Prozess innerhalnb eines definierten Interval kein 'Lebenszeichen', 
-    wird dieser gestoppt und nbeu gestartet.
+    wird dieser gestoppt und neu gestartet.
     Dieses Modul sendet periodisch eine keep-alive Nachricht an das Systemd-Watchdog.
   </p>
   <p>
-    FHEM muss unter Kontrolle von Systemd laufe und Watchdog muss korrekt konfiguriert sein.<br/>
+    FHEM muss unter Kontrolle von Systemd laufen und Watchdog muss korrekt konfiguriert sein.<br/>
     Folgendes Script kann benutzt werden:<br/>
     <code>
-     [Unit]
-     Description=FHEM Home Automation
-     Requires=network.target
-     #After=network.target
-     After=dhcpcd.service
-  
-     [Service]
-     Type=forking
-     NotifyAccess=all
-     User=fhem
-     Group=dialout
-     WorkingDirectory=/opt/fhem
-     ExecStart=/usr/bin/perl fhem.pl fhem.cfg
-     #ExecStart=/usr/bin/perl fhem.pl configDB
-     TimeoutStartSec=240
-     TimeoutStopSec=120
-     #ExecStop=/usr/bin/pkill -U fhem perl
-     ExecStop=/usr/bin/pkill -f -U fhem "fhem.pl fhem.cfg"
-     # Restart options: no, on-success, on-failure, on-abnormal, on-watchdog, on-abort, or always.
-     Restart=on-failure
-     RestartSec=3
-     WatchdogSec=180
-     PIDFile=/opt/fhem/log/fhem.pid
-  
-     [Install]
-     WantedBy=multi-user.target
+     [Unit]<br/>
+     Description=FHEM Home Automation<br/>
+     Requires=network.target<br/>
+     #After=network.target<br/>
+     After=dhcpcd.service<br/>
+  <br/>
+     [Service]<br/>
+     Type=forking<br/>
+     NotifyAccess=all<br/>
+     User=fhem<br/>
+     Group=dialout<br/>
+     WorkingDirectory=/opt/fhem<br/>
+     ExecStart=/usr/bin/perl fhem.pl fhem.cfg<br/>
+     #ExecStart=/usr/bin/perl fhem.pl configDB<br/>
+     TimeoutStartSec=240<br/>
+     TimeoutStopSec=120<br/>
+     #ExecStop=/usr/bin/pkill -U fhem perl<br/>
+     ExecStop=/usr/bin/pkill -f -U fhem "fhem.pl fhem.cfg"<br/>
+     # Restart options: no, on-success, on-failure, on-abnormal, on-watchdog, on-abort, or always.<br/>
+     Restart=on-failure<br/>
+     RestartSec=3<br/>
+     WatchdogSec=180<br/>
+     PIDFile=/opt/fhem/log/fhem.pid<br/>
+  <br/>
+     [Install]<br/>
+     WantedBy=multi-user.target<br/>
     </code><br/>
     Das Script kann unter "/etc/systemd/system/fhem.service" angelegt werden. 
     Mit "sudo systemctl daemon-reload" wird sysgtemd-Konfiguration erneuert.
@@ -291,35 +291,35 @@ sub watchdog_client_NotifySystemD($$) {
     This module periodically sends keep-alive message to the systemd.
   </p>
   <p>
-    fhem must be started under control of systemmd. Watchdog must be configured properly.<br/>
+    fhem must be started under control of systemd. Watchdog must be also configured properly.<br/>
     You can use the following script:<br/>
     <code>
-     [Unit]
-     Description=FHEM Home Automation
-     Requires=network.target
-     #After=network.target
-     After=dhcpcd.service
-  
-     [Service]
-     Type=forking
-     NotifyAccess=all
-     User=fhem
-     Group=dialout
-     WorkingDirectory=/opt/fhem
-     ExecStart=/usr/bin/perl fhem.pl fhem.cfg
-     #ExecStart=/usr/bin/perl fhem.pl configDB
-     TimeoutStartSec=240
-     TimeoutStopSec=120
-     #ExecStop=/usr/bin/pkill -U fhem perl
-     ExecStop=/usr/bin/pkill -f -U fhem "fhem.pl fhem.cfg"
-     # Restart options: no, on-success, on-failure, on-abnormal, on-watchdog, on-abort, or always.
-     Restart=on-failure
-     RestartSec=3
-     WatchdogSec=180
-     PIDFile=/opt/fhem/log/fhem.pid
-  
-     [Install]
-     WantedBy=multi-user.target
+     [Unit]<br/>
+     Description=FHEM Home Automation<br/>
+     Requires=network.target<br/>
+     #After=network.target<br/>
+     After=dhcpcd.service<br/>
+  <br/>
+     [Service]<br/>
+     Type=forking<br/>
+     NotifyAccess=all<br/>
+     User=fhem<br/>
+     Group=dialout<br/>
+     WorkingDirectory=/opt/fhem<br/>
+     ExecStart=/usr/bin/perl fhem.pl fhem.cfg<br/>
+     #ExecStart=/usr/bin/perl fhem.pl configDB<br/>
+     TimeoutStartSec=240<br/>
+     TimeoutStopSec=120<br/>
+     #ExecStop=/usr/bin/pkill -U fhem perl<br/>
+     ExecStop=/usr/bin/pkill -f -U fhem "fhem.pl fhem.cfg"<br/>
+     # Restart options: no, on-success, on-failure, on-abnormal, on-watchdog, on-abort, or always.<br/>
+     Restart=on-failure<br/>
+     RestartSec=3<br/>
+     WatchdogSec=180<br/>
+     PIDFile=/opt/fhem/log/fhem.pid<br/>
+  <br/>
+     [Install]<br/>
+     WantedBy=multi-user.target<br/>
     </code><br/>
     Create the script as "/etc/systemd/system/fhem.service". 
     Use "sudo systemctl daemon-reload" to reload systemd configuration.
