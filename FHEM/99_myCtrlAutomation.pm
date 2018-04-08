@@ -65,12 +65,20 @@ sub actPIRVorgarten() {
 sub actPIR_EGFlur() {
 	getGenericCtrlBlock("ctrl_last_pir_eg_fl");
 	voiceMorningGreeting();
+	welcomeHome_Light();
 }
 
 # Benachrichtigungen von PIR im OG Flur.
 sub actPIR_OGFlur() {
 	getGenericCtrlBlock("ctrl_last_pir_og_fl");
-	welcomeHome_Light();
+	#welcomeHome_Light();
+	# TODO
+}
+
+# Benachrichtigungen von PIR im OG Flur.
+sub actPIR_DGFlur() {
+	getGenericCtrlBlock("ctrl_last_pir_dg_fl");
+	#
 	# TODO
 }
 
