@@ -25,7 +25,7 @@ package main;
 
 use strict;
 use warnings;
-use List::Util qw[min max];
+#use List::Util qw[min max];
 use Data::Dumper;
 
 #####################################
@@ -257,8 +257,8 @@ sub dev_proxy_computeCombReading($$) {
     return join(" ", keys %{ $tm });
   }
   
-  my $maxV = max(@values);
-  my $minV = min(@values);
+  my $maxV = List::Util::max(@values);
+  my $minV = List::Util::min(@values);
   #if($maxV-$minV<10) {
     return $minV+($maxV-$minV)/2;
   #}
