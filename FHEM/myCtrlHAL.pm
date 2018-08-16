@@ -64,6 +64,7 @@ myCtrlHAL_Initialize($$)
   my ($hash) = @_;
 }
 
+
 ################################################################################
 # liefert Liste der Tueren und Fenster, die bestimmten Status haben
 #  >list model=HM-SEC-RHS:FILTER=state=closed
@@ -75,10 +76,19 @@ myCtrlHAL_Initialize($$)
 #    wenn nicht vorhanden, dann 'alias', wenn auch nicht vorhanden, dann NAME
 ################################################################################
 sub getWindowDoorList($;$) {
- my($state, $not)=@_;
- my $spec = 'model=HM-SEC-RHS:FILTER=state='.$state;
- if(defined($not)) {
-   $spec = 'model=HM-SEC-RHS:FILTER=state!='.$state;
+  my($state, $not)=@_;
+  return getSpecDeviceList("warnType=leave:FILTER=devType=window|door",$state,$not);
+}
+
+sub getSpecDeviceList($$;$) {
+ my($specdef,$state, $not)=@_;
+ #my $spec = 'model=HM-SEC-RHS:FILTER=state='.$state;
+ #my $spec = 'warnType=leave:FILTER=state='.$state;
+ my $spec = $specdef.':FILTER=STATE='.$state;
+ if($not) {
+   #$spec = 'model=HM-SEC-RHS:FILTER=state!='.$state;
+   #$spec = 'warnType=leave:FILTER=state!='.$state;
+   $spec = $specdef.':FILTER=STATE!='.$state;
  }
  my @ret;
  my @devArray = devspec2array($spec);

@@ -477,6 +477,11 @@ sub voiceActGenericUserEvent() {
   # TODO
 }
 
+sub uniq {
+  my %seen;
+  return grep { !$seen{$_}++ } @_;
+}
+
 ###############################################################################
 # BenutzerEvent: Benutzer geht aus dem Haus
 ###############################################################################
@@ -490,9 +495,9 @@ sub voiceActLeaveHome() {
   
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   
-  my @wndOpen = getWindowDoorList(+STATE_NAME_WIN_OPENED);
-  my @wndTilted = getWindowDoorList(+STATE_NAME_WIN_TILTED);
-  my @wndNotClosed = getWindowDoorList(+STATE_NAME_WIN_CLOSED,1);
+  my @wndOpen = uniq(getWindowDoorList(+STATE_NAME_WIN_OPENED));
+  my @wndTilted = uniq(getWindowDoorList(+STATE_NAME_WIN_TILTED));
+  my @wndNotClosed = uniq(getWindowDoorList(+STATE_NAME_WIN_CLOSED,1));
   my $numOpen = scalar(@wndOpen);
   my $numTilted = scalar(@wndTilted);
   my $numNotClosed = scalar(@wndNotClosed);
@@ -501,7 +506,7 @@ sub voiceActLeaveHome() {
   
   if($numNotClosed>($numOpen+$numTilted)) {
     # Fenster im undefiniertem Zustand => Problem  mit Sensoren melden
-    $text.="Warnung, ".($numNotClosed-$numOpen-$numTilted)." Fenster in unbekannten Zustand! Bitte ueberpruefen Sie die Sensoren!";
+    $text.="Warnung, ".($numNotClosed-$numOpen-$numTilted)." Fenster in unbekannten Zustand! Sensor ueberpruefen!";
     $flag=1;
   }
   

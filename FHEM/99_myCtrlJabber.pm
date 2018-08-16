@@ -10,13 +10,54 @@ use Time::Local;
 require "$attr{global}{modpath}/FHEM/myCtrlHAL.pm";
 
 use constant {
- MY_JABBER_ADDR    => 'hexenmeister@jabber.de'
+ MY_JABBER_ADDR    => 'hexenmeister@jabber.de',
+ MY_TELEGRAM_GROUP => "admin"
 };
+
+sub myCtrlJabber_sendTelegramMessageToGroup($$);
+sub myCtrlJabber_sendTelegramMessageToChat($$);
+sub myCtrlJabber_sendJabberMessage($$);
 
 sub
 myCtrlJabber_Initialize($$)
 {
   my ($hash) = @_;
+}
+
+my $useJabber = 0;
+my $useTelegram = 1;
+
+sub sendMessageToDefaultChannel($$) {
+  my($rcp, $msg) = @_;
+  
+  if($useJabber) {
+    myCtrlJabber_sendJabberMessage($rcp, $msg);
+  }
+  
+  if($useTelegram) {
+    myCtrlJabber_sendTelegramMessageToGroup($rcp, $msg);
+  }
+}
+
+######################################################
+# Meldung per Telegram senden an eine User-Gruppe
+######################################################
+sub myCtrlJabber_sendTelegramMessageToGroup($$)
+{
+  my($rcp, $msg) = @_;
+  fhem('set NN_HA_Net_Telegram out-json {"group":"'.$rcp.'","content":'.'"'.$msg.'"}');
+}
+
+######################################################
+# Meldung per Telegram senden an eine User-Gruppe
+######################################################
+sub myCtrlJabber_sendTelegramMessageToChat($$)
+{
+  my($rcp, $msg) = @_;
+  my $find = "\n";
+  my $replace = '\n';
+  $msg =~ s/$find/$replace/g;
+  fhem('set NN_HA_Net_Telegram out-json {"chatId":"'.$rcp.'","content":'.'"'.$msg.'"}');
 }
 
 ######################################################
@@ -43,11 +84,16 @@ sendJabberEcho()
 ######################################################
 # Meldung an mein Handy per Jabber senden
 ######################################################
-sub
-sendMeJabberMessage($)
+sub sendMeMessageToDefaultChannel($)
 {
 	my($msg) = @_;
-	myCtrlJabber_sendJabberMessage(+MY_JABBER_ADDR, $msg);
+	if($useJabber) {
+	  myCtrlJabber_sendJabberMessage(+MY_JABBER_ADDR, $msg);
+	}
+	
+	if($useTelegram) {
+	  myCtrlJabber_sendTelegramMessageToGroup(+MY_TELEGRAM_GROUP, $msg);
+	}
 }
 
 #--- User Methods -------------------------------------------------------------
@@ -92,7 +138,7 @@ sendMeStatusMsg()
   }
 	
   my $msgBat='';
-	my $sensors = HAL_getSensorNames();
+	#$sensors = HAL_getSensorNames();
   foreach my $sensorname (@$sensors) {
     if(HAL_isDeviceLowBat($sensorname)) {
       my $info = HAL_getDeviceBatStatus($sensorname);
@@ -106,23 +152,36 @@ sendMeStatusMsg()
    $msg.="\nno low batteries"; 
   }
 
-	sendMeJabberMessage($msg);
+	sendMeMessageToDefaultChannel($msg);
 }
 
 ######################################################
-# Kleines Jabber-Cmd-Interface
+# Kleines Cmd-Interface
 ######################################################
-sub
-sendJabberAnswer()
-{
+sub sendJabberAnswer() {
   my $lastsender=ReadingsVal(+DEVICE_NAME_JABBER,"LastSenderJID","0");
   my $lastmsg=ReadingsVal(+DEVICE_NAME_JABBER,"LastMessage","0");
+  sendAnswerToChannel("jabber", $lastsender, $lastmsg);
+}
+
+sub sendTelegramAnswer() {
+  my $lastsender=ReadingsVal("NN_HA_Net_Telegram","chatId","");
+  my $lastmsg=ReadingsVal("NN_HA_Net_Telegram","content","");
+  sendAnswerToChannel("telegram", $lastsender, $lastmsg);
+}
+
+
+sub sendAnswerToChannel($$$) {
+  my($channel, $lastsender, $lastmsg) = @_;
+  
+  #my $lastsender=ReadingsVal(+DEVICE_NAME_JABBER,"LastSenderJID","0");
+  #my $lastmsg=ReadingsVal(+DEVICE_NAME_JABBER,"LastMessage","0");
   my @cmd_list = split(/\s+/, trim($lastmsg));
   my $cmd = lc($cmd_list[0]);
   # erstes Element entfernen
   shift(@cmd_list);
   #Log 3, "Jabber: ".$lastsender." - ".$lastmsg;
-  
+    
   my $newmsg;
   if($cmd eq "status") {
   	#TODO
@@ -199,13 +258,24 @@ sendJabberAnswer()
     $newmsg.=fhem("mget ".$cmd_tail);
   }
   
-  if(defined($newmsg)) {
-    fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " ".$newmsg);
-  } else {
-  	fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender. 
-  	     " Unbekanter Befehl: ".$lastmsg);
+  if($channel eq "jabber") {
+    if(defined($newmsg)) {
+      myCtrlJabber_sendJabberMessage($lastsender, $newmsg);
+      #fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender . " ".$newmsg);
+    } else {
+      myCtrlJabber_sendJabberMessage($lastsender, "Unbekanter Befehl: ".$lastmsg);
+    	#fhem("set ".+DEVICE_NAME_JABBER." msg ". $lastsender. " Unbekanter Befehl: ".$lastmsg);
+    }
   }
+    
+  if($channel eq "telegram") {
+    if(defined($newmsg)) {
+      myCtrlJabber_sendTelegramMessageToChat($lastsender, $newmsg);
+    } else {
+      myCtrlJabber_sendTelegramMessageToChat($lastsender, "Unbekanter Befehl: ".$lastmsg);
+    }
+  }
+  
 }
-
 
 1;
