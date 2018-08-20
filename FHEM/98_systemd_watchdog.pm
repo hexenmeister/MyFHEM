@@ -23,7 +23,7 @@
 #
 ###############################################################################
 
-# $Id$
+# $Id: 98_systemd_watchdog.pm 17185 2018-08-20 19:10:42Z hexenmeister $
 
 package main;
 
@@ -219,6 +219,7 @@ sub watchdog_client_NotifySystemD($$) {
 1;
 
 =pod
+=item summary_DE Sendet periodisch eine keep-alive Nachricht an das Systemd.
 =begin html_DE
 
 <a name="systemd_watchdog"></a>
@@ -245,6 +246,11 @@ sub watchdog_client_NotifySystemD($$) {
      NotifyAccess=all<br/>
      User=fhem<br/>
      Group=dialout<br/>
+     # Run ExecStartPre with root-permissions<br/>
+	 PermissionsStartOnly=true<br/>
+	 ExecStartPre=-/bin/mkdir /var/run/fhem<br/>
+	 ExecStartPre=/bin/chown -R fhem:dialout /var/run/fhem<br/>
+	 # Run ExecStart with defined user and group<br/>
      WorkingDirectory=/opt/fhem<br/>
      ExecStart=/usr/bin/perl fhem.pl fhem.cfg<br/>
      #ExecStart=/usr/bin/perl fhem.pl configDB<br/>
@@ -256,7 +262,7 @@ sub watchdog_client_NotifySystemD($$) {
      Restart=on-failure<br/>
      RestartSec=3<br/>
      WatchdogSec=180<br/>
-     PIDFile=/opt/fhem/log/fhem.pid<br/>
+     PIDFile=/var/run/fhem/fhem.pid<br/>
   <br/>
      [Install]<br/>
      WantedBy=multi-user.target<br/>
@@ -266,8 +272,10 @@ sub watchdog_client_NotifySystemD($$) {
     Anschliessend kann FHEM mit folgendem Befehl gestartet werden: "sudo systemctl start fhem.service".
     <br/>
     Wenn in dem Script "Type=notify" verwendet wird, muss global Attribute "nofork=1" gesetzt sein.<br/>
+    <code>attr global nofork 1</code><br/>
     Bei "Type=forking" muss in Script der korrekte Pfad zu dem PID-Datei angegeben werden, 
     diese Datei muss auch in FHEM mit dem global Attribute "pidfilename" aktiviert sein.<br/> 
+    <code>attr global pidfilename /var/run/fhem/fhem.pid</code><br/>
   </p>
 
   <a name="MQTTdefine"></a>
@@ -280,6 +288,7 @@ sub watchdog_client_NotifySystemD($$) {
 
 =end html_DE
 
+=item summary Sends periodically keep-alive message to the systemd.
 =begin html
 
 <a name="systemd_watchdog"></a>
@@ -305,6 +314,11 @@ sub watchdog_client_NotifySystemD($$) {
      NotifyAccess=all<br/>
      User=fhem<br/>
      Group=dialout<br/>
+     # Run ExecStartPre with root-permissions<br/>
+	 PermissionsStartOnly=true<br/>
+	 ExecStartPre=-/bin/mkdir /var/run/fhem<br/>
+	 ExecStartPre=/bin/chown -R fhem:dialout /var/run/fhem<br/>
+	 # Run ExecStart with defined user and group<br/>
      WorkingDirectory=/opt/fhem<br/>
      ExecStart=/usr/bin/perl fhem.pl fhem.cfg<br/>
      #ExecStart=/usr/bin/perl fhem.pl configDB<br/>
@@ -316,7 +330,7 @@ sub watchdog_client_NotifySystemD($$) {
      Restart=on-failure<br/>
      RestartSec=3<br/>
      WatchdogSec=180<br/>
-     PIDFile=/opt/fhem/log/fhem.pid<br/>
+     PIDFile=/var/run/fhem/fhem.pid<br/>
   <br/>
      [Install]<br/>
      WantedBy=multi-user.target<br/>
@@ -325,8 +339,10 @@ sub watchdog_client_NotifySystemD($$) {
     Use "sudo systemctl daemon-reload" to reload systemd configuration.
     Start fhem with: "sudo systemctl start fhem.service".
     <br/>
-    If you like to use Type=notify, you must set fhem global attribute nofork=1.<br/> 
-    If you use Type=forking, please set fhem global pidfilename.<br/> 
+    If you like to use Type=notify, you must set fhem global attribute nofork=1.<br/>
+    <code>attr global nofork 1</code><br/>
+    If you use Type=forking, please set fhem global pidfilename.<br/>
+    <code>attr global pidfilename /var/run/fhem/fhem.pid</code><br/>
   </p>
 
   <a name="MQTTdefine"></a>
