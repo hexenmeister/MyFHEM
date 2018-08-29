@@ -4201,7 +4201,7 @@ SYSMON_Exec_Ssh($$)
    
    SYSMON_Log($hash, 5, "Execute '".$cmd."' by SSH");
    my $p_tmp = '';
-   if(!defined($port)) {
+   if(defined($port)) {
      $p_tmp = ' -p '.$port.' ';
    }
    
