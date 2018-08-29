@@ -20,23 +20,25 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id: 10_MQTT_BRIDGE.pm 15150 2017-09-28 20:39:00Z eisler $
+# $Id: $
 #
 ##############################################
 
 use strict;
 use warnings;
 
-my $DEBUG = 1;
+#my $DEBUG = 1;
 my $cvsid = '$Id: $';
-my $VERSION = "version 0.2.1 by hexenmeister\n$cvsid";
+my $VERSION = "version 0.9.1 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
 
 my %gets = (
   "version"   => "noArg",
-  #"readings"  => ""
+  "devlist"   => "",
+  "devinfo"   => ""
+  #"report"=>"noArg",
 );
 
 use constant {
@@ -76,6 +78,7 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
     CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE." ".
     #"mqttTopicPrefix ".
     "disable:1,0 ".
+    "debug:0,1 ".
     #"qos ".
     #"retain ".
     #"publish-topic-base ".
@@ -88,13 +91,16 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
     main::LoadModule("MQTT");
 
     # Beim ModulReload Deviceliste loeschen (eig. nur fuer bei der Entwicklung nuetzich)
-    if($DEBUG) {
+    #if($DEBUG) {
+    #if($hash->{'.debug'}) {
       foreach my $d (keys %defs) {
         if($defs{$d}{TYPE} eq "MQTT_GENERIC_BRIDGE") {
           $defs{$d}{".initialized"} = 0;
         }
       }
-    }
+    #}
+
+    $hash->{'.debug'} = '0';
 }
 
 package MQTT::GENERIC_BRIDGE;
@@ -105,11 +111,11 @@ use GPUtils qw(:all);
 
 use Net::MQTT::Constants;
 
-if ($DEBUG) {
+#if ($DEBUG) {
   use Data::Dumper;
-#   $gets{"debugInfo"}="noArg";
-#   $gets{"debugReinit"}="noArg";
-}
+##   $gets{"debugInfo"}="noArg";
+##   $gets{"debugReinit"}="noArg";
+#}
 
 BEGIN {
   MQTT->import(qw(:all));
@@ -118,6 +124,9 @@ BEGIN {
     AttrVal
     CommandAttr
     readingsSingleUpdate
+    readingsBeginUpdate
+    readingsBulkUpdate
+    readingsEndUpdate
     Log3
     DoSet
     fhem
@@ -143,13 +152,22 @@ BEGIN {
 };
 
 use constant {
+  HELPER => ".helper",
+
   HS_TAB_NAME_DEVICES         => "devices",
   HS_TAB_NAME_SUBSCRIBE       => "subscribeTab", # subscribed topics 
   
-  HS_PROP_NAME_PREFIX         => "prefix",
-  HS_PROP_NAME_PREFIX_OLD     => "prefix_old",
-  HS_PROP_NAME_DEVSPEC        => "devspec",
   HS_FLAG_INITIALIZED         => ".initialized",
+  HS_PROP_NAME_INTERVAL       => ".interval",
+  HS_PROP_NAME_PREFIX_OLD     => ".prefix_old",
+  HS_PROP_NAME_DEVICE_CNT     => ".cnt_devices",
+  HS_PROP_NAME_INCOMING_CNT   => ".cnt_incoming",
+  HS_PROP_NAME_OUTGOING_CNT   => ".cnt_outgoing",
+  HS_PROP_NAME_UPDATE_R_CNT   => ".cnt_update_r",
+  HS_PROP_NAME_UPDATE_S_CNT   => ".cnt_update_s",
+  
+  HS_PROP_NAME_PREFIX         => "prefix",
+  HS_PROP_NAME_DEVSPEC        => "devspec",
 
   HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE    => "globalTypeExcludes",
   HS_PROP_NAME_GLOBAL_EXCLUDES_READING => "globalReadingExcludes",
@@ -175,6 +193,16 @@ sub getDevicePublishRec($$$);
 sub isConnected($);
 sub ioDevConnect($);
 sub ioDevDisconnect($);
+sub updateDevCount($);
+
+sub isDebug($) {
+  my ($hash) = @_;
+  return AttrVal($hash->{NAME},"debug",0);  
+  #if($hash->{'.debug'}) {
+  #  return 1;
+  #}
+  #return 0;
+}
 
 # Device define
 sub Define() {
@@ -182,7 +210,10 @@ sub Define() {
   # Definition :=> defmod mqttGeneric MQTT_GENERIC_BRIDGE [prefix] [devspec]
 
   $prefix="mqtt" unless defined $prefix; # default prefix is 'mqtt'
-  $hash->{+HS_PROP_NAME_PREFIX_OLD}=$hash->{+HS_PROP_NAME_PREFIX};
+  
+  $hash->{+HELPER} = {} unless defined $hash->{+HELPER};
+
+  $hash->{+HELPER}->{+HS_PROP_NAME_PREFIX_OLD}=$hash->{+HS_PROP_NAME_PREFIX};
   $hash->{+HS_PROP_NAME_PREFIX}=$prefix; # store in device hash
   $hash->{+HS_PROP_NAME_DEVSPEC} = defined($devspec)?$devspec:".*";
 
@@ -190,7 +221,22 @@ sub Define() {
   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_TYPE}    = {};
   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES} = {};
 
-  $hash->{INTERVAL} = 60; # Sekunden
+
+  $hash->{+HELPER}->{+HS_PROP_NAME_DEVICE_CNT}   = 0;
+  $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT} = 0 unless defined $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT};
+  $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT} = 0 unless defined $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT};
+  $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT} = 0 unless defined $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT};
+  $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_S_CNT} = 0 unless defined $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_S_CNT};
+
+  #TODO: aktivieren, wenn gebraucht wird
+  $hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL} = 60; # Sekunden
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"incoming-count",$hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT});
+  readingsBulkUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT});
+  readingsBulkUpdate($hash,"updated-reading-count",$hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT});
+  readingsBulkUpdate($hash,"updated-set-count",$hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_S_CNT});
+  readingsEndUpdate($hash,0);
 
   firstInit($hash);
 
@@ -213,14 +259,14 @@ sub firstInit($) {
     # IO
     AssignIoPort($hash);
 
-    $hash->{+HS_FLAG_INITIALIZED} = 0;
+    $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 0;
 
     # wenn bereits ein prefix bestand, die userAttr entfernen : HS_PROP_NAME_PREFIX_OLD != HS_PROP_NAME_PREFIX
     my $prefix = $hash->{+HS_PROP_NAME_PREFIX};
     #$hash->{+HS_PROP_NAME_DEVSPEC} = defined($devspec)?$devspec:".*";
     my $devspec = $hash->{+HS_PROP_NAME_DEVSPEC};
     $devspec = 'global' if ($devspec eq '.*'); # use global, if all devices observed
-    my $prefix_old = $hash->{+HS_PROP_NAME_PREFIX_OLD};
+    my $prefix_old = $hash->{+HELPER}->{+HS_PROP_NAME_PREFIX_OLD};
     if(defined($prefix_old) and ($prefix ne $prefix_old)) {
       removeOldUserAttr($hash, $prefix_old, $devspec);
     }
@@ -246,7 +292,9 @@ sub firstInit($) {
     InitializeDevices($hash);
   
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MQTT::GENERIC_BRIDGE::timerProc", $hash, 0);
+    if(defined($hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL}) && ($hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL} ne '0')) {
+      InternalTimer(gettimeofday()+$hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL}, "MQTT::GENERIC_BRIDGE::timerProc", $hash, 0);
+    }
 
     MQTT::client_start($hash);
   }
@@ -259,7 +307,9 @@ sub timerProc($) {
   # TODO: Resend
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MQTT::GENERIC_BRIDGE::timerProc", $hash, 0);
+  if(defined($hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL}) && ($hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL} ne '0')) {
+    InternalTimer(gettimeofday()+$hash->{+HELPER}->{+HS_PROP_NAME_INTERVAL}, "MQTT::GENERIC_BRIDGE::timerProc", $hash, 0);
+  }
 }
 
 # prueft, ob Verbindung zum MQTT-Broker besteht.
@@ -267,6 +317,19 @@ sub timerProc($) {
 sub isConnected($) {
   my $hash = shift;
   return MQTT::isConnected($hash->{IODev});
+}
+
+sub updateDevCount($) {
+  my $hash = shift;
+  # device count
+  my $size = 0;
+  foreach my $dname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}}) {
+    if($dname ne ":global") {
+      $size++;
+    }
+  }
+  $hash->{+HELPER}->{+HS_PROP_NAME_DEVICE_CNT} = $size;
+  readingsSingleUpdate($hash,"device-count",$size,1);
 }
 
 # loescht angelegte userattr aus den jeweiligen Devices (oder aus dem global-Device)
@@ -812,7 +875,7 @@ sub CreateDevicesTable($) {
 
   $hash->{+HS_TAB_NAME_DEVICES} = $map;
   UpdateSubscriptions($hash);
-  $hash->{+HS_FLAG_INITIALIZED} = 1;
+  $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 1;
 }
 
 sub UpdateSubscriptionsSingleDevice($$) {
@@ -827,6 +890,9 @@ sub UpdateSubscriptions($) {
   my ($hash) = @_;
     #RemoveAllSubscripton($hash);
     #return;
+
+  updateDevCount($hash);
+
   my $topicMap = {};
   my $gmap = $hash->{+HS_TAB_NAME_DEVICES};
   if(defined($gmap)) {
@@ -909,29 +975,32 @@ sub InitializeDevices($) {
 sub CheckInitialization($) {
   my ($hash) = @_;
   # Pruefen, on interne Strukturen initialisiert sind
-  return if $hash->{+HS_FLAG_INITIALIZED};
+  return if $hash->{+HELPER}->{+HS_FLAG_INITIALIZED};
   InitializeDevices($hash);
 }
 
 my %getsDebug = (
+  "debugInfo" => "",
+  "debugReinit" => "",
+  "debugShowPubRec" => ""
 );
-if ($DEBUG) {
-  $getsDebug{"debugInfo"}="";
-  $getsDebug{"debugReinit"}="";
-  $getsDebug{"debugShowPubRec"}="";
-}
+# if ($DEBUG) {
+#   $getsDebug{"debugInfo"}="";
+#   $getsDebug{"debugReinit"}="";
+#   $getsDebug{"debugShowPubRec"}="";
+# }
 
 sub Get($$$@) {
   my ($hash, $name, $command, $args) = @_;
   return "Need at least one parameters" unless (defined $command);
-  unless (defined($gets{$command}) or defined($getsDebug{$command})) {
+  unless (defined($gets{$command}) or (isDebug($hash) && defined($getsDebug{$command}))) {
     my $rstr="Unknown argument $command, choose one of";
     foreach my $vname (keys %gets) {
       $rstr.=" $vname";
       my $vval=$gets{$vname};
       $rstr.=":$vval" if $vval;
     }
-    if ($DEBUG) {
+    if (isDebug($hash)) {
       $rstr.=" debugInfo:noArg debugReinit:noArg";
       $rstr.=" debugShowPubRec:";
       foreach my $dname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}}) {
@@ -948,8 +1017,8 @@ sub Get($$$@) {
   #  unless (defined($gets{$command}));
 
   COMMAND_HANDLER: {
-    $command eq "debugInfo" and $DEBUG and do {
-      my $debugInfo = "initialized: ".$hash->{+HS_FLAG_INITIALIZED}."\n\n";
+    $command eq "debugInfo" and isDebug($hash) and do {
+      my $debugInfo = "initialized: ".$hash->{+HELPER}->{+HS_FLAG_INITIALIZED}."\n\n";
       $debugInfo.= "device data records: ".Dumper($hash->{+HS_TAB_NAME_DEVICES})."\n\n";
       $debugInfo.= "subscriptionTab: ".Dumper($hash->{+HS_TAB_NAME_SUBSCRIBE})."\n\n";
       $debugInfo.= "subscription helper array: ".Dumper($hash->{subscribe})."\n\n";
@@ -967,7 +1036,7 @@ sub Get($$$@) {
     $command eq "version" and do {
       return $VERSION;
     };
-    $command eq "debugReinit" and $DEBUG and do {
+    $command eq "debugReinit" and isDebug($hash) and do {
       #Log3($hash->{NAME},1,">>>>>>>>>>>>>> : ".Dumper($command));
       InitializeDevices($hash);
       last;
@@ -975,7 +1044,60 @@ sub Get($$$@) {
     $command eq "debugShowPubRec" and do {
       my($dev,$reading) = split(/>/,$args);
       return "PubRec: $dev:$reading = ".Dumper(getDevicePublishRec($hash, $dev, $reading));
-      last;
+      #last;
+    };
+    $command eq "devlist" and do {
+      my $res="";
+      foreach my $dname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}}) {
+        if($dname ne ":global") {
+          if($args) {
+            next unless $dname =~ /^$args$/;
+          }
+          $res.=$dname."\n";
+        }
+      }
+      $res = "no devices found" unless ($res ne "");
+      return $res;
+    };
+    $command eq "devinfo" and do {
+      my $res="";
+      foreach my $dname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}}) {
+        if($dname ne ":global") {
+          if($args) {
+            next unless $dname =~ /^$args$/;
+          }
+          $res.=$dname."\n";
+          $res.="  publish:\n";
+          foreach my $rname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}->{$dname}->{':publish'}}) {
+            my $pubRec = getDevicePublishRec($hash, $dname, $rname);
+            if(defined($pubRec)) {
+              my $topic = $pubRec->{'topic'};
+              my $qos = $pubRec->{'qos'};
+              my $retain = $pubRec->{'retain'};
+              my $expression = $pubRec->{'expression'};
+              $res.= "    ".$rname." =>\t$topic (qos: $qos";
+              $res.= "; retain" if ($retain ne "0");
+              $res.= "; exp: $expression" if defined ($expression);
+              $res.= ")\n";
+            }
+          }
+          $res.="  subscribe:\n";
+          foreach my $subRec (@{$hash->{+HS_TAB_NAME_DEVICES}->{$dname}->{':subscribe'}}) {
+            my $qos = $subRec->{'qos'};
+            my $mode = $subRec->{'mode'};
+            my $expression = $subRec->{'expression'};
+            $res.= "    ".$subRec->{'reading'}." <=\t ".$subRec->{'topic'}." (mode: $mode";
+            $res.= "; qos: $qos" if defined ($qos);
+            $res.= "; exp: $expression" if defined ($expression);
+            $res.= ")\n";
+            # TODO
+          }
+        }
+        $res.= "\n";
+      }
+      $res = "no devices found" unless ($res ne "");
+      return $res;
+      #last;
     };
     # $command eq "YYY" and do {
     #   #  
@@ -1078,7 +1200,7 @@ sub Notify() {
 #       Ein einzelner Wert bedeutet, dass ein Geraetetyp mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
 #       Durch ein Doppelpunkt getrennte Paare werden als Type:Reading interptretiert. 
 #       Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
-#       Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetueps 
+#       Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetyps 
 #       bzw. genannte Readings an jedem Geraetetyp ignoriert werden.
 sub defineGlobalTypeExclude($;$) {
   my ($hash, $valueType) = @_;
@@ -1181,6 +1303,9 @@ sub doPublish($$$$$) {
   if(defined($topic) and defined($message)) {
     $msgid = send_publish($hash->{IODev}, topic => $topic, message => $message, qos => $qos, retain => $retain);
     readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
+    $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT}++;
+    readingsSingleUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT},1);
+    #Log3($hash->{NAME},1,"publish: $topic => $message");
   }
   $hash->{message_ids}->{$msgid}++ if defined $msgid;
 }
@@ -1355,14 +1480,23 @@ sub doSetUpdate($$$$$) {
   my ($hash,$mode,$device,$reading,$message) = @_;
   if($mode eq 'S') {
     my $err;
+    my @args = split ("[ \t]+",$message);
     if(($reading eq '') or ($reading eq 'state')) {
-      $err = DoSet($device,$message);
+      #$err = DoSet($device,$message);
+      $err = DoSet($device,@args);
     } else {
-      $err = DoSet($device,$reading,$message);
+      #$err = DoSet($device,$reading,$message);
+      $err = DoSet($device,$reading,@args);
+    }
+    unless (defined($err)) {
+      $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_S_CNT}++; 
+      readingsSingleUpdate($hash,"updated-set-count",$hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_S_CNT},1);
     }
     Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE error in set command: ".$err) if defined $err;
   } elsif($mode eq 'R') {
     readingsSingleUpdate($defs{$device},$reading,$message,1);
+    $hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT}++; 
+    readingsSingleUpdate($hash,"updated-reading-count",$hash->{+HELPER}->{+HS_PROP_NAME_UPDATE_R_CNT},1);
   } else {
     Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: unexpected mode: : ".$mode);
   }
@@ -1372,6 +1506,9 @@ sub onmessage($$$) {
   my ($hash,$topic,$message) = @_;
   CheckInitialization($hash);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: onmessage: $topic => $message");
+
+  $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT}++; 
+  readingsSingleUpdate($hash,"incoming-count",$hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT},1);
 
   my $fMap = searchDeviceForTopic($hash, $topic);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE DEBUG: onmessage: $fMap : ".Dumper($fMap));
@@ -1398,10 +1535,10 @@ sub onmessage($$$) {
             $redefMap = $ret;
           } elsif(ref($ret) eq 'ARRAY') {
             # ignore
-          } elsif(!defined($ret)) {
-            $message = undef;
           } elsif($value ne $message) {
             $message = $value;
+          } elsif(!defined($ret)) {
+            $message = undef;
           } else {
             $message = $ret;
           }
@@ -1429,268 +1566,6 @@ sub onmessage($$$) {
 
 }
 1;
-
-# Subscribe: $reading/$device <=> +-Platzhalter: /TEST/BLUP/+ => der letzte + steht fue $reading, vorherige fuer $device
-# oder besser Zerlegung von Vorne oder von Hinten? /xxxxxxx/xxx.../$reading?, bei global: /xxxx.../xxx../$device/$reading ? 
-# oder so: /XXXX/+/+/$reading/xxx/#. Damit wurde MQTT-Subscription /XXXX/+/+/+/xxx/# sein und Suchpattern /XXXX/+/+/&lt;READING&gt;/xxx/#
-#  analog fuer Devices: /XXXX/$device/+/$reading/xxx/# => /XXXX/+/+/+/xxx/# /XXXX/<DEVICE>/+/&lt;READING&gt;/xxx/#
-# Definitionen:
-#   mqttSubscribe &lt;reading&gt;:topic=<topic>
-#   mqttSubscribe *:topic=<topic>
-# Bei konkretten ist einfach:
-#   &lt;reading&gt;:topic=/TEST/DEVX/temperature
-# Mit Wilccards:
-#   *:topic=/TEST/DEVX/$reading
-#   *:topic=/TEST/DEVX/$reading/#
-#   *:topic=/TEST/$device/$reading
-#   *:topic=/TEST/$device/$reading/#
-#   *:topic=/TEST/$device/$reading/blup
-#   *:topic=/TEST/+/$device/$reading/#
-#   *:topic=/TEST/+/$device/+/$reading/
-#
-# bei Definitionen in Geraeteattributen: $device=Devicename, $reading=Readingname, wenn mit konkretem Reading definiert, + sonst (also mit *)
-# bei Definitionen in der Bridgeattributen: $device=Devicename, wenn konkret angegeben, + sonst (*), $reading analog $reading in Geraeteattributen.
-# weitere Wildcards (+ und #) sind zugelassen (damit koennen ggf. mehrere konkrete Topics ein Device/Reading updaten. Duerfte meist unsinnig sein.).
-# 
-# Ersetzungshilfe:  {my $reading="rrr";;my $a='$reading/asd/$reading/+/sdfasd/$reading/#';;$a =~ s/\$reading/$reading/g;;$a} => rrr/asd/rrr/+/sdfasd/rrr/#
-#
-#
-#
-# Sollen ggf. Readings und vlt. sogar Devices automatisch angelegt werden (autocreate)? Dann vlr. sogar mit autosetzen von Attributen wie 'room' ($room)?
-#  autocreate evtl. ja. room => nein.
-#
-# Gueltige Topics:   /TEMP/+/temperature, /+/+/#, /TEMP/#, #
-# Ungueltige Topics: /TEMP/#/temperature, ++, +#
-# 
-# Strukturen:
-# Suche eingehenden topics: 
-#  => nein, es wird aenliche Struktur verwendet, wie beim Publish
-#   --map->{topic ggf. mit wildcards}->{devicemaping}->'device-maping-topic'
-#   --map->{topic ggf. mit wildcards}->{deviceliste}->[liste/map] # gefundenen Devices?
-#   --map->{topic ggf. mit wildcards}->{wildcard?}->flag # Optmierungsmassnahme/Cache, optional
-# 
-# Suche nach Device-Mapping:
-#   wird noch benoetigt?
-# 
-# Cache fuer gefundene topics: (Optimierung)
-#   map->{incomming_topic}->[{deviceliste}]->[liste/map]-jeweils->{reading}
-#   notwendig? Spaeter vlt.? => erstmal nicht
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-
-# Dieses Modul ist eine MQTT-Bridge, die gleichzeitig mehrere FHEM-Devices erfasst und deren Readings 
-# per MQTT weiter gibt bzw. aus den eintreffenden MQTT-Nachrichten befuellt oder diese als 'set'-Befehl ausfuert.
-# Es wird ein <a href="#MQTT">MQTT</a>-Geraet als IODev benoetigt.
-#
-# Die (minimal) Konfiguration der Bridge selbst ist grundsaetzlich sehr einfach.<br/>
-# <br/>
-# <a name="MQTT_GENERIC_BRIDGEdefine"></a>
-# Definition:
-#   Im einfachsten Fall reichen schon zwei Zeilen:
-#     defmod mqttGeneric MQTT_GENERIC_BRIDGE [prefix] [devspec]
-#     attr mqttGeneric IODev <MQTT-Device>
-#   Alle Parameter im Define sind optional. 
-#   Der erste ist ein Prefix fuer die Steuerattribute, worueber die zu ueberwachende Geraete (s.u.) 
-#   konfiguriert werden. Dafaultwert ist 'mqtt'. 
-#   Wird dieser z.B. als 'hugo' redefiniert, heissen die Steuerungsattribute entsprechend hugoPublish etc.
-#   Der zweite Parameter ('devspec') erlaubt die Menge der zu ueberwachenden Geraeten 
-#   zu begrenzen (sonst werden einfach alle ueberwacht, was jedoch Performance kosten kann).
-#   s.a. <a href="https://fhem.de/commandref_DE.html#devspec">devspec</a>
-#
-# Attribute:
-#   IODev
-#     Dieses Attribut ist obligatorisch und muss den Namen einer funktionierenden MQTT-Modulinstanz enthalten.
-#
-#   disable
-#     Wert 1 deaktiviert die Bridge
-#
-#     Beispiel:
-#       attr &lt;dev&gt; disable 1
-#
-#   globalDefaults
-#     Definiert Defaults, die greifen, falls in dem jeweiligen Geraet definierte Werte nicht greifen. s.a. <a href="#MQTT_GENERIC_BRIDGEmqttDefaults">mqttDefaults</a>. 
-#
-#   globalAlias
-#     Definiert Alias, die greifen, falls in dem jeweiligen Geraet definierte Werte nicht greifen. s.a. <a href="#MQTT_GENERIC_BRIDGEmqttAlias">mqttAlias</a>.
-#
-#   globalPublish
-#     Definiert Topics/Flags fuer die uebertragung per MQTT. Sie greifen, falls in dem jeweiligen Geraet 
-#     definierte Werte nicht greifen oder nicht vorhanden sind. s.a. <a href="#MQTT_GENERIC_BRIDGEmqttPublish">mqttPublish</a>.
-#
-#   globalSubscribe TODO - wird derzeit nicht unterstuetzt und wird moeglicherweise gar nicht implementiert
-#     Definiert Topics/Flags fuer die Aufnahme der Werte aus der MQTT-Uebertragung. Sie greifen, falls in dem jeweiligen Geraet 
-#     definierte Werte nicht greifen oder nicht vorhanden sind. s.a. <a href="#MQTT_GENERIC_BRIDGEmqttSubscribe">mqttSubscribe</a>.
-#
-#   globalTypeExclude TODO - ist derzeit nicht implementiert
-#     Definiert (Geraete)Typen und Readings, die nicht bei der Uebertragung beruecksichtigt werden. 
-#     Ein einzelner Wert bedeutet, dass ein Geraete diesen Typen komplett ignoriert wird (also fuer alle seine Readings).
-#     Durch ein Doppelpunkt getrennte Paare werden als Type:Reading interptretiert. 
-#     Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
-#     Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetueps 
-#     bzw. genannte Readings an jedem Geraetetyp ignoriert werden.
-#
-#     Beispiel:
-#       attr &lt;dev&gt; globalTypeExclude MQTT MQTT_GENERIC_BRIDGE:* MQTT_BRIDGE:transmission-state *:baseID
-#
-#   globalDeviceExclude TODO - ist derzeit nicht implementiert
-#     Definiert Geraetenamen und Readings, die nicht uebertragen werden. 
-#     Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
-#     Durch ein Doppelpunkt getrennte Paare werden als Device:Reading interptretiert. 
-#     Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.
-#
-#     Beispiel:
-#       attr &lt;dev&gt; globalDeviceExclude Test Bridge:transmission-state
-#
-#
-# Fuer die ueberwachten Geraete wird die Liste der moeglichen Attribute automatisch um mehrere weitere Eintraege ergaenzt, 
-# die alle mit vorher in der Bridge definierten Prefix anfangen. Ueber diese wird die eigentliche MQTT-Anbindung konfiguriert.
-#
-# Defaultmaessig werden folgende Attribute verwendet: mqttDefaults, mqttAlias, mqttPublish, mqttSubscribe.
-# Sie haben dabei folgende Bedeutung:
-# 
-#   mqttDefaults 
-#     Hier wird eine Liste der "key=value"-Paare erwartet. Folgende Keys sind dabei moeglich:
-#       'qos' definiert ein Default fuer MQTT-Paramter 'Quality of Service'.
-#       'retain' erlaubt MQTT-Nachrichten als 'retained messages' zu markieren.
-#       'base' wird als Variable ($base) bei der Konfiguration von konkreten Topics zur Verfuegung gestellt. 
-#              Sie kann entweder Text oder eine Perl-Expression enthalten. 
-#              Perl-Expression muss in Geschweifte Klammern eingeschlossen werden.
-#              In einer Expression koennen Variablen verwendet werden.
-#              ($reading = Original-Readingname, $device = Devicename, $name = Readingalias (s. <a href="#MQTT_GENERIC_BRIDGEmqttAlias">mqttAlias</a>). 
-#              Ist kein Alias definiert, ist $name=$reading).
-#
-#     Alle diese Werte koennen durch vorangestelle Prefixe ('pub:' oder 'sub') in ihrer Gueltigkeit 
-#     nur auf das Senden bzw. Empfangen begrenzt werden (soweit sinnvoll). 
-#     Werte fuer 'qos' und 'retain' werden nur verwendet, 
-#     wenn keine explizite Angaben darueber fuer ein konkretes Topic gemacht worden sind.
-#
-#     Beispiel:
-#       attr &lt;dev&gt; mqttDefaults base={"/TEST/$device"} pub:qos=0 sub:qos=2 retain=0
-#
-#   mqttAlias 
-#     Dieses Attribut ermoeglicht Readings unter einem anderen Namen auf MQTT-Topict zu mappen. 
-#     Eigentlich nur sinnvoll, wenn Topicdefinitionen Perl-Expressions mit entsprechenden Variablen sind.
-#     Auch hier werden 'pub:' und 'sub:' Prefixe unterstuetzt (fuer 'subscribe' gilt das Mapping quasi umgekehrt).
-#     TODO: fuer siubscribe noch nicht implementiert.
-#
-#     Beispiel:
-#       attr &lt;dev&gt; mqttAlias pub:temperature=temp
-#
-#   mqttPublish
-#     Hier werden konkrette Topics definiet und den Readings zugeordnet (Format: &lt;reading&gt;:topic=<topic>). 
-#     Weiterhin koennen diese einzeln mit 'qos'- und 'retain'-Flags versehen werden. 
-#     Topics koennen auch als Perl-Expression mit Veriablen definiert werden ($reading, $device, $name, $base).
-#     Werte fuer mehrere Readings koennen auch gemeinsam gleichzeitig definiert werden, 
-#     indem sie, mittels '|' getrennt, zusammen angegeben werden.
-#     Wird anstatt eines Readingsnamen ein '*' verwendet, gilt diese Definition fuer alle Readings, 
-#     fuer die keine explizite Angaben gemacht worden.
-#     Es koennen auch Expressions (reading:expression=...) definiert werden. 
-#     Die Expressions koennen dabei entweder Variablen ($value, $topic, $qos, $retain) redefinieren, oder einen Wert != undef zurrueckgeben.
-#     Der Rueckhgabe wert wird als neue Nachricht-Value verwendet, die Redefinition der Variable hat jedoch Vorrang.
-#     Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden. 
-#     Ist die Rueckgabe ein Hash (nur 'topic' und 'stopic'), werden seine Schluesselwerte als Topic verwendet, 
-#     die Inhalte der Nachrichten sind entsprechend die Werte aus dem Hash.
-#
-#     Beispiel:
-#       attr &lt;dev&gt; mqttPublish temperature:topic={"$base/$name"} temperature:qos=1 temperature:retain=0 *:topic={"$base/$name"} humidity:topic=/TEST/Feuchte
-#       attr &lt;dev&gt; mqttPublish temperature|humidity:topic={"$base/$name"} temperature|humidity:qos=1 temperature|humidity:retain=0
-#       attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} *:qos=2 *:retain=0
-#       attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={"message: $value"}
-#       attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={$value="message: $value"}
-#       attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={"/TEST/Topic1"=>"$message", "/TEST/Topic2"=>"message: $message"}
-#
-#   mqttSubscribe 
-#     Dieses Attribut konfiguriert das Empfangen der MQTT-Nachrichten und Reaktionen darauf.
-#     Die Konfiguration ist aehnlich der fuer das 'mqttPublish'-Attribut. Es koennen topics fuer das Setzen von Readings ('topic') und
-#     Aufrufe von 'set'-Befehl an dem Geraet ('stopic') definiert werden. 
-#     Mit Hilfe von zusaetzliche auszufuehrenden Perl-Expressions ('expression') kann das Ergebnis vor dem Setzen/Ausfueren beeinflusst werden.
-#     Die Expression kann dabei entweder Variable $value redefinieren, oder einen Wert != undef zurrueckgeben. Redefinition der Variable hat Vorrang.
-#     Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden. 
-#     Ist die Rueckgabe ein Hash (nur 'topic' und 'stopic'), werden seine Schluesselwerte als Readingsnamen/'set'-Parameter verwendet, 
-#     die zu setzenden Werte sind entsprechend die Werte aus dem Hash.
-#     Weiterhin kann das Attribut 'qos' angegeben werden ('retain' macht dagegen keinen Sinn).
-#     In der Topic-Definition koennen MQTT-Wildcards (+ und #) verwendet werden. 
-#     Falls der Reading-Name mit einem '*'-Zeichen am Anfang definiert wird, gilt dieser als 'Platzhalter'.
-#     Der tatsaechlicher Name der Reading (und ggf. des Geraetes) wird dabei durch Variablen in dem Topic 
-#     definiert ($device (nur fuer globale Definition in der Bridge), $reading, $name).
-#     Im Topic wirken diese Variablen als Wildcards, macht natuerlich nur Sinn, wenn Reading-Name auch nicht fest definiert ist (also faengt mit '*' an). 
-#     Die Variable $name wird im Unterschied zu $reading ggf. ueber die in 'mqttAlias' definierten Aliases beeinflusst.
-#     Auch Verwendung von $base ist erlaubt.
-#     Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuert.
-#     Fuer ein 'set &lt;dev&gt; &lt;value&gt;' soll als Reading-Name 'state' verwendet werden.
-#
-#     Beispiele:
-#       attr &lt;dev&gt; mqttSubscribe temperature:topic=/TEST/temperature test:qos=0 *:topic={"/TEST/$reading/value"} 
-#       attr &lt;dev&gt; mqttSubscribe desired-temperature:stopic={"/TEST/temperature/set"}
-#       attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={...}
-#       attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={$value="x"}
-#       attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={"R1"=>$value, "R2"=>"Val: $value", "R3"=>"x"}
-#
-#   mqttDisable
-#     Wird dieses Attribut in einem Geraet gesetzt, wird dieses Geraet vom Versand der Readingswerten ausgeschlossen.
-#
-#   Beispiele: 
-#     Bridge fuer alle moeglichen Geraete mit dem Standardprefix:
-#       defmod mqttGeneric MQTT_GENERIC_BRIDGE
-#       attr mqttGeneric IODev mqtt
-#
-#     Bridge mit dem Prefix 'mqtt' fuer drei bestimmte Geraete:
-#       defmod mqttGeneric MQTT_GENERIC_BRIDGE mqtt sensor1,sensor2,sensor3
-#       attr mqttGeneric IODev mqtt
-#
-#     Bridge fuer alle Geraete in einem bestimmten Raum:
-#       defmod mqttGeneric MQTT_GENERIC_BRIDGE mqtt room=Wohnzimmer
-#       attr mqttGeneric IODev mqtt
-#     
-#     Einfachste Konfiguration eines Temperatursensors:
-#       defmod sensor XXX
-#       attr sensor mqttPublish temperature:topic=/haus/sensor/temperature
-#
-#     Alle Readings eines Sensors (mit ihren Namen wie sie sind) per MQTT versenden:
-#       defmod sensor XXX
-#       attr sensor mqttPublish *:topic={"/sensor/$reading"}
-#     
-#     Topicsdefinition mit Auslagerung von dem gemeinsamen Teilnamen in 'base'-Variable:
-#       defmod sensor XXX
-#       attr sensor mqttDefaults base={"/$device/$reading"}
-#       attr sensor mqttPublish *:topic={$base}
-#
-#     Topicsdefinition nur fuer bestimmte Readings mit deren gleichzeitigen Umbennenung (Alias):
-#       defmod sensor XXX
-#       attr sensor mqttAlias temperature=temp humidity=hum
-#       attr sensor mqttDefaults base={"/$device/$name"} 
-#       attr sensor mqttPublish temperature:topic={$base} humidity:topic={$base}
-#
-#
-#   Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices, die Reading 'temperature' besitzen:
-#       defmod mqttGeneric MQTT_GENERIC_BRIDGE 
-#       attr mqttGeneric IODev mqtt
-#       attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0
-#       attr mqttGeneric publish temperature:topic={"/haus/$device/$reading"}
-#
-#   Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices 
-#   (wegen schlechter uebersicht und einer unnoetig grossen Menge eher nicht zu empfehlen):
-#       defmod mqttGeneric MQTT_GENERIC_BRIDGE 
-#       attr mqttGeneric IODev mqtt
-#       attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0
-#       attr mqttGeneric publish *:topic={"/haus/$device/$reading"}
-#     
-#    Einschraenkungen:
-#      Wenn mehrere Readings das selbe Topic abonieren, sind dabei keine unterschiedlichen QOS moeglich.
-#      Wird in so einem Fall QOS ungleich 0 benoetigt, sollte dieser entweder fuer alle Readings gleich einzeln definiert werden,
-#      oder allgemeinguetltig ueber Defaults. Ansonsten wird beim Erstellen von Abonements der erst gefundene Wert verwendet. 
-#
-#      Abonements werden nur erneuert, wenn dich das Topic aendert, QOS-Flag-Aenderung alleine wirkt sich daher erst nach einem Neustart aus.
-#
-#   TODOs
-#   - global Subscribe
-#   - global excludes
-#   - QOS for subscribe (fertig?), defaults(qos, fertig?), alias mapping
-#   - resendOnConnect (no, first, last, all)
-#   - resendInterval (no/0, x min)
-#   - templates (template in der Bridge, mqttUseTemplate in Device)
-
 
 =pod
 =item [device]
@@ -1720,39 +1595,356 @@ sub onmessage($$$) {
 =item summary_DE MQTT_GENERIC_BRIDGE acts as a bridge for any fhem-devices and mqtt-topics
 =begin html_DE
 
-<a name="MQTT_GENERIC_BRIDGE"></a>
-<h3>MQTT_GENERIC_BRIDGE</h3>
-<ul>
+ <a name="MQTT_GENERIC_BRIDGE"></a>
+ <h3>MQTT_GENERIC_BRIDGE</h3>
+ <ul>
+ <p>
+    Dieses Modul ist eine MQTT-Bridge, die gleichzeitig mehrere FHEM-Devices erfasst und deren Readings 
+    per MQTT weiter gibt bzw. aus den eintreffenden MQTT-Nachrichten befuellt oder diese als 'set'-Befehl 
+    an dem konfigurierten FHEM-Geraet ausfuert.
+    <br/>Es wird ein <a href="#MQTT">MQTT</a>-Geraet als IODev benoetigt.
+ </p>
+ <p>Die (minimale) Konfiguration der Bridge selbst ist grundsaetzlich sehr einfach.</p>
+ <a name="MQTT_GENERIC_BRIDGEdefine"></a>
+ <p><b>Definition:</b></p>
+ <ul>
+   <p>Im einfachsten Fall reichen schon zwei Zeilen:</p>
+     <p><code>defmod mqttGeneric MQTT_GENERIC_BRIDGE [prefix] [devspec]</br>
+     attr mqttGeneric IODev <MQTT-Device></code></p>
+   <p>Alle Parameter im Define sind optional.</p>
+   <p>Der erste ist ein Prefix fuer die Steuerattribute, worueber die zu ueberwachende Geraete (s.u.) 
+   konfiguriert werden. Defaultwert ist 'mqtt'. 
+   Wird dieser z.B. als 'hugo' redefiniert, heissen die Steuerungsattribute entsprechend hugoPublish etc.</p>
+   <p>Der zweite Parameter ('devspec') erlaubt die Menge der zu ueberwachenden Geraeten 
+   zu begrenzen (sonst werden einfach alle ueberwacht, was jedoch Performance kosten kann).
+   s.a. <a href="https://fhem.de/commandref_DE.html#devspec">devspec</a></p>
+ </ul>
+ 
+ <a name="MQTT_GENERIC_BRIDGEget"></a>
+ <p><b>get:</b></p>
+ <ul>
+   <li>
+     <p>version<br/>
+     Zeigt Modulversion an.</p>
+   </li>
+   <li>
+     <p>devlist [&lt;name (regex)&gt;]<br/>
+     Liefert Liste der Namen der von dieser Bridge ueberwachten Geraete deren Namen zu dem optionalen regulaerem Ausdruck entsprechen. 
+     Fehlt der Ausdruck, werden alle Geraete aufgelistet. 
+     </p>
+   </li>
+   <li>
+     <p>devinfo [&lt;name (regex)&gt;]<br/>
+     Gibt eine Liste der ueberwachten Geraete aus, deren Namen zu dem optionalen regulaerem Ausdruck entsprechen. 
+     Fehlt der Ausdruck, werden alle Geraete aufgelistet. Zusätzlich werden bei 'publish' und 'subscribe' 
+     verwendete Topics angezeigt incl. der entsprechenden Readinsnamen.</p>
+   </li>
+ </ul>
 
-  <p>Dieses Modul ist eine MQTT-Bridge, die gleichzeitig mehrere FHEM-Devices erfasst und deren Readings 
-     per MQTT weiter gibt bzw. aus den eintreffenden MQTT-Nachrichten befuellt.</p>
-  <p>Es wird ein <a href="#MQTT">MQTT</a>-Geraet als IODev benoetigt.</p>
-  <p>Die (minimal) Konfiguration der Bridge selbst ist grundsaetzlich sehr einfach.</p>
-  <a name="MQTT_GENERIC_BRIDGEdefine"></a>
-  <p><b>Define</b></p>
-  <ul>
-    <p><code>define &lt;name&gt; MQTT_GENERIC_BRIDGE [&lt;configAttrPrefix&gt;] [&lt;dev-spec&gt;]</code></p>
-    <p>Specifies the generic bridge. Publish/Subscriptions must be definen with the Device atributen<br/>
-       &lt;configAttrPrefix&gt; Prefix fuer Konfig-Attributeinden Geraeten</p>
-  </ul>
-  <a name="MQTT_GENERIC_BRIDGEget"></a>
-  <p><b>Get</b></p>
-  <ul>
+ <a name="MQTT_GENERIC_BRIDGEreadings"></a>
+ <p><b>readings:</b></p>
+ <ul>
+   <li>
+     <p>device-count<br/>
+     Anzahl der ueberwachten Geraete</p>
+   </li>
+   <li>
+     <p>incoming-count<br/>
+     Anzahl eingehenden Nachrichten</p>
+   </li>
+   <li>
+     <p>outgoing-count<br/>
+     Anzahl ausgehende Nachrichten</p>
+   </li>
+   <li>
+     <p>updated-reading-count<br/>
+     Anzahl der gesetzen Readings</p>
+   </li>
+   <li>
+     <p>updated-set-count<br/>
+     Anzahl der abgesetzen 'set' Befehle</p>
+   </li>
+   <li>
+     <p>transmission-state<br/>
+     letze Uebertragunsart</p>
+   </li>
+ </ul>
+
+ <a name="MQTT_GENERIC_BRIDGEattr"></a>
+ <p><b>Attribute:</b></p>
+ <ul>
+   <p>folgende Attribute werden unterstuetzt:</p>
+   <li><p>IODev<br/>
+     Dieses Attribut ist obligatorisch und muss den Namen einer funktionierenden MQTT-Modulinstanz enthalten. 
+     Modul MQTT2_SERVER wird nicht unterstuetzt.</p>
+   </li>
+
+   <li>
+     <p>disable<br/>
+     Wert 1 deaktiviert die Bridge</p>
+     <p>Beispiel:<br>
+       <code>attr &lt;dev&gt; disable 1</code>
+     </p>
+   </li>
+
+   <li>
+     <p>globalDefaults<br/>
+        Definiert Defaults. Diese greifen in dem Fall, wenn in dem jeweiligen Geraet definierte Werte nicht zutreffen. 
+        s.a. <a href="#MQTT_GENERIC_BRIDGEmqttDefaults">mqttDefaults</a>. 
+     </p>
+   </li>
+
+   <li>
+    <p>globalAlias<br/>
+        Definiert Alias. Diese greifen in dem Fall, wenn in dem jeweiligen Geraet definierte Werte nicht zutreffen. 
+        s.a. <a href="#MQTT_GENERIC_BRIDGEmqttAlias">mqttAlias</a>.
+     </p>
+   </li>
+   
+   <li>
+    <p>globalPublish<br/>
+        Definiert Topics/Flags fuer die Uebertragung per MQTT. Diese werden angewendet, falls in dem jeweiligen Geraet 
+        definierte Werte nicht greifen oder nicht vorhanden sind. 
+        s.a. <a href="#MQTT_GENERIC_BRIDGEmqttPublish">mqttPublish</a>.
+     </p>
+   </li>
+
+<!--
+   <li>
+    <p>globalSubscribe ! TODO - wird derzeit nicht unterstuetzt und wird moeglicherweise gar nicht implementiert !<br/>
+        Definiert Topics/Flags fuer die Aufnahme der Werte aus der MQTT-Uebertragung. Sie greifen, falls in dem jeweiligen Geraet 
+        definierte Werte nicht greifen oder nicht vorhanden sind. s.a. <a href="#MQTT_GENERIC_BRIDGEmqttSubscribe">mqttSubscribe</a>.
+     </p>
+   </li>
+
+   <li>
+    <p>globalTypeExclude ! TODO - ist derzeit nicht implementiert !<br/>
+        Definiert (Geraete-)Typen und Readings, die nicht bei der Uebertragung beruecksichtigt werden. 
+        Ein einzelner Wert bedeutet, dass ein Geraet diesen Types komplett ignoriert wird (also fuer alle seine Readings).
+        Durch ein Doppelpunkt getrennte Paare werden als Type:Reading interptretiert. 
+        Das Bedeutet, dass an dem gegebenen Type die genannte Reading nicht uebertragen wird.
+        Ein Stern anstatt Type oder auch Reading bedeutet, dass alle Readings eines Geretaetyps
+        bzw. genannte Readings an jedem Geraetetyp ignoriert werden. </p>
+        <p>Beispiel:<br/>
+        <code>attr &lt;dev&gt; globalTypeExclude MQTT MQTT_GENERIC_BRIDGE:* MQTT_BRIDGE:transmission-state *:baseID</code></p>
+   </li>
+
+   <li>
+    <p>globalDeviceExclude ! TODO - ist derzeit nicht implementiert !<br/>
+        Definiert Geraetenamen und Readings, die nicht uebertragen werden. 
+        Ein einzelner Wert bedeutet, dass ein Geraet mit diesem Namen komplett ignoriert wird (also fuer alle seine Readings).
+        Durch ein Doppelpunkt getrennte Paare werden als Device:Reading interptretiert. 
+        Das Bedeutet, dass an dem gegebenen Geraet die genannte Reading nicht uebertragen wird.</p>
+        <p>Beispiel:<br/>
+            <code>attr &lt;dev&gt; globalDeviceExclude Test Bridge:transmission-state</code></p>
+   </li>
+        -->
+
+   <p>Fuer die ueberwachten Geraete wird eine Liste der moeglichen Attribute automatisch um mehrere weitere Eintraege ergaenzt. 
+      Sie fangen alle mit vorher in der Bridge definiertem Prefix an. Ueber diese Attribute wird die eigentliche MQTT-Anbindung konfiguriert.<br/>
+      Defaultmaessig werden folgende Attributnamen verwendet: mqttDefaults, mqttAlias, mqttPublish, mqttSubscribe.
+      <br/>Die Bedeutung dieser Attribute wird im Folgenden erklaert.
+    </p>
+
     <li>
-      <p><code>get &lt;name&gt; TODO</code><br/>
-         TODO</p>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttDefaults">mqttDefaults</a><br/>
+            Hier wird eine Liste der "key=value"-Paare erwartet. Folgende Keys sind dabei moeglich:
+            <ul>
+             <li>'qos' <br/>definiert ein Defaultwert fuer MQTT-Paramter 'Quality of Service'.</li>
+             <li>'retain' <br/>erlaubt MQTT-Nachrichten als 'retained messages' zu markieren.</li>
+             <li>'base' <br/>wird als Variable ($base) bei der Konfiguration von konkreten Topics zur Verfuegung gestellt.
+                   Sie kann entweder Text oder eine Perl-Expression enthalten. 
+                   Perl-Expression muss in geschweifte Klammern eingeschlossen werden.
+                   In einer Expression koennen folgende Variablen verwendet werden:
+                   $reading = Original-Readingname, $device = Devicename und $name = Readingalias (s. <a href="#MQTT_GENERIC_BRIDGEmqttAlias">mqttAlias</a>. 
+                   Ist kein Alias definiert, ist $name=$reading).</li>
+            </ul>
+            <br/>
+            Alle diese Werte koennen durch vorangestelle Prefixe ('pub:' oder 'sub') in ihrer Gueltigkeit 
+            auf nur Senden bzw. nur Empfangen begrenzt werden (soweit sinnvoll). 
+            Werte fuer 'qos' und 'retain' werden nur verwendet, 
+            wenn keine explizite Angaben darueber fuer ein konkretes Topic gemacht worden sind.</p>
+            <p>Beispiel:<br/>
+                <code>attr &lt;dev&gt; mqttDefaults base={"/TEST/$device"} pub:qos=0 sub:qos=2 retain=0</code></p>
+        </p>
     </li>
-  </ul>
-  <a name="MQTT_GENERIC_BRIDGEattr"></a>
-  <p><b>Attributes</b></p>
-  <ul>
+ 
+
     <li>
-      <p><code>attr &lt;name&gt; XXX</code><br/>
-         TODO
-      </p>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttAlias">mqttAlias</a><br/>
+            Dieses Attribut ermoeglicht Readings unter einem anderen Namen auf MQTT-Topic zu mappen. 
+            Eigentlich nur sinnvoll, wenn Topicdefinitionen Perl-Expressions mit entsprechenden Variablen sind.
+            Auch hier werden 'pub:' und 'sub:' Prefixe unterstuetzt (fuer 'subscribe' gilt das Mapping quasi umgekehrt).
+            <br/><!--TODO: -->Alias fuer subscribe ist derzeit nicht implementiert!</p>
+            <p>Beispiel:<br/>
+                <code>attr &lt;dev&gt; mqttAlias pub:temperature=temp</code></p>
+        </p>
+    </li>
+  
+    <li>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttPublish">mqttPublish</a><br/>
+            Hier werden konkrette Topics definiet und den Readings zugeordnet (Format: &lt;reading&gt;:topic=&lt;topic&gt;). 
+            Weiterhin koennen diese einzeln mit 'qos'- und 'retain'-Flags versehen werden. <br/>
+            Topics koennen auch als Perl-Expression mit Veriablen definiert werden ($reading, $device, $name, $base).<br/>
+            Werte fuer mehrere Readings koennen auch gemeinsam gleichzeitig definiert werden, 
+            indem sie, mittels '|' getrennt, zusammen angegeben werden.<br/>
+            Wird anstatt eines Readingsnamen ein '*' verwendet, gilt diese Definition fuer alle Readings, 
+            fuer die keine explizite Angaben gemacht wurden.<br/>
+            Es koennen auch Expressions (reading:expression=...) definiert werden. <br/>
+            Die Expressions koenne sinnvollerweise entweder Variablen ($value, $topic, $qos, $retain, $message) veraendern, oder einen Wert != undef zurrueckgeben.<br/>
+            Der Rueckhgabe wert wird als neue Nachricht-Value verwendet, die Aenderung der Variablen hat dabei jedoch Vorrang.<br/>
+            Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden. <br/>
+            Ist die Rueckgabe ein Hash (nur 'topic' und 'stopic'), werden seine Schluesselwerte als Topic verwendet, 
+            die Inhalte der Nachrichten sind entsprechend die Werte aus dem Hash.</p>
+            <p>Beispiele:<br/>
+                <code> attr &lt;dev&gt; mqttPublish temperature:topic={"$base/$name"} temperature:qos=1 temperature:retain=0 *:topic={"$base/$name"} humidity:topic=/TEST/Feuchte<br/>
+                attr &lt;dev&gt; mqttPublish temperature|humidity:topic={"$base/$name"} temperature|humidity:qos=1 temperature|humidity:retain=0<br/>
+                attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} *:qos=2 *:retain=0<br/>
+                attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={"message: $value"}<br/>
+                attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={$value="message: $value"}<br/>
+                attr &lt;dev&gt; mqttPublish *:topic={"$base/$name"} reading:expression={"/TEST/Topic1"=>"$message", "/TEST/Topic2"=>"message: $message"}</code></p>
+        </p>
+    </li>
+
+    <li>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttSubscribe">mqttSubscribe</a><br/>
+            Dieses Attribut konfiguriert das Empfangen der MQTT-Nachrichten und die entsprechenden Reaktionen darauf.<br/>
+            Die Konfiguration ist aehnlich der fuer das 'mqttPublish'-Attribut. Es koennen Topics fuer das Setzen von Readings ('topic') und
+            Aufrufe von 'set'-Befehl an dem Geraet ('stopic') definiert werden. <br/>
+            Mit Hilfe von zusaetzlichen auszufuehrenden Perl-Expressions ('expression') kann das Ergebnis vor dem Setzen/Ausfueren noch beeinflusst werden.<br/>
+            In der Expression sind folgende Variablen verfügbar: $device, $reading, $message (initial gleich $value).
+            Die Expression kann dabei entweder Variable $value veraendern, oder einen Wert != undef zurueckgeben. Redefinition der Variable hat Vorrang.
+            Ist der Rueckgabewert undef, dann wird das Setzen/Ausfuehren unterbunden (es sei denn, $value hat einen neuen Wert). <br/>
+            Ist die Rueckgabe ein Hash (nur fuer 'topic' und 'stopic'), dann werden seine Schluesselwerte als Readingsnamen bzw. 'set'-Parameter verwendet, 
+            die zu setzenden Werte sind entsprechend die Werte aus dem Hash.<br/>
+            Weiterhin kann das Attribut 'qos' angegeben werden ('retain' macht dagegen keinen Sinn).<br/>
+            In der Topic-Definition koennen MQTT-Wildcards (+ und #) verwendet werden. <br/>
+            Falls der Reading-Name mit einem '*'-Zeichen am Anfang definiert wird, gilt dieser als 'Platzhalter'.
+            Der tatsaechliche Name der Reading (und ggf. des Geraetes) wird dabei durch Variablen aus dem Topic 
+            definiert ($device (nur fuer globale Definition in der Bridge), $reading, $name).
+            Im Topic wirken diese Variablen als Wildcards, macht natuerlich nur Sinn, wenn Reading-Name auch nicht fest definiert ist (also faengt mit '*' an). <br/>
+            Die Variable $name wird im Unterschied zu $reading ggf. ueber die in 'mqttAlias' definierten Aliases beeinflusst.
+            Auch Verwendung von $base ist erlaubt.<br/>
+            Bei Verwendung von 'stopic' wird das 'set'-Befehl als 'set &lt;dev&gt; &lt;reading&gt; &lt;value&gt;' ausgefuert.
+            Fuer ein 'set &lt;dev&gt; &lt;value&gt;' soll als Reading-Name 'state' verwendet werden.</p>
+            <p>Beispiele:<br/>
+                <code>attr &lt;dev&gt; mqttSubscribe temperature:topic=/TEST/temperature test:qos=0 *:topic={"/TEST/$reading/value"} <br/>
+                    attr &lt;dev&gt; mqttSubscribe desired-temperature:stopic={"/TEST/temperature/set"}<br/>
+                    attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={...}<br/>
+                    attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={$value="x"}<br/>
+                    attr &lt;dev&gt; mqttSubscribe state:stopic={"/TEST/light/set"} state:expression={"R1"=>$value, "R2"=>"Val: $value", "R3"=>"x"}
+                 </code></p>
+        </p>
+    </li>
+
+    <li>
+        <p><a name="MQTT_GENERIC_BRIDGEmqttDisable">mqttDisable</a><br/>
+            Wird dieses Attribut in einem Geraet gesetzt, wird dieses Geraet vom Versand der Readingswerten ausgeschlossen.</p>
+        </p>
     </li>
     
-  </ul>
 </ul>
+ 
+<p><b>Beispiele</b></p>
+
+<ul>
+    <li>
+        <p>Bridge fuer alle moeglichen Geraete mit dem Standardprefix:<br/>
+                <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE<br/>
+                        attr mqttGeneric IODev mqtt</code>
+        </p>
+        </p>
+    </li>
+    
+    <li>
+        <p>Bridge mit dem Prefix 'mqtt' fuer drei bestimmte Geraete:<br/>
+            <code> defmod mqttGeneric MQTT_GENERIC_BRIDGE mqtt sensor1,sensor2,sensor3<br/>
+                    attr mqttGeneric IODev mqtt</code></p>
+        </p>
+    </li>
+
+    <li>
+        <p>Bridge fuer alle Geraete in einem bestimmten Raum:<br/>
+            <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE mqtt room=Wohnzimmer<br/>
+                attr mqttGeneric IODev mqtt</code></p>
+        </p>
+    </li>
+     
+    <li>
+        <p>Einfachste Konfiguration eines Temperatursensors:<br/>
+            <code>defmod sensor XXX<br/>
+                attr sensor mqttPublish temperature:topic=/haus/sensor/temperature</code></p>
+        </p>
+    </li>
+
+    <li>
+        <p>Alle Readings eines Sensors (mit ihren Namen wie sie sind) per MQTT versenden:<br/>
+            <code> defmod sensor XXX<br/>
+                attr sensor mqttPublish *:topic={"/sensor/$reading"}</code></p>
+        </p>
+    </li>
+     
+    <li>
+        <p>Topicsdefinition mit Auslagerung von dem gemeinsamen Teilnamen in 'base'-Variable:<br/>
+            <code>defmod sensor XXX<br/>
+                attr sensor mqttDefaults base={"/$device/$reading"}<br/>
+                attr sensor mqttPublish *:topic={$base}</code></p>
+        </p>
+    </li>
+
+    <li>
+        <p>Topicsdefinition nur fuer bestimmte Readings mit deren gleichzeitigen Umbennenung (Alias):<br/>
+            <code>defmod sensor XXX<br/>
+                attr sensor mqttAlias temperature=temp humidity=hum<br/>
+                attr sensor mqttDefaults base={"/$device/$name"}<br/>
+                attr sensor mqttPublish temperature:topic={$base} humidity:topic={$base}<br/></code></p>
+        </p>
+    </li>
+
+    <li>
+        <p>Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices, die Reading 'temperature' besitzen:<br/>
+            <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE <br/>
+                attr mqttGeneric IODev mqtt <br/>
+                attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0 <br/>
+                attr mqttGeneric publish temperature:topic={"/haus/$device/$reading"} <br/>
+         </code></p>
+        </p>
+    </li>
+
+    <li>
+        <p>Beispiel fuer eine zentralle Konfiguration in der Bridge fuer alle Devices <br/>
+                (wegen schlechter uebersicht und einer unnoetig grossen Menge eher nicht zu empfehlen):<br/>
+            <code>defmod mqttGeneric MQTT_GENERIC_BRIDGE <br/>
+                attr mqttGeneric IODev mqtt <br/>
+                attr mqttGeneric defaults sub:qos=2 pub:qos=0 retain=0 <br/>
+                attr mqttGeneric publish *:topic={"/haus/$device/$reading"} <br/></code></p>
+        </p>
+    </li>
+</ul>
+
+<p><b>Einschraenkungen:</b></p>
+
+<ul>
+      <li>Wenn mehrere Readings das selbe Topic abonieren, sind dabei keine unterschiedlichen QOS moeglich.</li>
+      <li>Wird in so einem Fall QOS ungleich 0 benoetigt, sollte dieser entweder fuer alle Readings gleich einzeln definiert werden,
+      oder allgemeinguetltig ueber Defaults. <br/>
+      Ansonsten wird beim Erstellen von Abonements der erst gefundene Wert verwendet. </li>
+      <li>Abonements werden nur erneuert, wenn sich das Topic aendert, QOS-Flag-Aenderung alleine wirkt sich daher erst nach einem Neustart aus.</li>
+</ul>
+
+<!--TODO-->
+<!--
+<p><b>Ideen:</b></p>
+<ul>
+  <li>global Subscribe</li>
+  <li>global excludes</li>
+  <li>QOS for subscribe (fertig?), defaults(qos, fertig?), alias mapping</li>
+  <li>resendOnConnect (no, first, last, all)</li>
+  <li>resendInterval (no/0, x min)</li>
+  <li>templates (template in der Bridge, mqttUseTemplate in Device)</li>
+</ul>
+-->
+</ul>
+
 =end html_DE
 =cut
