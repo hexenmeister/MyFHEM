@@ -31,21 +31,24 @@ myCtrlAutomation_Undef($$)
 # --- Notifier- und Actions-Fn ------------------------------------------------
 # wird beim Start von FHEM aufgerufen (notify global:INITIALIZED)
 sub notifierFn_FHEM_Start() {
-	sendMeJabberMessage('Service Message: FHEM gestartet');
+	#sendMeJabberMessage('Service Message: FHEM gestartet');
+	sendMeMessageToDefaultChannel('Service Message: FHEM gestartet');
 	setAllAutomatikControlsDefaults();
 	# ggf. Weiteres...
 }
 
 # wird beim Shutdown aufgrufen (notify global:SHUTDOWN)
 sub notifierFn_FHEM_Shutdown() {
-	sendMeJabberMessage('Service Message: FHEM faehrt herunter');
+	#sendMeJabberMessage('Service Message: FHEM faehrt herunter');
+	sendMeMessageToDefaultChannel('Service Message: FHEM faehrt herunter');
 	# ggf. Weiteres...
 }
 
 # Methode für Benachrichtigung beim Klingeln an der Haustuer
 sub actHaustuerKlingel() {
 	#TODO: HAL
-	sendMeJabberMessage("Tuerklingel am ".ReadingsTimestamp('KlingelIn','reading',''));
+	#sendMeJabberMessage("Tuerklingel am ".ReadingsTimestamp('KlingelIn','reading',''));
+	sendMeMessageToDefaultChannel("Tuerklingel am ".ReadingsTimestamp('KlingelIn','reading',''));
 	voiceDoorbell();
 }
 
