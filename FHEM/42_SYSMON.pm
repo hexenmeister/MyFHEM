@@ -27,7 +27,7 @@
 #
 ################################################################
 
-# $Id: 42_SYSMON.pm 15910 2018-01-16 23:07:56Z hexenmeister $
+# $Id: 42_SYSMON.pm 17227 2018-08-29 19:58:18Z hexenmeister $
 
 package main;
 
@@ -42,7 +42,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.3.3";
+my $VERSION = "2.3.4";
 
 use constant {
   PERL_VERSION    => "perl_version",
