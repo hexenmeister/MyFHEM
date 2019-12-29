@@ -671,7 +671,7 @@ sub GSD_Parse($$) {
       readingsBulkUpdate($dev_hash, $mId_miss_rName, $msg_id_missing_cnt);
     }
     
-    my @readings_keys=keys($dMap->{READINGS});
+    my @readings_keys=keys( %{$dMap->{READINGS}} );
     if(scalar(@readings_keys)>0) {
       foreach my $reading (sort @readings_keys) {
         my $val = $dMap->{READINGS}->{$reading};
